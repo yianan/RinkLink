@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply text-slate-900 antialiased;
+    background:
+      radial-gradient(1100px circle at 12% 8%, rgba(124, 58, 237, 0.14), transparent 55%),
+      radial-gradient(900px circle at 85% 18%, rgba(56, 189, 248, 0.12), transparent 50%),
+      linear-gradient(to bottom right, #f8fafc, #ffffff, #f5f3ff);
+  }
+
+  ::selection {
+    @apply bg-brand-200 text-slate-900;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+  }
+
+  .page-title {
+    @apply text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-slate-600;
+  }
+
+  .rl-tooltip {
+    position: relative;
+  }
+
+  .rl-tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 10px);
+    transform: translateX(-50%) translateY(2px);
+    padding: 6px 10px;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.92);
+    color: white;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease, transform 120ms ease;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+    z-index: 60;
+  }
+
+  .rl-tooltip::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 2px);
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(15, 23, 42, 0.92);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+    z-index: 60;
+  }
+
+  .rl-tooltip:focus-visible::after,
+  .rl-tooltip:focus-visible::before {
+    opacity: 1;
+  }
+
+  .rl-tooltip:focus-visible::after {
+    transform: translateX(-50%) translateY(0);
+  }
+}

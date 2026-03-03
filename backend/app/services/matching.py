@@ -1,13 +1,13 @@
 from sqlalchemy.orm import Session
 
-from ..models import Team, ScheduleEntry, Association
+from ..models import Team, ScheduleEntry, Association, GameProposal
 from ..schemas.search import AutoMatchResult
 from .distance import get_distance
 
 
 def find_auto_matches(db: Session, team_id: str) -> list[AutoMatchResult]:
     """Find schedule entries from other teams that align on the same date
-    where one side is home and the other is away, both open."""
+    where one side is home and the other is away, both open, and times match exactly."""
     team = db.get(Team, team_id)
     if not team:
         return []
@@ -21,6 +21,8 @@ def find_auto_matches(db: Session, team_id: str) -> list[AutoMatchResult]:
 
     results: list[AutoMatchResult] = []
     for entry in my_entries:
+        if entry.time is None:
+            continue
         # Find opposite type on same date from other teams in same age group
         opposite_type = "away" if entry.entry_type == "home" else "home"
         matches = (
@@ -28,6 +30,7 @@ def find_auto_matches(db: Session, team_id: str) -> list[AutoMatchResult]:
             .join(Team, ScheduleEntry.team_id == Team.id)
             .filter(
                 ScheduleEntry.date == entry.date,
+                ScheduleEntry.time == entry.time,
                 ScheduleEntry.entry_type == opposite_type,
                 ScheduleEntry.status == "open",
                 Team.id != team_id,
@@ -68,5 +71,36 @@ def find_auto_matches(db: Session, team_id: str) -> list[AutoMatchResult]:
                 away_time=away_entry.time,
                 distance_miles=dist,
             ))
+
+    if results:
+        entry_ids: set[str] = set()
+        for r in results:
+            entry_ids.add(r.home_entry_id)
+            entry_ids.add(r.away_entry_id)
+
+        proposals = (
+            db.query(GameProposal)
+            .filter(
+                GameProposal.status.in_(("proposed", "accepted")),
+                GameProposal.home_schedule_entry_id.in_(entry_ids),
+                GameProposal.away_schedule_entry_id.in_(entry_ids),
+            )
+            .order_by(GameProposal.updated_at.desc())
+            .all()
+        )
+        existing_by_pair: dict[str, GameProposal] = {}
+        for p in proposals:
+            key = "|".join(sorted([p.home_schedule_entry_id, p.away_schedule_entry_id]))
+            if key not in existing_by_pair:
+                existing_by_pair[key] = p
+
+        for r in results:
+            key = "|".join(sorted([r.home_entry_id, r.away_entry_id]))
+            p = existing_by_pair.get(key)
+            if not p:
+                continue
+            r.has_existing_proposal = True
+            r.existing_proposal_id = p.id
+            r.existing_proposal_status = p.status
 
     return results

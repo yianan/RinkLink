@@ -7,7 +7,27 @@ from .schedule_entry import (
     ScheduleUploadPreview,
     ScheduleConfirmUpload,
 )
-from .game_proposal import ProposalCreate, ProposalOut
+from .game_proposal import ProposalCreate, ProposalOut, ProposalRescheduleCreate
+from .game import GameOut, GameUpdate, WeeklyConfirmUpdate
+from .notification import NotificationOut
+from .player import (
+    PlayerCreate,
+    PlayerUpdate,
+    PlayerOut,
+    PlayerUploadPreview,
+    PlayerConfirmUpload,
+)
+from .scoresheet import (
+    GameScoresheetOut,
+    UpsertPlayerStats,
+    GamePenaltyCreate,
+    UpsertGoalieStats,
+    GameSignatureCreate,
+    GamePlayerStatOut,
+    GamePenaltyOut,
+    GameGoalieStatOut,
+    GameSignatureOut,
+)
 from .search import OpponentResult, AutoMatchResult
 from .rink import (
     RinkCreate, RinkUpdate, RinkOut,
@@ -20,7 +40,14 @@ __all__ = [
     "TeamCreate", "TeamUpdate", "TeamOut",
     "ScheduleEntryCreate", "ScheduleEntryUpdate", "ScheduleEntryOut",
     "ScheduleUploadPreview", "ScheduleConfirmUpload",
-    "ProposalCreate", "ProposalOut",
+    "ProposalCreate", "ProposalOut", "ProposalRescheduleCreate",
+    "GameOut", "GameUpdate", "WeeklyConfirmUpdate",
+    "NotificationOut",
+    "PlayerCreate", "PlayerUpdate", "PlayerOut",
+    "PlayerUploadPreview", "PlayerConfirmUpload",
+    "GameScoresheetOut",
+    "UpsertPlayerStats", "GamePenaltyCreate", "UpsertGoalieStats", "GameSignatureCreate",
+    "GamePlayerStatOut", "GamePenaltyOut", "GameGoalieStatOut", "GameSignatureOut",
     "OpponentResult", "AutoMatchResult",
     "RinkCreate", "RinkUpdate", "RinkOut",
     "IceSlotCreate", "IceSlotUpdate", "IceSlotOut",

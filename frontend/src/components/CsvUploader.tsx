@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react';
-import {
-  Box, Button, Typography, Paper, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Alert, Chip,
-} from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { UploadCloud } from 'lucide-react';
 import { api } from '../api/client';
 import { ScheduleUploadPreview, ScheduleUploadRow } from '../types';
+import { cn } from '../lib/cn';
+import { Alert } from './ui/Alert';
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
+import { Card } from './ui/Card';
 
 interface Props {
   teamId: string;
@@ -53,90 +54,102 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
   };
 
   return (
-    <Box>
+    <div className="space-y-3">
       {!preview && (
-        <Paper
-          variant="outlined"
+        <div
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
-          sx={{
-            p: 4, textAlign: 'center', cursor: 'pointer',
-            bgcolor: dragOver ? 'action.hover' : 'background.paper',
-            border: '2px dashed', borderColor: dragOver ? 'primary.main' : 'divider',
-          }}
+          className={cn(
+            'rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors',
+            dragOver ? 'border-brand-500 bg-brand-50/60' : 'border-slate-200 bg-white',
+          )}
         >
-          <CloudUploadIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-          <Typography variant="body1" gutterBottom>
-            Drag & drop a CSV file here, or click to browse
-          </Typography>
-          <Button variant="contained" component="label" disabled={loading}>
-            Choose File
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+            <UploadCloud className="h-6 w-6" />
+          </div>
+          <div className="text-sm font-medium text-slate-900">Drag & drop a CSV file here</div>
+          <div className="mt-1 text-sm text-slate-600">or choose a file to preview before importing</div>
+
+          <div className="mt-5 flex items-center justify-center gap-2">
+            <Button type="button" variant="primary" disabled={loading} onClick={() => document.getElementById('schedule-csv-input')?.click()}>
+              Choose File
+            </Button>
             <input
+              id="schedule-csv-input"
               type="file"
               accept=".csv"
-              hidden
+              className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) handleFile(file);
               }}
             />
-          </Button>
-          <Typography variant="caption" display="block" sx={{ mt: 1, color: 'text.secondary' }}>
+          </div>
+
+          <div className="mt-3 text-xs text-slate-500">
             Expected columns: Date, Time, Home/Away (optional: Opponent, Location, Notes)
-          </Typography>
-        </Paper>
+          </div>
+        </div>
       )}
 
-      {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+      {error && <Alert variant="error">{error}</Alert>}
 
       {preview && (
-        <Box>
-          <Typography variant="h6" gutterBottom>
-            Preview ({preview.entries.length} entries)
-          </Typography>
+        <div className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold tracking-tight text-slate-900">
+                Preview <span className="text-slate-500">({preview.entries.length} entries)</span>
+              </div>
+              <div className="mt-1 text-sm text-slate-600">Confirm to add these entries to your schedule.</div>
+            </div>
+          </div>
           {preview.warnings.map((w, i) => (
-            <Alert key={i} severity="warning" sx={{ mb: 1 }}>{w}</Alert>
+            <Alert key={i} variant="warning">{w}</Alert>
           ))}
-          <TableContainer component={Paper} sx={{ maxHeight: 400, mb: 2 }}>
-            <Table size="small" stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Time</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Opponent</TableCell>
-                  <TableCell>Status</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {preview.entries.map((row: ScheduleUploadRow, i: number) => (
-                  <TableRow key={i}>
-                    <TableCell>{row.date}</TableCell>
-                    <TableCell>{row.time || '-'}</TableCell>
-                    <TableCell>
-                      <Chip label={row.entry_type} size="small"
-                        color={row.entry_type === 'home' ? 'success' : 'info'} />
-                    </TableCell>
-                    <TableCell>{row.opponent_name || '-'}</TableCell>
-                    <TableCell>
-                      <Chip label={row.status} size="small" variant="outlined" />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button variant="contained" onClick={handleConfirm} disabled={loading}>
+
+          <Card className="overflow-hidden">
+            <div className="max-h-[420px] overflow-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Time</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Opponent</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {preview.entries.map((row: ScheduleUploadRow, i: number) => (
+                    <tr key={i} className="bg-white">
+                      <td className="px-4 py-3 font-medium text-slate-900">{row.date}</td>
+                      <td className="px-4 py-3 text-slate-700">{row.time || '-'}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={row.entry_type === 'home' ? 'success' : 'info'}>{row.entry_type}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{row.opponent_name || '-'}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline">{row.status}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="primary" onClick={handleConfirm} disabled={loading}>
               Confirm Upload
             </Button>
-            <Button variant="outlined" onClick={() => setPreview(null)} disabled={loading}>
+            <Button type="button" variant="outline" onClick={() => setPreview(null)} disabled={loading}>
               Cancel
             </Button>
-          </Box>
-        </Box>
+          </div>
+        </div>
       )}
-    </Box>
+    </div>
   );
 }

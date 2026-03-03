@@ -36,6 +36,26 @@ export const api = {
   deleteTeam: (id: string) =>
     request<void>(`/teams/${id}`, { method: 'DELETE' }),
 
+  // Players / Roster
+  getPlayers: (teamId: string) => request<import('../types').Player[]>(`/teams/${teamId}/players`),
+  createPlayer: (teamId: string, data: Partial<import('../types').Player>) =>
+    request<import('../types').Player>(`/teams/${teamId}/players`, { method: 'POST', body: JSON.stringify(data) }),
+  updatePlayer: (id: string, data: Partial<import('../types').Player>) =>
+    request<import('../types').Player>(`/players/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePlayer: (id: string) =>
+    request<void>(`/players/${id}`, { method: 'DELETE' }),
+  uploadRoster: async (teamId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${BASE_URL}/teams/${teamId}/players/upload`, { method: 'POST', body: formData });
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+    return res.json() as Promise<import('../types').PlayerUploadPreview>;
+  },
+  confirmRosterUpload: (teamId: string, entries: import('../types').PlayerUploadRow[], replace_existing: boolean) =>
+    request<import('../types').Player[]>(`/teams/${teamId}/players/confirm-upload`, {
+      method: 'POST', body: JSON.stringify({ entries, replace_existing }),
+    }),
+
   // Schedule
   getSchedule: (teamId: string, params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
@@ -70,7 +90,18 @@ export const api = {
     request<import('../types').AutoMatchResult[]>(`/search/auto-matches?team_id=${teamId}`),
 
   // Proposals
-  createProposal: (data: Partial<import('../types').GameProposal>) =>
+  createProposal: (data: {
+    home_team_id: string;
+    away_team_id: string;
+    home_schedule_entry_id: string;
+    away_schedule_entry_id: string;
+    proposed_date: string;
+    proposed_time?: string | null;
+    proposed_by_team_id: string;
+    ice_slot_id?: string | null;
+    rink_id?: string | null;
+    message?: string | null;
+  }) =>
     request<import('../types').GameProposal>('/proposals', { method: 'POST', body: JSON.stringify(data) }),
   getProposals: (teamId: string, params?: Record<string, string>) => {
     const qs = params ? '&' + new URLSearchParams(params).toString() : '';
@@ -82,6 +113,61 @@ export const api = {
     request<import('../types').GameProposal>(`/proposals/${id}/decline`, { method: 'PATCH' }),
   cancelProposal: (id: string) =>
     request<import('../types').GameProposal>(`/proposals/${id}/cancel`, { method: 'PATCH' }),
+  rescheduleProposal: (
+    id: string,
+    data: {
+      proposed_date: string;
+      proposed_time?: string | null;
+      proposed_by_team_id: string;
+      ice_slot_id?: string | null;
+      rink_id?: string | null;
+      message?: string | null;
+    },
+  ) =>
+    request<import('../types').GameProposal>(`/proposals/${id}/reschedule`, { method: 'POST', body: JSON.stringify(data) }),
+
+  // Games
+  getGames: (teamId: string, params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<import('../types').Game[]>(`/teams/${teamId}/games${qs}`);
+  },
+  getGame: (id: string) => request<import('../types').Game>(`/games/${id}`),
+  updateGame: (id: string, data: Partial<import('../types').Game>) =>
+    request<import('../types').Game>(`/games/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  weeklyConfirmGame: (id: string, team_id: string, confirmed: boolean) =>
+    request<import('../types').Game>(`/games/${id}/weekly-confirm`, { method: 'PATCH', body: JSON.stringify({ team_id, confirmed }) }),
+
+  // Scoresheet
+  getScoresheet: (gameId: string) =>
+    request<import('../types').GameScoresheet>(`/games/${gameId}/scoresheet`),
+  upsertPlayerStats: (gameId: string, stats: import('../types').GamePlayerStatUpsert[]) =>
+    request<import('../types').GamePlayerStat[]>(`/games/${gameId}/player-stats`, {
+      method: 'PUT',
+      body: JSON.stringify({ stats }),
+    }),
+  listPenalties: (gameId: string) =>
+    request<import('../types').GamePenalty[]>(`/games/${gameId}/penalties`),
+  createPenalty: (gameId: string, data: Partial<import('../types').GamePenalty>) =>
+    request<import('../types').GamePenalty>(`/games/${gameId}/penalties`, { method: 'POST', body: JSON.stringify(data) }),
+  deletePenalty: (id: string) =>
+    request<void>(`/game-penalties/${id}`, { method: 'DELETE' }),
+  upsertGoalieStats: (gameId: string, stats: import('../types').GameGoalieStatUpsert[]) =>
+    request<import('../types').GameGoalieStat[]>(`/games/${gameId}/goalie-stats`, {
+      method: 'PUT',
+      body: JSON.stringify({ stats }),
+    }),
+  listSignatures: (gameId: string) =>
+    request<import('../types').GameSignature[]>(`/games/${gameId}/signatures`),
+  signGame: (gameId: string, data: Partial<import('../types').GameSignature>) =>
+    request<import('../types').GameSignature>(`/games/${gameId}/signatures`, { method: 'POST', body: JSON.stringify(data) }),
+
+  // Notifications
+  getNotifications: (teamId: string, params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<import('../types').Notification[]>(`/teams/${teamId}/notifications${qs}`);
+  },
+  markNotificationRead: (id: string) =>
+    request<import('../types').Notification>(`/notifications/${id}/read`, { method: 'PATCH' }),
 
   // Rinks
   getRinks: () => request<import('../types').Rink[]>('/rinks'),

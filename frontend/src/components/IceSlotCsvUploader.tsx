@@ -1,11 +1,11 @@
 import { useState, useCallback } from 'react';
-import {
-  Box, Typography, Paper, Button, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Alert, CircularProgress,
-} from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { Loader2, UploadCloud } from 'lucide-react';
 import { api } from '../api/client';
 import { IceSlotUploadPreview } from '../types';
+import { cn } from '../lib/cn';
+import { Alert } from './ui/Alert';
+import { Button } from './ui/Button';
+import { Card } from './ui/Card';
 
 interface Props {
   rinkId: string;
@@ -53,83 +53,110 @@ export default function IceSlotCsvUploader({ rinkId, onConfirmed }: Props) {
   };
 
   return (
-    <Box>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+    <div className="space-y-3">
+      {error && <Alert variant="error">{error}</Alert>}
 
       {!preview && (
-        <Paper
-          sx={{
-            p: 4, textAlign: 'center', border: '2px dashed',
-            borderColor: dragOver ? 'primary.main' : 'grey.300',
-            bgcolor: dragOver ? 'action.hover' : 'background.paper',
-            cursor: 'pointer',
-          }}
+        <div
+          className={cn(
+            'rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors',
+            dragOver ? 'border-brand-500 bg-brand-50/60' : 'border-slate-200 bg-white',
+          )}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
         >
           {loading ? (
-            <CircularProgress />
+            <div className="flex items-center justify-center gap-2 text-sm text-slate-700">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Uploading…
+            </div>
           ) : (
             <>
-              <CloudUploadIcon sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
-              <Typography gutterBottom>Drag & drop a CSV file here</Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Expected columns: Date, Start Time, End Time, Notes
-              </Typography>
-              <Button variant="outlined" component="label" sx={{ mt: 1 }}>
-                Browse Files
-                <input type="file" accept=".csv" hidden
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
-              </Button>
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                <UploadCloud className="h-6 w-6" />
+              </div>
+              <div className="text-sm font-medium text-slate-900">Drag & drop a CSV file here</div>
+              <div className="mt-1 text-sm text-slate-600">Expected columns: Date, Start Time, End Time, Notes</div>
+
+              <div className="mt-5 flex items-center justify-center">
+                <Button type="button" variant="outline" onClick={() => document.getElementById('ice-slot-csv-input')?.click()}>
+                  Browse Files
+                </Button>
+                <input
+                  id="ice-slot-csv-input"
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFile(f);
+                  }}
+                />
+              </div>
             </>
           )}
-        </Paper>
+        </div>
       )}
 
       {preview && (
-        <>
+        <div className="space-y-3">
           {preview.warnings.length > 0 && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              {preview.warnings.map((w, i) => <div key={i}>{w}</div>)}
+            <Alert variant="warning">
+              <ul className="list-disc space-y-1 pl-5">
+                {preview.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
             </Alert>
           )}
 
-          <Typography variant="subtitle1" gutterBottom>
-            Preview: {preview.entries.length} ice slot(s)
-          </Typography>
+          <div className="text-sm font-semibold tracking-tight text-slate-900">
+            Preview <span className="text-slate-500">({preview.entries.length} ice slot(s))</span>
+          </div>
 
-          <TableContainer component={Paper} sx={{ mb: 2 }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Start Time</TableCell>
-                  <TableCell>End Time</TableCell>
-                  <TableCell>Notes</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {preview.entries.map((e, i) => (
-                  <TableRow key={i}>
-                    <TableCell>{e.date}</TableCell>
-                    <TableCell>{e.start_time}</TableCell>
-                    <TableCell>{e.end_time || '-'}</TableCell>
-                    <TableCell>{e.notes || '-'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <Card className="overflow-hidden">
+            <div className="overflow-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Start</th>
+                    <th className="px-4 py-3">End</th>
+                    <th className="px-4 py-3">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {preview.entries.map((e, i) => (
+                    <tr key={i} className="bg-white">
+                      <td className="px-4 py-3 font-medium text-slate-900">{e.date}</td>
+                      <td className="px-4 py-3 text-slate-700">{e.start_time}</td>
+                      <td className="px-4 py-3 text-slate-700">{e.end_time || '-'}</td>
+                      <td className="px-4 py-3 text-slate-700">{e.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
 
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button variant="contained" onClick={handleConfirm} disabled={loading || preview.entries.length === 0}>
-              {loading ? <CircularProgress size={20} /> : `Confirm & Add ${preview.entries.length} Slot(s)`}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="primary" onClick={handleConfirm} disabled={loading || preview.entries.length === 0}>
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Working…
+                </>
+              ) : (
+                `Confirm & Add ${preview.entries.length} Slot(s)`
+              )}
             </Button>
-            <Button onClick={() => setPreview(null)}>Cancel</Button>
-          </Box>
-        </>
+            <Button type="button" variant="outline" onClick={() => setPreview(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
       )}
-    </Box>
+    </div>
   );
 }
