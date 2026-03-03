@@ -1,16 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Box, Typography, Paper, Button, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  IconButton,
-} from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Map, Pencil, Trash2, Utensils } from 'lucide-react';
 import { api } from '../api/client';
 import { Rink } from '../types';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
 
 const emptyForm = { name: '', address: '', city: '', state: '', zip_code: '', phone: '', contact_email: '' };
+
+function mapsQueryUrl(query: string) {
+  const url = new URL('https://www.google.com/maps/search/');
+  url.searchParams.set('api', '1');
+  url.searchParams.set('query', query);
+  return url.toString();
+}
 
 export default function RinkListPage() {
   const navigate = useNavigate();
@@ -51,74 +56,143 @@ export default function RinkListPage() {
   };
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h5">Rinks</Typography>
-        <Button variant="contained" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="page-title">Rinks</div>
+          <div className="page-subtitle">Manage rinks and their ice slots.</div>
+        </div>
+        <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
           Add Rink
         </Button>
-      </Box>
+      </div>
 
-      <TableContainer component={Paper}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Address</TableCell>
-              <TableCell>City</TableCell>
-              <TableCell>Phone</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell width={140}>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rinks.map((r) => (
-              <TableRow key={r.id} hover sx={{ cursor: 'pointer' }}
-                onClick={() => navigate(`/rinks/${r.id}/slots`)}>
-                <TableCell>{r.name}</TableCell>
-                <TableCell>{r.address}</TableCell>
-                <TableCell>{r.city}, {r.state} {r.zip_code}</TableCell>
-                <TableCell>{r.phone}</TableCell>
-                <TableCell>{r.contact_email}</TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <IconButton size="small" onClick={() => handleEdit(r)}><EditIcon fontSize="small" /></IconButton>
-                  <IconButton size="small" onClick={() => handleDelete(r.id)}><DeleteIcon fontSize="small" /></IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-            {rinks.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
-                  No rinks yet. Add one or seed demo data.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <Card className="overflow-hidden">
+        <div className="overflow-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+              <tr>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Address</th>
+                <th className="px-4 py-3">City</th>
+                <th className="px-4 py-3">Phone</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 bg-white">
+              {rinks.map((r) => (
+                <tr
+                  key={r.id}
+                  className="cursor-pointer hover:bg-slate-50/60"
+                  onClick={() => navigate(`/rinks/${r.id}/slots`)}
+                >
+                  <td className="px-4 py-3 font-medium text-slate-900">{r.name}</td>
+                  <td className="px-4 py-3 text-slate-700">{r.address}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {r.city}, {r.state} {r.zip_code}
+                  </td>
+                  <td className="px-4 py-3 text-slate-700">{r.phone}</td>
+                  <td className="px-4 py-3 text-slate-700">{r.contact_email}</td>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          const label = [r.name, r.address, `${r.city}, ${r.state} ${r.zip_code}`].filter(Boolean).join(', ');
+                          window.open(mapsQueryUrl(`restaurants near ${label}`), '_blank', 'noopener,noreferrer');
+                        }}
+                        aria-label="Restaurants nearby"
+                      >
+                        <Utensils className="h-4 w-4 text-slate-600" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          const label = [r.name, r.address, `${r.city}, ${r.state} ${r.zip_code}`].filter(Boolean).join(', ');
+                          window.open(mapsQueryUrl(`things to do near ${label}`), '_blank', 'noopener,noreferrer');
+                        }}
+                        aria-label="Things to do nearby"
+                      >
+                        <Map className="h-4 w-4 text-slate-600" />
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(r)} aria-label="Edit">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(r.id)} aria-label="Delete">
+                        <Trash2 className="h-4 w-4 text-rose-600" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
 
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editId ? 'Edit' : 'Add'} Rink</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <TextField label="Name" value={form.name} onChange={(e) => setField('name', e.target.value)} required fullWidth />
-            <TextField label="Address" value={form.address} onChange={(e) => setField('address', e.target.value)} fullWidth />
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <TextField label="City" value={form.city} onChange={(e) => setField('city', e.target.value)} fullWidth />
-              <TextField label="State" value={form.state} onChange={(e) => setField('state', e.target.value)} sx={{ width: 100 }} />
-              <TextField label="Zip" value={form.zip_code} onChange={(e) => setField('zip_code', e.target.value)} sx={{ width: 120 }} />
-            </Box>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <TextField label="Phone" value={form.phone} onChange={(e) => setField('phone', e.target.value)} fullWidth />
-              <TextField label="Contact Email" value={form.contact_email} onChange={(e) => setField('contact_email', e.target.value)} fullWidth />
-            </Box>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSave} disabled={!form.name}>Save</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+              {rinks.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600">
+                    No rinks yet. Add one or seed demo data.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`${editId ? 'Edit' : 'Add'} Rink`}
+        footer={
+          <>
+            <Button type="button" onClick={handleSave} disabled={!form.name}>
+              Save
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Name</label>
+            <Input value={form.name} onChange={(e) => setField('name', e.target.value)} required />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Address</label>
+            <Input value={form.address} onChange={(e) => setField('address', e.target.value)} />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="sm:col-span-1">
+              <label className="mb-1 block text-xs font-medium text-slate-600">City</label>
+              <Input value={form.city} onChange={(e) => setField('city', e.target.value)} />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="mb-1 block text-xs font-medium text-slate-600">State</label>
+              <Input value={form.state} onChange={(e) => setField('state', e.target.value)} />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="mb-1 block text-xs font-medium text-slate-600">Zip</label>
+              <Input value={form.zip_code} onChange={(e) => setField('zip_code', e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Phone</label>
+              <Input value={form.phone} onChange={(e) => setField('phone', e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Contact Email</label>
+              <Input value={form.contact_email} onChange={(e) => setField('contact_email', e.target.value)} />
+            </div>
+          </div>
+        </div>
+      </Modal>
+    </div>
   );
 }

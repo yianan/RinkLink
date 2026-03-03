@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
-import {
-  Box, Typography, Button, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Paper, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField, IconButton, MenuItem,
-} from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Pencil, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import { Team, Association } from '../types';
 import { useTeam } from '../context/TeamContext';
 import AgeLevelSelect from '../components/AgeLevelSelect';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
+import { Select } from '../components/ui/Select';
 
 const emptyForm = {
   association_id: '', name: '', age_group: '', level: '',
@@ -71,76 +70,158 @@ export default function TeamListPage() {
   const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h5">Teams</Typography>
-        <Button variant="contained" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="page-title">Teams</div>
+          <div className="page-subtitle">Create teams and manage contact details.</div>
+        </div>
+        <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
           Add Team
         </Button>
-      </Box>
+      </div>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Association</TableCell>
-              <TableCell>Age</TableCell>
-              <TableCell>Level</TableCell>
-              <TableCell>Ranking</TableCell>
-              <TableCell>Manager</TableCell>
-              <TableCell width={100}>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {teams.map((t) => (
-              <TableRow key={t.id}>
-                <TableCell>{t.name}</TableCell>
-                <TableCell>{t.association_name}</TableCell>
-                <TableCell>{t.age_group}</TableCell>
-                <TableCell>{t.level}</TableCell>
-                <TableCell>{t.myhockey_ranking ?? '-'}</TableCell>
-                <TableCell>{t.manager_name}</TableCell>
-                <TableCell>
-                  <IconButton size="small" onClick={() => handleEdit(t)}><EditIcon /></IconButton>
-                  <IconButton size="small" onClick={() => handleDelete(t.id)}><DeleteIcon /></IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <Card className="overflow-hidden">
+        <div className="overflow-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+              <tr>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Association</th>
+                <th className="px-4 py-3">Age</th>
+                <th className="px-4 py-3">Level</th>
+                <th className="px-4 py-3">Ranking</th>
+                <th className="px-4 py-3">Manager</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 bg-white">
+              {teams.map((t) => (
+                <tr key={t.id} className="hover:bg-slate-50/60">
+                  <td className="px-4 py-3 font-medium text-slate-900">{t.name}</td>
+                  <td className="px-4 py-3 text-slate-700">{t.association_name}</td>
+                  <td className="px-4 py-3 text-slate-700">{t.age_group}</td>
+                  <td className="px-4 py-3 text-slate-700">{t.level}</td>
+                  <td className="px-4 py-3 text-slate-700">{t.myhockey_ranking ?? '-'}</td>
+                  <td className="px-4 py-3 text-slate-700">{t.manager_name}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-1">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(t)} aria-label="Edit">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(t.id)} aria-label="Delete">
+                        <Trash2 className="h-4 w-4 text-rose-600" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
 
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editId ? 'Edit' : 'Add'} Team</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
-          <TextField select label="Association" value={form.association_id}
-            onChange={(e) => setField('association_id', e.target.value)} required disabled={!!editId}>
-            {associations.map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
-          </TextField>
-          <TextField label="Team Name" value={form.name} onChange={(e) => setField('name', e.target.value)} required />
-          <AgeLevelSelect ageGroup={form.age_group} level={form.level}
+              {teams.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600">
+                    No teams yet. Add one or seed demo data.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`${editId ? 'Edit' : 'Add'} Team`}
+        footer={
+          <>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={!form.name || !form.association_id || !form.age_group || !form.level}
+            >
+              Save
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Association</label>
+            <Select
+              value={form.association_id}
+              onChange={(e) => setField('association_id', e.target.value)}
+              required
+              disabled={!!editId}
+            >
+              <option value="" disabled>
+                Select association…
+              </option>
+              {associations.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Team Name</label>
+            <Input value={form.name} onChange={(e) => setField('name', e.target.value)} required />
+          </div>
+
+          <AgeLevelSelect
+            ageGroup={form.age_group}
+            level={form.level}
             onAgeGroupChange={(v) => setField('age_group', v)}
-            onLevelChange={(v) => setField('level', v)} />
-          <TextField label="Manager Name" value={form.manager_name} onChange={(e) => setField('manager_name', e.target.value)} />
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField label="Email" value={form.manager_email} onChange={(e) => setField('manager_email', e.target.value)} fullWidth />
-            <TextField label="Phone" value={form.manager_phone} onChange={(e) => setField('manager_phone', e.target.value)} fullWidth />
-          </Box>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField label="Rink City" value={form.rink_city} onChange={(e) => setField('rink_city', e.target.value)} fullWidth />
-            <TextField label="State" value={form.rink_state} onChange={(e) => setField('rink_state', e.target.value)} sx={{ width: 80 }} />
-            <TextField label="Zip" value={form.rink_zip} onChange={(e) => setField('rink_zip', e.target.value)} sx={{ width: 120 }} />
-          </Box>
-          <TextField label="MyHockey Ranking" type="number" value={form.myhockey_ranking}
-            onChange={(e) => setField('myhockey_ranking', e.target.value)} />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSave}
-            disabled={!form.name || !form.association_id || !form.age_group || !form.level}>Save</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+            onLevelChange={(v) => setField('level', v)}
+          />
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Manager Name</label>
+            <Input value={form.manager_name} onChange={(e) => setField('manager_name', e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Email</label>
+              <Input value={form.manager_email} onChange={(e) => setField('manager_email', e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Phone</label>
+              <Input value={form.manager_phone} onChange={(e) => setField('manager_phone', e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="sm:col-span-1">
+              <label className="mb-1 block text-xs font-medium text-slate-600">Rink City</label>
+              <Input value={form.rink_city} onChange={(e) => setField('rink_city', e.target.value)} />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="mb-1 block text-xs font-medium text-slate-600">State</label>
+              <Input value={form.rink_state} onChange={(e) => setField('rink_state', e.target.value)} />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="mb-1 block text-xs font-medium text-slate-600">Zip</label>
+              <Input value={form.rink_zip} onChange={(e) => setField('rink_zip', e.target.value)} />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">MyHockey Ranking</label>
+            <Input
+              type="number"
+              inputMode="numeric"
+              value={form.myhockey_ranking}
+              onChange={(e) => setField('myhockey_ranking', e.target.value)}
+            />
+          </div>
+        </div>
+      </Modal>
+    </div>
   );
 }

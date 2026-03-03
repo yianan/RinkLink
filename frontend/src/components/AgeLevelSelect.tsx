@@ -1,22 +1,19 @@
-import { TextField, MenuItem, Box } from '@mui/material';
+import { Input } from './ui/Input';
+import { Select } from './ui/Select';
 
-const AGE_GROUPS = ['19U', '18U', '16U', '15U', '14U', '13U', '12U', '11U', '10U', '9U', '8U', '7U', '6U'];
+const STANDARD_AGE_GROUPS = ['19U', '16U', '14U', '12U', '10U', '8U', '6U'];
 
-const LEVELS_BY_AGE: Record<string, string[]> = {
-  '19U': ['AAA', 'AA', 'A', 'B'],
-  '18U': ['AAA', 'AA', 'A', 'B'],
-  '16U': ['AAA', 'AA', 'A', 'B'],
-  '15U': ['AAA', 'AA', 'A', 'B'],
-  '14U': ['AAA', 'AA', 'A', 'B'],
-  '13U': ['AAA', 'AA', 'A', 'B'],
-  '12U': ['AAA', 'AA', 'A', 'B'],
-  '11U': ['AA', 'A', 'B'],
-  '10U': ['AA', 'A', 'B'],
-  '9U': ['A', 'B'],
-  '8U': ['A', 'B'],
-  '7U': ['A', 'B'],
-  '6U': ['A', 'B'],
-};
+const LEVELS_10U_PLUS = ['AAA', 'AA', 'A', 'B', 'C', 'Rec'];
+const LEVELS_6U_8U = ['Beginner', 'Beginner/Intermediate', 'Intermediate', 'Intermediate/Advanced', 'Advanced'];
+
+const CUSTOM = '__custom__';
+
+function parseAgeNumber(ageGroup: string) {
+  const m = ageGroup.match(/(\\d+)/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
 
 interface Props {
   ageGroup: string;
@@ -26,38 +23,91 @@ interface Props {
 }
 
 export default function AgeLevelSelect({ ageGroup, level, onAgeGroupChange, onLevelChange }: Props) {
-  const levels = LEVELS_BY_AGE[ageGroup] || [];
+  const isCustomAge = !!ageGroup && !STANDARD_AGE_GROUPS.includes(ageGroup);
+  const ageSelectValue = isCustomAge ? CUSTOM : ageGroup;
+
+  const ageNumber = parseAgeNumber(ageGroup);
+  const isMite = ageNumber != null ? ageNumber <= 8 : ageGroup === '6U' || ageGroup === '8U';
+  const standardLevels = !ageGroup ? [] : isMite ? LEVELS_6U_8U : LEVELS_10U_PLUS;
+
+  const isCustomLevel = !!level && !standardLevels.includes(level);
+  const levelSelectValue = isCustomLevel ? CUSTOM : level;
 
   return (
-    <Box sx={{ display: 'flex', gap: 2 }}>
-      <TextField
-        select
-        label="Age Group"
-        value={ageGroup}
-        onChange={(e) => {
-          onAgeGroupChange(e.target.value);
-          onLevelChange('');
-        }}
-        fullWidth
-        required
-      >
-        {AGE_GROUPS.map((ag) => (
-          <MenuItem key={ag} value={ag}>{ag}</MenuItem>
-        ))}
-      </TextField>
-      <TextField
-        select
-        label="Level"
-        value={level}
-        onChange={(e) => onLevelChange(e.target.value)}
-        fullWidth
-        required
-        disabled={!ageGroup}
-      >
-        {levels.map((l) => (
-          <MenuItem key={l} value={l}>{l}</MenuItem>
-        ))}
-      </TextField>
-    </Box>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div>
+        <label className="mb-1 block text-xs font-medium text-slate-600">Age Group</label>
+        <Select
+          value={ageSelectValue}
+          required
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === CUSTOM) {
+              if (!isCustomAge) onAgeGroupChange('');
+            } else {
+              onAgeGroupChange(v);
+            }
+            onLevelChange('');
+          }}
+        >
+          <option value="" disabled>
+            Select age…
+          </option>
+          {STANDARD_AGE_GROUPS.map((ag) => (
+            <option key={ag} value={ag}>
+              {ag}
+            </option>
+          ))}
+          <option value={CUSTOM}>Custom…</option>
+        </Select>
+
+        {ageSelectValue === CUSTOM && (
+          <div className="mt-2">
+            <Input
+              value={ageGroup}
+              onChange={(e) => onAgeGroupChange(e.target.value)}
+              placeholder="Custom age group (e.g., 18U)"
+            />
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label className="mb-1 block text-xs font-medium text-slate-600">Level</label>
+        <Select
+          value={levelSelectValue}
+          required
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === CUSTOM) {
+              if (!isCustomLevel) onLevelChange('');
+            } else {
+              onLevelChange(v);
+            }
+          }}
+          disabled={!ageGroup}
+        >
+          <option value="" disabled>
+            Select level…
+          </option>
+          {standardLevels.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+          <option value={CUSTOM}>Custom…</option>
+        </Select>
+
+        {levelSelectValue === CUSTOM && (
+          <div className="mt-2">
+            <Input
+              value={level}
+              onChange={(e) => onLevelChange(e.target.value)}
+              placeholder="Custom level"
+            />
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

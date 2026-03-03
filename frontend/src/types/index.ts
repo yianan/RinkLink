@@ -78,6 +78,16 @@ export interface GameProposal {
   away_team_name: string | null;
   home_team_association: string | null;
   away_team_association: string | null;
+  rink_name: string | null;
+  rink_address: string | null;
+  rink_city: string | null;
+  rink_state: string | null;
+  rink_zip: string | null;
+  ice_slot_date: string | null;
+  ice_slot_start_time: string | null;
+  ice_slot_end_time: string | null;
+  ice_slot_notes: string | null;
+  location_label: string | null;
 }
 
 export interface OpponentResult {
@@ -92,6 +102,9 @@ export interface OpponentResult {
   entry_date: string;
   entry_time: string | null;
   entry_type: string;
+  has_existing_proposal: boolean;
+  existing_proposal_id: string | null;
+  existing_proposal_status: string | null;
 }
 
 export interface Rink {
@@ -146,4 +159,141 @@ export interface AutoMatchResult {
   home_time: string | null;
   away_time: string | null;
   distance_miles: number | null;
+  has_existing_proposal: boolean;
+  existing_proposal_id: string | null;
+  existing_proposal_status: string | null;
+}
+
+export interface Player {
+  id: string;
+  team_id: string;
+  first_name: string;
+  last_name: string;
+  jersey_number: number | null;
+  position: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlayerUploadRow {
+  first_name: string;
+  last_name: string;
+  jersey_number: number | null;
+  position: string | null;
+}
+
+export interface PlayerUploadPreview {
+  entries: PlayerUploadRow[];
+  warnings: string[];
+}
+
+export interface Game {
+  id: string;
+  home_team_id: string;
+  away_team_id: string;
+  home_schedule_entry_id: string | null;
+  away_schedule_entry_id: string | null;
+  proposal_id: string | null;
+  ice_slot_id: string | null;
+  date: string;
+  time: string | null;
+  status: string;
+  home_weekly_confirmed: boolean;
+  away_weekly_confirmed: boolean;
+  home_score: number | null;
+  away_score: number | null;
+  created_at: string;
+  updated_at: string;
+  home_team_name: string | null;
+  away_team_name: string | null;
+  home_association_name: string | null;
+  away_association_name: string | null;
+  rink_name: string | null;
+  rink_address: string | null;
+  rink_city: string | null;
+  rink_state: string | null;
+  rink_zip: string | null;
+  location_label: string | null;
+}
+
+export interface Notification {
+  id: string;
+  team_id: string;
+  notif_type: string;
+  title: string;
+  message: string | null;
+  week_start: string | null;
+  read_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GamePlayerStat {
+  id: string;
+  game_id: string;
+  team_id: string;
+  player_id: string;
+  goals: number;
+  assists: number;
+  shots_on_goal: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GamePlayerStatUpsert {
+  team_id: string;
+  player_id: string;
+  goals: number;
+  assists: number;
+  shots_on_goal: number;
+}
+
+export interface GamePenalty {
+  id: string;
+  game_id: string;
+  team_id: string;
+  player_id: string | null;
+  penalty_type: string;
+  minutes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GameGoalieStat {
+  id: string;
+  game_id: string;
+  team_id: string;
+  player_id: string;
+  saves: number;
+  shootout_shots: number;
+  shootout_saves: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GameGoalieStatUpsert {
+  team_id: string;
+  player_id: string;
+  saves: number;
+  shootout_shots: number;
+  shootout_saves: number;
+}
+
+export interface GameSignature {
+  id: string;
+  game_id: string;
+  team_id: string | null;
+  role: string;
+  signer_name: string;
+  signed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GameScoresheet {
+  game: Game;
+  player_stats: GamePlayerStat[];
+  penalties: GamePenalty[];
+  goalie_stats: GameGoalieStat[];
+  signatures: GameSignature[];
 }
