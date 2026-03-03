@@ -11,6 +11,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import SearchIcon from '@mui/icons-material/Search';
 import MailIcon from '@mui/icons-material/Mail';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AcUnitIcon from '@mui/icons-material/AcUnit';
 import { TeamProvider } from './context/TeamContext';
 import TeamSwitcher from './components/TeamSwitcher';
 import HomePage from './pages/HomePage';
@@ -20,6 +21,8 @@ import SchedulePage from './pages/SchedulePage';
 import SearchPage from './pages/SearchPage';
 import ProposalsPage from './pages/ProposalsPage';
 import WeeklyConfirmPage from './pages/WeeklyConfirmPage';
+import RinkListPage from './pages/RinkListPage';
+import IceSlotsPage from './pages/IceSlotsPage';
 
 const DRAWER_WIDTH = 220;
 
@@ -37,6 +40,7 @@ const NAV_ITEMS = [
   { path: '/schedule', label: 'Schedule', icon: <CalendarMonthIcon /> },
   { path: '/search', label: 'Find Opponents', icon: <SearchIcon /> },
   { path: '/proposals', label: 'Proposals', icon: <MailIcon /> },
+  { path: '/rinks', label: 'Rinks', icon: <AcUnitIcon /> },
   { path: '/confirm', label: 'Weekly Confirm', icon: <CheckCircleIcon /> },
 ];
 
@@ -50,7 +54,7 @@ function NavDrawer() {
       <List>
         {NAV_ITEMS.map((item) => (
           <ListItemButton key={item.path} component={Link} to={item.path}
-            selected={location.pathname === item.path}>
+            selected={item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)}>
             <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
             <ListItemText primary={item.label} primaryTypographyProps={{ variant: 'body2' }} />
           </ListItemButton>
@@ -81,6 +85,8 @@ function AppContent() {
             <Route path="/schedule" element={<SchedulePage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/proposals" element={<ProposalsPage />} />
+            <Route path="/rinks" element={<RinkListPage />} />
+            <Route path="/rinks/:rinkId/slots" element={<IceSlotsPage />} />
             <Route path="/confirm" element={<WeeklyConfirmPage />} />
           </Routes>
         </Container>

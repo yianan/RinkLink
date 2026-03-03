@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Team, ScheduleEntry, Association
+from ..models.rink import Rink, IceSlot
 from ..schemas.search import OpponentResult, AutoMatchResult
+from ..schemas.rink import IceSlotOut
 from ..services.distance import get_distance
 from ..services.matching import find_auto_matches
 
@@ -21,6 +23,7 @@ def search_opponents(
     age_group: str | None = Query(None),
     min_ranking: int | None = Query(None),
     max_ranking: int | None = Query(None),
+    rink_id: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     team = db.get(Team, team_id)

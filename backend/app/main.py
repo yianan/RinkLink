@@ -30,11 +30,12 @@ def health():
 
 
 # Routers imported after app creation to avoid circular imports
-from .routers import associations, teams, schedules, search, proposals, seed as seed_router  # noqa: E402
+from .routers import associations, teams, schedules, search, proposals, rinks, seed as seed_router  # noqa: E402
 
 app.include_router(associations.router, prefix="/api")
 app.include_router(teams.router, prefix="/api")
 app.include_router(schedules.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
 app.include_router(proposals.router, prefix="/api")
+app.include_router(rinks.router, prefix="/api")
 app.include_router(seed_router.router, prefix="/api")

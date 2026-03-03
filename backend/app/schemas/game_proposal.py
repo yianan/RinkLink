@@ -12,6 +12,7 @@ class ProposalCreate(BaseModel):
     proposed_date: dt.date
     proposed_time: Optional[dt.time] = None
     proposed_by_team_id: str
+    ice_slot_id: Optional[str] = None
     message: Optional[str] = None
 
 
@@ -25,6 +26,7 @@ class ProposalOut(BaseModel):
     proposed_time: Optional[dt.time]
     status: str
     proposed_by_team_id: str
+    ice_slot_id: Optional[str]
     message: Optional[str]
     responded_at: Optional[dt.datetime]
     created_at: dt.datetime

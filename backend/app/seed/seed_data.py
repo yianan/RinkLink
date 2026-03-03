@@ -4,6 +4,7 @@ from datetime import date, time
 from sqlalchemy.orm import Session
 
 from ..models import Association, Team, ScheduleEntry, GameProposal, ZipCode
+from ..models.rink import Rink, IceSlot
 
 
 def _id():
@@ -34,6 +35,8 @@ def seed_demo_data(db: Session):
     """Seed associations, teams, schedule entries, and sample proposals."""
     # Clear existing data
     db.query(GameProposal).delete()
+    db.query(IceSlot).delete()
+    db.query(Rink).delete()
     db.query(ScheduleEntry).delete()
     db.query(Team).delete()
     db.query(Association).delete()
@@ -243,9 +246,68 @@ def seed_demo_data(db: Session):
     db.add_all(proposals)
     db.commit()
 
+    # --- Rinks & Ice Slots ---
+    r1_id, r2_id, r3_id = _id(), _id(), _id()
+    rinks = [
+        Rink(id=r1_id, name="Centennial Ice Rink", address="2300 Old Glenview Rd",
+             city="Wilmette", state="IL", zip_code="60091",
+             phone="847-256-9666", contact_email="ice@centennialrink.com"),
+        Rink(id=r2_id, name="The Edge Ice Arena", address="735 E Jefferson St",
+             city="Bensenville", state="IL", zip_code="60106",
+             phone="630-350-3434", contact_email="bookings@edgeicearena.com"),
+        Rink(id=r3_id, name="Fox Valley Ice Arena", address="1996 S Kirk Rd",
+             city="Geneva", state="IL", zip_code="60134",
+             phone="630-232-0200", contact_email="schedule@foxvalleyice.com"),
+    ]
+    db.add_all(rinks)
+    db.commit()
+
+    # Ice slots: 5-8 per rink overlapping with team schedule dates
+    ice_slots = []
+    # Centennial (Wilmette) - matches Northshore dates
+    for d, st, et, notes in [
+        (date(2026, 3, 8), time(17, 0), time(18, 30), "Full sheet"),
+        (date(2026, 3, 8), time(19, 0), time(20, 30), None),
+        (date(2026, 3, 15), time(14, 0), time(15, 30), "Full sheet"),
+        (date(2026, 3, 22), time(10, 0), time(11, 30), None),
+        (date(2026, 3, 22), time(12, 0), time(13, 30), "Half sheet"),
+        (date(2026, 3, 29), time(16, 0), time(17, 30), None),
+        (date(2026, 4, 5), time(12, 0), time(13, 30), "Full sheet"),
+        (date(2026, 4, 19), time(17, 0), time(18, 30), None),
+    ]:
+        ice_slots.append(IceSlot(id=_id(), rink_id=r1_id, date=d, start_time=st, end_time=et, notes=notes))
+
+    # The Edge (Bensenville) - matches Mission dates
+    for d, st, et, notes in [
+        (date(2026, 3, 8), time(18, 0), time(19, 30), None),
+        (date(2026, 3, 15), time(15, 0), time(16, 30), "Full sheet"),
+        (date(2026, 3, 29), time(14, 0), time(15, 30), None),
+        (date(2026, 4, 12), time(16, 0), time(17, 30), "Full sheet"),
+        (date(2026, 4, 26), time(10, 0), time(11, 30), None),
+        (date(2026, 5, 10), time(14, 0), time(15, 30), None),
+    ]:
+        ice_slots.append(IceSlot(id=_id(), rink_id=r2_id, date=d, start_time=st, end_time=et, notes=notes))
+
+    # Fox Valley (Geneva) - matches Team IL dates
+    for d, st, et, notes in [
+        (date(2026, 3, 8), time(16, 0), time(17, 30), "Full sheet"),
+        (date(2026, 3, 22), time(14, 0), time(15, 30), None),
+        (date(2026, 4, 5), time(11, 0), time(12, 30), "Full sheet"),
+        (date(2026, 4, 19), time(16, 0), time(17, 30), None),
+        (date(2026, 5, 3), time(13, 0), time(14, 30), None),
+        (date(2026, 3, 15), time(13, 0), time(14, 30), "Half sheet"),
+        (date(2026, 3, 29), time(15, 0), time(16, 30), None),
+    ]:
+        ice_slots.append(IceSlot(id=_id(), rink_id=r3_id, date=d, start_time=st, end_time=et, notes=notes))
+
+    db.add_all(ice_slots)
+    db.commit()
+
     return {
         "associations": 3,
         "teams": 6,
         "schedule_entries": len(entries),
         "proposals": len(proposals),
+        "rinks": 3,
+        "ice_slots": len(ice_slots),
     }

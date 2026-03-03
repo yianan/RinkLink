@@ -9,6 +9,11 @@ from .schedule_entry import (
 )
 from .game_proposal import ProposalCreate, ProposalOut
 from .search import OpponentResult, AutoMatchResult
+from .rink import (
+    RinkCreate, RinkUpdate, RinkOut,
+    IceSlotCreate, IceSlotUpdate, IceSlotOut,
+    IceSlotUploadPreview, IceSlotConfirmUpload,
+)
 
 __all__ = [
     "AssociationCreate", "AssociationUpdate", "AssociationOut",
@@ -17,4 +22,7 @@ __all__ = [
     "ScheduleUploadPreview", "ScheduleConfirmUpload",
     "ProposalCreate", "ProposalOut",
     "OpponentResult", "AutoMatchResult",
+    "RinkCreate", "RinkUpdate", "RinkOut",
+    "IceSlotCreate", "IceSlotUpdate", "IceSlotOut",
+    "IceSlotUploadPreview", "IceSlotConfirmUpload",
 ]

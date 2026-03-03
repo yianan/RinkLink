@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
-  Box, Typography, Paper, TextField, Slider, Button, Table, TableBody,
+  Box, Typography, Paper, TextField, MenuItem, Slider, Button, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Chip, Tabs, Tab, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { useTeam } from '../context/TeamContext';
 import { api } from '../api/client';
-import { OpponentResult, AutoMatchResult, ScheduleEntry } from '../types';
+import { OpponentResult, AutoMatchResult, ScheduleEntry, Rink, IceSlot } from '../types';
 
 export default function SearchPage() {
   const { activeTeam } = useTeam();
@@ -18,19 +18,33 @@ export default function SearchPage() {
   const [results, setResults] = useState<OpponentResult[]>([]);
   const [autoMatches, setAutoMatches] = useState<AutoMatchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [rinks, setRinks] = useState<Rink[]>([]);
+  const [selectedRink, setSelectedRink] = useState('');
+  const [availableSlots, setAvailableSlots] = useState<IceSlot[]>([]);
   const [proposalDialog, setProposalDialog] = useState<{
     open: boolean;
     opponent?: OpponentResult;
     autoMatch?: AutoMatchResult;
     myEntry?: ScheduleEntry;
   }>({ open: false });
+  const [selectedIceSlotId, setSelectedIceSlotId] = useState('');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (!activeTeam) return;
     api.getSchedule(activeTeam.id, { status: 'open' }).then(setOpenDates);
     api.getAutoMatches(activeTeam.id).then(setAutoMatches);
+    api.getRinks().then(setRinks);
   }, [activeTeam]);
+
+  // Fetch available ice slots when a rink and date are selected
+  useEffect(() => {
+    if (!selectedRink || !selectedDate) {
+      setAvailableSlots([]);
+      return;
+    }
+    api.getAvailableSlots(selectedRink, selectedDate).then(setAvailableSlots);
+  }, [selectedRink, selectedDate]);
 
   const handleSearch = async () => {
     if (!activeTeam || !selectedDate) return;
@@ -41,6 +55,7 @@ export default function SearchPage() {
         date: selectedDate,
       };
       if (maxDistance < 200) params.max_distance_miles = maxDistance.toString();
+      if (selectedRink) params.rink_id = selectedRink;
       const data = await api.searchOpponents(params);
       setResults(data);
     } finally {
@@ -84,11 +99,13 @@ export default function SearchPage() {
       away_schedule_entry_id: awayEntryId,
       proposed_date: date,
       proposed_by_team_id: activeTeam.id,
+      ice_slot_id: selectedIceSlotId || null,
       message: message || null,
     });
 
     setProposalDialog({ open: false });
     setMessage('');
+    setSelectedIceSlotId('');
     // Refresh
     if (tab === 0 && selectedDate) handleSearch();
     if (tab === 1) api.getAutoMatches(activeTeam.id).then(setAutoMatches);
@@ -116,14 +133,17 @@ export default function SearchPage() {
                 label="Open Date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                sx={{ minWidth: 200 }}
-                slotProps={{ select: { native: true } }}
+                sx={{ minWidth: 250 }}
+                slotProps={{ inputLabel: { shrink: true } }}
+                placeholder="Select a date..."
               >
-                <option value="">Select a date...</option>
+                <MenuItem value="">
+                  <em>Select a date...</em>
+                </MenuItem>
                 {openDates.map((e) => (
-                  <option key={e.id} value={e.date}>
+                  <MenuItem key={e.id} value={e.date}>
                     {e.date} ({e.entry_type}) {e.time || ''}
-                  </option>
+                  </MenuItem>
                 ))}
               </TextField>
               <Box sx={{ minWidth: 200 }}>
@@ -131,12 +151,37 @@ export default function SearchPage() {
                 <Slider value={maxDistance} onChange={(_, v) => setMaxDistance(v as number)}
                   min={10} max={200} step={10} />
               </Box>
+              <TextField
+                select
+                label="Rink"
+                value={selectedRink}
+                onChange={(e) => setSelectedRink(e.target.value)}
+                sx={{ minWidth: 200 }}
+                slotProps={{ inputLabel: { shrink: true } }}
+              >
+                <MenuItem value="">
+                  <em>Any rink</em>
+                </MenuItem>
+                {rinks.map((r) => (
+                  <MenuItem key={r.id} value={r.id}>
+                    {r.name} ({r.city})
+                  </MenuItem>
+                ))}
+              </TextField>
               <Button variant="contained" startIcon={<SearchIcon />} onClick={handleSearch}
                 disabled={!selectedDate || loading}>
                 Search
               </Button>
             </Box>
           </Paper>
+
+          {availableSlots.length > 0 && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              {availableSlots.length} available ice slot(s) at {rinks.find((r) => r.id === selectedRink)?.name}:
+              {' '}
+              {availableSlots.map((s) => `${s.start_time}${s.end_time ? '-' + s.end_time : ''}${s.notes ? ' (' + s.notes + ')' : ''}`).join(', ')}
+            </Alert>
+          )}
 
           <TableContainer component={Paper}>
             <Table size="small">
@@ -247,6 +292,26 @@ export default function SearchPage() {
                 ? `vs ${proposalDialog.opponent.team_name} on ${proposalDialog.opponent.entry_date}`
                 : ''}
           </Typography>
+          {availableSlots.length > 0 && (
+            <TextField
+              select
+              label="Ice Slot (optional)"
+              value={selectedIceSlotId}
+              onChange={(e) => setSelectedIceSlotId(e.target.value)}
+              fullWidth
+              sx={{ mt: 2 }}
+              slotProps={{ inputLabel: { shrink: true } }}
+            >
+              <MenuItem value="">
+                <em>No ice slot</em>
+              </MenuItem>
+              {availableSlots.map((s) => (
+                <MenuItem key={s.id} value={s.id}>
+                  {s.start_time}{s.end_time ? '-' + s.end_time : ''} at {s.rink_name}{s.notes ? ` (${s.notes})` : ''}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
           <TextField
             label="Message (optional)"
             value={message}

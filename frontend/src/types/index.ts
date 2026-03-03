@@ -69,6 +69,7 @@ export interface GameProposal {
   proposed_time: string | null;
   status: 'proposed' | 'accepted' | 'declined' | 'cancelled';
   proposed_by_team_id: string;
+  ice_slot_id: string | null;
   message: string | null;
   responded_at: string | null;
   created_at: string;
@@ -91,6 +92,45 @@ export interface OpponentResult {
   entry_date: string;
   entry_time: string | null;
   entry_type: string;
+}
+
+export interface Rink {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  phone: string;
+  contact_email: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IceSlot {
+  id: string;
+  rink_id: string;
+  date: string;
+  start_time: string;
+  end_time: string | null;
+  status: 'available' | 'held' | 'booked';
+  booked_by_team_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  rink_name: string | null;
+}
+
+export interface IceSlotUploadRow {
+  date: string;
+  start_time: string;
+  end_time: string | null;
+  notes: string | null;
+}
+
+export interface IceSlotUploadPreview {
+  entries: IceSlotUploadRow[];
+  warnings: string[];
 }
 
 export interface AutoMatchResult {

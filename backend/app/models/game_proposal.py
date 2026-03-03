@@ -21,6 +21,7 @@ class GameProposal(Base):
     proposed_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="proposed")
     proposed_by_team_id: Mapped[str] = mapped_column(ForeignKey("teams.id"), nullable=False)
+    ice_slot_id: Mapped[str | None] = mapped_column(ForeignKey("ice_slots.id"), nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     responded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
@@ -31,3 +32,4 @@ class GameProposal(Base):
     home_schedule_entry = relationship("ScheduleEntry", foreign_keys=[home_schedule_entry_id])
     away_schedule_entry = relationship("ScheduleEntry", foreign_keys=[away_schedule_entry_id])
     proposed_by_team = relationship("Team", foreign_keys=[proposed_by_team_id])
+    ice_slot = relationship("IceSlot", foreign_keys=[ice_slot_id])

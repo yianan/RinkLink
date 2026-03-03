@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import GameProposal, ScheduleEntry, Team, Association
+from ..models.rink import IceSlot
 from ..schemas import ProposalCreate, ProposalOut
 
 router = APIRouter(tags=["proposals"])
@@ -103,6 +104,13 @@ def accept_proposal(id: str, db: Session = Depends(get_db)):
             home_entry.time = proposal.proposed_time
         if away_entry:
             away_entry.time = proposal.proposed_time
+
+    # Mark ice slot as booked if one was attached
+    if proposal.ice_slot_id:
+        ice_slot = db.get(IceSlot, proposal.ice_slot_id)
+        if ice_slot and ice_slot.status == "available":
+            ice_slot.status = "booked"
+            ice_slot.booked_by_team_id = proposal.home_team_id
 
     db.commit()
     db.refresh(proposal)

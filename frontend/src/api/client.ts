@@ -83,6 +83,40 @@ export const api = {
   cancelProposal: (id: string) =>
     request<import('../types').GameProposal>(`/proposals/${id}/cancel`, { method: 'PATCH' }),
 
+  // Rinks
+  getRinks: () => request<import('../types').Rink[]>('/rinks'),
+  createRink: (data: Partial<import('../types').Rink>) =>
+    request<import('../types').Rink>('/rinks', { method: 'POST', body: JSON.stringify(data) }),
+  updateRink: (id: string, data: Partial<import('../types').Rink>) =>
+    request<import('../types').Rink>(`/rinks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRink: (id: string) =>
+    request<void>(`/rinks/${id}`, { method: 'DELETE' }),
+
+  // Ice Slots
+  getIceSlots: (rinkId: string, params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<import('../types').IceSlot[]>(`/rinks/${rinkId}/slots${qs}`);
+  },
+  createIceSlot: (rinkId: string, data: Partial<import('../types').IceSlot>) =>
+    request<import('../types').IceSlot>(`/rinks/${rinkId}/slots`, { method: 'POST', body: JSON.stringify(data) }),
+  uploadIceSlots: async (rinkId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${BASE_URL}/rinks/${rinkId}/slots/upload`, { method: 'POST', body: formData });
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+    return res.json() as Promise<import('../types').IceSlotUploadPreview>;
+  },
+  confirmIceSlotUpload: (rinkId: string, entries: import('../types').IceSlotUploadRow[]) =>
+    request<import('../types').IceSlot[]>(`/rinks/${rinkId}/slots/confirm-upload`, {
+      method: 'POST', body: JSON.stringify({ entries }),
+    }),
+  updateIceSlot: (id: string, data: Partial<import('../types').IceSlot>) =>
+    request<import('../types').IceSlot>(`/ice-slots/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteIceSlot: (id: string) =>
+    request<void>(`/ice-slots/${id}`, { method: 'DELETE' }),
+  getAvailableSlots: (rinkId: string, date: string) =>
+    request<import('../types').IceSlot[]>(`/rinks/${rinkId}/available-slots?date=${date}`),
+
   // Seed
   seed: () => request<{ message: string }>('/seed', { method: 'POST' }),
 };
