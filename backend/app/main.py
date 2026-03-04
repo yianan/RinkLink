@@ -6,13 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from .config import settings
-from .database import Base, engine
+from .database import engine  # noqa: F401 — imported to ensure engine is initialised
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    yield
+    yield  # schema managed by Alembic migrations, not create_all
 
 
 app = FastAPI(title="RinkLink", version="0.1.0", lifespan=lifespan)
