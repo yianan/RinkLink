@@ -125,11 +125,11 @@ function AppContent() {
       </header>
 
       <div className="pt-14">
-        <aside className="hidden lg:fixed lg:inset-y-14 lg:left-0 lg:block lg:w-64 lg:border-r lg:border-slate-200/70 lg:bg-gradient-to-b lg:from-white lg:via-brand-50/30 lg:to-white">
+        <aside className="hidden lg:fixed lg:inset-y-14 lg:left-0 lg:block lg:w-56 lg:border-r lg:border-slate-200/70 lg:bg-gradient-to-b lg:from-white lg:via-brand-50/30 lg:to-white">
           <AppNav />
         </aside>
 
-        <main className="container-page py-6 lg:pl-64">
+        <main className="container-page py-6 lg:pl-56">
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/associations" element={<AssociationListPage />} />
@@ -160,7 +160,7 @@ function AppContent() {
             onMouseDown={() => setMobileNavOpen(false)}
             aria-hidden="true"
           />
-          <div className="relative h-full w-80 max-w-[85vw] bg-gradient-to-b from-white via-brand-50/30 to-white shadow-2xl ring-1 ring-slate-200/70">
+          <div className="relative h-full w-72 max-w-[80vw] bg-gradient-to-b from-white via-brand-50/30 to-white shadow-2xl ring-1 ring-slate-200/70">
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
               <div className="text-sm font-semibold text-slate-900">Menu</div>
               <button

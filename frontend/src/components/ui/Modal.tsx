@@ -70,7 +70,7 @@ export function Modal({
         ref={panelRef}
         tabIndex={-1}
         className={cn(
-          'relative w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl',
+          'relative flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl',
           className,
         )}
       >
@@ -91,9 +91,13 @@ export function Modal({
           </Button>
         </div>
 
-        <div className="px-5 py-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
 
-        {footer && <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">{footer}</div>}
+        {footer && (
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body,

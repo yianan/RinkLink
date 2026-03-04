@@ -100,7 +100,7 @@ export default function PracticePage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="page-title">Practice Bookings</div>
           <div className="page-subtitle">Reserve ice time for practice — no opponent needed.</div>

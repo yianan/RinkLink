@@ -74,7 +74,61 @@ export default function AssociationListPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="divide-y divide-slate-200 bg-white md:hidden">
+          {associations.map((a) => {
+            const assocTeams = teamsByAssociation[a.id] || [];
+            const extraTeams = Math.max(0, assocTeams.length - 3);
+
+            return (
+              <div key={a.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-900">{a.name}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {a.city}, {a.state} {a.zip_code}
+                    </div>
+                    {a.league_affiliation ? (
+                      <div className="mt-2 text-xs text-slate-600">League: {a.league_affiliation}</div>
+                    ) : null}
+                    <div className="mt-2 text-xs text-slate-600">Teams: {assocTeams.length}</div>
+                    {assocTeams.length ? (
+                      <div className="mt-1 space-y-1">
+                        {assocTeams.slice(0, 3).map((t) => (
+                          <div key={t.id} className="truncate text-xs text-slate-700">
+                            {t.name}{' '}
+                            <span className="text-slate-500">
+                              ({t.age_group} {t.level})
+                            </span>
+                          </div>
+                        ))}
+                        {extraTeams ? (
+                          <div className="text-xs text-slate-500">+ {extraTeams} more</div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(a)} aria-label="Edit">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete">
+                      <Trash2 className="h-4 w-4 text-rose-600" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {associations.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-slate-600">
+              No associations yet. Add one or seed demo data.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
