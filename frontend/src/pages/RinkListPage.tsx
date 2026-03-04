@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, Map, Pencil, Trash2, Utensils } from 'lucide-react';
+import { Map, Pencil, Trash2, Utensils } from 'lucide-react';
 import { api } from '../api/client';
 import { Rink } from '../types';
 import { Button } from '../components/ui/Button';
@@ -71,7 +71,7 @@ export default function RinkListPage() {
 
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-max min-w-full text-left text-sm">
+          <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="px-4 py-3">Name</th>
@@ -88,19 +88,19 @@ export default function RinkListPage() {
                   className="cursor-pointer hover:bg-slate-50/60"
                   onClick={() => navigate(`/rinks/${r.id}/slots`)}
                 >
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{r.name}</div>
-                    {r.website && (
+                  <td className="px-4 py-3 font-medium">
+                    {r.website ? (
                       <a
                         href={r.website}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-0.5 inline-flex items-center gap-1 text-xs text-brand-600 hover:underline"
+                        className="text-brand-700 hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <ExternalLink className="h-3 w-3" />
-                        {r.website.replace(/^https?:\/\//, '')}
+                        {r.name}
                       </a>
+                    ) : (
+                      <span className="text-slate-900">{r.name}</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-700">
