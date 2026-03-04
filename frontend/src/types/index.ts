@@ -116,6 +116,7 @@ export interface Rink {
   zip_code: string;
   phone: string;
   contact_email: string;
+  website: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Map, Pencil, Trash2, Utensils } from 'lucide-react';
+import { ExternalLink, Map, Pencil, Trash2, Utensils } from 'lucide-react';
 import { api } from '../api/client';
 import { Rink } from '../types';
 import { Button } from '../components/ui/Button';
@@ -8,7 +8,7 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 
-const emptyForm = { name: '', address: '', city: '', state: '', zip_code: '', phone: '', contact_email: '' };
+const emptyForm = { name: '', address: '', city: '', state: '', zip_code: '', phone: '', contact_email: '', website: '' };
 
 function mapsQueryUrl(query: string) {
   const url = new URL('https://www.google.com/maps/search/');
@@ -30,10 +30,11 @@ export default function RinkListPage() {
   const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const handleSave = async () => {
+    const payload = { ...form, website: form.website || null };
     if (editId) {
-      await api.updateRink(editId, form);
+      await api.updateRink(editId, payload);
     } else {
-      await api.createRink(form);
+      await api.createRink(payload);
     }
     setOpen(false);
     load();
@@ -44,6 +45,7 @@ export default function RinkListPage() {
     setForm({
       name: r.name, address: r.address, city: r.city, state: r.state,
       zip_code: r.zip_code, phone: r.phone, contact_email: r.contact_email,
+      website: r.website ?? '',
     });
     setOpen(true);
   };
@@ -68,14 +70,13 @@ export default function RinkListPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="overflow-auto">
-          <table className="min-w-full text-left text-sm">
+        <div className="overflow-x-auto">
+          <table className="w-max min-w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Address</th>
-                <th className="px-4 py-3">City</th>
-                <th className="px-4 py-3">Phone</th>
+                <th className="px-4 py-3 whitespace-nowrap">Phone</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -87,12 +88,26 @@ export default function RinkListPage() {
                   className="cursor-pointer hover:bg-slate-50/60"
                   onClick={() => navigate(`/rinks/${r.id}/slots`)}
                 >
-                  <td className="px-4 py-3 font-medium text-slate-900">{r.name}</td>
-                  <td className="px-4 py-3 text-slate-700">{r.address}</td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {r.city}, {r.state} {r.zip_code}
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-slate-900">{r.name}</div>
+                    {r.website && (
+                      <a
+                        href={r.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-0.5 inline-flex items-center gap-1 text-xs text-brand-600 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        {r.website.replace(/^https?:\/\//, '')}
+                      </a>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{r.phone}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    <div>{r.address}</div>
+                    <div className="text-xs text-slate-500">{r.city}, {r.state} {r.zip_code}</div>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-slate-700">{r.phone}</td>
                   <td className="px-4 py-3 text-slate-700">{r.contact_email}</td>
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">
@@ -133,7 +148,7 @@ export default function RinkListPage() {
 
               {rinks.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600">
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-600">
                     No rinks yet. Add one or seed demo data.
                   </td>
                 </tr>
@@ -190,6 +205,14 @@ export default function RinkListPage() {
               <label className="mb-1 block text-xs font-medium text-slate-600">Contact Email</label>
               <Input value={form.contact_email} onChange={(e) => setField('contact_email', e.target.value)} />
             </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Website</label>
+            <Input
+              value={form.website}
+              onChange={(e) => setField('website', e.target.value)}
+              placeholder="https://..."
+            />
           </div>
         </div>
       </Modal>

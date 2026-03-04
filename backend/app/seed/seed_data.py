@@ -315,13 +315,16 @@ def seed_demo_data(db: Session):
     rinks = [
         Rink(id=r1_id, name="Centennial Ice Rink", address="2300 Old Glenview Rd",
              city="Wilmette", state="IL", zip_code="60091",
-             phone="847-256-9666", contact_email="ice@centennialrink.com"),
+             phone="847-256-9666", contact_email="ice@centennialrink.com",
+             website="https://www.wilmettepark.org/centennial-ice-rink"),
         Rink(id=r2_id, name="The Edge Ice Arena", address="735 E Jefferson St",
              city="Bensenville", state="IL", zip_code="60106",
-             phone="630-350-3434", contact_email="bookings@edgeicearena.com"),
+             phone="630-350-3434", contact_email="bookings@edgeicearena.com",
+             website="https://www.edgeicearena.com"),
         Rink(id=r3_id, name="Fox Valley Ice Arena", address="1996 S Kirk Rd",
              city="Geneva", state="IL", zip_code="60134",
-             phone="630-232-0200", contact_email="schedule@foxvalleyice.com"),
+             phone="630-232-0200", contact_email="schedule@foxvalleyice.com",
+             website="https://www.foxvalleyice.com"),
     ]
     db.add_all(rinks)
     db.commit()

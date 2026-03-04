@@ -16,6 +16,7 @@ class RinkCreate(BaseModel):
     zip_code: str = ""
     phone: str = ""
     contact_email: str = ""
+    website: Optional[str] = None
 
 
 class RinkUpdate(BaseModel):
@@ -26,6 +27,7 @@ class RinkUpdate(BaseModel):
     zip_code: Optional[str] = None
     phone: Optional[str] = None
     contact_email: Optional[str] = None
+    website: Optional[str] = None
 
 
 class RinkOut(BaseModel):
@@ -37,6 +39,7 @@ class RinkOut(BaseModel):
     zip_code: str
     phone: str
     contact_email: str
+    website: Optional[str]
     created_at: dt.datetime
     updated_at: dt.datetime
 
