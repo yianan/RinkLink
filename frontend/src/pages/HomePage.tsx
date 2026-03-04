@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, CheckCircle2, Inbox, Search } from 'lucide-react';
+import { Calendar, CheckCircle2, Dumbbell, Inbox } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { api } from '../api/client';
-import { ScheduleEntry, GameProposal, Game, Notification } from '../types';
+import { ScheduleEntry, GameProposal, Game, Notification, PracticeBooking } from '../types';
 import { cn } from '../lib/cn';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -48,6 +48,7 @@ export default function HomePage() {
   const [proposals, setProposals] = useState<GameProposal[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [practices, setPractices] = useState<PracticeBooking[]>([]);
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedError, setSeedError] = useState('');
 
@@ -55,13 +56,15 @@ export default function HomePage() {
     if (!activeTeam) return;
     api.getSchedule(activeTeam.id).then(setSchedule);
     api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }).then(setProposals);
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const todayStr = new Date().toISOString().slice(0, 10);
     api.getGames(activeTeam.id, { date_from: todayStr }).then(setGames);
     api.getNotifications(activeTeam.id, { unread_only: 'true' }).then(setNotifications);
+    api.getPracticeBookings(activeTeam.id, { status: 'active' }).then(setPractices);
   }, [activeTeam]);
 
+  const today = new Date().toISOString().slice(0, 10);
   const openDates = schedule.filter((e) => e.status === 'open');
+  const upcomingPractices = practices.filter((p) => p.slot_date && p.slot_date >= today);
   const upcoming = games
     .slice()
     .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
@@ -115,8 +118,6 @@ export default function HomePage() {
         </div>
         <Button
           type="button"
-          size="sm"
-          variant="outline"
           disabled={seedLoading}
           onClick={async () => {
             if (!confirm('Reset demo data? This will wipe your local database and re-seed everything.')) return;
@@ -188,11 +189,11 @@ export default function HomePage() {
           onClick={() => navigate('/games')}
         />
         <StatCard
-          title="Find Opponents"
-          value="Search"
-          icon={<Search className="h-4 w-4" />}
-          color="text-brand-700"
-          onClick={() => navigate('/search')}
+          title="Upcoming Practices"
+          value={upcomingPractices.length}
+          icon={<Dumbbell className="h-4 w-4" />}
+          color="text-violet-700"
+          onClick={() => navigate('/practice')}
         />
       </div>
 
@@ -260,6 +261,9 @@ export default function HomePage() {
         </Button>
         <Button type="button" variant="outline" onClick={() => navigate('/games')}>
           View Games
+        </Button>
+        <Button type="button" variant="outline" onClick={() => navigate('/practice')}>
+          Practice Bookings
         </Button>
         <Button type="button" variant="outline" onClick={() => navigate('/search')}>
           Find Opponents

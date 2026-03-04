@@ -313,18 +313,18 @@ def seed_demo_data(db: Session):
     # --- Rinks & Ice Slots ---
     r1_id, r2_id, r3_id = _id(), _id(), _id()
     rinks = [
-        Rink(id=r1_id, name="Centennial Ice Rink", address="2300 Old Glenview Rd",
+        Rink(id=r1_id, name="Johnny's IceHouse West", address="1350 W Madison St",
+             city="Chicago", state="IL", zip_code="60607",
+             phone="312-226-5555", contact_email="info@johnnysicehouse.com",
+             website="https://www.johnnysicehouse.com"),
+        Rink(id=r2_id, name="Centennial Ice Rink", address="2300 Old Glenview Rd",
              city="Wilmette", state="IL", zip_code="60091",
-             phone="847-256-9666", contact_email="ice@centennialrink.com",
-             website="https://www.wilmettepark.org/centennial-ice-rink"),
-        Rink(id=r2_id, name="The Edge Ice Arena", address="735 E Jefferson St",
-             city="Bensenville", state="IL", zip_code="60106",
-             phone="630-350-3434", contact_email="bookings@edgeicearena.com",
-             website="https://www.edgeicearena.com"),
-        Rink(id=r3_id, name="Fox Valley Ice Arena", address="1996 S Kirk Rd",
-             city="Geneva", state="IL", zip_code="60134",
-             phone="630-232-0200", contact_email="schedule@foxvalleyice.com",
-             website="https://www.foxvalleyice.com"),
+             phone="847-256-9666", contact_email="centennialice@wilmettepark.org",
+             website="https://www.wilmettepark.org/parks-facilities/centennial-ice-rink"),
+        Rink(id=r3_id, name="Northbrook Sports Center", address="1730 Pfingsten Rd",
+             city="Northbrook", state="IL", zip_code="60062",
+             phone="847-291-2980", contact_email="icerink@northbrook.il.us",
+             website="https://www.northbrookil.gov/departments/parks-recreation/northbrook-sports-center"),
     ]
     db.add_all(rinks)
     db.commit()
