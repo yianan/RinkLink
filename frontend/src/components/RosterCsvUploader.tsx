@@ -116,8 +116,8 @@ export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: str
           ))}
 
           <Card className="overflow-hidden">
-            <div className="max-h-[420px] overflow-auto">
-              <table className="min-w-full text-left text-sm">
+            <div className="max-h-[420px] overflow-x-auto">
+              <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                   <tr>
                     <th className="px-4 py-3">#</th>

@@ -89,7 +89,7 @@ export default function IceSlotsPage() {
         </div>
       </div>
 
-      <div className="inline-flex rounded-xl bg-slate-100 p-1">
+      <div className="flex w-fit rounded-xl bg-slate-100 p-1">
         {[
           { label: `List View (${slots.length})`, value: 0 },
           { label: 'Calendar View', value: 1 },

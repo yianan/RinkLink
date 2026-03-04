@@ -92,8 +92,8 @@ export default function SchedulePage() {
 
       {tab === 0 && (
         <Card className="overflow-hidden">
-          <div className="overflow-auto">
-            <table className="min-w-full text-left text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                 <tr>
                   <th className="px-4 py-3">Date</th>

@@ -201,7 +201,7 @@ export default function HomePage() {
         <Card className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="text-sm font-semibold tracking-tight text-slate-900">Upcoming Games</div>
-            <Button type="button" variant="outline" size="sm" onClick={() => navigate('/games')}>
+            <Button type="button" variant="outline" onClick={() => navigate('/games')}>
               View
             </Button>
           </div>
@@ -228,7 +228,7 @@ export default function HomePage() {
         <Card className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="text-sm font-semibold tracking-tight text-slate-900">Pending Proposals</div>
-            <Button type="button" variant="outline" size="sm" onClick={() => navigate('/proposals')}>
+            <Button type="button" variant="outline" onClick={() => navigate('/proposals')}>
               View
             </Button>
           </div>
@@ -245,7 +245,7 @@ export default function HomePage() {
                     </div>
                     <div className="mt-1 truncate text-xs text-slate-500">{p.message || '—'}</div>
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={() => navigate('/proposals')}>
+                  <Button type="button" variant="outline" onClick={() => navigate('/proposals')}>
                     Open
                   </Button>
                 </li>
