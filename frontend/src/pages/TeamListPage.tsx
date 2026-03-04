@@ -82,7 +82,57 @@ export default function TeamListPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="divide-y divide-slate-200 bg-white md:hidden">
+          {teams.map((t) => (
+            <div key={t.id} className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-slate-900">{t.name}</div>
+                  <div className="mt-0.5 text-xs text-slate-500">{t.association_name || '—'}</div>
+
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                    <span className="whitespace-nowrap">
+                      {t.age_group} {t.level}
+                    </span>
+                    <span className="whitespace-nowrap">Ranking: {t.myhockey_ranking ?? '—'}</span>
+                  </div>
+
+                  {(t.manager_name || t.manager_email) && (
+                    <div className="mt-2 text-sm text-slate-700">
+                      {t.manager_email ? (
+                        <a
+                          href={`mailto:${t.manager_email}`}
+                          className="text-brand-700 hover:underline"
+                        >
+                          {t.manager_name || 'Email'}
+                        </a>
+                      ) : (
+                        <span className="text-slate-900">{t.manager_name}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(t)} aria-label="Edit">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(t.id)} aria-label="Delete">
+                    <Trash2 className="h-4 w-4 text-rose-600" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {teams.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-slate-600">
+              No teams yet. Add one or seed demo data.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>

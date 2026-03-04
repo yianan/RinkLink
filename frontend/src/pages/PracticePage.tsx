@@ -127,7 +127,52 @@ export default function PracticePage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="divide-y divide-slate-200 bg-white md:hidden">
+          {displayed.map((b) => (
+            <div key={b.id} className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-slate-900">{b.slot_date || '—'}</div>
+                  <div className="mt-1 text-sm text-slate-700">
+                    {formatTimeHHMM(b.slot_start_time) || '—'}
+                    {b.slot_end_time ? `–${formatTimeHHMM(b.slot_end_time) || b.slot_end_time}` : ''}
+                  </div>
+                  <div className="mt-2 text-xs text-slate-500">
+                    {b.rink_name
+                      ? `${b.rink_name}${b.rink_city ? ` • ${b.rink_city}, ${b.rink_state}` : ''}`
+                      : '—'}
+                  </div>
+                  {(b.notes || b.slot_notes) && (
+                    <div className="mt-2 text-sm text-slate-700">{b.notes || b.slot_notes}</div>
+                  )}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Badge variant={b.status === 'active' ? 'success' : 'neutral'}>{b.status}</Badge>
+                    <span className="text-xs text-slate-500">Booked {new Date(b.created_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                {b.status === 'active' && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleCancel(b.id)}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {displayed.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-slate-600">
+              No {tab} practice bookings.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>

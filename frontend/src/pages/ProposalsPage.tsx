@@ -164,7 +164,99 @@ export default function ProposalsPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="divide-y divide-slate-200 bg-white md:hidden">
+          {proposals.map((p) => {
+            const isIncoming = p.proposed_by_team_id !== activeTeam.id;
+            const canRespond = isIncoming && p.status === 'proposed';
+            const canCancel = !isIncoming && p.status === 'proposed';
+            const canReschedule = p.status === 'accepted';
+            const canCancelAccepted = p.status === 'accepted';
+
+            const rinkLine = p.rink_name
+              ? `${p.rink_name}${p.rink_city ? ` • ${p.rink_city}, ${p.rink_state}` : ''}${p.ice_slot_start_time ? ` • ${formatTimeHHMM(p.ice_slot_start_time) || p.ice_slot_start_time}${p.ice_slot_end_time ? '-' + (formatTimeHHMM(p.ice_slot_end_time) || p.ice_slot_end_time) : ''}` : ''}`
+              : p.location_label || '—';
+
+            return (
+              <div key={p.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-900">
+                      {p.proposed_date} {formatTimeHHMM(p.proposed_time) || ''}
+                    </div>
+                    <div className="mt-2 space-y-1 text-sm text-slate-700">
+                      <div className="truncate">
+                        <span className="text-xs font-medium text-slate-500">Home</span>{' '}
+                        <span className="font-medium text-slate-900">{p.home_team_name}</span>
+                      </div>
+                      <div className="truncate">
+                        <span className="text-xs font-medium text-slate-500">Away</span>{' '}
+                        <span className="font-medium text-slate-900">{p.away_team_name}</span>
+                      </div>
+                    </div>
+                    {(p.home_team_association || p.away_team_association) && (
+                      <div className="mt-1 text-xs text-slate-500">
+                        {(p.home_team_association || '—')}{' '}
+                        <span className="text-slate-300">•</span>{' '}
+                        {(p.away_team_association || '—')}
+                      </div>
+                    )}
+                    <div className="mt-2 text-xs text-slate-500">{rinkLine}</div>
+                    {p.message ? (
+                      <div className="mt-2 text-sm text-slate-700">{p.message}</div>
+                    ) : null}
+                    <div className="mt-2 text-xs text-slate-500">Created {new Date(p.created_at).toLocaleDateString()}</div>
+                  </div>
+
+                  <Badge variant={statusColors[p.status] || 'neutral'}>{p.status}</Badge>
+                </div>
+
+                <div className="mt-3 flex flex-wrap justify-end gap-2">
+                  {canRespond && (
+                    <>
+                      <Button type="button" size="sm" onClick={() => handleAccept(p.id)}>
+                        Accept
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => handleDecline(p.id)}>
+                        Decline
+                      </Button>
+                    </>
+                  )}
+                  {canCancel && (
+                    <Button type="button" size="sm" variant="outline" onClick={() => handleCancel(p.id)}>
+                      Cancel
+                    </Button>
+                  )}
+                  {canReschedule && (
+                    <Button type="button" size="sm" variant="outline" onClick={() => handleRequestReschedule(p)}>
+                      Request Reschedule
+                    </Button>
+                  )}
+                  {canCancelAccepted && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (!confirm('Cancel this accepted game?')) return;
+                        handleCancel(p.id);
+                      }}
+                    >
+                      Cancel Game
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {proposals.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-slate-600">
+              No {tabDef.label.toLowerCase()} proposals.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>

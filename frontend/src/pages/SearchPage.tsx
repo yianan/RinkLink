@@ -325,7 +325,58 @@ export default function SearchPage() {
           )}
 
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="divide-y divide-slate-200 bg-white md:hidden">
+              {results.map((r) => (
+                <div key={r.schedule_entry_id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-slate-900">{r.team_name}</div>
+                      <div className="mt-0.5 text-xs text-slate-500">{r.association_name}</div>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                        <span className="whitespace-nowrap">{r.age_group} {r.level}</span>
+                        <span className="whitespace-nowrap">Ranking: {r.myhockey_ranking ?? '—'}</span>
+                        <span className="whitespace-nowrap">{r.distance_miles != null ? `${r.distance_miles} mi` : '—'}</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Badge variant={r.entry_type === 'home' ? 'success' : 'info'}>{r.entry_type}</Badge>
+                        <div className="text-sm text-slate-700">{formatTimeHHMM(r.entry_time) || ''}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-2">
+                      {r.has_existing_proposal ? (
+                        <>
+                          <Badge variant={r.existing_proposal_status === 'accepted' ? 'success' : 'warning'}>
+                            {r.existing_proposal_status === 'accepted' ? 'Accepted' : 'Pending'}
+                          </Badge>
+                          <Button type="button" size="sm" variant="outline" onClick={() => navigate('/proposals')}>
+                            View
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openProposal({ opponent: r, myEntry: selectedEntry || undefined })}
+                          disabled={!selectedEntry}
+                        >
+                          Propose
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {results.length === 0 && selectedEntry && !loading && (
+                <div className="px-4 py-10 text-center text-sm text-slate-600">
+                  No matching opponents found for this date/time. Matches require an exact time match and opposite home/away.
+                </div>
+              )}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                   <tr>
@@ -397,7 +448,60 @@ export default function SearchPage() {
 
       {tab === 1 && (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="divide-y divide-slate-200 bg-white md:hidden">
+            {autoMatches.map((m, i) => (
+              <div key={i} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-900">{m.date}</div>
+
+                    <div className="mt-2">
+                      <div className="text-sm font-medium text-slate-900">{m.home_team_name} <span className="text-xs font-medium text-slate-500">(H)</span></div>
+                      <div className="mt-0.5 text-xs text-slate-500">
+                        {m.home_association_name} {m.home_time && `@ ${formatTimeHHMM(m.home_time) || m.home_time}`}
+                      </div>
+                    </div>
+
+                    <div className="mt-2">
+                      <div className="text-sm font-medium text-slate-900">{m.away_team_name} <span className="text-xs font-medium text-slate-500">(A)</span></div>
+                      <div className="mt-0.5 text-xs text-slate-500">
+                        {m.away_association_name} {m.away_time && `@ ${formatTimeHHMM(m.away_time) || m.away_time}`}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 text-xs text-slate-600">
+                      Distance: {m.distance_miles != null ? `${m.distance_miles} mi` : '—'}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-2">
+                    {m.has_existing_proposal ? (
+                      <>
+                        <Badge variant={m.existing_proposal_status === 'accepted' ? 'success' : 'warning'}>
+                          {m.existing_proposal_status === 'accepted' ? 'Accepted' : 'Pending'}
+                        </Badge>
+                        <Button type="button" size="sm" variant="outline" onClick={() => navigate('/proposals')}>
+                          View
+                        </Button>
+                      </>
+                    ) : (
+                      <Button type="button" size="sm" variant="outline" onClick={() => openProposal({ autoMatch: m })}>
+                        Propose
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {autoMatches.length === 0 && (
+              <div className="px-4 py-10 text-center text-sm text-slate-600">
+                No auto-matches found. Add more open dates to find matches.
+              </div>
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                 <tr>

@@ -72,7 +72,51 @@ export default function WeeklyConfirmPage() {
       )}
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="divide-y divide-slate-200 bg-white md:hidden">
+          {games.map((g) => {
+            const isHome = activeTeam.id === g.home_team_id;
+            const opponent = isHome ? g.away_team_name : g.home_team_name;
+            const myConfirmed = isHome ? g.home_weekly_confirmed : g.away_weekly_confirmed;
+            const oppConfirmed = isHome ? g.away_weekly_confirmed : g.home_weekly_confirmed;
+
+            return (
+              <div key={g.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-900">
+                      {new Date(g.date + 'T00:00').toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                      })}{' '}
+                      {formatTimeHHMM(g.time) || ''}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-700">{opponent || 'TBD'}</div>
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-slate-500">You</span>
+                        <Switch checked={myConfirmed} onChange={() => handleToggle(g)} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-slate-500">Opponent</span>
+                        <Badge variant={oppConfirmed ? 'success' : 'outline'}>{oppConfirmed ? 'Yes' : 'No'}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <Badge variant="outline">{g.status}</Badge>
+                </div>
+              </div>
+            );
+          })}
+
+          {games.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-slate-600">
+              No non-league games scheduled for this week.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>

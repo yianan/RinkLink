@@ -79,7 +79,59 @@ export default function GamesPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="divide-y divide-slate-200 bg-white md:hidden">
+          {filtered.map((g) => {
+            const isHome = activeTeam.id === g.home_team_id;
+            const opponent = isHome ? g.away_team_name : g.home_team_name;
+            const myConfirmed = isHome ? g.home_weekly_confirmed : g.away_weekly_confirmed;
+            const oppConfirmed = isHome ? g.away_weekly_confirmed : g.home_weekly_confirmed;
+            const score =
+              g.home_score != null && g.away_score != null
+                ? `${g.home_score}-${g.away_score}`
+                : '—';
+
+            return (
+              <button
+                key={g.id}
+                type="button"
+                className="w-full px-4 py-4 text-left transition-colors hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                onClick={() => navigate(`/games/${g.id}`)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-900">
+                      {formatDateLabel(g.date)} {formatTimeHHMM(g.time) || ''}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+                      <span className="font-medium text-slate-900">{opponent || '—'}</span>
+                      <span className="text-xs text-slate-500">{isHome ? 'Home' : 'Away'}</span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {g.rink_name
+                        ? `${g.rink_name}${g.rink_city ? ` • ${g.rink_city}, ${g.rink_state}` : ''}`
+                        : g.location_label || 'No location yet'}
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Badge variant={statusColors[g.status] || 'neutral'}>{g.status}</Badge>
+                      <Badge variant="outline">Score: {score}</Badge>
+                      <span className="text-xs text-slate-500">
+                        Weekly: You {myConfirmed ? 'Yes' : 'No'} • Opp {oppConfirmed ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+
+          {filtered.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-slate-600">
+              No games to show.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>

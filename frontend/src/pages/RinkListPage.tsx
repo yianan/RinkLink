@@ -70,7 +70,101 @@ export default function RinkListPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="divide-y divide-slate-200 bg-white md:hidden">
+          {rinks.map((r) => (
+            <div
+              key={r.id}
+              role="button"
+              tabIndex={0}
+              className="p-4 transition-colors hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+              onClick={() => navigate(`/rinks/${r.id}/slots`)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') navigate(`/rinks/${r.id}/slots`);
+                if (e.key === ' ') {
+                  e.preventDefault();
+                  navigate(`/rinks/${r.id}/slots`);
+                }
+              }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-medium text-slate-900">
+                    {r.website ? (
+                      <a
+                        href={r.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-brand-700 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {r.name}
+                      </a>
+                    ) : (
+                      r.name
+                    )}
+                  </div>
+                  <div className="mt-1 text-sm text-slate-700">{r.address}</div>
+                  <div className="text-xs text-slate-500">
+                    {r.city}, {r.state} {r.zip_code}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                    {r.phone ? <span className="whitespace-nowrap">{r.phone}</span> : null}
+                    {r.contact_email ? (
+                      <a
+                        href={`mailto:${r.contact_email}`}
+                        className="break-all text-brand-700 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {r.contact_email}
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      const label = [r.name, r.address, `${r.city}, ${r.state} ${r.zip_code}`].filter(Boolean).join(', ');
+                      window.open(mapsQueryUrl(`restaurants near ${label}`), '_blank', 'noopener,noreferrer');
+                    }}
+                    aria-label="Restaurants nearby"
+                  >
+                    <Utensils className="h-4 w-4 text-slate-600" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      const label = [r.name, r.address, `${r.city}, ${r.state} ${r.zip_code}`].filter(Boolean).join(', ');
+                      window.open(mapsQueryUrl(`things to do near ${label}`), '_blank', 'noopener,noreferrer');
+                    }}
+                    aria-label="Things to do nearby"
+                  >
+                    <Map className="h-4 w-4 text-slate-600" />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(r)} aria-label="Edit">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(r.id)} aria-label="Delete">
+                    <Trash2 className="h-4 w-4 text-rose-600" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {rinks.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-slate-600">
+              No rinks yet. Add one or seed demo data.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>

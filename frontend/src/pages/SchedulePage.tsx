@@ -93,7 +93,43 @@ export default function SchedulePage() {
 
       {tab === 0 && (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="divide-y divide-slate-200 bg-white md:hidden">
+            {entries.map((e) => (
+              <div key={e.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-900">
+                      {e.date} {formatTimeHHMM(e.time) || ''}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>{e.entry_type}</Badge>
+                      <Badge variant={statusColors[e.status] || 'neutral'}>{e.status}</Badge>
+                    </div>
+
+                    {(e.opponent_name || e.location || e.notes) && (
+                      <div className="mt-3 space-y-1 text-sm text-slate-700">
+                        {e.opponent_name ? <div className="font-medium text-slate-900">vs {e.opponent_name}</div> : null}
+                        {e.location ? <div className="text-xs text-slate-500">{e.location}</div> : null}
+                        {e.notes ? <div className="text-xs text-slate-500">{e.notes}</div> : null}
+                      </div>
+                    )}
+                  </div>
+
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete">
+                    <Trash2 className="h-4 w-4 text-rose-600" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            {entries.length === 0 && (
+              <div className="px-4 py-10 text-center text-sm text-slate-600">
+                No schedule entries. Upload a CSV or add entries manually.
+              </div>
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                 <tr>
