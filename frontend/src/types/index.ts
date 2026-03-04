@@ -297,3 +297,22 @@ export interface GameScoresheet {
   goalie_stats: GameGoalieStat[];
   signatures: GameSignature[];
 }
+
+export interface PracticeBooking {
+  id: string;
+  team_id: string;
+  ice_slot_id: string;
+  notes: string | null;
+  status: 'active' | 'cancelled';
+  created_at: string;
+  updated_at: string;
+  team_name: string | null;
+  slot_date: string | null;
+  slot_start_time: string | null;
+  slot_end_time: string | null;
+  slot_notes: string | null;
+  rink_id: string | null;
+  rink_name: string | null;
+  rink_city: string | null;
+  rink_state: string | null;
+}

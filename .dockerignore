@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/__pycache__
+**/*.pyc
+**/*.pyo
+backend/rinklink.db
+backend/rinklink.db-shm
+backend/rinklink.db-wal
+.git
+.gitignore

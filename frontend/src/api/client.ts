@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:8000/api';
+const BASE_URL = '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -202,6 +202,19 @@ export const api = {
     request<void>(`/ice-slots/${id}`, { method: 'DELETE' }),
   getAvailableSlots: (rinkId: string, date: string) =>
     request<import('../types').IceSlot[]>(`/rinks/${rinkId}/available-slots?date=${date}`),
+
+  // Practice Bookings
+  getPracticeBookings: (teamId: string, params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<import('../types').PracticeBooking[]>(`/teams/${teamId}/practice-bookings${qs}`);
+  },
+  createPracticeBooking: (teamId: string, data: { ice_slot_id: string; notes?: string | null }) =>
+    request<import('../types').PracticeBooking>(`/teams/${teamId}/practice-bookings`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  cancelPracticeBooking: (bookingId: string) =>
+    request<void>(`/practice-bookings/${bookingId}`, { method: 'DELETE' }),
 
   // Seed
   seed: () => request<{ message: string }>('/seed', { method: 'POST' }),

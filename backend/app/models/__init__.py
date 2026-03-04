@@ -9,6 +9,7 @@ from .scoresheet import GamePlayerStat, GamePenalty, GameGoalieStat, GameSignatu
 from .zip_code import ZipCode
 from .rink import Rink, IceSlot
 from .proposal_rink_preference import ProposalRinkPreference
+from .practice_booking import PracticeBooking
 
 __all__ = [
     "Association",
@@ -26,4 +27,5 @@ __all__ = [
     "ZipCode",
     "Rink",
     "IceSlot",
+    "PracticeBooking",
 ]
