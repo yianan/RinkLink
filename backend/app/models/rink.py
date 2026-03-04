@@ -20,6 +20,7 @@ class Rink(Base):
     zip_code: Mapped[str] = mapped_column(String(10), default="")
     phone: Mapped[str] = mapped_column(String(30), default="")
     contact_email: Mapped[str] = mapped_column(String(200), default="")
+    website: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
