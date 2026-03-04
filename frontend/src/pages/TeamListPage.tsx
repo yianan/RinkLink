@@ -103,7 +103,29 @@ export default function TeamListPage() {
                   <td className="px-4 py-3 text-slate-700">{t.age_group}</td>
                   <td className="px-4 py-3 text-slate-700">{t.level}</td>
                   <td className="px-4 py-3 text-slate-700">{t.myhockey_ranking ?? '-'}</td>
-                  <td className="px-4 py-3 text-slate-700">{t.manager_name}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {t.manager_name ? (
+                      t.manager_email ? (
+                        <a
+                          href={`mailto:${t.manager_email}`}
+                          className="text-slate-900 underline underline-offset-2 hover:text-slate-950"
+                        >
+                          {t.manager_name}
+                        </a>
+                      ) : (
+                        <span className="text-slate-900">{t.manager_name}</span>
+                      )
+                    ) : t.manager_email ? (
+                      <a
+                        href={`mailto:${t.manager_email}`}
+                        className="text-slate-900 underline underline-offset-2 hover:text-slate-950"
+                      >
+                        Email
+                      </a>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
                       <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(t)} aria-label="Edit">

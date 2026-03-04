@@ -3,6 +3,7 @@ import { Loader2, UploadCloud } from 'lucide-react';
 import { api } from '../api/client';
 import { IceSlotUploadPreview } from '../types';
 import { cn } from '../lib/cn';
+import { formatTimeHHMM } from '../lib/time';
 import { Alert } from './ui/Alert';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
@@ -116,28 +117,43 @@ export default function IceSlotCsvUploader({ rinkId, onConfirmed }: Props) {
           </div>
 
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Start</th>
-                    <th className="px-4 py-3">End</th>
-                    <th className="px-4 py-3">Notes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {preview.entries.map((e, i) => (
+            <table className="w-full table-fixed text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                <tr>
+                  <th className="px-3 py-3 sm:px-4">Date</th>
+                  <th className="hidden px-3 py-3 sm:table-cell sm:px-4">Start</th>
+                  <th className="hidden px-3 py-3 sm:table-cell sm:px-4">End</th>
+                  <th className="hidden px-3 py-3 md:table-cell md:px-4">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {preview.entries.map((e, i) => {
+                  const startTime = formatTimeHHMM(e.start_time) ?? e.start_time;
+                  const endTime = e.end_time ? formatTimeHHMM(e.end_time) ?? e.end_time : null;
+
+                  return (
                     <tr key={i} className="bg-white">
-                      <td className="px-4 py-3 font-medium text-slate-900">{e.date}</td>
-                      <td className="px-4 py-3 text-slate-700">{e.start_time}</td>
-                      <td className="px-4 py-3 text-slate-700">{e.end_time || '-'}</td>
-                      <td className="px-4 py-3 text-slate-700">{e.notes || '-'}</td>
+                      <td className="px-3 py-3 font-medium text-slate-900 sm:px-4">
+                        <div className="whitespace-nowrap">{e.date}</div>
+                        <div className="mt-0.5 text-xs font-normal text-slate-500 break-words whitespace-normal sm:hidden">
+                          {startTime}
+                          {endTime ? `–${endTime}` : ''}
+                          {e.notes ? ` • ${e.notes}` : ''}
+                        </div>
+                        <div className="mt-0.5 hidden text-xs font-normal text-slate-500 break-words whitespace-normal sm:block md:hidden">
+                          {e.notes || '-'}
+                        </div>
+                      </td>
+                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4">{startTime}</td>
+                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4">{endTime || '-'}</td>
+                      <td className="hidden px-3 py-3 text-slate-700 break-words whitespace-normal md:table-cell md:px-4">
+                        {e.notes || '-'}
+                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </Card>
 
           <div className="flex flex-wrap items-center gap-2">

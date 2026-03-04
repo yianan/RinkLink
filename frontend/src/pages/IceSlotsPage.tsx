@@ -12,6 +12,7 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Textarea } from '../components/ui/Textarea';
 import { cn } from '../lib/cn';
+import { formatTimeHHMM } from '../lib/time';
 
 const statusColors: Record<string, 'success' | 'warning' | 'info' | 'neutral'> = {
   available: 'success',
@@ -72,7 +73,7 @@ export default function IceSlotsPage() {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Button type="button" variant="ghost" size="icon" onClick={() => navigate('/rinks')} aria-label="Back to rinks">
@@ -89,7 +90,7 @@ export default function IceSlotsPage() {
         </div>
       </div>
 
-      <div className="flex w-fit rounded-xl bg-slate-100 p-1">
+      <div className="grid w-full grid-cols-1 gap-1 rounded-xl bg-slate-100 p-1 sm:grid-cols-3">
         {[
           { label: `List View (${slots.length})`, value: 0 },
           { label: 'Calendar View', value: 1 },
@@ -100,7 +101,7 @@ export default function IceSlotsPage() {
             type="button"
             onClick={() => setTab(t.value)}
             className={cn(
-              'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+              'w-full rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
               tab === t.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900',
             )}
           >
@@ -118,29 +119,46 @@ export default function IceSlotsPage() {
           </div>
 
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Start</th>
-                    <th className="px-4 py-3">End</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Notes</th>
-                    <th className="px-4 py-3 text-right"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {slots.map((s) => (
+            <table className="w-full table-fixed text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                <tr>
+                  <th className="px-3 py-3 sm:px-4">Date</th>
+                  <th className="hidden px-3 py-3 sm:table-cell sm:px-4">Start</th>
+                  <th className="hidden px-3 py-3 sm:table-cell sm:px-4">End</th>
+                  <th className="hidden px-3 py-3 sm:table-cell sm:px-4">Status</th>
+                  <th className="hidden px-3 py-3 md:table-cell md:px-4">Notes</th>
+                  <th className="px-3 py-3 text-right sm:px-4"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {slots.map((s) => {
+                  const startTime = formatTimeHHMM(s.start_time) ?? s.start_time;
+                  const endTime = s.end_time ? formatTimeHHMM(s.end_time) ?? s.end_time : null;
+
+                  return (
                     <tr key={s.id} className="hover:bg-slate-50/60">
-                      <td className="px-4 py-3 font-medium text-slate-900">{s.date}</td>
-                      <td className="px-4 py-3 text-slate-700">{s.start_time}</td>
-                      <td className="px-4 py-3 text-slate-700">{s.end_time || '-'}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3 font-medium text-slate-900 sm:px-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="whitespace-nowrap">{s.date}</div>
+                          <div className="sm:hidden">
+                            <Badge variant={statusColors[s.status] || 'neutral'}>{s.status}</Badge>
+                          </div>
+                        </div>
+                        <div className="mt-0.5 text-xs font-normal text-slate-500 break-words whitespace-normal sm:hidden">
+                          {startTime}
+                          {endTime ? `–${endTime}` : ''}
+                          {s.notes ? ` • ${s.notes}` : ''}
+                        </div>
+                      </td>
+                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4">{startTime}</td>
+                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4">{endTime || '-'}</td>
+                      <td className="hidden px-3 py-3 sm:table-cell sm:px-4">
                         <Badge variant={statusColors[s.status] || 'neutral'}>{s.status}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-slate-700">{s.notes || '-'}</td>
-                      <td className="px-4 py-3">
+                      <td className="hidden px-3 py-3 text-slate-700 break-words whitespace-normal md:table-cell md:px-4">
+                        {s.notes || '-'}
+                      </td>
+                      <td className="px-3 py-3 sm:px-4">
                         <div className="flex justify-end">
                           <Button
                             type="button"
@@ -155,18 +173,18 @@ export default function IceSlotsPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );
+                })}
 
-                  {slots.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600">
-                        No ice slots yet. Add one or upload a CSV.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                {slots.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600">
+                      No ice slots yet. Add one or upload a CSV.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </Card>
         </div>
       )}
@@ -183,8 +201,8 @@ export default function IceSlotsPage() {
                     variant={statusColors[s.status] || 'neutral'}
                     className={cn(s.status === 'available' ? '' : 'bg-white')}
                   >
-                    {s.date.substring(5)} {s.start_time}
-                    {s.end_time ? '-' + s.end_time : ''}
+                    {s.date.substring(5)} {formatTimeHHMM(s.start_time) ?? s.start_time}
+                    {s.end_time ? `-${formatTimeHHMM(s.end_time) ?? s.end_time}` : ''}
                   </Badge>
                 ))}
               </div>

@@ -3,6 +3,7 @@ import { UploadCloud } from 'lucide-react';
 import { api } from '../api/client';
 import { ScheduleUploadPreview, ScheduleUploadRow } from '../types';
 import { cn } from '../lib/cn';
+import { formatTimeHHMM } from '../lib/time';
 import { Alert } from './ui/Alert';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
@@ -125,7 +126,7 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
                   {preview.entries.map((row: ScheduleUploadRow, i: number) => (
                     <tr key={i} className="bg-white">
                       <td className="px-4 py-3 font-medium text-slate-900">{row.date}</td>
-                      <td className="px-4 py-3 text-slate-700">{row.time || '-'}</td>
+                      <td className="px-4 py-3 text-slate-700">{formatTimeHHMM(row.time) || '-'}</td>
                       <td className="px-4 py-3">
                         <Badge variant={row.entry_type === 'home' ? 'success' : 'info'}>{row.entry_type}</Badge>
                       </td>

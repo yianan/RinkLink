@@ -8,6 +8,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { cn } from '../lib/cn';
+import { formatTimeHHMM } from '../lib/time';
 
 const statusColors: Record<string, 'info' | 'warning' | 'success' | 'neutral'> = {
   scheduled: 'info',
@@ -110,7 +111,7 @@ export default function GamesPage() {
                 return (
                   <tr key={g.id} className="hover:bg-slate-50/60">
                     <td className="px-4 py-3 font-medium text-slate-900">
-                      {formatDateLabel(g.date)} {g.time || ''}
+                      {formatDateLabel(g.date)} {formatTimeHHMM(g.time) || ''}
                     </td>
                     <td className="px-4 py-3 text-slate-700">
                       <div className="font-medium text-slate-900">{opponent || '—'}</div>

@@ -10,6 +10,7 @@ import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { cn } from '../lib/cn';
+import { formatTimeHHMM } from '../lib/time';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -144,8 +145,8 @@ export default function PracticePage() {
                 <tr key={b.id} className="hover:bg-slate-50/60">
                   <td className="px-4 py-3 font-medium text-slate-900">{b.slot_date || '—'}</td>
                   <td className="px-4 py-3 text-slate-700">
-                    {b.slot_start_time || '—'}
-                    {b.slot_end_time ? `–${b.slot_end_time}` : ''}
+                    {formatTimeHHMM(b.slot_start_time) || '—'}
+                    {b.slot_end_time ? `–${formatTimeHHMM(b.slot_end_time) || b.slot_end_time}` : ''}
                   </td>
                   <td className="px-4 py-3">
                     {b.rink_name ? (
@@ -275,8 +276,8 @@ export default function PracticePage() {
               </option>
               {slots.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.start_time}
-                  {s.end_time ? `–${s.end_time}` : ''} {s.notes ? `(${s.notes})` : ''}
+                  {formatTimeHHMM(s.start_time) || s.start_time}
+                  {s.end_time ? `–${formatTimeHHMM(s.end_time) || s.end_time}` : ''} {s.notes ? `(${s.notes})` : ''}
                 </option>
               ))}
             </Select>

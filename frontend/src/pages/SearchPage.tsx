@@ -13,6 +13,7 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { cn } from '../lib/cn';
+import { formatTimeHHMM } from '../lib/time';
 
 const LEVELS_10U_PLUS = ['AAA', 'AA', 'A', 'B', 'C', 'Rec'];
 const LEVELS_6U_8U = ['Beginner', 'Beginner/Intermediate', 'Intermediate', 'Intermediate/Advanced', 'Advanced'];
@@ -234,7 +235,7 @@ export default function SearchPage() {
                   <option value="">Select a date…</option>
                   {openDates.map((e) => (
                     <option key={e.id} value={e.id}>
-                      {e.date} ({e.entry_type}) {e.time || ''}
+                      {e.date} ({e.entry_type}) {formatTimeHHMM(e.time) || ''}
                     </option>
                   ))}
                 </Select>
@@ -317,7 +318,7 @@ export default function SearchPage() {
               {availableSlots
                 .map(
                   (s) =>
-                    `${s.start_time}${s.end_time ? '-' + s.end_time : ''}${s.notes ? ' (' + s.notes + ')' : ''}`,
+                    `${formatTimeHHMM(s.start_time) || s.start_time}${s.end_time ? '-' + (formatTimeHHMM(s.end_time) || s.end_time) : ''}${s.notes ? ' (' + s.notes + ')' : ''}`,
                 )
                 .join(', ')}
             </Alert>
@@ -350,7 +351,7 @@ export default function SearchPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <Badge variant={r.entry_type === 'home' ? 'success' : 'info'}>{r.entry_type}</Badge>
-                          <div className="text-slate-700">{r.entry_time || ''}</div>
+                          <div className="text-slate-700">{formatTimeHHMM(r.entry_time) || ''}</div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -414,13 +415,13 @@ export default function SearchPage() {
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">{m.home_team_name}</div>
                       <div className="mt-0.5 text-xs text-slate-500">
-                        {m.home_association_name} {m.home_time && `@ ${m.home_time}`}
+                        {m.home_association_name} {m.home_time && `@ ${formatTimeHHMM(m.home_time) || m.home_time}`}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">{m.away_team_name}</div>
                       <div className="mt-0.5 text-xs text-slate-500">
-                        {m.away_association_name} {m.away_time && `@ ${m.away_time}`}
+                        {m.away_association_name} {m.away_time && `@ ${formatTimeHHMM(m.away_time) || m.away_time}`}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-700">{m.distance_miles != null ? `${m.distance_miles} mi` : '-'}</td>
@@ -515,8 +516,8 @@ export default function SearchPage() {
                 <option value="">{!proposalRinkId ? 'Select a rink first' : proposalSlots.length === 0 ? 'No available slots' : 'No ice slot'}</option>
                 {proposalSlots.map((s: IceSlot) => (
                   <option key={s.id} value={s.id}>
-                    {s.start_time}
-                    {s.end_time ? '-' + s.end_time : ''} {s.notes ? `(${s.notes})` : ''}
+                    {formatTimeHHMM(s.start_time) || s.start_time}
+                    {s.end_time ? '-' + (formatTimeHHMM(s.end_time) || s.end_time) : ''} {s.notes ? `(${s.notes})` : ''}
                   </option>
                 ))}
               </Select>

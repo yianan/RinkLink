@@ -11,6 +11,7 @@ import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { cn } from '../lib/cn';
+import { formatTimeHHMM } from '../lib/time';
 
 const statusColors: Record<string, 'warning' | 'success' | 'danger' | 'neutral'> = {
   proposed: 'warning',
@@ -31,8 +32,7 @@ const TABS: Array<{
 ];
 
 function timeInputValue(t: string | null) {
-  if (!t) return '';
-  return t.length >= 5 ? t.slice(0, 5) : t;
+  return formatTimeHHMM(t) || '';
 }
 
 function dedupeAcceptedProposals(ps: GameProposal[]) {
@@ -189,7 +189,7 @@ export default function ProposalsPage() {
                 return (
                   <tr key={p.id} className="hover:bg-slate-50/60">
                     <td className="px-4 py-3 font-medium text-slate-900">
-                      {p.proposed_date} {p.proposed_time || ''}
+                      {p.proposed_date} {formatTimeHHMM(p.proposed_time) || ''}
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">{p.home_team_name}</div>
@@ -205,7 +205,7 @@ export default function ProposalsPage() {
                           <div className="font-medium text-slate-900">{p.rink_name}</div>
                           <div className="mt-0.5 text-xs text-slate-500">
                             {p.rink_city}, {p.rink_state}
-                            {p.ice_slot_start_time && ` • ${p.ice_slot_start_time}${p.ice_slot_end_time ? '-' + p.ice_slot_end_time : ''}`}
+                            {p.ice_slot_start_time && ` • ${formatTimeHHMM(p.ice_slot_start_time) || p.ice_slot_start_time}${p.ice_slot_end_time ? '-' + (formatTimeHHMM(p.ice_slot_end_time) || p.ice_slot_end_time) : ''}`}
                           </div>
                         </div>
                       ) : p.location_label ? (
@@ -330,8 +330,8 @@ export default function ProposalsPage() {
                 <option value="">No ice slot</option>
                 {rescheduleSlots.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.start_time}
-                    {s.end_time ? '-' + s.end_time : ''} {s.notes ? `(${s.notes})` : ''}
+                    {formatTimeHHMM(s.start_time) || s.start_time}
+                    {s.end_time ? '-' + (formatTimeHHMM(s.end_time) || s.end_time) : ''} {s.notes ? `(${s.notes})` : ''}
                   </option>
                 ))}
               </Select>

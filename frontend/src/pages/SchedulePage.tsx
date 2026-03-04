@@ -12,6 +12,7 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { cn } from '../lib/cn';
+import { formatTimeHHMM } from '../lib/time';
 
 const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
   open: 'success',
@@ -110,7 +111,7 @@ export default function SchedulePage() {
                 {entries.map((e) => (
                   <tr key={e.id} className="hover:bg-slate-50/60">
                     <td className="px-4 py-3 font-medium text-slate-900">{e.date}</td>
-                    <td className="px-4 py-3 text-slate-700">{e.time || '-'}</td>
+                    <td className="px-4 py-3 text-slate-700">{formatTimeHHMM(e.time) || '-'}</td>
                     <td className="px-4 py-3">
                       <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>{e.entry_type}</Badge>
                     </td>
@@ -170,7 +171,7 @@ export default function SchedulePage() {
                         day: 'numeric',
                       })}
                     </div>
-                    <div className="mt-0.5 text-xs text-slate-600">{e.time || '—'}</div>
+                    <div className="mt-0.5 text-xs text-slate-600">{formatTimeHHMM(e.time) || '—'}</div>
                     <div className="mt-2 flex flex-wrap gap-1">
                       <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>{e.entry_type}</Badge>
                       <Badge variant="outline">{e.status}</Badge>

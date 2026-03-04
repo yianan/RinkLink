@@ -108,7 +108,19 @@ export default function RinkListPage() {
                     <div className="text-xs text-slate-500">{r.city}, {r.state} {r.zip_code}</div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-slate-700">{r.phone}</td>
-                  <td className="px-4 py-3 text-slate-700">{r.contact_email}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {r.contact_email ? (
+                      <a
+                        href={`mailto:${r.contact_email}`}
+                        className="text-brand-700 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {r.contact_email}
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">
                       <Button

@@ -5,9 +5,13 @@ import { useTeam } from '../context/TeamContext';
 import { api } from '../api/client';
 import { ScheduleEntry, GameProposal, Game, Notification, PracticeBooking } from '../types';
 import { cn } from '../lib/cn';
+import { formatTimeHHMM } from '../lib/time';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+
+const clickableCard =
+  'cursor-pointer text-left transition-shadow transition-colors hover:border-brand-200/80 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50';
 
 function StatCard({ title, value, icon, color, onClick }: {
   title: string; value: number | string; icon: React.ReactNode; color: string; onClick?: () => void;
@@ -27,7 +31,7 @@ function StatCard({ title, value, icon, color, onClick }: {
       }}
       className={cn(
         'p-4 text-left transition-shadow',
-        onClick && 'cursor-pointer hover:shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50',
+        onClick && clickableCard,
       )}
     >
       <div className="flex items-center gap-2">
@@ -151,12 +155,13 @@ export default function HomePage() {
               <div className="mt-1 text-sm text-slate-700">{weekly.message}</div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" onClick={() => navigate('/confirm')}>
+              <Button type="button" size="sm" onClick={() => navigate('/confirm')}>
                 Confirm Games
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                size="sm"
+                variant="ghost"
                 onClick={() => api.markNotificationRead(weekly.id).then(() => setNotifications((ns) => ns.filter((n) => n.id !== weekly.id)))}
               >
                 Dismiss
@@ -198,12 +203,26 @@ export default function HomePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="p-4">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate('/games')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') navigate('/games');
+            if (e.key === ' ') {
+              e.preventDefault();
+              navigate('/games');
+            }
+          }}
+          className={cn('p-4', clickableCard)}
+        >
           <div className="flex items-start justify-between gap-3">
-            <div className="text-sm font-semibold tracking-tight text-slate-900">Upcoming Games</div>
-            <Button type="button" variant="outline" onClick={() => navigate('/games')}>
-              View
-            </Button>
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-sky-700">
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="text-sm font-medium text-slate-700">Upcoming Games</div>
+            </div>
           </div>
 
           {upcoming.length === 0 ? (
@@ -211,10 +230,10 @@ export default function HomePage() {
           ) : (
             <ul className="mt-3 divide-y divide-slate-200">
               {upcoming.map((g) => (
-                <li key={g.id} className="flex items-center justify-between gap-3 py-3">
+                <li key={g.id} className="flex items-center justify-between gap-3 px-2 py-3">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-slate-900">
-                      {g.date} {g.time || ''} — {g.home_team_name} vs {g.away_team_name}
+                      {g.date} {formatTimeHHMM(g.time) || ''} — {g.home_team_name} vs {g.away_team_name}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">{g.rink_name || g.location_label || 'No location yet'}</div>
                   </div>
@@ -225,12 +244,26 @@ export default function HomePage() {
           )}
         </Card>
 
-        <Card className="p-4">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate('/proposals')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') navigate('/proposals');
+            if (e.key === ' ') {
+              e.preventDefault();
+              navigate('/proposals');
+            }
+          }}
+          className={cn('p-4', clickableCard)}
+        >
           <div className="flex items-start justify-between gap-3">
-            <div className="text-sm font-semibold tracking-tight text-slate-900">Pending Proposals</div>
-            <Button type="button" variant="outline" onClick={() => navigate('/proposals')}>
-              View
-            </Button>
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-amber-700">
+                <Inbox className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="text-sm font-medium text-slate-700">Pending Proposals</div>
+            </div>
           </div>
 
           {proposals.length === 0 ? (
@@ -238,39 +271,18 @@ export default function HomePage() {
           ) : (
             <ul className="mt-3 divide-y divide-slate-200">
               {proposals.map((p) => (
-                <li key={p.id} className="flex items-center justify-between gap-3 py-3">
+                <li key={p.id} className="flex items-start justify-between gap-3 px-2 py-3">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-slate-900">
                       {p.proposed_date} — {p.home_team_name} vs {p.away_team_name}
                     </div>
                     <div className="mt-1 truncate text-xs text-slate-500">{p.message || '—'}</div>
                   </div>
-                  <Button type="button" variant="outline" onClick={() => navigate('/proposals')}>
-                    Open
-                  </Button>
                 </li>
               ))}
             </ul>
           )}
         </Card>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" onClick={() => navigate('/schedule')}>
-          View Schedule
-        </Button>
-        <Button type="button" variant="outline" onClick={() => navigate('/games')}>
-          View Games
-        </Button>
-        <Button type="button" variant="outline" onClick={() => navigate('/practice')}>
-          Practice Bookings
-        </Button>
-        <Button type="button" variant="outline" onClick={() => navigate('/search')}>
-          Find Opponents
-        </Button>
-        <Button type="button" variant="outline" onClick={() => navigate('/confirm')}>
-          Weekly Confirm
-        </Button>
       </div>
     </div>
   );

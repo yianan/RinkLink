@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import { Switch } from '../components/ui/Switch';
 import { Button } from '../components/ui/Button';
+import { formatTimeHHMM } from '../lib/time';
 
 function formatLocalDateISO(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -99,7 +100,7 @@ export default function WeeklyConfirmPage() {
                       day: 'numeric',
                     })}
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{g.time || '-'}</td>
+                  <td className="px-4 py-3 text-slate-700">{formatTimeHHMM(g.time) || '-'}</td>
                   <td className="px-4 py-3 text-slate-700">{opponent || 'TBD'}</td>
                   <td className="px-4 py-3">
                     <Badge variant="outline">{g.status}</Badge>

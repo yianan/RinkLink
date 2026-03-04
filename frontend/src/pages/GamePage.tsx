@@ -15,6 +15,7 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
+import { formatTimeHHMM } from '../lib/time';
 
 function formatDateLabel(d: string) {
   return new Date(d + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
@@ -240,7 +241,7 @@ export default function GamePage() {
         <div>
           <div className="page-title">Game Scoresheet</div>
           <div className="page-subtitle">
-            {formatDateLabel(game.date)} {game.time || ''} • {homeName} vs {awayName}
+            {formatDateLabel(game.date)} {formatTimeHHMM(game.time) || ''} • {homeName} vs {awayName}
             {isThisWeek && <span className="ml-2 text-xs font-medium text-brand-700">This week</span>}
           </div>
         </div>
