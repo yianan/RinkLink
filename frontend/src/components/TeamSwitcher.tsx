@@ -6,7 +6,7 @@ export default function TeamSwitcher() {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="hidden text-xs font-medium text-white/80 sm:block">Active team</div>
+      <div className="hidden text-xs font-medium text-slate-600 sm:block dark:text-white/80">Active team</div>
       <div className="w-full min-w-0 sm:w-[320px]">
         <Select
           value={activeTeam?.id || ''}
@@ -14,7 +14,7 @@ export default function TeamSwitcher() {
             const team = teams.find((t) => t.id === e.target.value) || null;
             setActiveTeam(team);
           }}
-          className="bg-white/90 text-slate-900 shadow-sm ring-1 ring-white/30 focus:border-white focus:ring-white"
+          className="bg-white/80 text-slate-900 shadow-sm ring-1 ring-slate-200/80 focus:border-cyan-400 focus:ring-cyan-400 dark:bg-slate-950/40 dark:text-slate-100 dark:ring-slate-700/60 dark:focus:border-cyan-400 dark:focus:ring-cyan-400"
         >
           <option value="">Select a team…</option>
           {teams.map((t) => (

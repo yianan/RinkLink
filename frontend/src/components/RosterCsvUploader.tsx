@@ -57,14 +57,16 @@ export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: str
           onDrop={handleDrop}
           className={cn(
             'rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors',
-            dragOver ? 'border-brand-500 bg-brand-50/60' : 'border-slate-200 bg-white',
+            dragOver
+              ? 'border-brand-500 bg-brand-50/60 dark:border-cyan-400 dark:bg-cyan-950/25'
+              : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/20',
           )}
         >
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 dark:bg-slate-900/50 dark:text-slate-200">
             <UploadCloud className="h-6 w-6" />
           </div>
-          <div className="text-sm font-medium text-slate-900">Drag & drop a roster CSV here</div>
-          <div className="mt-1 text-sm text-slate-600">or choose a file to preview before importing</div>
+          <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Drag & drop a roster CSV here</div>
+          <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">or choose a file to preview before importing</div>
 
           <div className="mt-5 flex items-center justify-center gap-2">
             <Button type="button" variant="primary" disabled={loading} onClick={() => document.getElementById('roster-csv-input')?.click()}>
@@ -82,7 +84,7 @@ export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: str
             />
           </div>
 
-          <div className="mt-3 text-xs text-slate-500">
+          <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
             Expected columns: First Name, Last Name (optional: Number/Jersey, Position)
           </div>
         </div>
@@ -94,16 +96,16 @@ export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: str
         <div className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold tracking-tight text-slate-900">
-                Preview <span className="text-slate-500">({preview.entries.length} player(s))</span>
+              <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                Preview <span className="text-slate-500 dark:text-slate-400">({preview.entries.length} player(s))</span>
               </div>
-              <div className="mt-1 text-sm text-slate-600">Confirm to import this roster.</div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Confirm to import this roster.</div>
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-slate-700">
+            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-950/20 dark:focus:ring-cyan-400"
                 checked={replaceExisting}
                 onChange={(e) => setReplaceExisting(e.target.checked)}
               />
@@ -118,7 +120,7 @@ export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: str
           <Card className="overflow-hidden">
             <div className="max-h-[420px] overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
                   <tr>
                     <th className="px-4 py-3">#</th>
                     <th className="px-4 py-3">First</th>
@@ -126,13 +128,13 @@ export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: str
                     <th className="px-4 py-3">Pos</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                   {preview.entries.map((p, i) => (
-                    <tr key={i} className="bg-white">
-                      <td className="px-4 py-3 font-medium text-slate-900">{p.jersey_number ?? '-'}</td>
-                      <td className="px-4 py-3 text-slate-700">{p.first_name}</td>
-                      <td className="px-4 py-3 text-slate-700">{p.last_name}</td>
-                      <td className="px-4 py-3 text-slate-700">{p.position || '-'}</td>
+                    <tr key={i} className="bg-white dark:bg-slate-950/20">
+                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{p.jersey_number ?? '-'}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.first_name}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.last_name}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.position || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -153,4 +155,3 @@ export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: str
     </div>
   );
 }
-

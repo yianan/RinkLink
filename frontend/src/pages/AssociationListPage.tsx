@@ -74,7 +74,7 @@ export default function AssociationListPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="divide-y divide-slate-200 bg-white md:hidden">
+        <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
           {associations.map((a) => {
             const assocTeams = teamsByAssociation[a.id] || [];
             const extraTeams = Math.max(0, assocTeams.length - 3);
@@ -83,26 +83,26 @@ export default function AssociationListPage() {
               <div key={a.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-900">{a.name}</div>
-                    <div className="mt-1 text-xs text-slate-500">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{a.name}</div>
+                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                       {a.city}, {a.state} {a.zip_code}
                     </div>
                     {a.league_affiliation ? (
-                      <div className="mt-2 text-xs text-slate-600">League: {a.league_affiliation}</div>
+                      <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">League: {a.league_affiliation}</div>
                     ) : null}
-                    <div className="mt-2 text-xs text-slate-600">Teams: {assocTeams.length}</div>
+                    <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">Teams: {assocTeams.length}</div>
                     {assocTeams.length ? (
                       <div className="mt-1 space-y-1">
                         {assocTeams.slice(0, 3).map((t) => (
-                          <div key={t.id} className="truncate text-xs text-slate-700">
+                          <div key={t.id} className="truncate text-xs text-slate-700 dark:text-slate-300">
                             {t.name}{' '}
-                            <span className="text-slate-500">
+                            <span className="text-slate-500 dark:text-slate-400">
                               ({t.age_group} {t.level})
                             </span>
                           </div>
                         ))}
                         {extraTeams ? (
-                          <div className="text-xs text-slate-500">+ {extraTeams} more</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400">+ {extraTeams} more</div>
                         ) : null}
                       </div>
                     ) : null}
@@ -122,7 +122,7 @@ export default function AssociationListPage() {
           })}
 
           {associations.length === 0 && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600">
+            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
               No associations yet. Add one or seed demo data.
             </div>
           )}
@@ -130,7 +130,7 @@ export default function AssociationListPage() {
 
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-300">
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">City</th>
@@ -141,21 +141,21 @@ export default function AssociationListPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {associations.map((a) => (
-                <tr key={a.id} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-3 font-medium text-slate-900">{a.name}</td>
-                  <td className="px-4 py-3 text-slate-700">{a.city}</td>
-                  <td className="px-4 py-3 text-slate-700">{a.state}</td>
-                  <td className="px-4 py-3 text-slate-700">{a.zip_code}</td>
-                  <td className="px-4 py-3 text-slate-700">{a.league_affiliation || '-'}</td>
-                  <td className="px-4 py-3 text-slate-700">
+                <tr key={a.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{a.name}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{a.city}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{a.state}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{a.zip_code}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{a.league_affiliation || '-'}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                     {teamsByAssociation[a.id]?.length ? (
                       <div className="space-y-1">
                         {teamsByAssociation[a.id].map((t) => (
                           <div key={t.id} className="truncate">
                             {t.name}{' '}
-                            <span className="text-xs text-slate-500">
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
                               ({t.age_group} {t.level})
                             </span>
                           </div>
@@ -180,7 +180,7 @@ export default function AssociationListPage() {
 
               {associations.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600">
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No associations yet. Add one or seed demo data.
                   </td>
                 </tr>
@@ -207,31 +207,31 @@ export default function AssociationListPage() {
       >
         <div className="grid grid-cols-1 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Name</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Name</label>
             <Input value={form.name} onChange={(e) => setField('name', e.target.value)} required />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Home Rink Address</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Home Rink Address</label>
             <Input value={form.home_rink_address} onChange={(e) => setField('home_rink_address', e.target.value)} />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600">City</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">City</label>
               <Input value={form.city} onChange={(e) => setField('city', e.target.value)} />
             </div>
             <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600">State</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">State</label>
               <Input value={form.state} onChange={(e) => setField('state', e.target.value)} />
             </div>
             <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Zip</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Zip</label>
               <Input value={form.zip_code} onChange={(e) => setField('zip_code', e.target.value)} />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">League Affiliation</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">League Affiliation</label>
             <Input value={form.league_affiliation} onChange={(e) => setField('league_affiliation', e.target.value)} />
           </div>
         </div>

@@ -58,7 +58,7 @@ export default function GamesPage() {
         <div className="page-subtitle">Accepted non-league games with scoresheets and weekly confirmation.</div>
       </div>
 
-      <div className="inline-flex rounded-xl bg-slate-100 p-1">
+      <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
         {[
           { label: `Upcoming (${counts.upcoming})`, value: 0 },
           { label: `Past (${counts.past})`, value: 1 },
@@ -70,7 +70,9 @@ export default function GamesPage() {
             onClick={() => setTab(t.value)}
             className={cn(
               'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === t.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900',
+              tab === t.value
+                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100 dark:shadow-none dark:ring-1 dark:ring-slate-800/70'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
             )}
           >
             {t.label}
@@ -79,7 +81,7 @@ export default function GamesPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="divide-y divide-slate-200 bg-white md:hidden">
+        <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
           {filtered.map((g) => {
             const isHome = activeTeam.id === g.home_team_id;
             const opponent = isHome ? g.away_team_name : g.home_team_name;
@@ -94,19 +96,19 @@ export default function GamesPage() {
               <button
                 key={g.id}
                 type="button"
-                className="w-full px-4 py-4 text-left transition-colors hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                className="w-full px-4 py-4 text-left transition-colors hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:hover:bg-slate-900/40 dark:focus-visible:ring-offset-slate-950"
                 onClick={() => navigate(`/games/${g.id}`)}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-900">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
                       {formatDateLabel(g.date)} {formatTimeHHMM(g.time) || ''}
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-700">
-                      <span className="font-medium text-slate-900">{opponent || '—'}</span>
-                      <span className="text-xs text-slate-500">{isHome ? 'Home' : 'Away'}</span>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <span className="font-medium text-slate-900 dark:text-slate-100">{opponent || '—'}</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">{isHome ? 'Home' : 'Away'}</span>
                     </div>
-                    <div className="mt-1 text-xs text-slate-500">
+                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                       {g.rink_name
                         ? `${g.rink_name}${g.rink_city ? ` • ${g.rink_city}, ${g.rink_state}` : ''}`
                         : g.location_label || 'No location yet'}
@@ -114,7 +116,7 @@ export default function GamesPage() {
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <Badge variant={statusColors[g.status] || 'neutral'}>{g.status}</Badge>
                       <Badge variant="outline">Score: {score}</Badge>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
                         Weekly: You {myConfirmed ? 'Yes' : 'No'} • Opp {oppConfirmed ? 'Yes' : 'No'}
                       </span>
                     </div>
@@ -125,7 +127,7 @@ export default function GamesPage() {
           })}
 
           {filtered.length === 0 && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600">
+            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
               No games to show.
             </div>
           )}
@@ -133,7 +135,7 @@ export default function GamesPage() {
 
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Opponent</th>
@@ -149,7 +151,7 @@ export default function GamesPage() {
                 <th className="px-4 py-3 text-right"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {filtered.map((g) => {
                 const isHome = activeTeam.id === g.home_team_id;
                 const opponent = isHome ? g.away_team_name : g.home_team_name;
@@ -161,31 +163,31 @@ export default function GamesPage() {
                     : '—';
 
                 return (
-                  <tr key={g.id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3 font-medium text-slate-900">
+                  <tr key={g.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
                       {formatDateLabel(g.date)} {formatTimeHHMM(g.time) || ''}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      <div className="font-medium text-slate-900">{opponent || '—'}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">{isHome ? 'Home' : 'Away'}</div>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                      <div className="font-medium text-slate-900 dark:text-slate-100">{opponent || '—'}</div>
+                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{isHome ? 'Home' : 'Away'}</div>
                     </td>
-                    <td className="px-4 py-3 text-slate-700">
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                       {g.rink_name ? (
                         <div>
-                          <div className="font-medium text-slate-900">{g.rink_name}</div>
-                          <div className="mt-0.5 text-xs text-slate-500">
+                          <div className="font-medium text-slate-900 dark:text-slate-100">{g.rink_name}</div>
+                          <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                             {g.rink_city}, {g.rink_state}
                           </div>
                         </div>
                       ) : g.location_label ? (
-                        <div className="max-w-[360px] truncate text-slate-700" title={g.location_label}>
+                        <div className="max-w-[360px] truncate text-slate-700 dark:text-slate-300" title={g.location_label}>
                           {g.location_label}
                         </div>
                       ) : (
                         '—'
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">{score}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{score}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant={myConfirmed ? 'success' : 'outline'}>You: {myConfirmed ? 'Yes' : 'No'}</Badge>
@@ -208,7 +210,7 @@ export default function GamesPage() {
 
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600">
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No games to show.
                   </td>
                 </tr>

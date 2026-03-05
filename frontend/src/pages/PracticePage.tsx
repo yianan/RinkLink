@@ -6,6 +6,7 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
@@ -110,7 +111,7 @@ export default function PracticePage() {
         </Button>
       </div>
 
-      <div className="inline-flex rounded-xl bg-slate-100 p-1">
+      <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
         {(['upcoming', 'history'] as const).map((t) => (
           <button
             key={t}
@@ -118,7 +119,9 @@ export default function PracticePage() {
             onClick={() => setTab(t)}
             className={cn(
               'rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors',
-              tab === t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900',
+              tab === t
+                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100 dark:shadow-none dark:ring-1 dark:ring-slate-800/70'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
             )}
           >
             {t}
@@ -127,27 +130,27 @@ export default function PracticePage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="divide-y divide-slate-200 bg-white md:hidden">
+        <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
           {displayed.map((b) => (
             <div key={b.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-900">{b.slot_date || '—'}</div>
-                  <div className="mt-1 text-sm text-slate-700">
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{b.slot_date || '—'}</div>
+                  <div className="mt-1 text-sm text-slate-700 dark:text-slate-300">
                     {formatTimeHHMM(b.slot_start_time) || '—'}
                     {b.slot_end_time ? `–${formatTimeHHMM(b.slot_end_time) || b.slot_end_time}` : ''}
                   </div>
-                  <div className="mt-2 text-xs text-slate-500">
+                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                     {b.rink_name
                       ? `${b.rink_name}${b.rink_city ? ` • ${b.rink_city}, ${b.rink_state}` : ''}`
                       : '—'}
                   </div>
                   {(b.notes || b.slot_notes) && (
-                    <div className="mt-2 text-sm text-slate-700">{b.notes || b.slot_notes}</div>
+                    <div className="mt-2 text-sm text-slate-700 dark:text-slate-300">{b.notes || b.slot_notes}</div>
                   )}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Badge variant={b.status === 'active' ? 'success' : 'neutral'}>{b.status}</Badge>
-                    <span className="text-xs text-slate-500">Booked {new Date(b.created_at).toLocaleDateString()}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Booked {new Date(b.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
 
@@ -166,7 +169,7 @@ export default function PracticePage() {
           ))}
 
           {displayed.length === 0 && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600">
+            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
               No {tab} practice bookings.
             </div>
           )}
@@ -174,7 +177,7 @@ export default function PracticePage() {
 
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Time</th>
@@ -185,19 +188,19 @@ export default function PracticePage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {displayed.map((b) => (
-                <tr key={b.id} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-3 font-medium text-slate-900">{b.slot_date || '—'}</td>
-                  <td className="px-4 py-3 text-slate-700">
+                <tr key={b.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{b.slot_date || '—'}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                     {formatTimeHHMM(b.slot_start_time) || '—'}
                     {b.slot_end_time ? `–${formatTimeHHMM(b.slot_end_time) || b.slot_end_time}` : ''}
                   </td>
                   <td className="px-4 py-3">
                     {b.rink_name ? (
                       <div>
-                        <div className="font-medium text-slate-900">{b.rink_name}</div>
-                        <div className="mt-0.5 text-xs text-slate-500">
+                        <div className="font-medium text-slate-900 dark:text-slate-100">{b.rink_name}</div>
+                        <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                           {b.rink_city}, {b.rink_state}
                         </div>
                       </div>
@@ -205,11 +208,11 @@ export default function PracticePage() {
                       '—'
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{b.notes || b.slot_notes || '—'}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{b.notes || b.slot_notes || '—'}</td>
                   <td className="px-4 py-3">
                     <Badge variant={b.status === 'active' ? 'success' : 'neutral'}>{b.status}</Badge>
                   </td>
-                  <td className="px-4 py-3 text-slate-700">
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                     {new Date(b.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-3">
@@ -231,7 +234,7 @@ export default function PracticePage() {
 
               {displayed.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600">
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No {tab} practice bookings.
                   </td>
                 </tr>
@@ -274,7 +277,7 @@ export default function PracticePage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Rink</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink</label>
               <Select
                 value={selectedRinkId}
                 onChange={(e) => {
@@ -291,8 +294,8 @@ export default function PracticePage() {
               </Select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Date</label>
-              <input
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Date</label>
+              <Input
                 type="date"
                 min={today}
                 value={selectedDate}
@@ -300,13 +303,12 @@ export default function PracticePage() {
                   setSelectedDate(e.target.value);
                   setSelectedSlotId('');
                 }}
-                className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Ice Slot</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Ice Slot</label>
             <Select
               value={selectedSlotId}
               onChange={(e) => setSelectedSlotId(e.target.value)}
@@ -329,7 +331,7 @@ export default function PracticePage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Notes (optional)</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Notes (optional)</label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           </div>
         </div>

@@ -75,7 +75,7 @@ export default function SchedulePage() {
         </Button>
       </div>
 
-      <div className="inline-flex rounded-xl bg-slate-100 p-1">
+      <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
         {['List View', 'Calendar View', 'Upload CSV'].map((label, i) => (
           <button
             key={label}
@@ -83,7 +83,9 @@ export default function SchedulePage() {
             onClick={() => setTab(i)}
             className={cn(
               'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === i ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900',
+              tab === i
+                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100 dark:shadow-none dark:ring-1 dark:ring-slate-800/70'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
             )}
           >
             {label}
@@ -93,12 +95,12 @@ export default function SchedulePage() {
 
       {tab === 0 && (
         <Card className="overflow-hidden">
-          <div className="divide-y divide-slate-200 bg-white md:hidden">
+          <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
             {entries.map((e) => (
               <div key={e.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-900">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
                       {e.date} {formatTimeHHMM(e.time) || ''}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -107,10 +109,10 @@ export default function SchedulePage() {
                     </div>
 
                     {(e.opponent_name || e.location || e.notes) && (
-                      <div className="mt-3 space-y-1 text-sm text-slate-700">
-                        {e.opponent_name ? <div className="font-medium text-slate-900">vs {e.opponent_name}</div> : null}
-                        {e.location ? <div className="text-xs text-slate-500">{e.location}</div> : null}
-                        {e.notes ? <div className="text-xs text-slate-500">{e.notes}</div> : null}
+                      <div className="mt-3 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+                        {e.opponent_name ? <div className="font-medium text-slate-900 dark:text-slate-100">vs {e.opponent_name}</div> : null}
+                        {e.location ? <div className="text-xs text-slate-500 dark:text-slate-400">{e.location}</div> : null}
+                        {e.notes ? <div className="text-xs text-slate-500 dark:text-slate-400">{e.notes}</div> : null}
                       </div>
                     )}
                   </div>
@@ -123,7 +125,7 @@ export default function SchedulePage() {
             ))}
 
             {entries.length === 0 && (
-              <div className="px-4 py-10 text-center text-sm text-slate-600">
+              <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                 No schedule entries. Upload a CSV or add entries manually.
               </div>
             )}
@@ -131,7 +133,7 @@ export default function SchedulePage() {
 
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
                 <tr>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Time</th>
@@ -143,20 +145,20 @@ export default function SchedulePage() {
                   <th className="px-4 py-3 text-right"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
+              <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                 {entries.map((e) => (
-                  <tr key={e.id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3 font-medium text-slate-900">{e.date}</td>
-                    <td className="px-4 py-3 text-slate-700">{formatTimeHHMM(e.time) || '-'}</td>
+                  <tr key={e.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{e.date}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatTimeHHMM(e.time) || '-'}</td>
                     <td className="px-4 py-3">
                       <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>{e.entry_type}</Badge>
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={statusColors[e.status] || 'neutral'}>{e.status}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-slate-700">{e.opponent_name || '-'}</td>
-                    <td className="px-4 py-3 text-slate-700">{e.location || '-'}</td>
-                    <td className="px-4 py-3 text-slate-700">{e.notes || '-'}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{e.opponent_name || '-'}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{e.location || '-'}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{e.notes || '-'}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end">
                         <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete">
@@ -169,7 +171,7 @@ export default function SchedulePage() {
 
                 {entries.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-600">
+                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                       No schedule entries. Upload a CSV or add entries manually.
                     </td>
                   </tr>
@@ -184,7 +186,7 @@ export default function SchedulePage() {
         <div className="space-y-4">
           {Object.entries(byMonth).sort().map(([month, monthEntries]) => (
             <div key={month} className="space-y-2">
-              <div className="text-sm font-semibold tracking-tight text-slate-900">
+              <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 {new Date(month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </div>
               <div className="flex flex-wrap gap-2">
@@ -195,32 +197,32 @@ export default function SchedulePage() {
                       'w-[160px] p-3',
                       e.status === 'open'
                         ? e.entry_type === 'home'
-                          ? 'border-emerald-200 bg-emerald-50/60'
-                          : 'border-sky-200 bg-sky-50/60'
-                        : 'bg-white',
+                          ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/25'
+                          : 'border-sky-200 bg-sky-50/60 dark:border-sky-900/60 dark:bg-sky-950/25'
+                        : '',
                     )}
                   >
-                    <div className="text-sm font-semibold text-slate-900">
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                       {new Date(e.date + 'T00:00').toLocaleDateString('en-US', {
                         weekday: 'short',
                         month: 'short',
                         day: 'numeric',
                       })}
                     </div>
-                    <div className="mt-0.5 text-xs text-slate-600">{formatTimeHHMM(e.time) || '—'}</div>
+                    <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{formatTimeHHMM(e.time) || '—'}</div>
                     <div className="mt-2 flex flex-wrap gap-1">
                       <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>{e.entry_type}</Badge>
                       <Badge variant="outline">{e.status}</Badge>
                     </div>
                     {e.opponent_name && (
-                      <div className="mt-2 truncate text-xs text-slate-700">vs {e.opponent_name}</div>
+                      <div className="mt-2 truncate text-xs text-slate-700 dark:text-slate-300">vs {e.opponent_name}</div>
                     )}
                   </Card>
                 ))}
               </div>
             </div>
           ))}
-          {entries.length === 0 && <div className="text-sm text-slate-600">No schedule entries yet.</div>}
+          {entries.length === 0 && <div className="text-sm text-slate-600 dark:text-slate-400">No schedule entries yet.</div>}
         </div>
       )}
 
@@ -243,7 +245,7 @@ export default function SchedulePage() {
       >
         <div className="grid grid-cols-1 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Date</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Date</label>
             <Input
               type="date"
               value={addForm.date}
@@ -252,7 +254,7 @@ export default function SchedulePage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Time</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Time</label>
             <Input
               type="time"
               value={addForm.time}
@@ -260,7 +262,7 @@ export default function SchedulePage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Type</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Type</label>
             <Select
               value={addForm.entry_type}
               onChange={(e) => setAddForm((f) => ({ ...f, entry_type: e.target.value }))}

@@ -242,7 +242,7 @@ export default function GamePage() {
           <div className="page-title">Game Scoresheet</div>
           <div className="page-subtitle">
             {formatDateLabel(game.date)} {formatTimeHHMM(game.time) || ''} • {homeName} vs {awayName}
-            {isThisWeek && <span className="ml-2 text-xs font-medium text-brand-700">This week</span>}
+            {isThisWeek && <span className="ml-2 text-xs font-medium text-brand-700 dark:text-cyan-300">This week</span>}
           </div>
         </div>
         <Button type="button" variant="outline" onClick={() => navigate('/games')}>
@@ -253,18 +253,18 @@ export default function GamePage() {
       <Card className="p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <div className="text-sm font-semibold tracking-tight text-slate-900">Game Details</div>
-            <div className="text-sm text-slate-700">
-              <span className="font-medium text-slate-900">{homeName}</span> (Home) vs{' '}
-              <span className="font-medium text-slate-900">{awayName}</span> (Away)
+            <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Game Details</div>
+            <div className="text-sm text-slate-700 dark:text-slate-300">
+              <span className="font-medium text-slate-900 dark:text-slate-100">{homeName}</span> (Home) vs{' '}
+              <span className="font-medium text-slate-900 dark:text-slate-100">{awayName}</span> (Away)
             </div>
             {rinkLabel ? (
-              <div className="flex items-start gap-2 text-sm text-slate-700">
-                <MapPin className="mt-0.5 h-4 w-4 text-slate-500" />
+              <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <MapPin className="mt-0.5 h-4 w-4 text-slate-500 dark:text-slate-400" />
                 <div className="min-w-0">{rinkLabel}</div>
               </div>
             ) : (
-              <div className="text-sm text-slate-600">No location attached yet. Add a rink or ice slot when proposing a game.</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">No location attached yet. Add a rink or ice slot when proposing a game.</div>
             )}
           </div>
 
@@ -297,8 +297,8 @@ export default function GamePage() {
       <Card className="p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold tracking-tight text-slate-900">Score</div>
-            <div className="mt-1 text-sm text-slate-600">Update the score as the game progresses.</div>
+            <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Score</div>
+            <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Update the score as the game progresses.</div>
           </div>
           <Button type="button" onClick={handleSaveScore}>
             <Save className="h-4 w-4" />
@@ -307,8 +307,8 @@ export default function GamePage() {
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="text-xs font-medium text-slate-500">{homeName}</div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20">
+            <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{homeName}</div>
             <div className="mt-2">
               <Input
                 inputMode="numeric"
@@ -318,8 +318,8 @@ export default function GamePage() {
               />
             </div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="text-xs font-medium text-slate-500">{awayName}</div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20">
+            <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{awayName}</div>
             <div className="mt-2">
               <Input
                 inputMode="numeric"
@@ -335,8 +335,8 @@ export default function GamePage() {
       <Card className="p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold tracking-tight text-slate-900">Player Stats</div>
-            <div className="mt-1 text-sm text-slate-600">Goals, assists, shots on goal.</div>
+            <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Player Stats</div>
+            <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Goals, assists, shots on goal.</div>
           </div>
           <Button type="button" onClick={handleSaveStats}>
             <Save className="h-4 w-4" />
@@ -349,13 +349,13 @@ export default function GamePage() {
             { teamId: game.home_team_id, title: homeName, players: homePlayers },
             { teamId: game.away_team_id, title: awayName, players: awayPlayers },
           ].map((t) => (
-            <Card key={t.teamId} className="overflow-hidden border-slate-200">
-              <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="text-sm font-semibold tracking-tight text-slate-900">{t.title}</div>
+            <Card key={t.teamId} className="overflow-hidden border-slate-200 dark:border-slate-800">
+              <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
+                <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{t.title}</div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-white text-xs uppercase tracking-wide text-slate-600">
+                  <thead className="bg-white text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-950/20 dark:text-slate-400">
                     <tr>
                       <th className="px-4 py-2">#</th>
                       <th className="px-4 py-2">Player</th>
@@ -364,15 +364,15 @@ export default function GamePage() {
                       <th className="px-4 py-2">SOG</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
+                  <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                     {t.players.map((p) => {
                       const v = statDraft[p.id] || { goals: 0, assists: 0, shots: 0, team_id: t.teamId };
                       return (
                         <tr key={p.id}>
-                          <td className="px-4 py-2 font-medium text-slate-900">{p.jersey_number ?? '-'}</td>
-                          <td className="px-4 py-2 text-slate-700">
+                          <td className="px-4 py-2 font-medium text-slate-900 dark:text-slate-100">{p.jersey_number ?? '-'}</td>
+                          <td className="px-4 py-2 text-slate-700 dark:text-slate-300">
                             {p.first_name} {p.last_name}
-                            {p.position ? <span className="ml-2 text-xs text-slate-500">{p.position}</span> : null}
+                            {p.position ? <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">{p.position}</span> : null}
                           </td>
                           <td className="px-4 py-2">
                             <Input
@@ -413,7 +413,7 @@ export default function GamePage() {
 
                     {t.players.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-600">
+                        <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-600 dark:text-slate-400">
                           No roster for this team yet. Add players on the Roster page.
                         </td>
                       </tr>
@@ -427,12 +427,12 @@ export default function GamePage() {
       </Card>
 
       <Card className="p-4">
-        <div className="text-sm font-semibold tracking-tight text-slate-900">Penalties</div>
-        <div className="mt-1 text-sm text-slate-600">Type and duration (minutes).</div>
+        <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Penalties</div>
+        <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Type and duration (minutes).</div>
 
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-3">
-            <label className="mb-1 block text-xs font-medium text-slate-600">Team</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Team</label>
             <Select
               value={penaltyForm.team_id}
               onChange={(e) => setPenaltyForm((f) => ({ ...f, team_id: e.target.value, player_id: '' }))}
@@ -443,7 +443,7 @@ export default function GamePage() {
             </Select>
           </div>
           <div className="lg:col-span-3">
-            <label className="mb-1 block text-xs font-medium text-slate-600">Player (optional)</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Player (optional)</label>
             <Select
               value={penaltyForm.player_id}
               onChange={(e) => setPenaltyForm((f) => ({ ...f, player_id: e.target.value }))}
@@ -458,7 +458,7 @@ export default function GamePage() {
             </Select>
           </div>
           <div className="lg:col-span-4">
-            <label className="mb-1 block text-xs font-medium text-slate-600">Penalty Type</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Penalty Type</label>
             <Textarea
               value={penaltyForm.penalty_type}
               onChange={(e) => setPenaltyForm((f) => ({ ...f, penalty_type: e.target.value }))}
@@ -466,7 +466,7 @@ export default function GamePage() {
             />
           </div>
           <div className="lg:col-span-1">
-            <label className="mb-1 block text-xs font-medium text-slate-600">Min</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Min</label>
             <Input
               inputMode="numeric"
               value={penaltyForm.minutes}
@@ -480,9 +480,9 @@ export default function GamePage() {
           </div>
         </div>
 
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/20">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3">Team</th>
                 <th className="px-4 py-3">Player</th>
@@ -491,13 +491,13 @@ export default function GamePage() {
                 <th className="px-4 py-3 text-right"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {scoresheet.penalties.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-3 text-slate-700">{p.team_id === game.home_team_id ? homeName : awayName}</td>
-                  <td className="px-4 py-3 text-slate-700">{playerName(p.player_id)}</td>
-                  <td className="px-4 py-3 text-slate-700">{p.penalty_type}</td>
-                  <td className="px-4 py-3 text-slate-700">{p.minutes}</td>
+                <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.team_id === game.home_team_id ? homeName : awayName}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{playerName(p.player_id)}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.penalty_type}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.minutes}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end">
                       <Button type="button" variant="ghost" size="icon" onClick={() => handleDeletePenalty(p.id)} aria-label="Delete penalty">
@@ -510,7 +510,7 @@ export default function GamePage() {
 
               {scoresheet.penalties.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-600">
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-600 dark:text-slate-400">
                     No penalties recorded.
                   </td>
                 </tr>
@@ -523,8 +523,8 @@ export default function GamePage() {
       <Card className="p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold tracking-tight text-slate-900">Goaltender Stats</div>
-            <div className="mt-1 text-sm text-slate-600">Saves and shootouts.</div>
+            <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Goaltender Stats</div>
+            <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Saves and shootouts.</div>
           </div>
           <Button type="button" onClick={handleSaveGoalies}>
             <Save className="h-4 w-4" />
@@ -539,11 +539,11 @@ export default function GamePage() {
           ].map((t) => {
             const d = goalieDraft[t.teamId] || { player_id: '', saves: '0', shootout_shots: '0', shootout_saves: '0' };
             return (
-              <Card key={t.teamId} className="border-slate-200 p-4">
-                <div className="text-sm font-semibold tracking-tight text-slate-900">{t.title}</div>
+              <Card key={t.teamId} className="border-slate-200 p-4 dark:border-slate-800">
+                <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{t.title}</div>
                 <div className="mt-3 grid grid-cols-1 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Goalie</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Goalie</label>
                     <Select
                       value={d.player_id}
                       onChange={(e) => setGoalieDraft((g) => ({ ...g, [t.teamId]: { ...d, player_id: e.target.value } }))}
@@ -559,7 +559,7 @@ export default function GamePage() {
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-600">Saves</label>
+                      <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Saves</label>
                       <Input
                         inputMode="numeric"
                         value={d.saves}
@@ -567,7 +567,7 @@ export default function GamePage() {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-600">SO Shots</label>
+                      <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">SO Shots</label>
                       <Input
                         inputMode="numeric"
                         value={d.shootout_shots}
@@ -575,7 +575,7 @@ export default function GamePage() {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-600">SO Saves</label>
+                      <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">SO Saves</label>
                       <Input
                         inputMode="numeric"
                         value={d.shootout_saves}
@@ -591,24 +591,24 @@ export default function GamePage() {
       </Card>
 
       <Card className="p-4">
-        <div className="text-sm font-semibold tracking-tight text-slate-900">Verification Signatures</div>
-        <div className="mt-1 text-sm text-slate-600">Digital signatures from coaches/managers and referees.</div>
+        <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Verification Signatures</div>
+        <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Digital signatures from coaches/managers and referees.</div>
 
         <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
           {signatureRoles.map((r) => {
             const existing = scoresheet.signatures.find((s) => s.role === r.role) || null;
             return (
-              <Card key={r.role} className="border-slate-200 p-4">
+              <Card key={r.role} className="border-slate-200 p-4 dark:border-slate-800">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold tracking-tight text-slate-900">{r.label}</div>
+                    <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{r.label}</div>
                     {existing ? (
-                      <div className="mt-1 text-sm text-slate-700">
-                        Signed by <span className="font-medium text-slate-900">{existing.signer_name}</span>{' '}
-                        <span className="text-slate-500">({new Date(existing.signed_at).toLocaleString()})</span>
+                      <div className="mt-1 text-sm text-slate-700 dark:text-slate-300">
+                        Signed by <span className="font-medium text-slate-900 dark:text-slate-100">{existing.signer_name}</span>{' '}
+                        <span className="text-slate-500 dark:text-slate-400">({new Date(existing.signed_at).toLocaleString()})</span>
                       </div>
                     ) : (
-                      <div className="mt-1 text-sm text-slate-600">Not signed yet.</div>
+                      <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Not signed yet.</div>
                     )}
                   </div>
                   {existing ? <ShieldCheck className="h-5 w-5 text-emerald-600" /> : <div className="h-5 w-5" />}

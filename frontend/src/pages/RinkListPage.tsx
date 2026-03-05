@@ -70,13 +70,13 @@ export default function RinkListPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="divide-y divide-slate-200 bg-white md:hidden">
+        <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
           {rinks.map((r) => (
             <div
               key={r.id}
               role="button"
               tabIndex={0}
-              className="p-4 transition-colors hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+              className="p-4 transition-colors hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:hover:bg-slate-900/40 dark:focus-visible:ring-offset-slate-950"
               onClick={() => navigate(`/rinks/${r.id}/slots`)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') navigate(`/rinks/${r.id}/slots`);
@@ -88,13 +88,13 @@ export default function RinkListPage() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-medium text-slate-900">
+                  <div className="font-medium text-slate-900 dark:text-slate-100">
                     {r.website ? (
                       <a
                         href={r.website}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-brand-700 hover:underline"
+                        className="text-brand-700 hover:underline dark:text-cyan-300"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {r.name}
@@ -103,16 +103,16 @@ export default function RinkListPage() {
                       r.name
                     )}
                   </div>
-                  <div className="mt-1 text-sm text-slate-700">{r.address}</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="mt-1 text-sm text-slate-700 dark:text-slate-300">{r.address}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
                     {r.city}, {r.state} {r.zip_code}
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
                     {r.phone ? <span className="whitespace-nowrap">{r.phone}</span> : null}
                     {r.contact_email ? (
                       <a
                         href={`mailto:${r.contact_email}`}
-                        className="break-all text-brand-700 hover:underline"
+                        className="break-all text-brand-700 hover:underline dark:text-cyan-300"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {r.contact_email}
@@ -132,7 +132,7 @@ export default function RinkListPage() {
                     }}
                     aria-label="Restaurants nearby"
                   >
-                    <Utensils className="h-4 w-4 text-slate-600" />
+                    <Utensils className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                   </Button>
                   <Button
                     type="button"
@@ -144,7 +144,7 @@ export default function RinkListPage() {
                     }}
                     aria-label="Things to do nearby"
                   >
-                    <Map className="h-4 w-4 text-slate-600" />
+                    <Map className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                   </Button>
                   <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(r)} aria-label="Edit">
                     <Pencil className="h-4 w-4" />
@@ -158,7 +158,7 @@ export default function RinkListPage() {
           ))}
 
           {rinks.length === 0 && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600">
+            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
               No rinks yet. Add one or seed demo data.
             </div>
           )}
@@ -166,7 +166,7 @@ export default function RinkListPage() {
 
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Address</th>
@@ -175,11 +175,11 @@ export default function RinkListPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {rinks.map((r) => (
                 <tr
                   key={r.id}
-                  className="cursor-pointer hover:bg-slate-50/60"
+                  className="cursor-pointer hover:bg-slate-50/60 dark:hover:bg-slate-900/40"
                   onClick={() => navigate(`/rinks/${r.id}/slots`)}
                 >
                   <td className="px-4 py-3 font-medium">
@@ -188,25 +188,25 @@ export default function RinkListPage() {
                         href={r.website}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-brand-700 hover:underline"
+                        className="text-brand-700 hover:underline dark:text-cyan-300"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {r.name}
                       </a>
                     ) : (
-                      <span className="text-slate-900">{r.name}</span>
+                      <span className="text-slate-900 dark:text-slate-100">{r.name}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-700">
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                     <div>{r.address}</div>
-                    <div className="text-xs text-slate-500">{r.city}, {r.state} {r.zip_code}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">{r.city}, {r.state} {r.zip_code}</div>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-slate-700">{r.phone}</td>
-                  <td className="px-4 py-3 text-slate-700">
+                  <td className="px-4 py-3 whitespace-nowrap text-slate-700 dark:text-slate-300">{r.phone}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                     {r.contact_email ? (
                       <a
                         href={`mailto:${r.contact_email}`}
-                        className="text-brand-700 hover:underline"
+                        className="text-brand-700 hover:underline dark:text-cyan-300"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {r.contact_email}
@@ -227,7 +227,7 @@ export default function RinkListPage() {
                         }}
                         aria-label="Restaurants nearby"
                       >
-                        <Utensils className="h-4 w-4 text-slate-600" />
+                        <Utensils className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                       </Button>
                       <Button
                         type="button"
@@ -239,7 +239,7 @@ export default function RinkListPage() {
                         }}
                         aria-label="Things to do nearby"
                       >
-                        <Map className="h-4 w-4 text-slate-600" />
+                        <Map className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                       </Button>
                       <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(r)} aria-label="Edit">
                         <Pencil className="h-4 w-4" />
@@ -254,7 +254,7 @@ export default function RinkListPage() {
 
               {rinks.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-600">
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No rinks yet. Add one or seed demo data.
                   </td>
                 </tr>
@@ -281,39 +281,39 @@ export default function RinkListPage() {
       >
         <div className="grid grid-cols-1 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Name</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Name</label>
             <Input value={form.name} onChange={(e) => setField('name', e.target.value)} required />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Address</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Address</label>
             <Input value={form.address} onChange={(e) => setField('address', e.target.value)} />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600">City</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">City</label>
               <Input value={form.city} onChange={(e) => setField('city', e.target.value)} />
             </div>
             <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600">State</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">State</label>
               <Input value={form.state} onChange={(e) => setField('state', e.target.value)} />
             </div>
             <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Zip</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Zip</label>
               <Input value={form.zip_code} onChange={(e) => setField('zip_code', e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Phone</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Phone</label>
               <Input value={form.phone} onChange={(e) => setField('phone', e.target.value)} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Contact Email</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Contact Email</label>
               <Input value={form.contact_email} onChange={(e) => setField('contact_email', e.target.value)} />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Website</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Website</label>
             <Input
               value={form.website}
               onChange={(e) => setField('website', e.target.value)}

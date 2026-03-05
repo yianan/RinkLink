@@ -61,24 +61,26 @@ export default function IceSlotCsvUploader({ rinkId, onConfirmed }: Props) {
         <div
           className={cn(
             'rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors',
-            dragOver ? 'border-brand-500 bg-brand-50/60' : 'border-slate-200 bg-white',
+            dragOver
+              ? 'border-brand-500 bg-brand-50/60 dark:border-cyan-400 dark:bg-cyan-950/25'
+              : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/20',
           )}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
         >
           {loading ? (
-            <div className="flex items-center justify-center gap-2 text-sm text-slate-700">
+            <div className="flex items-center justify-center gap-2 text-sm text-slate-700 dark:text-slate-300">
               <Loader2 className="h-4 w-4 animate-spin" />
               Uploading…
             </div>
           ) : (
             <>
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 dark:bg-slate-900/50 dark:text-slate-200">
                 <UploadCloud className="h-6 w-6" />
               </div>
-              <div className="text-sm font-medium text-slate-900">Drag & drop a CSV file here</div>
-              <div className="mt-1 text-sm text-slate-600">Expected columns: Date, Start Time, End Time, Notes</div>
+              <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Drag & drop a CSV file here</div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Expected columns: Date, Start Time, End Time, Notes</div>
 
               <div className="mt-5 flex items-center justify-center">
                 <Button type="button" variant="outline" onClick={() => document.getElementById('ice-slot-csv-input')?.click()}>
@@ -112,13 +114,13 @@ export default function IceSlotCsvUploader({ rinkId, onConfirmed }: Props) {
             </Alert>
           )}
 
-          <div className="text-sm font-semibold tracking-tight text-slate-900">
-            Preview <span className="text-slate-500">({preview.entries.length} ice slot(s))</span>
+          <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+            Preview <span className="text-slate-500 dark:text-slate-400">({preview.entries.length} ice slot(s))</span>
           </div>
 
           <Card className="overflow-hidden">
             <table className="w-full table-fixed text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
                 <tr>
                   <th className="px-3 py-3 sm:px-4">Date</th>
                   <th className="hidden px-3 py-3 sm:table-cell sm:px-4">Start</th>
@@ -126,27 +128,27 @@ export default function IceSlotCsvUploader({ rinkId, onConfirmed }: Props) {
                   <th className="hidden px-3 py-3 md:table-cell md:px-4">Notes</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {preview.entries.map((e, i) => {
                   const startTime = formatTimeHHMM(e.start_time) ?? e.start_time;
                   const endTime = e.end_time ? formatTimeHHMM(e.end_time) ?? e.end_time : null;
 
                   return (
-                    <tr key={i} className="bg-white">
-                      <td className="px-3 py-3 font-medium text-slate-900 sm:px-4">
+                    <tr key={i} className="bg-white dark:bg-slate-950/20">
+                      <td className="px-3 py-3 font-medium text-slate-900 sm:px-4 dark:text-slate-100">
                         <div className="whitespace-nowrap">{e.date}</div>
-                        <div className="mt-0.5 text-xs font-normal text-slate-500 break-words whitespace-normal sm:hidden">
+                        <div className="mt-0.5 break-words whitespace-normal text-xs font-normal text-slate-500 sm:hidden dark:text-slate-400">
                           {startTime}
                           {endTime ? `–${endTime}` : ''}
                           {e.notes ? ` • ${e.notes}` : ''}
                         </div>
-                        <div className="mt-0.5 hidden text-xs font-normal text-slate-500 break-words whitespace-normal sm:block md:hidden">
+                        <div className="mt-0.5 hidden break-words whitespace-normal text-xs font-normal text-slate-500 sm:block md:hidden dark:text-slate-400">
                           {e.notes || '-'}
                         </div>
                       </td>
-                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4">{startTime}</td>
-                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4">{endTime || '-'}</td>
-                      <td className="hidden px-3 py-3 text-slate-700 break-words whitespace-normal md:table-cell md:px-4">
+                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4 dark:text-slate-300">{startTime}</td>
+                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4 dark:text-slate-300">{endTime || '-'}</td>
+                      <td className="hidden px-3 py-3 text-slate-700 break-words whitespace-normal md:table-cell md:px-4 dark:text-slate-300">
                         {e.notes || '-'}
                       </td>
                     </tr>

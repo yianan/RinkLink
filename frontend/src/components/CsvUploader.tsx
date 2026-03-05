@@ -63,14 +63,16 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
           onDrop={handleDrop}
           className={cn(
             'rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors',
-            dragOver ? 'border-brand-500 bg-brand-50/60' : 'border-slate-200 bg-white',
+            dragOver
+              ? 'border-brand-500 bg-brand-50/60 dark:border-cyan-400 dark:bg-cyan-950/25'
+              : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/20',
           )}
         >
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 dark:bg-slate-900/50 dark:text-slate-200">
             <UploadCloud className="h-6 w-6" />
           </div>
-          <div className="text-sm font-medium text-slate-900">Drag & drop a CSV file here</div>
-          <div className="mt-1 text-sm text-slate-600">or choose a file to preview before importing</div>
+          <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Drag & drop a CSV file here</div>
+          <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">or choose a file to preview before importing</div>
 
           <div className="mt-5 flex items-center justify-center gap-2">
             <Button type="button" variant="primary" disabled={loading} onClick={() => document.getElementById('schedule-csv-input')?.click()}>
@@ -88,7 +90,7 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
             />
           </div>
 
-          <div className="mt-3 text-xs text-slate-500">
+          <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
             Expected columns: Date, Time, Home/Away (optional: Opponent, Location, Notes)
           </div>
         </div>
@@ -100,10 +102,10 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
         <div className="space-y-3">
           <div className="flex items-end justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold tracking-tight text-slate-900">
-                Preview <span className="text-slate-500">({preview.entries.length} entries)</span>
+              <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                Preview <span className="text-slate-500 dark:text-slate-400">({preview.entries.length} entries)</span>
               </div>
-              <div className="mt-1 text-sm text-slate-600">Confirm to add these entries to your schedule.</div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Confirm to add these entries to your schedule.</div>
             </div>
           </div>
           {preview.warnings.map((w, i) => (
@@ -113,7 +115,7 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
           <Card className="overflow-hidden">
             <div className="max-h-[420px] overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
                   <tr>
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">Time</th>
@@ -122,15 +124,15 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
                     <th className="px-4 py-3">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                   {preview.entries.map((row: ScheduleUploadRow, i: number) => (
-                    <tr key={i} className="bg-white">
-                      <td className="px-4 py-3 font-medium text-slate-900">{row.date}</td>
-                      <td className="px-4 py-3 text-slate-700">{formatTimeHHMM(row.time) || '-'}</td>
+                    <tr key={i} className="bg-white dark:bg-slate-950/20">
+                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{row.date}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatTimeHHMM(row.time) || '-'}</td>
                       <td className="px-4 py-3">
                         <Badge variant={row.entry_type === 'home' ? 'success' : 'info'}>{row.entry_type}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-slate-700">{row.opponent_name || '-'}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.opponent_name || '-'}</td>
                       <td className="px-4 py-3">
                         <Badge variant="outline">{row.status}</Badge>
                       </td>

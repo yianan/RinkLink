@@ -90,7 +90,7 @@ export default function IceSlotsPage() {
         </div>
       </div>
 
-      <div className="grid w-full grid-cols-1 gap-1 rounded-xl bg-slate-100 p-1 sm:grid-cols-3">
+      <div className="grid w-full grid-cols-1 gap-1 rounded-xl bg-slate-100 p-1 sm:grid-cols-3 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
         {[
           { label: `List View (${slots.length})`, value: 0 },
           { label: 'Calendar View', value: 1 },
@@ -102,7 +102,9 @@ export default function IceSlotsPage() {
             onClick={() => setTab(t.value)}
             className={cn(
               'w-full rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === t.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900',
+              tab === t.value
+                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100 dark:shadow-none dark:ring-1 dark:ring-slate-800/70'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
             )}
           >
             {t.label}
@@ -120,7 +122,7 @@ export default function IceSlotsPage() {
 
           <Card className="overflow-hidden">
             <table className="w-full table-fixed text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
                 <tr>
                   <th className="px-3 py-3 sm:px-4">Date</th>
                   <th className="hidden px-3 py-3 sm:table-cell sm:px-4">Start</th>
@@ -130,32 +132,32 @@ export default function IceSlotsPage() {
                   <th className="px-3 py-3 text-right sm:px-4"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
+              <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                 {slots.map((s) => {
                   const startTime = formatTimeHHMM(s.start_time) ?? s.start_time;
                   const endTime = s.end_time ? formatTimeHHMM(s.end_time) ?? s.end_time : null;
 
                   return (
-                    <tr key={s.id} className="hover:bg-slate-50/60">
-                      <td className="px-3 py-3 font-medium text-slate-900 sm:px-4">
+                    <tr key={s.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                      <td className="px-3 py-3 font-medium text-slate-900 sm:px-4 dark:text-slate-100">
                         <div className="flex items-start justify-between gap-2">
                           <div className="whitespace-nowrap">{s.date}</div>
                           <div className="sm:hidden">
                             <Badge variant={statusColors[s.status] || 'neutral'}>{s.status}</Badge>
                           </div>
                         </div>
-                        <div className="mt-0.5 text-xs font-normal text-slate-500 break-words whitespace-normal sm:hidden">
+                        <div className="mt-0.5 break-words whitespace-normal text-xs font-normal text-slate-500 sm:hidden dark:text-slate-400">
                           {startTime}
                           {endTime ? `–${endTime}` : ''}
                           {s.notes ? ` • ${s.notes}` : ''}
                         </div>
                       </td>
-                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4">{startTime}</td>
-                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4">{endTime || '-'}</td>
+                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4 dark:text-slate-300">{startTime}</td>
+                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4 dark:text-slate-300">{endTime || '-'}</td>
                       <td className="hidden px-3 py-3 sm:table-cell sm:px-4">
                         <Badge variant={statusColors[s.status] || 'neutral'}>{s.status}</Badge>
                       </td>
-                      <td className="hidden px-3 py-3 text-slate-700 break-words whitespace-normal md:table-cell md:px-4">
+                      <td className="hidden px-3 py-3 text-slate-700 break-words whitespace-normal md:table-cell md:px-4 dark:text-slate-300">
                         {s.notes || '-'}
                       </td>
                       <td className="px-3 py-3 sm:px-4">
@@ -168,7 +170,7 @@ export default function IceSlotsPage() {
                             disabled={s.status === 'booked'}
                             aria-label="Delete slot"
                           >
-                            <Trash2 className={cn('h-4 w-4', s.status === 'booked' ? 'text-slate-300' : 'text-rose-600')} />
+                            <Trash2 className={cn('h-4 w-4', s.status === 'booked' ? 'text-slate-300 dark:text-slate-600' : 'text-rose-600')} />
                           </Button>
                         </div>
                       </td>
@@ -178,7 +180,7 @@ export default function IceSlotsPage() {
 
                 {slots.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600">
+                    <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                       No ice slots yet. Add one or upload a CSV.
                     </td>
                   </tr>
@@ -193,13 +195,13 @@ export default function IceSlotsPage() {
         <div className="space-y-3">
           {Object.entries(byMonth).sort().map(([month, monthSlots]) => (
             <Card key={month} className="p-4">
-              <div className="text-sm font-semibold tracking-tight text-slate-900">{month}</div>
+              <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{month}</div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {monthSlots.map((s) => (
                   <Badge
                     key={s.id}
                     variant={statusColors[s.status] || 'neutral'}
-                    className={cn(s.status === 'available' ? '' : 'bg-white')}
+                    className={cn(s.status === 'available' ? '' : 'bg-white dark:bg-slate-950/40')}
                   >
                     {s.date.substring(5)} {formatTimeHHMM(s.start_time) ?? s.start_time}
                     {s.end_time ? `-${formatTimeHHMM(s.end_time) ?? s.end_time}` : ''}
@@ -209,7 +211,7 @@ export default function IceSlotsPage() {
             </Card>
           ))}
 
-          {Object.keys(byMonth).length === 0 && <div className="text-sm text-slate-600">No ice slots to display.</div>}
+          {Object.keys(byMonth).length === 0 && <div className="text-sm text-slate-600 dark:text-slate-400">No ice slots to display.</div>}
         </div>
       )}
 
@@ -232,7 +234,7 @@ export default function IceSlotsPage() {
       >
         <div className="grid grid-cols-1 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Date</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Date</label>
             <Input
               type="date"
               value={form.date}
@@ -242,7 +244,7 @@ export default function IceSlotsPage() {
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Start Time</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Start Time</label>
               <Input
                 type="time"
                 value={form.start_time}
@@ -251,7 +253,7 @@ export default function IceSlotsPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">End Time</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">End Time</label>
               <Input
                 type="time"
                 value={form.end_time}
@@ -260,7 +262,7 @@ export default function IceSlotsPage() {
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Notes</label>
             <Textarea
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}

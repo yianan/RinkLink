@@ -147,7 +147,7 @@ export default function ProposalsPage() {
         <div className="page-subtitle">Accept, decline, cancel, or request a reschedule.</div>
       </div>
 
-      <div className="inline-flex rounded-xl bg-slate-100 p-1">
+      <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
         {TABS.map((t, i) => (
           <button
             key={t.label}
@@ -155,7 +155,9 @@ export default function ProposalsPage() {
             onClick={() => setTab(i)}
             className={cn(
               'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === i ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900',
+              tab === i
+                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100 dark:shadow-none dark:ring-1 dark:ring-slate-800/70'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
             )}
           >
             {t.label}
@@ -164,7 +166,7 @@ export default function ProposalsPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="divide-y divide-slate-200 bg-white md:hidden">
+        <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
           {proposals.map((p) => {
             const isIncoming = p.proposed_by_team_id !== activeTeam.id;
             const canRespond = isIncoming && p.status === 'proposed';
@@ -180,31 +182,31 @@ export default function ProposalsPage() {
               <div key={p.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-900">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
                       {p.proposed_date} {formatTimeHHMM(p.proposed_time) || ''}
                     </div>
-                    <div className="mt-2 space-y-1 text-sm text-slate-700">
+                    <div className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-300">
                       <div className="truncate">
-                        <span className="text-xs font-medium text-slate-500">Home</span>{' '}
-                        <span className="font-medium text-slate-900">{p.home_team_name}</span>
+                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Home</span>{' '}
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{p.home_team_name}</span>
                       </div>
                       <div className="truncate">
-                        <span className="text-xs font-medium text-slate-500">Away</span>{' '}
-                        <span className="font-medium text-slate-900">{p.away_team_name}</span>
+                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Away</span>{' '}
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{p.away_team_name}</span>
                       </div>
                     </div>
                     {(p.home_team_association || p.away_team_association) && (
-                      <div className="mt-1 text-xs text-slate-500">
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                         {(p.home_team_association || '—')}{' '}
                         <span className="text-slate-300">•</span>{' '}
                         {(p.away_team_association || '—')}
                       </div>
                     )}
-                    <div className="mt-2 text-xs text-slate-500">{rinkLine}</div>
+                    <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{rinkLine}</div>
                     {p.message ? (
-                      <div className="mt-2 text-sm text-slate-700">{p.message}</div>
+                      <div className="mt-2 text-sm text-slate-700 dark:text-slate-300">{p.message}</div>
                     ) : null}
-                    <div className="mt-2 text-xs text-slate-500">Created {new Date(p.created_at).toLocaleDateString()}</div>
+                    <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">Created {new Date(p.created_at).toLocaleDateString()}</div>
                   </div>
 
                   <Badge variant={statusColors[p.status] || 'neutral'}>{p.status}</Badge>
@@ -250,7 +252,7 @@ export default function ProposalsPage() {
           })}
 
           {proposals.length === 0 && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600">
+            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
               No {tabDef.label.toLowerCase()} proposals.
             </div>
           )}
@@ -258,7 +260,7 @@ export default function ProposalsPage() {
 
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Home</th>
@@ -270,7 +272,7 @@ export default function ProposalsPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {proposals.map((p) => {
                 const isIncoming = p.proposed_by_team_id !== activeTeam.id;
                 const canRespond = isIncoming && p.status === 'proposed';
@@ -279,29 +281,29 @@ export default function ProposalsPage() {
                 const canCancelAccepted = p.status === 'accepted';
 
                 return (
-                  <tr key={p.id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3 font-medium text-slate-900">
+                  <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
                       {p.proposed_date} {formatTimeHHMM(p.proposed_time) || ''}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-900">{p.home_team_name}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">{p.home_team_association}</div>
+                      <div className="font-medium text-slate-900 dark:text-slate-100">{p.home_team_name}</div>
+                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{p.home_team_association}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-900">{p.away_team_name}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">{p.away_team_association}</div>
+                      <div className="font-medium text-slate-900 dark:text-slate-100">{p.away_team_name}</div>
+                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{p.away_team_association}</div>
                     </td>
-                    <td className="px-4 py-3 text-slate-700">
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                       {p.rink_name ? (
                         <div>
-                          <div className="font-medium text-slate-900">{p.rink_name}</div>
-                          <div className="mt-0.5 text-xs text-slate-500">
+                          <div className="font-medium text-slate-900 dark:text-slate-100">{p.rink_name}</div>
+                          <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                             {p.rink_city}, {p.rink_state}
                             {p.ice_slot_start_time && ` • ${formatTimeHHMM(p.ice_slot_start_time) || p.ice_slot_start_time}${p.ice_slot_end_time ? '-' + (formatTimeHHMM(p.ice_slot_end_time) || p.ice_slot_end_time) : ''}`}
                           </div>
                         </div>
                       ) : p.location_label ? (
-                        <div className="max-w-[320px] truncate text-slate-700" title={p.location_label}>
+                        <div className="max-w-[320px] truncate text-slate-700 dark:text-slate-300" title={p.location_label}>
                           {p.location_label}
                         </div>
                       ) : (
@@ -311,8 +313,8 @@ export default function ProposalsPage() {
                     <td className="px-4 py-3">
                       <Badge variant={statusColors[p.status] || 'neutral'}>{p.status}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-slate-700">{p.message || '-'}</td>
-                    <td className="px-4 py-3 text-slate-700">{new Date(p.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.message || '-'}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{new Date(p.created_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
                         {canRespond && (
@@ -356,7 +358,7 @@ export default function ProposalsPage() {
 
               {proposals.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-600">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No {tabDef.label.toLowerCase()} proposals.
                   </td>
                 </tr>
@@ -386,18 +388,18 @@ export default function ProposalsPage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Date</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Date</label>
               <Input type="date" value={rescheduleDate} onChange={(e) => setRescheduleDate(e.target.value)} required />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Time</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Time</label>
               <Input type="time" value={rescheduleTime} onChange={(e) => setRescheduleTime(e.target.value)} required />
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Rink (optional)</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink (optional)</label>
               <Select value={rescheduleRinkId} onChange={(e) => { setRescheduleRinkId(e.target.value); setRescheduleSlotId(''); }}>
                 <option value="">No rink</option>
                 {rinks.map((r) => (
@@ -408,7 +410,7 @@ export default function ProposalsPage() {
               </Select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Ice Slot (optional)</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Ice Slot (optional)</label>
               <Select
                 value={rescheduleSlotId}
                 onChange={(e) => {
@@ -431,7 +433,7 @@ export default function ProposalsPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Message (optional)</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Message (optional)</label>
             <Textarea value={rescheduleMessage} onChange={(e) => setRescheduleMessage(e.target.value)} rows={2} />
           </div>
         </div>

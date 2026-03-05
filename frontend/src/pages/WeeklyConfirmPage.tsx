@@ -61,8 +61,8 @@ export default function WeeklyConfirmPage() {
         <Card className="p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold tracking-tight text-slate-900">{weekly.title}</div>
-              <div className="mt-1 text-sm text-slate-700">{weekly.message}</div>
+              <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{weekly.title}</div>
+              <div className="mt-1 text-sm text-slate-700 dark:text-slate-300">{weekly.message}</div>
             </div>
             <Button type="button" variant="outline" onClick={() => api.markNotificationRead(weekly.id).then(() => setNotifications((ns) => ns.filter((n) => n.id !== weekly.id)))}>
               Dismiss
@@ -72,7 +72,7 @@ export default function WeeklyConfirmPage() {
       )}
 
       <Card className="overflow-hidden">
-        <div className="divide-y divide-slate-200 bg-white md:hidden">
+        <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
           {games.map((g) => {
             const isHome = activeTeam.id === g.home_team_id;
             const opponent = isHome ? g.away_team_name : g.home_team_name;
@@ -83,7 +83,7 @@ export default function WeeklyConfirmPage() {
               <div key={g.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-900">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
                       {new Date(g.date + 'T00:00').toLocaleDateString('en-US', {
                         weekday: 'short',
                         month: 'short',
@@ -91,14 +91,14 @@ export default function WeeklyConfirmPage() {
                       })}{' '}
                       {formatTimeHHMM(g.time) || ''}
                     </div>
-                    <div className="mt-1 text-sm text-slate-700">{opponent || 'TBD'}</div>
+                    <div className="mt-1 text-sm text-slate-700 dark:text-slate-300">{opponent || 'TBD'}</div>
                     <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-slate-500">You</span>
+                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">You</span>
                         <Switch checked={myConfirmed} onChange={() => handleToggle(g)} />
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-slate-500">Opponent</span>
+                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Opponent</span>
                         <Badge variant={oppConfirmed ? 'success' : 'outline'}>{oppConfirmed ? 'Yes' : 'No'}</Badge>
                       </div>
                     </div>
@@ -110,7 +110,7 @@ export default function WeeklyConfirmPage() {
           })}
 
           {games.length === 0 && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600">
+            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
               No non-league games scheduled for this week.
             </div>
           )}
@@ -118,7 +118,7 @@ export default function WeeklyConfirmPage() {
 
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Time</th>
@@ -128,7 +128,7 @@ export default function WeeklyConfirmPage() {
                 <th className="px-4 py-3 text-center">Opponent</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {games.map((g) => {
                 const isHome = activeTeam.id === g.home_team_id;
                 const opponent = isHome ? g.away_team_name : g.home_team_name;
@@ -136,16 +136,16 @@ export default function WeeklyConfirmPage() {
                 const oppConfirmed = isHome ? g.away_weekly_confirmed : g.home_weekly_confirmed;
 
                 return (
-                  <tr key={g.id} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-3 font-medium text-slate-900">
+                  <tr key={g.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
                     {new Date(g.date + 'T00:00').toLocaleDateString('en-US', {
                       weekday: 'short',
                       month: 'short',
                       day: 'numeric',
                     })}
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{formatTimeHHMM(g.time) || '-'}</td>
-                  <td className="px-4 py-3 text-slate-700">{opponent || 'TBD'}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatTimeHHMM(g.time) || '-'}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{opponent || 'TBD'}</td>
                   <td className="px-4 py-3">
                     <Badge variant="outline">{g.status}</Badge>
                   </td>
@@ -163,7 +163,7 @@ export default function WeeklyConfirmPage() {
 
               {games.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600">
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No non-league games scheduled for this week.
                   </td>
                 </tr>

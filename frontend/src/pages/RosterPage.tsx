@@ -89,7 +89,7 @@ export default function RosterPage() {
         </Button>
       </div>
 
-      <div className="inline-flex rounded-xl bg-slate-100 p-1">
+      <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/40">
         {[
           { label: `Players (${players.length})`, value: 0 },
           { label: 'Upload CSV', value: 1 },
@@ -100,7 +100,9 @@ export default function RosterPage() {
             onClick={() => setTab(t.value)}
             className={cn(
               'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === t.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900',
+              tab === t.value
+                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
             )}
           >
             {t.label}
@@ -112,7 +114,7 @@ export default function RosterPage() {
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-300">
                 <tr>
                   <th className="px-4 py-3">#</th>
                   <th className="px-4 py-3">Name</th>
@@ -120,14 +122,14 @@ export default function RosterPage() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
+              <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                 {players.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3 font-medium text-slate-900">{p.jersey_number ?? '-'}</td>
-                    <td className="px-4 py-3 text-slate-700">
+                  <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{p.jersey_number ?? '-'}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                       {p.first_name} {p.last_name}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">{p.position || '-'}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.position || '-'}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
                         <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit">
@@ -143,7 +145,7 @@ export default function RosterPage() {
 
                 {players.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-10 text-center text-sm text-slate-600">
+                    <td colSpan={4} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                       No players yet. Upload a CSV or add players manually.
                     </td>
                   </tr>
@@ -174,27 +176,27 @@ export default function RosterPage() {
         }
       >
         <div className="grid grid-cols-1 gap-3">
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            <Users className="h-4 w-4 text-slate-500" />
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
+            <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             <div className="truncate">
-              Team: <span className="font-medium text-slate-900">{activeTeam.name}</span>
+              Team: <span className="font-medium text-slate-900 dark:text-slate-100">{activeTeam.name}</span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">First Name</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">First Name</label>
               <Input value={form.first_name} onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Last Name</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Last Name</label>
               <Input value={form.last_name} onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))} />
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Jersey #</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Jersey #</label>
               <Input
                 inputMode="numeric"
                 value={form.jersey_number}
@@ -202,7 +204,7 @@ export default function RosterPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Position</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Position</label>
               <Select value={form.position} onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))}>
                 <option value="">—</option>
                 <option value="F">Forward (F)</option>
@@ -216,4 +218,3 @@ export default function RosterPage() {
     </div>
   );
 }
-

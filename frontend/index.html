@@ -5,6 +5,17 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>RinkLink</title>
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem('rinklink.theme');
+          const theme = stored === 'dark' || stored === 'light' ? stored : 'dark';
+          document.documentElement.classList.toggle('dark', theme === 'dark');
+        } catch {
+          // ignore
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

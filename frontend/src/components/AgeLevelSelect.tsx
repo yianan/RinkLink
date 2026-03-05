@@ -36,7 +36,7 @@ export default function AgeLevelSelect({ ageGroup, level, onAgeGroupChange, onLe
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-600">Age Group</label>
+        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Age Group</label>
         <Select
           value={ageSelectValue}
           required
@@ -73,7 +73,7 @@ export default function AgeLevelSelect({ ageGroup, level, onAgeGroupChange, onLe
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-600">Level</label>
+        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Level</label>
         <Select
           value={levelSelectValue}
           required

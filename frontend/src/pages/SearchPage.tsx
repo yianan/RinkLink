@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search as SearchIcon } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
@@ -198,6 +198,10 @@ export default function SearchPage() {
   }
 
   const standardLevels = standardLevelsForAgeGroup(activeTeam.age_group);
+  const rangeMin = 10;
+  const rangeMax = 200;
+  const rangeProgress = Math.min(100, Math.max(0, ((maxDistance - rangeMin) / (rangeMax - rangeMin)) * 100));
+  const rangeStyle = { '--rl-range-progress': `${rangeProgress}%` } as CSSProperties;
 
   return (
     <div className="space-y-4">
@@ -206,7 +210,7 @@ export default function SearchPage() {
         <div className="page-subtitle">Search by open date or use auto-match suggestions.</div>
       </div>
 
-      <div className="inline-flex rounded-xl bg-slate-100 p-1">
+      <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
         {[
           { label: 'Search by Date', value: 0 },
           { label: `Auto-Matches (${autoMatches.length})`, value: 1 },
@@ -217,7 +221,9 @@ export default function SearchPage() {
             onClick={() => setTab(t.value)}
             className={cn(
               'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === t.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900',
+              tab === t.value
+                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100 dark:shadow-none dark:ring-1 dark:ring-slate-800/70'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
             )}
           >
             {t.label}
@@ -230,7 +236,7 @@ export default function SearchPage() {
           <Card className="p-4">
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
               <div className="lg:col-span-4">
-                <label className="mb-1 block text-xs font-medium text-slate-600">Open Date</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Open Date</label>
                 <Select value={selectedEntryId} onChange={(e) => setSelectedEntryId(e.target.value)}>
                   <option value="">Select a date…</option>
                   {openDates.map((e) => (
@@ -243,22 +249,23 @@ export default function SearchPage() {
 
               <div className="lg:col-span-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-slate-600">Max Distance</label>
-                  <div className="text-xs text-slate-500">{maxDistance >= 200 ? 'Any' : `${maxDistance} mi`}</div>
+                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Max Distance</label>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{maxDistance >= 200 ? 'Any' : `${maxDistance} mi`}</div>
                 </div>
                 <input
                   type="range"
-                  min={10}
-                  max={200}
+                  min={rangeMin}
+                  max={rangeMax}
                   step={10}
                   value={maxDistance}
                   onChange={(e) => setMaxDistance(parseInt(e.target.value))}
-                  className="mt-2 w-full accent-brand-600"
+                  className="rl-range mt-2 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-950"
+                  style={rangeStyle}
                 />
               </div>
 
               <div className="lg:col-span-3">
-                <label className="mb-1 block text-xs font-medium text-slate-600">Rink (optional)</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink (optional)</label>
                 <Select value={selectedRink} onChange={(e) => setSelectedRink(e.target.value)}>
                   <option value="">Any rink</option>
                   {rinks.map((r) => (
@@ -277,7 +284,7 @@ export default function SearchPage() {
               </div>
 
               <div className="lg:col-span-3">
-                <label className="mb-1 block text-xs font-medium text-slate-600">Level (optional)</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Level (optional)</label>
                 <Select value={level} onChange={(e) => setLevel(e.target.value)}>
                   <option value="">Any level</option>
                   {standardLevels.map((l) => (
@@ -289,7 +296,7 @@ export default function SearchPage() {
               </div>
 
               <div className="lg:col-span-4">
-                <label className="mb-1 block text-xs font-medium text-slate-600">MYHockey Ranking (optional)</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">MYHockey Ranking (optional)</label>
                 <div className="grid grid-cols-2 gap-2">
                   <Input
                     inputMode="numeric"
@@ -325,21 +332,21 @@ export default function SearchPage() {
           )}
 
           <Card className="overflow-hidden">
-            <div className="divide-y divide-slate-200 bg-white md:hidden">
+            <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
               {results.map((r) => (
                 <div key={r.schedule_entry_id} className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-slate-900">{r.team_name}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">{r.association_name}</div>
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{r.team_name}</div>
+                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{r.association_name}</div>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
                         <span className="whitespace-nowrap">{r.age_group} {r.level}</span>
                         <span className="whitespace-nowrap">Ranking: {r.myhockey_ranking ?? '—'}</span>
                         <span className="whitespace-nowrap">{r.distance_miles != null ? `${r.distance_miles} mi` : '—'}</span>
                       </div>
                       <div className="mt-2 flex items-center gap-2">
                         <Badge variant={r.entry_type === 'home' ? 'success' : 'info'}>{r.entry_type}</Badge>
-                        <div className="text-sm text-slate-700">{formatTimeHHMM(r.entry_time) || ''}</div>
+                        <div className="text-sm text-slate-700 dark:text-slate-300">{formatTimeHHMM(r.entry_time) || ''}</div>
                       </div>
                     </div>
 
@@ -349,7 +356,7 @@ export default function SearchPage() {
                           <Badge variant={r.existing_proposal_status === 'accepted' ? 'success' : 'warning'}>
                             {r.existing_proposal_status === 'accepted' ? 'Accepted' : 'Pending'}
                           </Badge>
-                          <Button type="button" size="sm" variant="outline" onClick={() => navigate('/proposals')}>
+                          <Button type="button" size="sm" variant="primary" onClick={() => navigate('/proposals')}>
                             View
                           </Button>
                         </>
@@ -357,7 +364,7 @@ export default function SearchPage() {
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
+                          variant="primary"
                           onClick={() => openProposal({ opponent: r, myEntry: selectedEntry || undefined })}
                           disabled={!selectedEntry}
                         >
@@ -370,7 +377,7 @@ export default function SearchPage() {
               ))}
 
               {results.length === 0 && selectedEntry && !loading && (
-                <div className="px-4 py-10 text-center text-sm text-slate-600">
+                <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                   No matching opponents found for this date/time. Matches require an exact time match and opposite home/away.
                 </div>
               )}
@@ -378,7 +385,7 @@ export default function SearchPage() {
 
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
                   <tr>
                     <th className="px-4 py-3">Team</th>
                     <th className="px-4 py-3">Association</th>
@@ -389,20 +396,20 @@ export default function SearchPage() {
                     <th className="px-4 py-3 text-right"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
+                <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                   {results.map((r) => (
-                    <tr key={r.schedule_entry_id} className="hover:bg-slate-50/60">
-                      <td className="px-4 py-3 font-medium text-slate-900">{r.team_name}</td>
-                      <td className="px-4 py-3 text-slate-700">{r.association_name}</td>
-                      <td className="px-4 py-3 text-slate-700">
+                    <tr key={r.schedule_entry_id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{r.team_name}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{r.association_name}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                         {r.age_group} {r.level}
                       </td>
-                      <td className="px-4 py-3 text-slate-700">{r.myhockey_ranking ?? '-'}</td>
-                      <td className="px-4 py-3 text-slate-700">{r.distance_miles != null ? `${r.distance_miles} mi` : '-'}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{r.myhockey_ranking ?? '-'}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{r.distance_miles != null ? `${r.distance_miles} mi` : '-'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <Badge variant={r.entry_type === 'home' ? 'success' : 'info'}>{r.entry_type}</Badge>
-                          <div className="text-slate-700">{formatTimeHHMM(r.entry_time) || ''}</div>
+                          <div className="text-slate-700 dark:text-slate-300">{formatTimeHHMM(r.entry_time) || ''}</div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -412,7 +419,7 @@ export default function SearchPage() {
                               <Badge variant={r.existing_proposal_status === 'accepted' ? 'success' : 'warning'}>
                                 {r.existing_proposal_status === 'accepted' ? 'Accepted' : 'Pending'}
                               </Badge>
-                              <Button type="button" size="sm" variant="outline" onClick={() => navigate('/proposals')}>
+                              <Button type="button" size="sm" variant="primary" onClick={() => navigate('/proposals')}>
                                 View
                               </Button>
                             </div>
@@ -420,7 +427,7 @@ export default function SearchPage() {
                             <Button
                               type="button"
                               size="sm"
-                              variant="outline"
+                              variant="primary"
                               onClick={() => openProposal({ opponent: r, myEntry: selectedEntry || undefined })}
                               disabled={!selectedEntry}
                             >
@@ -434,7 +441,7 @@ export default function SearchPage() {
 
                   {results.length === 0 && selectedEntry && !loading && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600">
+                      <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                         No matching opponents found for this date/time. Matches require an exact time match and opposite home/away.
                       </td>
                     </tr>
@@ -448,28 +455,28 @@ export default function SearchPage() {
 
       {tab === 1 && (
         <Card className="overflow-hidden">
-          <div className="divide-y divide-slate-200 bg-white md:hidden">
+          <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
             {autoMatches.map((m, i) => (
               <div key={i} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-900">{m.date}</div>
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{m.date}</div>
 
                     <div className="mt-2">
-                      <div className="text-sm font-medium text-slate-900">{m.home_team_name} <span className="text-xs font-medium text-slate-500">(H)</span></div>
-                      <div className="mt-0.5 text-xs text-slate-500">
+                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{m.home_team_name} <span className="text-xs font-medium text-slate-500 dark:text-slate-400">(H)</span></div>
+                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         {m.home_association_name} {m.home_time && `@ ${formatTimeHHMM(m.home_time) || m.home_time}`}
                       </div>
                     </div>
 
                     <div className="mt-2">
-                      <div className="text-sm font-medium text-slate-900">{m.away_team_name} <span className="text-xs font-medium text-slate-500">(A)</span></div>
-                      <div className="mt-0.5 text-xs text-slate-500">
+                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{m.away_team_name} <span className="text-xs font-medium text-slate-500 dark:text-slate-400">(A)</span></div>
+                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         {m.away_association_name} {m.away_time && `@ ${formatTimeHHMM(m.away_time) || m.away_time}`}
                       </div>
                     </div>
 
-                    <div className="mt-2 text-xs text-slate-600">
+                    <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
                       Distance: {m.distance_miles != null ? `${m.distance_miles} mi` : '—'}
                     </div>
                   </div>
@@ -480,12 +487,12 @@ export default function SearchPage() {
                         <Badge variant={m.existing_proposal_status === 'accepted' ? 'success' : 'warning'}>
                           {m.existing_proposal_status === 'accepted' ? 'Accepted' : 'Pending'}
                         </Badge>
-                        <Button type="button" size="sm" variant="outline" onClick={() => navigate('/proposals')}>
+                        <Button type="button" size="sm" variant="primary" onClick={() => navigate('/proposals')}>
                           View
                         </Button>
                       </>
                     ) : (
-                      <Button type="button" size="sm" variant="outline" onClick={() => openProposal({ autoMatch: m })}>
+                      <Button type="button" size="sm" variant="primary" onClick={() => openProposal({ autoMatch: m })}>
                         Propose
                       </Button>
                     )}
@@ -495,7 +502,7 @@ export default function SearchPage() {
             ))}
 
             {autoMatches.length === 0 && (
-              <div className="px-4 py-10 text-center text-sm text-slate-600">
+              <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                 No auto-matches found. Add more open dates to find matches.
               </div>
             )}
@@ -503,7 +510,7 @@ export default function SearchPage() {
 
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
                 <tr>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Home Team</th>
@@ -512,23 +519,23 @@ export default function SearchPage() {
                   <th className="px-4 py-3 text-right"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
+              <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                 {autoMatches.map((m, i) => (
-                  <tr key={i} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3 font-medium text-slate-900">{m.date}</td>
+                  <tr key={i} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{m.date}</td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-900">{m.home_team_name}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">
+                      <div className="font-medium text-slate-900 dark:text-slate-100">{m.home_team_name}</div>
+                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         {m.home_association_name} {m.home_time && `@ ${formatTimeHHMM(m.home_time) || m.home_time}`}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-900">{m.away_team_name}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">
+                      <div className="font-medium text-slate-900 dark:text-slate-100">{m.away_team_name}</div>
+                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         {m.away_association_name} {m.away_time && `@ ${formatTimeHHMM(m.away_time) || m.away_time}`}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-700">{m.distance_miles != null ? `${m.distance_miles} mi` : '-'}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{m.distance_miles != null ? `${m.distance_miles} mi` : '-'}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end">
                         {m.has_existing_proposal ? (
@@ -536,12 +543,12 @@ export default function SearchPage() {
                             <Badge variant={m.existing_proposal_status === 'accepted' ? 'success' : 'warning'}>
                               {m.existing_proposal_status === 'accepted' ? 'Accepted' : 'Pending'}
                             </Badge>
-                            <Button type="button" size="sm" variant="outline" onClick={() => navigate('/proposals')}>
+                            <Button type="button" size="sm" variant="primary" onClick={() => navigate('/proposals')}>
                               View
                             </Button>
                           </div>
                         ) : (
-                          <Button type="button" size="sm" variant="outline" onClick={() => openProposal({ autoMatch: m })}>
+                          <Button type="button" size="sm" variant="primary" onClick={() => openProposal({ autoMatch: m })}>
                             Propose
                           </Button>
                         )}
@@ -552,7 +559,7 @@ export default function SearchPage() {
 
                 {autoMatches.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-600">
+                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                       No auto-matches found. Add more open dates to find matches.
                     </td>
                   </tr>
@@ -580,7 +587,7 @@ export default function SearchPage() {
       >
         <div className="space-y-3">
           {proposalError && <Alert variant="error" title="Proposal failed">{proposalError}</Alert>}
-          <div className="text-sm text-slate-700">
+          <div className="text-sm text-slate-700 dark:text-slate-300">
             {proposalDialog.autoMatch
               ? `${proposalDialog.autoMatch.home_team_name} (H) vs ${proposalDialog.autoMatch.away_team_name} (A) on ${proposalDialog.autoMatch.date}`
               : proposalDialog.opponent
@@ -590,7 +597,7 @@ export default function SearchPage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Rink (optional)</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink (optional)</label>
               <Select
                 value={proposalRinkId}
                 onChange={(e) => {
@@ -605,13 +612,13 @@ export default function SearchPage() {
                   </option>
                 ))}
               </Select>
-              <div className="mt-1 text-xs text-slate-500">
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 Pick a rink to attach a location even if you don&apos;t have a specific ice slot yet.
               </div>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Ice Slot (optional)</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Ice Slot (optional)</label>
               <Select
                 value={selectedIceSlotId}
                 onChange={(e) => setSelectedIceSlotId(e.target.value)}
@@ -626,7 +633,7 @@ export default function SearchPage() {
                 ))}
               </Select>
               {proposalRinkId && proposalSlots.length === 0 && (
-                <div className="mt-1 text-xs text-slate-500">
+                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   No available ice slots at this rink on {proposalDate}. You can still propose the rink without a slot.
                 </div>
               )}
@@ -634,7 +641,7 @@ export default function SearchPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Message (optional)</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Message (optional)</label>
             <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={2} />
           </div>
         </div>

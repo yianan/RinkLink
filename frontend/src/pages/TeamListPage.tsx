@@ -82,15 +82,15 @@ export default function TeamListPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="divide-y divide-slate-200 bg-white md:hidden">
+        <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
           {teams.map((t) => (
             <div key={t.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-900">{t.name}</div>
-                  <div className="mt-0.5 text-xs text-slate-500">{t.association_name || '—'}</div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{t.name}</div>
+                  <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t.association_name || '—'}</div>
 
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
                     <span className="whitespace-nowrap">
                       {t.age_group} {t.level}
                     </span>
@@ -98,16 +98,16 @@ export default function TeamListPage() {
                   </div>
 
                   {(t.manager_name || t.manager_email) && (
-                    <div className="mt-2 text-sm text-slate-700">
+                    <div className="mt-2 text-sm text-slate-700 dark:text-slate-300">
                       {t.manager_email ? (
                         <a
                           href={`mailto:${t.manager_email}`}
-                          className="text-brand-700 hover:underline"
+                          className="text-brand-700 hover:underline dark:text-cyan-300 dark:hover:text-cyan-200"
                         >
                           {t.manager_name || 'Email'}
                         </a>
                       ) : (
-                        <span className="text-slate-900">{t.manager_name}</span>
+                        <span className="text-slate-900 dark:text-slate-100">{t.manager_name}</span>
                       )}
                     </div>
                   )}
@@ -126,7 +126,7 @@ export default function TeamListPage() {
           ))}
 
           {teams.length === 0 && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600">
+            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
               No teams yet. Add one or seed demo data.
             </div>
           )}
@@ -134,7 +134,7 @@ export default function TeamListPage() {
 
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-300">
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Association</th>
@@ -145,30 +145,30 @@ export default function TeamListPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {teams.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-3 font-medium text-slate-900">{t.name}</td>
-                  <td className="px-4 py-3 text-slate-700">{t.association_name}</td>
-                  <td className="px-4 py-3 text-slate-700">{t.age_group}</td>
-                  <td className="px-4 py-3 text-slate-700">{t.level}</td>
-                  <td className="px-4 py-3 text-slate-700">{t.myhockey_ranking ?? '-'}</td>
-                  <td className="px-4 py-3 text-slate-700">
+                <tr key={t.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{t.name}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{t.association_name}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{t.age_group}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{t.level}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{t.myhockey_ranking ?? '-'}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                     {t.manager_name ? (
                       t.manager_email ? (
                         <a
                           href={`mailto:${t.manager_email}`}
-                          className="text-slate-900 underline underline-offset-2 hover:text-slate-950"
+                          className="text-slate-900 underline underline-offset-2 hover:text-slate-950 dark:text-slate-100 dark:hover:text-white"
                         >
                           {t.manager_name}
                         </a>
                       ) : (
-                        <span className="text-slate-900">{t.manager_name}</span>
+                        <span className="text-slate-900 dark:text-slate-100">{t.manager_name}</span>
                       )
                     ) : t.manager_email ? (
                       <a
                         href={`mailto:${t.manager_email}`}
-                        className="text-slate-900 underline underline-offset-2 hover:text-slate-950"
+                        className="text-slate-900 underline underline-offset-2 hover:text-slate-950 dark:text-slate-100 dark:hover:text-white"
                       >
                         Email
                       </a>
@@ -191,7 +191,7 @@ export default function TeamListPage() {
 
               {teams.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600">
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No teams yet. Add one or seed demo data.
                   </td>
                 </tr>
@@ -222,7 +222,7 @@ export default function TeamListPage() {
       >
         <div className="grid grid-cols-1 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Association</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Association</label>
             <Select
               value={form.association_id}
               onChange={(e) => setField('association_id', e.target.value)}
@@ -241,7 +241,7 @@ export default function TeamListPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Team Name</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Team Name</label>
             <Input value={form.name} onChange={(e) => setField('name', e.target.value)} required />
           </div>
 
@@ -253,38 +253,38 @@ export default function TeamListPage() {
           />
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Manager Name</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Manager Name</label>
             <Input value={form.manager_name} onChange={(e) => setField('manager_name', e.target.value)} />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Email</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Email</label>
               <Input value={form.manager_email} onChange={(e) => setField('manager_email', e.target.value)} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Phone</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Phone</label>
               <Input value={form.manager_phone} onChange={(e) => setField('manager_phone', e.target.value)} />
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Rink City</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink City</label>
               <Input value={form.rink_city} onChange={(e) => setField('rink_city', e.target.value)} />
             </div>
             <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600">State</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">State</label>
               <Input value={form.rink_state} onChange={(e) => setField('rink_state', e.target.value)} />
             </div>
             <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Zip</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Zip</label>
               <Input value={form.rink_zip} onChange={(e) => setField('rink_zip', e.target.value)} />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">MyHockey Ranking</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">MyHockey Ranking</label>
             <Input
               type="number"
               inputMode="numeric"
