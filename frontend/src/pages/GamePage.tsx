@@ -141,7 +141,7 @@ export default function GamePage() {
 
   const handleTypeChange = async (game_type: string) => {
     if (!gameId) return;
-    const updated = await api.updateGame(gameId, { game_type: game_type || null }) as Game;
+    const updated = await api.updateGame(gameId, { game_type: (game_type || null) as Game['game_type'] });
     setScoresheet((ss) => (ss ? { ...ss, game: { ...ss.game, ...updated } } : ss));
   };
 

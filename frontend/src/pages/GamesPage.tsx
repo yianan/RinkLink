@@ -47,7 +47,7 @@ export default function GamesPage() {
   }, [activeTeam]);
 
   const handleTypeChange = async (gameId: string, game_type: string) => {
-    const updated = await api.updateGame(gameId, { game_type: game_type || null }) as Game;
+    const updated = await api.updateGame(gameId, { game_type: (game_type || null) as Game['game_type'] });
     setGames((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
   };
 
