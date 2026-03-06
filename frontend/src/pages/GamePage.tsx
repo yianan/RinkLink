@@ -10,6 +10,7 @@ const GAME_TYPES = [
 ];
 import { api } from '../api/client';
 import {
+  Game,
   GameGoalieStatUpsert,
   GamePlayerStatUpsert,
   GameScoresheet,
@@ -140,7 +141,7 @@ export default function GamePage() {
 
   const handleTypeChange = async (game_type: string) => {
     if (!gameId) return;
-    const updated = await api.updateGame(gameId, { game_type: game_type || null });
+    const updated = await api.updateGame(gameId, { game_type: game_type || null }) as Game;
     setScoresheet((ss) => (ss ? { ...ss, game: { ...ss.game, ...updated } } : ss));
   };
 

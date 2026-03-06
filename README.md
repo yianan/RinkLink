@@ -7,7 +7,7 @@ Youth hockey scheduling app for finding opponents, managing games, and booking p
 - **Backend**: FastAPI + SQLAlchemy + SQLite (local) / PostgreSQL (production)
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS
 - **Migrations**: Alembic
-- **Deployment**: Railway (backend + frontend served together) + Railway Postgres
+- **Deployment**: Render (backend + frontend served together via Docker)
 
 ---
 
@@ -51,13 +51,14 @@ Or click **Seed Demo Data** on the homepage when no teams exist.
 ### 4. Test flow
 
 1. Select a team via the team switcher dropdown
-2. View the schedule (open dates are on the **Schedule** page)
-3. Search for opponents (**Find Opponents** page)
+2. View the schedule — open dates show **Find Opponents** and **Block/Unblock** buttons
+3. Search for opponents (**Find Opponents** page, or click directly from an open date)
 4. Propose a game from search results
-5. Switch to the opponent team
-6. Accept the proposal (**Proposals** page)
-7. Verify the schedule updates to reflect the accepted game
-8. Book practice ice on the **Practice** page
+5. Switch to the opponent team and accept the proposal (**Proposals** page)
+6. View the accepted game on the **Games** page; set its type (League / Non-League / Tournament)
+7. Confirm the game is happening this week on the **Weekly Confirm** page
+8. Fill in the scoresheet on the **Game** detail page (stats, penalties, goalie stats, signatures)
+9. Book practice ice on the **Practice** page (browse rinks → available ice slots → Book)
 
 ---
 
@@ -152,38 +153,38 @@ Alembic syncs **schema** (tables, columns, indexes, constraints) — not **data*
 
 ---
 
-## Deployment (Railway)
+## Deployment (Render)
 
-The app is deployed as a single Railway service (FastAPI serves the built React app as static files) plus a Railway-managed Postgres database.
+The app is deployed as a single Render Web Service (FastAPI serves the built React app as static files) backed by a Render-managed Postgres database.
 
 ### Architecture
 
 ```
 Browser
-  └── Railway service URL (e.g. rinklink-production.up.railway.app)
+  └── Render service URL
         ├── GET /api/*   → FastAPI handles the request
         └── GET /*       → FastAPI serves the built React SPA (index.html)
 
 FastAPI
-  └── Railway Postgres (DATABASE_URL injected automatically)
+  └── Render Postgres (DATABASE_URL set in environment)
 ```
 
-### First-time Railway setup
+### First-time Render setup
 
 1. **Push to GitHub** (the remote is already configured).
 
-2. **Create a Railway project**
-   - Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo** → select this repo.
-   - Railway detects `railway.toml` and `Dockerfile` automatically.
+2. **Create a Web Service on Render**
+   - Go to [render.com](https://render.com) → **New** → **Web Service** → connect this repo.
+   - Set **Runtime** to **Docker** — Render will use the `Dockerfile` automatically.
 
 3. **Add Postgres**
-   - Inside the Railway project: **+ New** → **Database** → **PostgreSQL**.
-   - Railway injects `DATABASE_URL` into the service environment automatically — no manual configuration needed.
+   - Create a **Render PostgreSQL** database and copy its **Internal Database URL**.
+   - Add it as an environment variable `DATABASE_URL` on the Web Service.
 
 4. **First deploy**
-   - Railway builds the Docker image (Node stage builds React, Python stage installs deps and copies the `dist/`).
-   - On startup the container runs `alembic upgrade head`, which creates all tables in the fresh Postgres DB.
-   - The health check hits `/api/health` to confirm everything is live.
+   - Render builds the Docker image (Node stage builds React, Python stage installs deps and copies `dist/`).
+   - On container start, `alembic upgrade head` runs to create all tables in the fresh Postgres DB.
+   - The health check hits `/api/health`.
 
 ### Every subsequent deploy
 
@@ -191,16 +192,14 @@ FastAPI
 git push origin main
 ```
 
-Railway rebuilds and redeploys automatically. If the push includes new migration files, `alembic upgrade head` applies them to Postgres before uvicorn starts. Zero manual steps.
+Render rebuilds and redeploys automatically. If the push includes new migration files, `alembic upgrade head` applies them before uvicorn starts.
 
 ### Environment variables
 
-Railway sets `DATABASE_URL` automatically when a Postgres service is linked. You can optionally set:
-
 | Variable | Default | Purpose |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///./rinklink.db` | Set automatically by Railway Postgres |
-| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:5174` | Comma-separated list of allowed origins; not needed when frontend and backend share the same Railway URL |
+| `DATABASE_URL` | `sqlite:///./rinklink.db` | Postgres URL from Render; falls back to SQLite locally |
+| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:5174` | Comma-separated allowed origins; not needed when frontend and backend share the same Render URL |
 
 ---
 
