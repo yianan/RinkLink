@@ -15,6 +15,9 @@ const emptyForm = {
   manager_name: '', manager_email: '', manager_phone: '',
   rink_city: '', rink_state: '', rink_zip: '',
   myhockey_ranking: '' as string,
+  wins: '' as string,
+  losses: '' as string,
+  ties: '' as string,
 };
 
 export default function TeamListPage() {
@@ -35,6 +38,9 @@ export default function TeamListPage() {
     const data = {
       ...form,
       myhockey_ranking: form.myhockey_ranking ? parseInt(form.myhockey_ranking) : null,
+      wins: form.wins ? parseInt(form.wins) : 0,
+      losses: form.losses ? parseInt(form.losses) : 0,
+      ties: form.ties ? parseInt(form.ties) : 0,
     };
     if (editId) {
       await api.updateTeam(editId, data);
@@ -55,6 +61,9 @@ export default function TeamListPage() {
       manager_name: t.manager_name, manager_email: t.manager_email, manager_phone: t.manager_phone,
       rink_city: t.rink_city, rink_state: t.rink_state, rink_zip: t.rink_zip,
       myhockey_ranking: t.myhockey_ranking?.toString() || '',
+      wins: t.wins?.toString() || '0',
+      losses: t.losses?.toString() || '0',
+      ties: t.ties?.toString() || '0',
     });
     setOpen(true);
   };
@@ -95,6 +104,9 @@ export default function TeamListPage() {
                       {t.age_group} {t.level}
                     </span>
                     <span className="whitespace-nowrap">Ranking: {t.myhockey_ranking ?? '—'}</span>
+                    <span className="whitespace-nowrap font-medium text-slate-700 dark:text-slate-300">
+                      {t.wins}-{t.losses}-{t.ties}
+                    </span>
                   </div>
 
                   {(t.manager_name || t.manager_email) && (
@@ -141,6 +153,7 @@ export default function TeamListPage() {
                 <th className="px-4 py-3">Age</th>
                 <th className="px-4 py-3">Level</th>
                 <th className="px-4 py-3">Ranking</th>
+                <th className="px-4 py-3">Record</th>
                 <th className="px-4 py-3">Manager</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -153,6 +166,7 @@ export default function TeamListPage() {
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{t.age_group}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{t.level}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{t.myhockey_ranking ?? '-'}</td>
+                  <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-300">{t.wins}-{t.losses}-{t.ties}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                     {t.manager_name ? (
                       t.manager_email ? (
@@ -191,7 +205,7 @@ export default function TeamListPage() {
 
               {teams.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No teams yet. Add one or seed demo data.
                   </td>
                 </tr>
@@ -291,6 +305,42 @@ export default function TeamListPage() {
               value={form.myhockey_ranking}
               onChange={(e) => setField('myhockey_ranking', e.target.value)}
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Record (W-L-T)</label>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={form.wins}
+                  onChange={(e) => setField('wins', e.target.value)}
+                  placeholder="W"
+                />
+              </div>
+              <div>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={form.losses}
+                  onChange={(e) => setField('losses', e.target.value)}
+                  placeholder="L"
+                />
+              </div>
+              <div>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={form.ties}
+                  onChange={(e) => setField('ties', e.target.value)}
+                  placeholder="T"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </Modal>

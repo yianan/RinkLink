@@ -135,7 +135,7 @@ function AppContent() {
           <AppNav />
         </aside>
 
-        <main className="container-page py-6 lg:pl-56">
+        <main className="w-full px-4 py-6 sm:px-6 lg:pl-64 lg:pr-6">
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/associations" element={<AssociationListPage />} />

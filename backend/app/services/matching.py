@@ -15,7 +15,7 @@ def find_auto_matches(db: Session, team_id: str) -> list[AutoMatchResult]:
     # Get this team's open entries
     my_entries = (
         db.query(ScheduleEntry)
-        .filter(ScheduleEntry.team_id == team_id, ScheduleEntry.status == "open")
+        .filter(ScheduleEntry.team_id == team_id, ScheduleEntry.status == "open", ScheduleEntry.blocked == False)  # noqa: E712
         .all()
     )
 
@@ -33,6 +33,7 @@ def find_auto_matches(db: Session, team_id: str) -> list[AutoMatchResult]:
                 ScheduleEntry.time == entry.time,
                 ScheduleEntry.entry_type == opposite_type,
                 ScheduleEntry.status == "open",
+                ScheduleEntry.blocked == False,  # noqa: E712
                 Team.id != team_id,
                 Team.age_group == team.age_group,
             )

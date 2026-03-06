@@ -22,6 +22,7 @@ class ScheduleEntryUpdate(BaseModel):
     opponent_name: Optional[str] = None
     location: Optional[str] = None
     notes: Optional[str] = None
+    blocked: Optional[bool] = None
 
 
 class ScheduleEntryOut(BaseModel):
@@ -36,6 +37,7 @@ class ScheduleEntryOut(BaseModel):
     location: Optional[str]
     notes: Optional[str]
     weekly_confirmed: bool
+    blocked: bool
     created_at: dt.datetime
     updated_at: dt.datetime
 

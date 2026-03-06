@@ -16,6 +16,7 @@ class GameOut(BaseModel):
     date: dt.date
     time: dt.time | None
     status: str
+    game_type: str | None
     home_weekly_confirmed: bool
     away_weekly_confirmed: bool
     home_score: int | None
@@ -40,6 +41,7 @@ class GameOut(BaseModel):
 
 class GameUpdate(BaseModel):
     status: str | None = None
+    game_type: str | None = None
     home_score: int | None = None
     away_score: int | None = None
 

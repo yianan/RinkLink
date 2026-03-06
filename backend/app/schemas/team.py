@@ -16,6 +16,9 @@ class TeamCreate(BaseModel):
     rink_state: str = ""
     rink_zip: str = ""
     myhockey_ranking: int | None = None
+    wins: int = 0
+    losses: int = 0
+    ties: int = 0
 
 
 class TeamUpdate(BaseModel):
@@ -29,6 +32,9 @@ class TeamUpdate(BaseModel):
     rink_state: str | None = None
     rink_zip: str | None = None
     myhockey_ranking: int | None = None
+    wins: int | None = None
+    losses: int | None = None
+    ties: int | None = None
 
 
 class TeamOut(BaseModel):
@@ -44,6 +50,9 @@ class TeamOut(BaseModel):
     rink_state: str
     rink_zip: str
     myhockey_ranking: int | None
+    wins: int
+    losses: int
+    ties: int
     association_name: str | None = None
     created_at: datetime
     updated_at: datetime

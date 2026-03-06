@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Ban, Eye, Search, Trash2 } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { api } from '../api/client';
 import { ScheduleEntry } from '../types';
@@ -22,6 +23,7 @@ const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> =
 
 export default function SchedulePage() {
   const { activeTeam } = useTeam();
+  const navigate = useNavigate();
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [tab, setTab] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
@@ -50,6 +52,15 @@ export default function SchedulePage() {
       await api.deleteScheduleEntry(id);
       load();
     }
+  };
+
+  const findOpponents = (entryId: string) => {
+    navigate(`/search?entry=${entryId}`);
+  };
+
+  const toggleBlocked = async (e: ScheduleEntry) => {
+    await api.updateScheduleEntry(e.id, { blocked: !e.blocked });
+    load();
   };
 
   if (!activeTeam) {
@@ -105,7 +116,9 @@ export default function SchedulePage() {
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>{e.entry_type}</Badge>
-                      <Badge variant={statusColors[e.status] || 'neutral'}>{e.status}</Badge>
+                      {e.blocked
+                        ? <Badge variant="warning">blocked</Badge>
+                        : <Badge variant={statusColors[e.status] || 'neutral'}>{e.status}</Badge>}
                     </div>
 
                     {(e.opponent_name || e.location || e.notes) && (
@@ -115,6 +128,34 @@ export default function SchedulePage() {
                         {e.notes ? <div className="text-xs text-slate-500 dark:text-slate-400">{e.notes}</div> : null}
                       </div>
                     )}
+
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {e.status === 'open' && e.time && !e.blocked && (
+                        <button
+                          type="button"
+                          onClick={() => findOpponents(e.id)}
+                          className="flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-cyan-300"
+                        >
+                          <Search className="h-3 w-3" />
+                          Find Opponents
+                        </button>
+                      )}
+                      {e.status === 'open' && (
+                        <button
+                          type="button"
+                          onClick={() => toggleBlocked(e)}
+                          className={cn(
+                            'flex items-center gap-1 text-xs font-medium hover:underline',
+                            e.blocked
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-slate-500 dark:text-slate-400',
+                          )}
+                        >
+                          {e.blocked ? <Eye className="h-3 w-3" /> : <Ban className="h-3 w-3" />}
+                          {e.blocked ? 'Unblock' : 'Block'}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete">
@@ -154,13 +195,41 @@ export default function SchedulePage() {
                       <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>{e.entry_type}</Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant={statusColors[e.status] || 'neutral'}>{e.status}</Badge>
+                      {e.blocked
+                        ? <Badge variant="warning">blocked</Badge>
+                        : <Badge variant={statusColors[e.status] || 'neutral'}>{e.status}</Badge>}
                     </td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{e.opponent_name || '-'}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{e.location || '-'}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{e.notes || '-'}</td>
                     <td className="px-4 py-3">
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-end gap-1">
+                        {e.status === 'open' && e.time && !e.blocked && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => findOpponents(e.id)}
+                            aria-label="Find opponents"
+                            title="Find Opponents"
+                          >
+                            <Search className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {e.status === 'open' && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleBlocked(e)}
+                            aria-label={e.blocked ? 'Unblock' : 'Block'}
+                            title={e.blocked ? 'Unblock' : 'Block'}
+                          >
+                            {e.blocked
+                              ? <Eye className="h-4 w-4 text-amber-500" />
+                              : <Ban className="h-4 w-4 text-slate-400" />}
+                          </Button>
+                        )}
                         <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete">
                           <Trash2 className="h-4 w-4 text-rose-600" />
                         </Button>
@@ -216,6 +285,31 @@ export default function SchedulePage() {
                     </div>
                     {e.opponent_name && (
                       <div className="mt-2 truncate text-xs text-slate-700 dark:text-slate-300">vs {e.opponent_name}</div>
+                    )}
+                    {e.status === 'open' && (
+                      <div className="mt-2 space-y-1">
+                        {e.time && !e.blocked && (
+                          <button
+                            type="button"
+                            onClick={() => findOpponents(e.id)}
+                            className="flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-cyan-300"
+                          >
+                            <Search className="h-3 w-3" />
+                            Find Opponents
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => toggleBlocked(e)}
+                          className={cn(
+                            'flex items-center gap-1 text-xs font-medium hover:underline',
+                            e.blocked ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400',
+                          )}
+                        >
+                          {e.blocked ? <Eye className="h-3 w-3" /> : <Ban className="h-3 w-3" />}
+                          {e.blocked ? 'Unblock' : 'Block'}
+                        </button>
+                      </div>
                     )}
                   </Card>
                 ))}

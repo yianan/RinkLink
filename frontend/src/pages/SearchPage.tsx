@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search as SearchIcon } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { api } from '../api/client';
@@ -35,6 +35,7 @@ function standardLevelsForAgeGroup(ageGroup: string) {
 export default function SearchPage() {
   const { activeTeam } = useTeam();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(0);
   const [openDates, setOpenDates] = useState<ScheduleEntry[]>([]);
   const [selectedEntryId, setSelectedEntryId] = useState('');
@@ -73,10 +74,17 @@ export default function SearchPage() {
 
   useEffect(() => {
     if (!activeTeam) return;
-    api.getSchedule(activeTeam.id, { status: 'open' }).then((data) => setOpenDates(data.filter((e) => !!e.time)));
+    const entryParam = searchParams.get('entry');
+    api.getSchedule(activeTeam.id, { status: 'open' }).then((data) => {
+      const filtered = data.filter((e) => !!e.time);
+      setOpenDates(filtered);
+      if (entryParam && filtered.some((e) => e.id === entryParam)) {
+        setSelectedEntryId(entryParam);
+      }
+    });
     api.getAutoMatches(activeTeam.id).then(setAutoMatches);
     api.getRinks().then(setRinks);
-  }, [activeTeam]);
+  }, [activeTeam]); // eslint-disable-line
 
   // Fetch available ice slots when a rink and date are selected
   useEffect(() => {

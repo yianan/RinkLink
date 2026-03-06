@@ -11,7 +11,7 @@ import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { cn } from '../lib/cn';
-import { formatTimeHHMM } from '../lib/time';
+import { formatTimeHHMM, formatDate } from '../lib/time';
 
 const statusColors: Record<string, 'warning' | 'success' | 'danger' | 'neutral'> = {
   proposed: 'warning',
@@ -206,7 +206,7 @@ export default function ProposalsPage() {
                     {p.message ? (
                       <div className="mt-2 text-sm text-slate-700 dark:text-slate-300">{p.message}</div>
                     ) : null}
-                    <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">Created {new Date(p.created_at).toLocaleDateString()}</div>
+                    <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">Created {formatDate(p.created_at)}</div>
                   </div>
 
                   <Badge variant={statusColors[p.status] || 'neutral'}>{p.status}</Badge>
@@ -314,7 +314,7 @@ export default function ProposalsPage() {
                       <Badge variant={statusColors[p.status] || 'neutral'}>{p.status}</Badge>
                     </td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.message || '-'}</td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{new Date(p.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatDate(p.created_at)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
                         {canRespond && (

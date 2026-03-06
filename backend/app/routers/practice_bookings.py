@@ -69,7 +69,7 @@ def list_practice_bookings(
     if status:
         q = q.filter(PracticeBooking.status == status)
 
-    bookings = q.order_by(PracticeBooking.created_at.desc()).all()
+    bookings = q.order_by(PracticeBooking.created_at.asc()).all()
     return [_enrich(pb, db) for pb in bookings]
 
 

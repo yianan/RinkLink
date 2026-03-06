@@ -202,7 +202,7 @@ def list_proposals(
     if status:
         q = q.filter(GameProposal.status == status)
 
-    proposals = q.order_by(GameProposal.created_at.desc()).all()
+    proposals = q.order_by(GameProposal.proposed_date.asc()).all()
     return [_enrich(p, db) for p in proposals]
 
 

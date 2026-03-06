@@ -23,6 +23,9 @@ export interface Team {
   rink_state: string;
   rink_zip: string;
   myhockey_ranking: number | null;
+  wins: number;
+  losses: number;
+  ties: number;
   association_name: string | null;
   created_at: string;
   updated_at: string;
@@ -40,6 +43,7 @@ export interface ScheduleEntry {
   location: string | null;
   notes: string | null;
   weekly_confirmed: boolean;
+  blocked: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -199,6 +203,7 @@ export interface Game {
   date: string;
   time: string | null;
   status: string;
+  game_type: 'league' | 'non_league' | 'tournament' | null;
   home_weekly_confirmed: boolean;
   away_weekly_confirmed: boolean;
   home_score: number | null;

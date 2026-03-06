@@ -34,6 +34,7 @@ class Game(Base):
     time: Mapped[time | None] = mapped_column(Time, nullable=True)
 
     status: Mapped[str] = mapped_column(String(20), default="scheduled")  # scheduled, confirmed, final, cancelled
+    game_type: Mapped[str | None] = mapped_column(String(20), nullable=True)  # league, non_league, tournament
 
     home_weekly_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
     away_weekly_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)

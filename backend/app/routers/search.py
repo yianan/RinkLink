@@ -69,6 +69,7 @@ def search_opponents(
             ScheduleEntry.time == my_entry.time,
             ScheduleEntry.entry_type == opposite_type,
             ScheduleEntry.status == "open",
+            ScheduleEntry.blocked == False,  # noqa: E712
             Team.id != team_id,
         )
     )

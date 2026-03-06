@@ -24,6 +24,9 @@ class Team(Base):
     rink_state: Mapped[str] = mapped_column(String(2), default="")
     rink_zip: Mapped[str] = mapped_column(String(10), default="")
     myhockey_ranking: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    wins: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    losses: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    ties: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

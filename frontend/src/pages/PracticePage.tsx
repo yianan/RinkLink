@@ -11,7 +11,7 @@ import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { cn } from '../lib/cn';
-import { formatTimeHHMM } from '../lib/time';
+import { formatTimeHHMM, formatDate } from '../lib/time';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -91,10 +91,16 @@ export default function PracticePage() {
     return <Alert variant="info">Select a team to view practice bookings.</Alert>;
   }
 
-  const upcomingBookings = bookings.filter(
+  const sorted = [...bookings].sort((a, b) => {
+    const da = a.slot_date ?? '';
+    const db_ = b.slot_date ?? '';
+    return da < db_ ? -1 : da > db_ ? 1 : 0;
+  });
+
+  const upcomingBookings = sorted.filter(
     (b) => b.status === 'active' && b.slot_date && b.slot_date >= today,
   );
-  const historyBookings = bookings.filter(
+  const historyBookings = sorted.filter(
     (b) => b.status === 'cancelled' || (b.slot_date && b.slot_date < today),
   );
   const displayed = tab === 'upcoming' ? upcomingBookings : historyBookings;
@@ -135,7 +141,7 @@ export default function PracticePage() {
             <div key={b.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{b.slot_date || '—'}</div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{formatDate(b.slot_date) || '—'}</div>
                   <div className="mt-1 text-sm text-slate-700 dark:text-slate-300">
                     {formatTimeHHMM(b.slot_start_time) || '—'}
                     {b.slot_end_time ? `–${formatTimeHHMM(b.slot_end_time) || b.slot_end_time}` : ''}
@@ -149,8 +155,8 @@ export default function PracticePage() {
                     <div className="mt-2 text-sm text-slate-700 dark:text-slate-300">{b.notes || b.slot_notes}</div>
                   )}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <Badge variant={b.status === 'active' ? 'success' : 'neutral'}>{b.status}</Badge>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">Booked {new Date(b.created_at).toLocaleDateString()}</span>
+                    <Badge variant={b.status === 'active' ? 'success' : 'neutral'}>{b.status === 'active' ? 'Confirmed' : b.status}</Badge>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Booked On {formatDate(b.created_at)}</span>
                   </div>
                 </div>
 
@@ -184,14 +190,14 @@ export default function PracticePage() {
                 <th className="px-4 py-3">Rink</th>
                 <th className="px-4 py-3">Notes</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Booked</th>
+                <th className="px-4 py-3">Booked On</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {displayed.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
-                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{b.slot_date || '—'}</td>
+                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{formatDate(b.slot_date) || '—'}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                     {formatTimeHHMM(b.slot_start_time) || '—'}
                     {b.slot_end_time ? `–${formatTimeHHMM(b.slot_end_time) || b.slot_end_time}` : ''}
@@ -210,10 +216,10 @@ export default function PracticePage() {
                   </td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{b.notes || b.slot_notes || '—'}</td>
                   <td className="px-4 py-3">
-                    <Badge variant={b.status === 'active' ? 'success' : 'neutral'}>{b.status}</Badge>
+                    <Badge variant={b.status === 'active' ? 'success' : 'neutral'}>{b.status === 'active' ? 'Confirmed' : b.status}</Badge>
                   </td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                    {new Date(b.created_at).toLocaleDateString()}
+                    {formatDate(b.created_at)}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end">

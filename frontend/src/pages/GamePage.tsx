@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { MapPin, Save, ShieldCheck, Trash2 } from 'lucide-react';
+
+const GAME_TYPES = [
+  { value: '', label: '—' },
+  { value: 'league', label: 'League' },
+  { value: 'non_league', label: 'Non-League' },
+  { value: 'tournament', label: 'Tournament' },
+];
 import { api } from '../api/client';
 import {
   GameGoalieStatUpsert,
@@ -128,6 +135,12 @@ export default function GamePage() {
     const home_score = scoreDraft.home === '' ? null : Number(scoreDraft.home);
     const away_score = scoreDraft.away === '' ? null : Number(scoreDraft.away);
     const updated = await api.updateGame(gameId, { home_score, away_score });
+    setScoresheet((ss) => (ss ? { ...ss, game: { ...ss.game, ...updated } } : ss));
+  };
+
+  const handleTypeChange = async (game_type: string) => {
+    if (!gameId) return;
+    const updated = await api.updateGame(gameId, { game_type: game_type || null });
     setScoresheet((ss) => (ss ? { ...ss, game: { ...ss.game, ...updated } } : ss));
   };
 
@@ -272,6 +285,15 @@ export default function GamePage() {
             <Badge variant={game.home_weekly_confirmed ? 'success' : 'outline'}>{homeName} confirmed</Badge>
             <Badge variant={game.away_weekly_confirmed ? 'success' : 'outline'}>{awayName} confirmed</Badge>
             <Badge variant="outline">{game.status}</Badge>
+            <Select
+              value={game.game_type ?? ''}
+              onChange={(e) => handleTypeChange(e.target.value)}
+              className="w-36"
+            >
+              {GAME_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </Select>
           </div>
         </div>
 

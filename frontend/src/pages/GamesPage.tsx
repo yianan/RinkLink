@@ -7,8 +7,22 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { Select } from '../components/ui/Select';
 import { cn } from '../lib/cn';
 import { formatTimeHHMM } from '../lib/time';
+
+const GAME_TYPES = [
+  { value: '', label: '—' },
+  { value: 'league', label: 'League' },
+  { value: 'non_league', label: 'Non-League' },
+  { value: 'tournament', label: 'Tournament' },
+];
+
+const gameTypeColors: Record<string, 'info' | 'success' | 'warning' | 'neutral'> = {
+  league: 'info',
+  non_league: 'neutral',
+  tournament: 'success',
+};
 
 const statusColors: Record<string, 'info' | 'warning' | 'success' | 'neutral'> = {
   scheduled: 'info',
@@ -31,6 +45,11 @@ export default function GamesPage() {
     if (!activeTeam) return;
     api.getGames(activeTeam.id).then(setGames);
   }, [activeTeam]);
+
+  const handleTypeChange = async (gameId: string, game_type: string) => {
+    const updated = await api.updateGame(gameId, { game_type: game_type || null });
+    setGames((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
+  };
 
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -115,6 +134,11 @@ export default function GamesPage() {
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <Badge variant={statusColors[g.status] || 'neutral'}>{g.status}</Badge>
+                      {g.game_type && (
+                        <Badge variant={gameTypeColors[g.game_type] || 'neutral'}>
+                          {GAME_TYPES.find((t) => t.value === g.game_type)?.label ?? g.game_type}
+                        </Badge>
+                      )}
                       <Badge variant="outline">Score: {score}</Badge>
                       <span className="text-xs text-slate-500 dark:text-slate-400">
                         Weekly: You {myConfirmed ? 'Yes' : 'No'} • Opp {oppConfirmed ? 'Yes' : 'No'}
@@ -141,6 +165,7 @@ export default function GamesPage() {
                 <th className="px-4 py-3">Opponent</th>
                 <th className="px-4 py-3">Rink</th>
                 <th className="px-4 py-3">Score</th>
+                <th className="px-4 py-3">Type</th>
                 <th
                   className="px-4 py-3"
                   title="Weekly confirm is an in-app check-in (typically on Mondays) for games in the current week. Update yours on the Weekly Confirm page."
@@ -189,6 +214,17 @@ export default function GamesPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{score}</td>
                     <td className="px-4 py-3">
+                      <Select
+                        value={g.game_type ?? ''}
+                        onChange={(e) => handleTypeChange(g.id, e.target.value)}
+                        className="w-36"
+                      >
+                        {GAME_TYPES.map((t) => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </Select>
+                    </td>
+                    <td className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant={myConfirmed ? 'success' : 'outline'}>You: {myConfirmed ? 'Yes' : 'No'}</Badge>
                         <Badge variant={oppConfirmed ? 'success' : 'outline'}>Opp: {oppConfirmed ? 'Yes' : 'No'}</Badge>
@@ -210,7 +246,7 @@ export default function GamesPage() {
 
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No games to show.
                   </td>
                 </tr>
