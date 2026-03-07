@@ -38,6 +38,7 @@ class ScheduleEntryOut(BaseModel):
     notes: Optional[str]
     weekly_confirmed: bool
     blocked: bool
+    game_id: Optional[str] = None
     created_at: dt.datetime
     updated_at: dt.datetime
 

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import ScheduleEntry, Team
+from ..models.game import Game
 from ..schemas import ScheduleEntryCreate, ScheduleEntryUpdate, ScheduleEntryOut
 from ..schemas.schedule_entry import ScheduleUploadPreview, ScheduleConfirmUpload
 from ..services.csv_parser import parse_csv
@@ -32,7 +33,25 @@ def list_schedule(
         q = q.filter(ScheduleEntry.date >= date_from)
     if date_to:
         q = q.filter(ScheduleEntry.date <= date_to)
-    return q.order_by(ScheduleEntry.date, ScheduleEntry.time).all()
+    entries = q.order_by(ScheduleEntry.date, ScheduleEntry.time).all()
+
+    entry_ids = [e.id for e in entries]
+    game_id_map: dict[str, str] = {}
+    if entry_ids:
+        games = db.query(Game).filter(
+            (Game.home_schedule_entry_id.in_(entry_ids)) |
+            (Game.away_schedule_entry_id.in_(entry_ids))
+        ).all()
+        for g in games:
+            if g.home_schedule_entry_id in entry_ids:
+                game_id_map[g.home_schedule_entry_id] = g.id
+            if g.away_schedule_entry_id in entry_ids:
+                game_id_map[g.away_schedule_entry_id] = g.id
+
+    return [
+        ScheduleEntryOut.model_validate(e).model_copy(update={"game_id": game_id_map.get(e.id)})
+        for e in entries
+    ]
 
 
 @router.post("/teams/{team_id}/schedule", response_model=ScheduleEntryOut, status_code=201)
@@ -90,12 +109,3 @@ def delete_schedule_entry(id: str, db: Session = Depends(get_db)):
     db.commit()
 
 
-@router.patch("/schedule-entries/{id}/weekly-confirm", response_model=ScheduleEntryOut)
-def toggle_weekly_confirm(id: str, db: Session = Depends(get_db)):
-    entry = db.get(ScheduleEntry, id)
-    if not entry:
-        raise HTTPException(404, "Schedule entry not found")
-    entry.weekly_confirmed = not entry.weekly_confirmed
-    db.commit()
-    db.refresh(entry)
-    return entry

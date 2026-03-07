@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ban, Eye, Search, Trash2 } from 'lucide-react';
+import { Ban, CheckCircle2, Eye, Search, Trash2, XCircle } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { api } from '../api/client';
 import { ScheduleEntry } from '../types';
@@ -56,6 +56,19 @@ export default function SchedulePage() {
 
   const findOpponents = (entryId: string) => {
     navigate(`/search?entry=${entryId}`);
+  };
+
+  const handleConfirm = async (e: ScheduleEntry) => {
+    if (!activeTeam || !e.game_id) return;
+    await api.confirmGame(e.game_id, activeTeam.id, true);
+    load();
+  };
+
+  const handleCancelGame = async (e: ScheduleEntry) => {
+    if (!e.game_id) return;
+    if (!confirm(`Cancel the game vs ${e.opponent_name || 'opponent'}? This cannot be undone.`)) return;
+    await api.cancelGame(e.game_id);
+    load();
   };
 
   const toggleBlocked = async (e: ScheduleEntry) => {
@@ -155,6 +168,34 @@ export default function SchedulePage() {
                           {e.blocked ? 'Unblock' : 'Block'}
                         </button>
                       )}
+                      {(e.status === 'scheduled' || e.status === 'confirmed') && e.game_id && (
+                        <>
+                          {!e.weekly_confirmed && (
+                            <button
+                              type="button"
+                              onClick={() => handleConfirm(e)}
+                              className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              Confirm
+                            </button>
+                          )}
+                          {e.weekly_confirmed && (
+                            <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Confirmed
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleCancelGame(e)}
+                            className="flex items-center gap-1 text-xs font-medium text-rose-600 hover:underline dark:text-rose-400"
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Cancel Game
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -229,6 +270,32 @@ export default function SchedulePage() {
                               ? <Eye className="h-4 w-4 text-amber-500" />
                               : <Ban className="h-4 w-4 text-slate-400" />}
                           </Button>
+                        )}
+                        {(e.status === 'scheduled' || e.status === 'confirmed') && e.game_id && (
+                          <>
+                            {!e.weekly_confirmed && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleConfirm(e)}
+                                title="Confirm Game"
+                                aria-label="Confirm Game"
+                              >
+                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                              </Button>
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleCancelGame(e)}
+                              title="Cancel Game"
+                              aria-label="Cancel Game"
+                            >
+                              <XCircle className="h-4 w-4 text-rose-500" />
+                            </Button>
+                          </>
                         )}
                         <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete">
                           <Trash2 className="h-4 w-4 text-rose-600" />
@@ -308,6 +375,33 @@ export default function SchedulePage() {
                         >
                           {e.blocked ? <Eye className="h-3 w-3" /> : <Ban className="h-3 w-3" />}
                           {e.blocked ? 'Unblock' : 'Block'}
+                        </button>
+                      </div>
+                    )}
+                    {(e.status === 'scheduled' || e.status === 'confirmed') && e.game_id && (
+                      <div className="mt-2 space-y-1">
+                        {!e.weekly_confirmed ? (
+                          <button
+                            type="button"
+                            onClick={() => handleConfirm(e)}
+                            className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            Confirm
+                          </button>
+                        ) : (
+                          <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Confirmed
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleCancelGame(e)}
+                          className="flex items-center gap-1 text-xs font-medium text-rose-600 hover:underline dark:text-rose-400"
+                        >
+                          <XCircle className="h-3 w-3" />
+                          Cancel Game
                         </button>
                       </div>
                     )}

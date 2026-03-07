@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Save } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { api } from '../api/client';
 import { Game } from '../types';
@@ -7,6 +8,7 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { cn } from '../lib/cn';
 import { formatTimeHHMM } from '../lib/time';
@@ -40,14 +42,34 @@ export default function GamesPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState(0);
   const [games, setGames] = useState<Game[]>([]);
+  const [scoreEdits, setScoreEdits] = useState<Record<string, { home: string; away: string }>>({});
 
   useEffect(() => {
     if (!activeTeam) return;
-    api.getGames(activeTeam.id).then(setGames);
+    api.getGames(activeTeam.id).then((gs) => {
+      setGames(gs);
+      const edits: Record<string, { home: string; away: string }> = {};
+      gs.forEach((g) => {
+        edits[g.id] = {
+          home: g.home_score != null ? String(g.home_score) : '',
+          away: g.away_score != null ? String(g.away_score) : '',
+        };
+      });
+      setScoreEdits(edits);
+    });
   }, [activeTeam]);
 
   const handleTypeChange = async (gameId: string, game_type: string) => {
     const updated = await api.updateGame(gameId, { game_type: (game_type || null) as Game['game_type'] });
+    setGames((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
+  };
+
+  const handleSaveScore = async (gameId: string) => {
+    const edit = scoreEdits[gameId];
+    if (!edit) return;
+    const home_score = edit.home === '' ? null : Number(edit.home);
+    const away_score = edit.away === '' ? null : Number(edit.away);
+    const updated = await api.updateGame(gameId, { home_score, away_score });
     setGames((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
   };
 
@@ -104,49 +126,61 @@ export default function GamesPage() {
           {filtered.map((g) => {
             const isHome = activeTeam.id === g.home_team_id;
             const opponent = isHome ? g.away_team_name : g.home_team_name;
-            const myConfirmed = isHome ? g.home_weekly_confirmed : g.away_weekly_confirmed;
-            const oppConfirmed = isHome ? g.away_weekly_confirmed : g.home_weekly_confirmed;
-            const score =
-              g.home_score != null && g.away_score != null
-                ? `${g.home_score}-${g.away_score}`
-                : '—';
+            const edit = scoreEdits[g.id] || { home: '', away: '' };
 
             return (
-              <button
-                key={g.id}
-                type="button"
-                className="w-full px-4 py-4 text-left transition-colors hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:hover:bg-slate-900/40 dark:focus-visible:ring-offset-slate-950"
-                onClick={() => navigate(`/games/${g.id}`)}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {formatDateLabel(g.date)} {formatTimeHHMM(g.time) || ''}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{opponent || '—'}</span>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">{isHome ? 'Home' : 'Away'}</span>
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {g.rink_name
-                        ? `${g.rink_name}${g.rink_city ? ` • ${g.rink_city}, ${g.rink_state}` : ''}`
-                        : g.location_label || 'No location yet'}
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <Badge variant={statusColors[g.status] || 'neutral'}>{g.status}</Badge>
-                      {g.game_type && (
-                        <Badge variant={gameTypeColors[g.game_type] || 'neutral'}>
-                          {GAME_TYPES.find((t) => t.value === g.game_type)?.label ?? g.game_type}
-                        </Badge>
-                      )}
-                      <Badge variant="outline">Score: {score}</Badge>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
-                        Weekly: You {myConfirmed ? 'Yes' : 'No'} • Opp {oppConfirmed ? 'Yes' : 'No'}
-                      </span>
-                    </div>
+              <div key={g.id} className="px-4 py-4">
+                <div
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/games/${g.id}`)}
+                >
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {formatDateLabel(g.date)} {formatTimeHHMM(g.time) || ''}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{opponent || '—'}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{isHome ? 'Home' : 'Away'}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {g.rink_name
+                      ? `${g.rink_name}${g.rink_city ? ` • ${g.rink_city}, ${g.rink_state}` : ''}`
+                      : g.location_label || 'No location yet'}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge variant={statusColors[g.status] || 'neutral'}>{g.status}</Badge>
+                    {g.game_type && (
+                      <Badge variant={gameTypeColors[g.game_type] || 'neutral'}>
+                        {GAME_TYPES.find((t) => t.value === g.game_type)?.label ?? g.game_type}
+                      </Badge>
+                    )}
                   </div>
                 </div>
-              </button>
+                <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Score:</span>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    className="w-14 text-center text-sm"
+                    value={edit.home}
+                    placeholder="H"
+                    onChange={(e) => setScoreEdits((s) => ({ ...s, [g.id]: { ...edit, home: e.target.value } }))}
+                  />
+                  <span className="text-slate-500">–</span>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    className="w-14 text-center text-sm"
+                    value={edit.away}
+                    placeholder="A"
+                    onChange={(e) => setScoreEdits((s) => ({ ...s, [g.id]: { ...edit, away: e.target.value } }))}
+                  />
+                  <Button type="button" size="sm" variant="ghost" onClick={() => handleSaveScore(g.id)} title="Save score">
+                    <Save className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
             );
           })}
 
@@ -166,12 +200,6 @@ export default function GamesPage() {
                 <th className="px-4 py-3">Rink</th>
                 <th className="px-4 py-3">Score</th>
                 <th className="px-4 py-3">Type</th>
-                <th
-                  className="px-4 py-3"
-                  title="Weekly confirm is an in-app check-in (typically on Mondays) for games in the current week. Update yours on the Weekly Confirm page."
-                >
-                  Weekly Confirm
-                </th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right"></th>
               </tr>
@@ -180,12 +208,7 @@ export default function GamesPage() {
               {filtered.map((g) => {
                 const isHome = activeTeam.id === g.home_team_id;
                 const opponent = isHome ? g.away_team_name : g.home_team_name;
-                const myConfirmed = isHome ? g.home_weekly_confirmed : g.away_weekly_confirmed;
-                const oppConfirmed = isHome ? g.away_weekly_confirmed : g.home_weekly_confirmed;
-                const score =
-                  g.home_score != null && g.away_score != null
-                    ? `${g.home_score}-${g.away_score}`
-                    : '—';
+                const edit = scoreEdits[g.id] || { home: '', away: '' };
 
                 return (
                   <tr key={g.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
@@ -212,7 +235,32 @@ export default function GamesPage() {
                         '—'
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{score}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          min="0"
+                          className="w-14 text-center text-sm"
+                          value={edit.home}
+                          placeholder="H"
+                          onChange={(e) => setScoreEdits((s) => ({ ...s, [g.id]: { ...edit, home: e.target.value } }))}
+                        />
+                        <span className="text-slate-500">–</span>
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          min="0"
+                          className="w-14 text-center text-sm"
+                          value={edit.away}
+                          placeholder="A"
+                          onChange={(e) => setScoreEdits((s) => ({ ...s, [g.id]: { ...edit, away: e.target.value } }))}
+                        />
+                        <Button type="button" size="sm" variant="ghost" onClick={() => handleSaveScore(g.id)} title="Save score">
+                          <Save className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <Select
                         value={g.game_type ?? ''}
@@ -223,12 +271,6 @@ export default function GamesPage() {
                           <option key={t.value} value={t.value}>{t.label}</option>
                         ))}
                       </Select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant={myConfirmed ? 'success' : 'outline'}>You: {myConfirmed ? 'Yes' : 'No'}</Badge>
-                        <Badge variant={oppConfirmed ? 'success' : 'outline'}>Opp: {oppConfirmed ? 'Yes' : 'No'}</Badge>
-                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={statusColors[g.status] || 'neutral'}>{g.status}</Badge>
@@ -246,7 +288,7 @@ export default function GamesPage() {
 
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No games to show.
                   </td>
                 </tr>

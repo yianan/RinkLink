@@ -44,6 +44,7 @@ export interface ScheduleEntry {
   notes: string | null;
   weekly_confirmed: boolean;
   blocked: boolean;
+  game_id: string | null;
   created_at: string;
   updated_at: string;
 }

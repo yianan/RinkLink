@@ -5,8 +5,35 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Game, Team, ScheduleEntry
+from ..models.rink import IceSlot
 from ..schemas import GameOut, GameUpdate, WeeklyConfirmUpdate
 from ..services.game_view import enrich_game
+
+
+def _update_team_record(team_id: str, db: Session) -> None:
+    """Recompute and store wins/losses/ties for a team from all final games."""
+    team = db.get(Team, team_id)
+    if not team:
+        return
+    final_games = db.query(Game).filter(
+        (Game.home_team_id == team_id) | (Game.away_team_id == team_id),
+        Game.status == "final",
+        Game.home_score.isnot(None),
+        Game.away_score.isnot(None),
+    ).all()
+    wins = losses = ties = 0
+    for g in final_games:
+        my_score = g.home_score if g.home_team_id == team_id else g.away_score
+        opp_score = g.away_score if g.home_team_id == team_id else g.home_score
+        if my_score > opp_score:
+            wins += 1
+        elif my_score < opp_score:
+            losses += 1
+        else:
+            ties += 1
+    team.wins = wins
+    team.losses = losses
+    team.ties = ties
 
 router = APIRouter(tags=["games"])
 
@@ -49,6 +76,41 @@ def update_game(id: str, body: GameUpdate, db: Session = Depends(get_db)):
         raise HTTPException(404, "Game not found")
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(g, k, v)
+    # Auto-finalize when both scores are provided and status wasn't explicitly set
+    if body.home_score is not None and body.away_score is not None and "status" not in body.model_fields_set:
+        g.status = "final"
+    db.flush()
+    if g.status == "final":
+        _update_team_record(g.home_team_id, db)
+        _update_team_record(g.away_team_id, db)
+    db.commit()
+    db.refresh(g)
+    return enrich_game(g, db)
+
+
+@router.patch("/games/{id}/cancel", response_model=GameOut)
+def cancel_game(id: str, db: Session = Depends(get_db)):
+    g = db.get(Game, id)
+    if not g:
+        raise HTTPException(404, "Game not found")
+    g.status = "cancelled"
+    g.home_weekly_confirmed = False
+    g.away_weekly_confirmed = False
+    for se_id in (g.home_schedule_entry_id, g.away_schedule_entry_id):
+        if not se_id:
+            continue
+        se = db.get(ScheduleEntry, se_id)
+        if not se:
+            continue
+        se.status = "open"
+        se.opponent_team_id = None
+        se.opponent_name = None
+        se.weekly_confirmed = False
+    if g.ice_slot_id:
+        slot = db.get(IceSlot, g.ice_slot_id)
+        if slot:
+            slot.status = "available"
+            slot.booked_by_team_id = None
     db.commit()
     db.refresh(g)
     return enrich_game(g, db)

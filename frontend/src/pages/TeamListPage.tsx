@@ -15,9 +15,6 @@ const emptyForm = {
   manager_name: '', manager_email: '', manager_phone: '',
   rink_city: '', rink_state: '', rink_zip: '',
   myhockey_ranking: '' as string,
-  wins: '' as string,
-  losses: '' as string,
-  ties: '' as string,
 };
 
 export default function TeamListPage() {
@@ -38,9 +35,6 @@ export default function TeamListPage() {
     const data = {
       ...form,
       myhockey_ranking: form.myhockey_ranking ? parseInt(form.myhockey_ranking) : null,
-      wins: form.wins ? parseInt(form.wins) : 0,
-      losses: form.losses ? parseInt(form.losses) : 0,
-      ties: form.ties ? parseInt(form.ties) : 0,
     };
     if (editId) {
       await api.updateTeam(editId, data);
@@ -61,9 +55,6 @@ export default function TeamListPage() {
       manager_name: t.manager_name, manager_email: t.manager_email, manager_phone: t.manager_phone,
       rink_city: t.rink_city, rink_state: t.rink_state, rink_zip: t.rink_zip,
       myhockey_ranking: t.myhockey_ranking?.toString() || '',
-      wins: t.wins?.toString() || '0',
-      losses: t.losses?.toString() || '0',
-      ties: t.ties?.toString() || '0',
     });
     setOpen(true);
   };
@@ -305,42 +296,6 @@ export default function TeamListPage() {
               value={form.myhockey_ranking}
               onChange={(e) => setField('myhockey_ranking', e.target.value)}
             />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Record (W-L-T)</label>
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  value={form.wins}
-                  onChange={(e) => setField('wins', e.target.value)}
-                  placeholder="W"
-                />
-              </div>
-              <div>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  value={form.losses}
-                  onChange={(e) => setField('losses', e.target.value)}
-                  placeholder="L"
-                />
-              </div>
-              <div>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  value={form.ties}
-                  onChange={(e) => setField('ties', e.target.value)}
-                  placeholder="T"
-                />
-              </div>
-            </div>
           </div>
         </div>
       </Modal>

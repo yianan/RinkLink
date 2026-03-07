@@ -78,9 +78,6 @@ export const api = {
     request<import('../types').ScheduleEntry>(`/schedule-entries/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteScheduleEntry: (id: string) =>
     request<void>(`/schedule-entries/${id}`, { method: 'DELETE' }),
-  toggleWeeklyConfirm: (id: string) =>
-    request<import('../types').ScheduleEntry>(`/schedule-entries/${id}/weekly-confirm`, { method: 'PATCH' }),
-
   // Search
   searchOpponents: (params: Record<string, string>) => {
     const qs = new URLSearchParams(params).toString();
@@ -134,8 +131,10 @@ export const api = {
   getGame: (id: string) => request<import('../types').Game>(`/games/${id}`),
   updateGame: (id: string, data: Partial<import('../types').Game>) =>
     request<import('../types').Game>(`/games/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  weeklyConfirmGame: (id: string, team_id: string, confirmed: boolean) =>
+  confirmGame: (id: string, team_id: string, confirmed: boolean) =>
     request<import('../types').Game>(`/games/${id}/weekly-confirm`, { method: 'PATCH', body: JSON.stringify({ team_id, confirmed }) }),
+  cancelGame: (id: string) =>
+    request<import('../types').Game>(`/games/${id}/cancel`, { method: 'PATCH' }),
 
   // Scoresheet
   getScoresheet: (gameId: string) =>

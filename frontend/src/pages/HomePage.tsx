@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, CheckCircle2, Dumbbell, Inbox } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { api } from '../api/client';
-import { ScheduleEntry, GameProposal, Game, Notification, PracticeBooking } from '../types';
+import { ScheduleEntry, GameProposal, Game, PracticeBooking } from '../types';
 import { cn } from '../lib/cn';
 import { formatTimeHHMM } from '../lib/time';
 import { Badge } from '../components/ui/Badge';
@@ -51,7 +51,6 @@ export default function HomePage() {
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
   const [proposals, setProposals] = useState<GameProposal[]>([]);
   const [games, setGames] = useState<Game[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [practices, setPractices] = useState<PracticeBooking[]>([]);
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedError, setSeedError] = useState('');
@@ -62,7 +61,6 @@ export default function HomePage() {
     api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }).then(setProposals);
     const todayStr = new Date().toISOString().slice(0, 10);
     api.getGames(activeTeam.id, { date_from: todayStr }).then(setGames);
-    api.getNotifications(activeTeam.id, { unread_only: 'true' }).then(setNotifications);
     api.getPracticeBookings(activeTeam.id, { status: 'active' }).then(setPractices);
   }, [activeTeam]);
 
@@ -73,8 +71,6 @@ export default function HomePage() {
     .slice()
     .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
     .slice(0, 5);
-  const weekly = notifications.find((n) => n.notif_type === 'weekly_confirm') || null;
-
   if (!activeTeam) {
     return (
       <div className="mx-auto max-w-2xl pt-12">
@@ -145,30 +141,6 @@ export default function HomePage() {
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100">
           {seedError}
         </div>
-      )}
-
-      {weekly && (
-        <Card className="p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{weekly.title}</div>
-              <div className="mt-1 text-sm text-slate-700 dark:text-slate-300">{weekly.message}</div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" onClick={() => navigate('/confirm')}>
-                Confirm Games
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => api.markNotificationRead(weekly.id).then(() => setNotifications((ns) => ns.filter((n) => n.id !== weekly.id)))}
-              >
-                Dismiss
-              </Button>
-            </div>
-          </div>
-        </Card>
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

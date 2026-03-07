@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
-  BadgeCheck,
   Building2,
   Calendar,
   ClipboardList,
@@ -28,7 +27,6 @@ import GamePage from './pages/GamePage';
 import SearchPage from './pages/SearchPage';
 import ProposalsPage from './pages/ProposalsPage';
 import PracticePage from './pages/PracticePage';
-import WeeklyConfirmPage from './pages/WeeklyConfirmPage';
 import RinkListPage from './pages/RinkListPage';
 import IceSlotsPage from './pages/IceSlotsPage';
 import { cn } from './lib/cn';
@@ -44,7 +42,6 @@ const NAV_ITEMS = [
   { path: '/proposals', label: 'Proposals', icon: Inbox },
   { path: '/practice', label: 'Practice', icon: Dumbbell },
   { path: '/rinks', label: 'Rinks', icon: Snowflake },
-  { path: '/confirm', label: 'Weekly Confirm', icon: BadgeCheck },
 ];
 
 function AppNav({ onNavigate }: { onNavigate?: () => void }) {
@@ -149,7 +146,6 @@ function AppContent() {
             <Route path="/practice" element={<PracticePage />} />
             <Route path="/rinks" element={<RinkListPage />} />
             <Route path="/rinks/:rinkId/slots" element={<IceSlotsPage />} />
-            <Route path="/confirm" element={<WeeklyConfirmPage />} />
           </Routes>
         </main>
       </div>

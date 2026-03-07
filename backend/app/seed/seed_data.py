@@ -14,6 +14,7 @@ from ..models import (
     ZipCode,
 )
 from ..models.rink import Rink, IceSlot
+from ..models.practice_booking import PracticeBooking
 
 
 def _id():
@@ -42,11 +43,12 @@ def seed_zip_codes(db: Session):
 
 def seed_demo_data(db: Session):
     """Seed associations, teams, schedule entries, and sample proposals."""
-    # Clear existing data
+    # Clear existing data (order matters: delete dependents before parents)
     db.query(Game).delete()
     db.query(GameProposal).delete()
     db.query(Notification).delete()
     db.query(Player).delete()
+    db.query(PracticeBooking).delete()
     db.query(IceSlot).delete()
     db.query(Rink).delete()
     db.query(ScheduleEntry).delete()
@@ -66,33 +68,41 @@ def seed_demo_data(db: Session):
     db.add_all(assocs)
     db.commit()
 
-    # Teams (2 per association)
-    t1_id, t2_id, t3_id, t4_id, t5_id, t6_id = [_id() for _ in range(6)]
+    # Teams (3 per association)
+    t1_id, t2_id, t3_id, t4_id, t5_id, t6_id, t7_id, t8_id, t9_id, t10_id = [_id() for _ in range(10)]
     teams = [
         Team(id=t1_id, association_id=a1_id, name="Northshore 14U AA", age_group="14U", level="AA",
              manager_name="Mike Johnson", manager_email="mike@northshore.org", manager_phone="847-555-0101",
-             rink_city="Wilmette", rink_state="IL", rink_zip="60091", myhockey_ranking=15,
-             wins=8, losses=3, ties=1),
+             rink_city="Wilmette", rink_state="IL", rink_zip="60091", myhockey_ranking=15),
         Team(id=t2_id, association_id=a1_id, name="Northshore 12U A", age_group="12U", level="A",
              manager_name="Sarah Chen", manager_email="sarah@northshore.org", manager_phone="847-555-0102",
-             rink_city="Wilmette", rink_state="IL", rink_zip="60091", myhockey_ranking=25,
-             wins=5, losses=6, ties=0),
+             rink_city="Wilmette", rink_state="IL", rink_zip="60091", myhockey_ranking=25),
         Team(id=t3_id, association_id=a2_id, name="Mission 14U AA", age_group="14U", level="AA",
              manager_name="Tom Williams", manager_email="tom@chimission.org", manager_phone="630-555-0201",
-             rink_city="Bensenville", rink_state="IL", rink_zip="60106", myhockey_ranking=8,
-             wins=10, losses=2, ties=0),
+             rink_city="Bensenville", rink_state="IL", rink_zip="60106", myhockey_ranking=8),
         Team(id=t4_id, association_id=a2_id, name="Mission 12U A", age_group="12U", level="A",
              manager_name="Lisa Park", manager_email="lisa@chimission.org", manager_phone="630-555-0202",
-             rink_city="Bensenville", rink_state="IL", rink_zip="60106", myhockey_ranking=12,
-             wins=7, losses=4, ties=1),
+             rink_city="Bensenville", rink_state="IL", rink_zip="60106", myhockey_ranking=12),
         Team(id=t5_id, association_id=a3_id, name="Team IL 14U AA", age_group="14U", level="AA",
              manager_name="Dave Brown", manager_email="dave@teamil.org", manager_phone="630-555-0301",
-             rink_city="Geneva", rink_state="IL", rink_zip="60134", myhockey_ranking=20,
-             wins=6, losses=5, ties=2),
+             rink_city="Geneva", rink_state="IL", rink_zip="60134", myhockey_ranking=20),
         Team(id=t6_id, association_id=a3_id, name="Team IL 12U A", age_group="12U", level="A",
              manager_name="Amy White", manager_email="amy@teamil.org", manager_phone="630-555-0302",
-             rink_city="Geneva", rink_state="IL", rink_zip="60134", myhockey_ranking=30,
-             wins=4, losses=7, ties=0),
+             rink_city="Geneva", rink_state="IL", rink_zip="60134", myhockey_ranking=30),
+        # 8U teams
+        Team(id=t7_id, association_id=a1_id, name="Northshore 8U Intermediate", age_group="8U", level="Intermediate",
+             manager_name="Karen Mills", manager_email="karen@northshore.org", manager_phone="847-555-0103",
+             rink_city="Wilmette", rink_state="IL", rink_zip="60091"),
+        Team(id=t8_id, association_id=a2_id, name="Mission 8U Beginner", age_group="8U", level="Beginner",
+             manager_name="Carlos Rivera", manager_email="carlos@chimission.org", manager_phone="630-555-0203",
+             rink_city="Bensenville", rink_state="IL", rink_zip="60106"),
+        Team(id=t9_id, association_id=a3_id, name="Team IL 8U Advanced", age_group="8U", level="Advanced",
+             manager_name="Jen Kowalski", manager_email="jen@teamil.org", manager_phone="630-555-0303",
+             rink_city="Geneva", rink_state="IL", rink_zip="60134"),
+        # 6U team
+        Team(id=t10_id, association_id=a1_id, name="Northshore 6U Beginner", age_group="6U", level="Beginner",
+             manager_name="Rachel Kim", manager_email="rachel@northshore.org", manager_phone="847-555-0104",
+             rink_city="Wilmette", rink_state="IL", rink_zip="60091"),
     ]
     db.add_all(teams)
     db.commit()
@@ -124,6 +134,10 @@ def seed_demo_data(db: Session):
     add_roster(t4_id, "MI-")
     add_roster(t5_id, "TI-")
     add_roster(t6_id, "TI-")
+    add_roster(t7_id, "NS8-")
+    add_roster(t8_id, "MI8-")
+    add_roster(t9_id, "TI8-")
+    add_roster(t10_id, "NS6-")
 
     db.add_all(players)
     db.commit()
@@ -226,6 +240,53 @@ def seed_demo_data(db: Session):
     ]
     for et, d, t, blocked in se:
         entries.append(ScheduleEntry(id=_id(), team_id=t6_id, date=d, time=t, entry_type=et, blocked=blocked))
+
+    # 8U teams — shorter schedules, Saturday mornings
+    # Northshore 8U Intermediate
+    se = [
+        ("home", date(2026, 3, 7), time(8, 0), False),
+        ("away", date(2026, 3, 14), time(8, 30), False),
+        ("home", date(2026, 3, 21), time(8, 0), False),
+        ("away", date(2026, 3, 28), time(9, 0), False),
+        ("home", date(2026, 4, 4), time(8, 0), False),
+        ("away", date(2026, 4, 11), time(8, 30), False),
+    ]
+    for et, d, t, blocked in se:
+        entries.append(ScheduleEntry(id=_id(), team_id=t7_id, date=d, time=t, entry_type=et, blocked=blocked))
+
+    # Mission 8U Beginner
+    se = [
+        ("away", date(2026, 3, 7), time(8, 0), False),   # matches Northshore 8U home
+        ("home", date(2026, 3, 14), time(8, 30), False),  # matches Northshore 8U away
+        ("away", date(2026, 3, 21), time(8, 0), False),   # matches Northshore 8U home
+        ("home", date(2026, 3, 28), time(9, 0), False),
+        ("away", date(2026, 4, 4), time(8, 0), False),    # matches Northshore 8U home
+        ("home", date(2026, 4, 11), time(8, 30), False),  # matches Northshore 8U away
+    ]
+    for et, d, t, blocked in se:
+        entries.append(ScheduleEntry(id=_id(), team_id=t8_id, date=d, time=t, entry_type=et, blocked=blocked))
+
+    # Team IL 8U Advanced
+    se = [
+        ("home", date(2026, 3, 7), time(9, 0), False),
+        ("away", date(2026, 3, 14), time(8, 30), False),
+        ("home", date(2026, 3, 28), time(9, 0), False),   # matches Mission 8U away
+        ("away", date(2026, 4, 4), time(8, 0), False),
+        ("home", date(2026, 4, 11), time(8, 30), False),
+        ("away", date(2026, 4, 18), time(9, 0), False),
+    ]
+    for et, d, t, blocked in se:
+        entries.append(ScheduleEntry(id=_id(), team_id=t9_id, date=d, time=t, entry_type=et, blocked=blocked))
+
+    # Northshore 6U Beginner — just a handful of fun skates
+    se = [
+        ("home", date(2026, 3, 7), time(7, 30), False),
+        ("away", date(2026, 3, 21), time(7, 30), False),
+        ("home", date(2026, 4, 4), time(7, 30), False),
+        ("away", date(2026, 4, 18), time(7, 30), False),
+    ]
+    for et, d, t, blocked in se:
+        entries.append(ScheduleEntry(id=_id(), team_id=t10_id, date=d, time=t, entry_type=et, blocked=blocked))
 
     db.add_all(entries)
     db.commit()
@@ -401,65 +462,82 @@ def seed_demo_data(db: Session):
             status="scheduled",
             game_type="non_league",
         ),
-        # Past league game: Northshore 14U AA vs Mission 14U AA
-        Game(
-            home_team_id=t1_id,
-            away_team_id=t3_id,
-            date=date(2026, 2, 15),
-            time=time(17, 0),
-            status="final",
-            game_type="league",
-            home_score=3,
-            away_score=2,
-            home_weekly_confirmed=True,
-            away_weekly_confirmed=True,
-        ),
-        # Past non-league game: Mission 14U AA vs Team IL 14U AA
-        Game(
-            home_team_id=t3_id,
-            away_team_id=t5_id,
-            date=date(2026, 2, 22),
-            time=time(14, 0),
-            status="final",
-            game_type="non_league",
-            home_score=4,
-            away_score=1,
-            home_weekly_confirmed=True,
-            away_weekly_confirmed=True,
-        ),
-        # Past tournament game: Northshore 14U AA vs Team IL 14U AA
-        Game(
-            home_team_id=t1_id,
-            away_team_id=t5_id,
-            date=date(2026, 2, 8),
-            time=time(10, 0),
-            status="final",
-            game_type="tournament",
-            home_score=2,
-            away_score=3,
-            home_weekly_confirmed=True,
-            away_weekly_confirmed=True,
-        ),
-        # Past league game: Northshore 12U A vs Mission 12U A
-        Game(
-            home_team_id=t2_id,
-            away_team_id=t4_id,
-            date=date(2026, 2, 14),
-            time=time(9, 0),
-            status="final",
-            game_type="league",
-            home_score=5,
-            away_score=3,
-            home_weekly_confirmed=True,
-            away_weekly_confirmed=True,
-        ),
+        # ── 14U AA season (t1=Northshore, t3=Mission, t5=Team IL) ──────────────
+        # Target records: t1 4-4-1 | t3 7-1-1 | t5 1-7-0
+        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 10, 5),  time=time(17, 0), status="final", game_type="league",     home_score=4, away_score=1),
+        Game(home_team_id=t5_id, away_team_id=t3_id, date=date(2025, 10, 5),  time=time(16, 0), status="final", game_type="league",     home_score=0, away_score=4),
+        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2025, 10, 12), time=time(17, 0), status="final", game_type="league",     home_score=4, away_score=1),
+        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 10, 19), time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=2),
+        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2025, 10, 26), time=time(17, 0), status="final", game_type="non_league", home_score=3, away_score=2),
+        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 11, 2),  time=time(17, 0), status="final", game_type="non_league", home_score=5, away_score=2),
+        Game(home_team_id=t5_id, away_team_id=t1_id, date=date(2025, 11, 9),  time=time(17, 0), status="final", game_type="league",     home_score=2, away_score=3),
+        Game(home_team_id=t1_id, away_team_id=t3_id, date=date(2025, 11, 16), time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=3),
+        Game(home_team_id=t3_id, away_team_id=t5_id, date=date(2025, 11, 23), time=time(17, 0), status="final", game_type="non_league", home_score=3, away_score=1),
+        Game(home_team_id=t5_id, away_team_id=t3_id, date=date(2025, 12, 7),  time=time(17, 0), status="final", game_type="league",     home_score=1, away_score=3),
+        # Feb 2026 (recent)
+        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2026, 2, 8),   time=time(10, 0), status="final", game_type="tournament",  home_score=2, away_score=3),
+        Game(home_team_id=t1_id, away_team_id=t3_id, date=date(2026, 2, 15),  time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=2),
+        Game(home_team_id=t3_id, away_team_id=t5_id, date=date(2026, 2, 22),  time=time(14, 0), status="final", game_type="non_league", home_score=4, away_score=1),
+
+        # ── 12U A season (t2=Northshore, t4=Mission, t6=Team IL) ────────────────
+        # Target records: t2 4-4-0 | t4 7-1-0 | t6 0-6-0
+        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 10, 5),  time=time(9, 0),  status="final", game_type="league",     home_score=4, away_score=2),
+        Game(home_team_id=t2_id, away_team_id=t6_id, date=date(2025, 10, 5),  time=time(10, 0), status="final", game_type="non_league", home_score=4, away_score=2),
+        Game(home_team_id=t4_id, away_team_id=t6_id, date=date(2025, 10, 12), time=time(9, 0),  status="final", game_type="league",     home_score=5, away_score=2),
+        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 10, 19), time=time(9, 0),  status="final", game_type="league",     home_score=3, away_score=1),
+        Game(home_team_id=t2_id, away_team_id=t6_id, date=date(2025, 10, 26), time=time(9, 0),  status="final", game_type="league",     home_score=3, away_score=1),
+        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 11, 2),  time=time(9, 0),  status="final", game_type="non_league", home_score=5, away_score=3),
+        Game(home_team_id=t6_id, away_team_id=t2_id, date=date(2025, 11, 9),  time=time(9, 0),  status="final", game_type="non_league", home_score=2, away_score=3),
+        Game(home_team_id=t2_id, away_team_id=t4_id, date=date(2025, 11, 16), time=time(9, 0),  status="final", game_type="league",     home_score=2, away_score=3),
+        Game(home_team_id=t4_id, away_team_id=t6_id, date=date(2025, 11, 23), time=time(9, 0),  status="final", game_type="league",     home_score=4, away_score=1),
+        Game(home_team_id=t6_id, away_team_id=t4_id, date=date(2025, 12, 7),  time=time(9, 0),  status="final", game_type="non_league", home_score=0, away_score=3),
+        # Feb 2026 (recent)
+        Game(home_team_id=t2_id, away_team_id=t4_id, date=date(2026, 2, 14),  time=time(9, 0),  status="final", game_type="league",     home_score=5, away_score=3),
+
+        # ── 8U season (t7=Northshore Intermediate, t8=Mission Beginner, t9=Team IL Advanced) ──
+        # Target records: t7 3-2-0 | t8 0-5-0 | t9 4-0-0
+        Game(home_team_id=t9_id, away_team_id=t7_id, date=date(2025, 10, 11), time=time(8, 0),  status="final", game_type="non_league", home_score=3, away_score=1),
+        Game(home_team_id=t7_id, away_team_id=t8_id, date=date(2025, 10, 18), time=time(8, 0),  status="final", game_type="non_league", home_score=3, away_score=1),
+        Game(home_team_id=t9_id, away_team_id=t8_id, date=date(2025, 10, 25), time=time(8, 0),  status="final", game_type="non_league", home_score=4, away_score=1),
+        Game(home_team_id=t7_id, away_team_id=t8_id, date=date(2025, 11, 1),  time=time(8, 0),  status="final", game_type="non_league", home_score=2, away_score=1),
+        Game(home_team_id=t8_id, away_team_id=t7_id, date=date(2025, 11, 15), time=time(8, 0),  status="final", game_type="non_league", home_score=1, away_score=3),
+        Game(home_team_id=t8_id, away_team_id=t9_id, date=date(2025, 12, 6),  time=time(8, 0),  status="final", game_type="non_league", home_score=0, away_score=3),
+        # Feb 2026 (recent)
+        Game(home_team_id=t7_id, away_team_id=t9_id, date=date(2026, 2, 21),  time=time(8, 0),  status="final", game_type="non_league", home_score=2, away_score=4),
     ]
     db.add_all(games)
     db.commit()
 
+    # Compute and store W/T/L for all teams from the seeded final games
+    all_team_ids = [t1_id, t2_id, t3_id, t4_id, t5_id, t6_id, t7_id, t8_id, t9_id, t10_id]
+    for team_id in all_team_ids:
+        team = db.get(Team, team_id)
+        if not team:
+            continue
+        final_games = db.query(Game).filter(
+            (Game.home_team_id == team_id) | (Game.away_team_id == team_id),
+            Game.status == "final",
+            Game.home_score.isnot(None),
+            Game.away_score.isnot(None),
+        ).all()
+        wins = losses = ties = 0
+        for g in final_games:
+            my_score = g.home_score if g.home_team_id == team_id else g.away_score
+            opp_score = g.away_score if g.home_team_id == team_id else g.home_score
+            if my_score > opp_score:
+                wins += 1
+            elif my_score < opp_score:
+                losses += 1
+            else:
+                ties += 1
+        team.wins = wins
+        team.losses = losses
+        team.ties = ties
+    db.commit()
+
     return {
         "associations": 3,
-        "teams": 6,
+        "teams": 10,
         "players": len(players),
         "schedule_entries": len(entries),
         "proposals": len(proposals),
