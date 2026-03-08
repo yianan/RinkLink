@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Ban, CheckCircle2, Eye, Search, Trash2, XCircle } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
+import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
 import { ScheduleEntry } from '../types';
 import CsvUploader from '../components/CsvUploader';
@@ -23,6 +24,7 @@ const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> =
 
 export default function SchedulePage() {
   const { activeTeam } = useTeam();
+  const { activeSeason } = useSeason();
   const navigate = useNavigate();
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [tab, setTab] = useState(0);
@@ -31,9 +33,11 @@ export default function SchedulePage() {
 
   const load = () => {
     if (!activeTeam) return;
-    api.getSchedule(activeTeam.id).then(setEntries);
+    const params: Record<string, string> = {};
+    if (activeSeason) params.season_id = activeSeason.id;
+    api.getSchedule(activeTeam.id, params).then(setEntries);
   };
-  useEffect(() => { load(); }, [activeTeam]); // eslint-disable-line
+  useEffect(() => { load(); }, [activeTeam, activeSeason]); // eslint-disable-line
 
   const handleAdd = async () => {
     if (!activeTeam) return;

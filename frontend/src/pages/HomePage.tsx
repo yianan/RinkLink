@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, CheckCircle2, Dumbbell, Inbox } from 'lucide-react';
+import { Calendar, CheckCircle2, Dumbbell, Inbox, Trophy } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
+import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
-import { ScheduleEntry, GameProposal, Game, PracticeBooking } from '../types';
+import { ScheduleEntry, GameProposal, Game, PracticeBooking, StandingsEntry } from '../types';
 import { cn } from '../lib/cn';
 import { formatTimeHHMM } from '../lib/time';
 import { Badge } from '../components/ui/Badge';
@@ -47,22 +48,37 @@ function StatCard({ title, value, icon, color, onClick }: {
 
 export default function HomePage() {
   const { activeTeam } = useTeam();
+  const { activeSeason } = useSeason();
   const navigate = useNavigate();
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
   const [proposals, setProposals] = useState<GameProposal[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [practices, setPractices] = useState<PracticeBooking[]>([]);
+  const [seasonRecord, setSeasonRecord] = useState<StandingsEntry | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedError, setSeedError] = useState('');
 
   useEffect(() => {
     if (!activeTeam) return;
-    api.getSchedule(activeTeam.id).then(setSchedule);
+    const schedParams: Record<string, string> = {};
+    if (activeSeason) schedParams.season_id = activeSeason.id;
+    api.getSchedule(activeTeam.id, schedParams).then(setSchedule);
     api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }).then(setProposals);
     const todayStr = new Date().toISOString().slice(0, 10);
-    api.getGames(activeTeam.id, { date_from: todayStr }).then(setGames);
+    const gameParams: Record<string, string> = { date_from: todayStr };
+    if (activeSeason) gameParams.season_id = activeSeason.id;
+    api.getGames(activeTeam.id, gameParams).then(setGames);
     api.getPracticeBookings(activeTeam.id, { status: 'active' }).then(setPractices);
-  }, [activeTeam]);
+
+    if (activeSeason) {
+      api.getStandings(activeSeason.id).then((standings) => {
+        const myRecord = standings.find((s) => s.team_id === activeTeam.id) || null;
+        setSeasonRecord(myRecord);
+      });
+    } else {
+      setSeasonRecord(null);
+    }
+  }, [activeTeam, activeSeason]);
 
   const today = new Date().toISOString().slice(0, 10);
   const openDates = schedule.filter((e) => e.status === 'open');
@@ -114,7 +130,9 @@ export default function HomePage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="page-title">{activeTeam.name} Dashboard</div>
-          <div className="page-subtitle">Quick stats and what needs your attention.</div>
+          <div className="page-subtitle">
+            {activeSeason ? `${activeSeason.name} season` : 'Quick stats and what needs your attention.'}
+          </div>
         </div>
         <Button
           type="button"
@@ -143,7 +161,19 @@ export default function HomePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={cn(
+        'grid grid-cols-1 gap-3 sm:grid-cols-2',
+        seasonRecord ? 'lg:grid-cols-5' : 'lg:grid-cols-4',
+      )}>
+        {seasonRecord && (
+          <StatCard
+            title="Season Record"
+            value={`${seasonRecord.wins}-${seasonRecord.losses}-${seasonRecord.ties}`}
+            icon={<Trophy className="h-4 w-4" />}
+            color="text-fuchsia-700"
+            onClick={() => navigate('/standings')}
+          />
+        )}
         <StatCard
           title="Open Dates"
           value={openDates.length}

@@ -34,6 +34,7 @@ export interface Team {
 export interface ScheduleEntry {
   id: string;
   team_id: string;
+  season_id: string | null;
   date: string;
   time: string | null;
   entry_type: 'home' | 'away';
@@ -201,6 +202,7 @@ export interface Game {
   away_schedule_entry_id: string | null;
   proposal_id: string | null;
   ice_slot_id: string | null;
+  season_id: string | null;
   date: string;
   time: string | null;
   status: string;
@@ -221,6 +223,42 @@ export interface Game {
   rink_state: string | null;
   rink_zip: string | null;
   location_label: string | null;
+}
+
+export interface Season {
+  id: string;
+  association_id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  game_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamSeasonRecord {
+  id: string;
+  team_id: string;
+  season_id: string;
+  wins: number;
+  losses: number;
+  ties: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StandingsEntry {
+  team_id: string;
+  team_name: string;
+  association_name: string | null;
+  age_group: string;
+  level: string;
+  wins: number;
+  losses: number;
+  ties: number;
+  points: number;
+  games_played: number;
 }
 
 export interface Notification {

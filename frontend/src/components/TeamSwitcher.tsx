@@ -19,7 +19,7 @@ export default function TeamSwitcher() {
           <option value="">Select a team…</option>
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.name} ({t.association_name})
+              {t.name}
             </option>
           ))}
         </Select>

@@ -215,6 +215,23 @@ export const api = {
   cancelPracticeBooking: (bookingId: string) =>
     request<void>(`/practice-bookings/${bookingId}`, { method: 'DELETE' }),
 
+  // Seasons
+  getSeasons: (params: Record<string, string>) => {
+    const qs = new URLSearchParams(params).toString();
+    return request<import('../types').Season[]>(`/seasons?${qs}`);
+  },
+  getSeason: (id: string) => request<import('../types').Season>(`/seasons/${id}`),
+  createSeason: (data: Partial<import('../types').Season>) =>
+    request<import('../types').Season>('/seasons', { method: 'POST', body: JSON.stringify(data) }),
+  updateSeason: (id: string, data: Partial<import('../types').Season>) =>
+    request<import('../types').Season>(`/seasons/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSeason: (id: string) =>
+    request<void>(`/seasons/${id}`, { method: 'DELETE' }),
+  getStandings: (seasonId: string, params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<import('../types').StandingsEntry[]>(`/seasons/${seasonId}/standings${qs}`);
+  },
+
   // Seed
   seed: () => request<{ message: string }>('/seed', { method: 'POST' }),
 };

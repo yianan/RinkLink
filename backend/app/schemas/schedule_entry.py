@@ -12,6 +12,7 @@ class ScheduleEntryCreate(BaseModel):
     opponent_name: Optional[str] = None
     location: Optional[str] = None
     notes: Optional[str] = None
+    season_id: Optional[str] = None
 
 
 class ScheduleEntryUpdate(BaseModel):
@@ -28,6 +29,7 @@ class ScheduleEntryUpdate(BaseModel):
 class ScheduleEntryOut(BaseModel):
     id: str
     team_id: str
+    season_id: Optional[str] = None
     date: dt.date
     time: Optional[dt.time]
     entry_type: str

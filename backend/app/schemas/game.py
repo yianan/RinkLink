@@ -13,6 +13,7 @@ class GameOut(BaseModel):
     away_schedule_entry_id: str | None
     proposal_id: str | None
     ice_slot_id: str | None
+    season_id: str | None = None
     date: dt.date
     time: dt.time | None
     status: str

@@ -10,6 +10,7 @@ from .zip_code import ZipCode
 from .rink import Rink, IceSlot
 from .proposal_rink_preference import ProposalRinkPreference
 from .practice_booking import PracticeBooking
+from .season import Season, TeamSeasonRecord
 
 __all__ = [
     "Association",
@@ -28,4 +29,6 @@ __all__ = [
     "Rink",
     "IceSlot",
     "PracticeBooking",
+    "Season",
+    "TeamSeasonRecord",
 ]

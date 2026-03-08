@@ -29,6 +29,7 @@ class Game(Base):
 
     proposal_id: Mapped[str | None] = mapped_column(ForeignKey("game_proposals.id"), nullable=True)
     ice_slot_id: Mapped[str | None] = mapped_column(ForeignKey("ice_slots.id"), nullable=True)
+    season_id: Mapped[str | None] = mapped_column(ForeignKey("seasons.id"), nullable=True, index=True)
 
     date: Mapped[date] = mapped_column(Date, nullable=False)
     time: Mapped[time | None] = mapped_column(Time, nullable=True)

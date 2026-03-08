@@ -12,6 +12,8 @@ from ..models import (
     Notification,
     Player,
     ZipCode,
+    Season,
+    TeamSeasonRecord,
 )
 from ..models.rink import Rink, IceSlot
 from ..models.practice_booking import PracticeBooking
@@ -44,6 +46,7 @@ def seed_zip_codes(db: Session):
 def seed_demo_data(db: Session):
     """Seed associations, teams, schedule entries, and sample proposals."""
     # Clear existing data (order matters: delete dependents before parents)
+    db.query(TeamSeasonRecord).delete()
     db.query(Game).delete()
     db.query(GameProposal).delete()
     db.query(Notification).delete()
@@ -52,6 +55,7 @@ def seed_demo_data(db: Session):
     db.query(IceSlot).delete()
     db.query(Rink).delete()
     db.query(ScheduleEntry).delete()
+    db.query(Season).delete()
     db.query(Team).delete()
     db.query(Association).delete()
     db.commit()
@@ -67,6 +71,19 @@ def seed_demo_data(db: Session):
     ]
     db.add_all(assocs)
     db.commit()
+
+    # Seasons for each association
+    s1_id, s2_id, s3_id = _id(), _id(), _id()
+    seasons = [
+        Season(id=s1_id, association_id=a1_id, name="2025-2026 Winter", start_date=date(2025, 9, 1), end_date=date(2026, 6, 30), is_active=True),
+        Season(id=s2_id, association_id=a2_id, name="2025-2026 Winter", start_date=date(2025, 9, 1), end_date=date(2026, 6, 30), is_active=True),
+        Season(id=s3_id, association_id=a3_id, name="2025-2026 Winter", start_date=date(2025, 9, 1), end_date=date(2026, 6, 30), is_active=True),
+    ]
+    db.add_all(seasons)
+    db.commit()
+
+    # Map association_id -> season_id for easy lookup
+    assoc_season = {a1_id: s1_id, a2_id: s2_id, a3_id: s3_id}
 
     # Teams (3 per association)
     t1_id, t2_id, t3_id, t4_id, t5_id, t6_id, t7_id, t8_id, t9_id, t10_id = [_id() for _ in range(10)]
@@ -142,6 +159,13 @@ def seed_demo_data(db: Session):
     db.add_all(players)
     db.commit()
 
+    # Map team_id -> season_id
+    team_season = {
+        t1_id: s1_id, t2_id: s1_id, t7_id: s1_id, t10_id: s1_id,  # Northshore
+        t3_id: s2_id, t4_id: s2_id, t8_id: s2_id,  # Mission
+        t5_id: s3_id, t6_id: s3_id, t9_id: s3_id,  # Team IL
+    }
+
     # Schedule entries with deliberate overlaps for auto-match
     entries = []
     # Northshore 14U AA (apr_26 blocked — team already committed that weekend)
@@ -158,7 +182,7 @@ def seed_demo_data(db: Session):
         ("away", date(2026, 5, 10), time(16, 0), False),
     ]
     for et, d, t, blocked in se:
-        entries.append(ScheduleEntry(id=_id(), team_id=t1_id, date=d, time=t, entry_type=et, blocked=blocked))
+        entries.append(ScheduleEntry(id=_id(), team_id=t1_id, season_id=team_season[t1_id], date=d, time=t, entry_type=et, blocked=blocked))
 
     # Mission 14U AA - overlapping dates with opposite types (may_3 blocked — tournament weekend)
     se = [
@@ -174,7 +198,7 @@ def seed_demo_data(db: Session):
         ("home", date(2026, 5, 10), time(16, 0), False),   # matches Northshore away
     ]
     for et, d, t, blocked in se:
-        entries.append(ScheduleEntry(id=_id(), team_id=t3_id, date=d, time=t, entry_type=et, blocked=blocked))
+        entries.append(ScheduleEntry(id=_id(), team_id=t3_id, season_id=team_season[t3_id], date=d, time=t, entry_type=et, blocked=blocked))
 
     # Team IL 14U AA (apr_19 blocked — school event)
     se = [
@@ -190,7 +214,7 @@ def seed_demo_data(db: Session):
         ("away", date(2026, 5, 10), time(16, 0), False),   # matches Mission home
     ]
     for et, d, t, blocked in se:
-        entries.append(ScheduleEntry(id=_id(), team_id=t5_id, date=d, time=t, entry_type=et, blocked=blocked))
+        entries.append(ScheduleEntry(id=_id(), team_id=t5_id, season_id=team_season[t5_id], date=d, time=t, entry_type=et, blocked=blocked))
 
     # 12U teams
     # Northshore 12U A
@@ -207,7 +231,7 @@ def seed_demo_data(db: Session):
         ("away", date(2026, 5, 9), time(11, 0), False),
     ]
     for et, d, t, blocked in se:
-        entries.append(ScheduleEntry(id=_id(), team_id=t2_id, date=d, time=t, entry_type=et, blocked=blocked))
+        entries.append(ScheduleEntry(id=_id(), team_id=t2_id, season_id=team_season[t2_id], date=d, time=t, entry_type=et, blocked=blocked))
 
     # Mission 12U A
     se = [
@@ -223,7 +247,7 @@ def seed_demo_data(db: Session):
         ("home", date(2026, 5, 9), time(11, 0), False),     # matches Northshore 12U away
     ]
     for et, d, t, blocked in se:
-        entries.append(ScheduleEntry(id=_id(), team_id=t4_id, date=d, time=t, entry_type=et, blocked=blocked))
+        entries.append(ScheduleEntry(id=_id(), team_id=t4_id, season_id=team_season[t4_id], date=d, time=t, entry_type=et, blocked=blocked))
 
     # Team IL 12U A
     se = [
@@ -239,7 +263,7 @@ def seed_demo_data(db: Session):
         ("away", date(2026, 5, 9), time(11, 0), False),
     ]
     for et, d, t, blocked in se:
-        entries.append(ScheduleEntry(id=_id(), team_id=t6_id, date=d, time=t, entry_type=et, blocked=blocked))
+        entries.append(ScheduleEntry(id=_id(), team_id=t6_id, season_id=team_season[t6_id], date=d, time=t, entry_type=et, blocked=blocked))
 
     # 8U teams — shorter schedules, Saturday mornings
     # Northshore 8U Intermediate
@@ -252,7 +276,7 @@ def seed_demo_data(db: Session):
         ("away", date(2026, 4, 11), time(8, 30), False),
     ]
     for et, d, t, blocked in se:
-        entries.append(ScheduleEntry(id=_id(), team_id=t7_id, date=d, time=t, entry_type=et, blocked=blocked))
+        entries.append(ScheduleEntry(id=_id(), team_id=t7_id, season_id=team_season[t7_id], date=d, time=t, entry_type=et, blocked=blocked))
 
     # Mission 8U Beginner
     se = [
@@ -264,7 +288,7 @@ def seed_demo_data(db: Session):
         ("home", date(2026, 4, 11), time(8, 30), False),  # matches Northshore 8U away
     ]
     for et, d, t, blocked in se:
-        entries.append(ScheduleEntry(id=_id(), team_id=t8_id, date=d, time=t, entry_type=et, blocked=blocked))
+        entries.append(ScheduleEntry(id=_id(), team_id=t8_id, season_id=team_season[t8_id], date=d, time=t, entry_type=et, blocked=blocked))
 
     # Team IL 8U Advanced
     se = [
@@ -276,7 +300,7 @@ def seed_demo_data(db: Session):
         ("away", date(2026, 4, 18), time(9, 0), False),
     ]
     for et, d, t, blocked in se:
-        entries.append(ScheduleEntry(id=_id(), team_id=t9_id, date=d, time=t, entry_type=et, blocked=blocked))
+        entries.append(ScheduleEntry(id=_id(), team_id=t9_id, season_id=team_season[t9_id], date=d, time=t, entry_type=et, blocked=blocked))
 
     # Northshore 6U Beginner — just a handful of fun skates
     se = [
@@ -286,7 +310,7 @@ def seed_demo_data(db: Session):
         ("away", date(2026, 4, 18), time(7, 30), False),
     ]
     for et, d, t, blocked in se:
-        entries.append(ScheduleEntry(id=_id(), team_id=t10_id, date=d, time=t, entry_type=et, blocked=blocked))
+        entries.append(ScheduleEntry(id=_id(), team_id=t10_id, season_id=team_season[t10_id], date=d, time=t, entry_type=et, blocked=blocked))
 
     db.add_all(entries)
     db.commit()
@@ -461,49 +485,50 @@ def seed_demo_data(db: Session):
             time=p_accepted.proposed_time,
             status="scheduled",
             game_type="non_league",
+            season_id=team_season[p_accepted.home_team_id],
         ),
         # ── 14U AA season (t1=Northshore, t3=Mission, t5=Team IL) ──────────────
         # Target records: t1 4-4-1 | t3 7-1-1 | t5 1-7-0
-        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 10, 5),  time=time(17, 0), status="final", game_type="league",     home_score=4, away_score=1),
-        Game(home_team_id=t5_id, away_team_id=t3_id, date=date(2025, 10, 5),  time=time(16, 0), status="final", game_type="league",     home_score=0, away_score=4),
-        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2025, 10, 12), time=time(17, 0), status="final", game_type="league",     home_score=4, away_score=1),
-        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 10, 19), time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=2),
-        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2025, 10, 26), time=time(17, 0), status="final", game_type="non_league", home_score=3, away_score=2),
-        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 11, 2),  time=time(17, 0), status="final", game_type="non_league", home_score=5, away_score=2),
-        Game(home_team_id=t5_id, away_team_id=t1_id, date=date(2025, 11, 9),  time=time(17, 0), status="final", game_type="league",     home_score=2, away_score=3),
-        Game(home_team_id=t1_id, away_team_id=t3_id, date=date(2025, 11, 16), time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=3),
-        Game(home_team_id=t3_id, away_team_id=t5_id, date=date(2025, 11, 23), time=time(17, 0), status="final", game_type="non_league", home_score=3, away_score=1),
-        Game(home_team_id=t5_id, away_team_id=t3_id, date=date(2025, 12, 7),  time=time(17, 0), status="final", game_type="league",     home_score=1, away_score=3),
+        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 10, 5),  time=time(17, 0), status="final", game_type="league",     home_score=4, away_score=1, season_id=s2_id),
+        Game(home_team_id=t5_id, away_team_id=t3_id, date=date(2025, 10, 5),  time=time(16, 0), status="final", game_type="league",     home_score=0, away_score=4, season_id=s3_id),
+        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2025, 10, 12), time=time(17, 0), status="final", game_type="league",     home_score=4, away_score=1, season_id=s1_id),
+        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 10, 19), time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=2, season_id=s2_id),
+        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2025, 10, 26), time=time(17, 0), status="final", game_type="non_league", home_score=3, away_score=2, season_id=s1_id),
+        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 11, 2),  time=time(17, 0), status="final", game_type="non_league", home_score=5, away_score=2, season_id=s2_id),
+        Game(home_team_id=t5_id, away_team_id=t1_id, date=date(2025, 11, 9),  time=time(17, 0), status="final", game_type="league",     home_score=2, away_score=3, season_id=s3_id),
+        Game(home_team_id=t1_id, away_team_id=t3_id, date=date(2025, 11, 16), time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=3, season_id=s1_id),
+        Game(home_team_id=t3_id, away_team_id=t5_id, date=date(2025, 11, 23), time=time(17, 0), status="final", game_type="non_league", home_score=3, away_score=1, season_id=s2_id),
+        Game(home_team_id=t5_id, away_team_id=t3_id, date=date(2025, 12, 7),  time=time(17, 0), status="final", game_type="league",     home_score=1, away_score=3, season_id=s3_id),
         # Feb 2026 (recent)
-        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2026, 2, 8),   time=time(10, 0), status="final", game_type="tournament",  home_score=2, away_score=3),
-        Game(home_team_id=t1_id, away_team_id=t3_id, date=date(2026, 2, 15),  time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=2),
-        Game(home_team_id=t3_id, away_team_id=t5_id, date=date(2026, 2, 22),  time=time(14, 0), status="final", game_type="non_league", home_score=4, away_score=1),
+        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2026, 2, 8),   time=time(10, 0), status="final", game_type="tournament",  home_score=2, away_score=3, season_id=s1_id),
+        Game(home_team_id=t1_id, away_team_id=t3_id, date=date(2026, 2, 15),  time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=2, season_id=s1_id),
+        Game(home_team_id=t3_id, away_team_id=t5_id, date=date(2026, 2, 22),  time=time(14, 0), status="final", game_type="non_league", home_score=4, away_score=1, season_id=s2_id),
 
         # ── 12U A season (t2=Northshore, t4=Mission, t6=Team IL) ────────────────
         # Target records: t2 4-4-0 | t4 7-1-0 | t6 0-6-0
-        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 10, 5),  time=time(9, 0),  status="final", game_type="league",     home_score=4, away_score=2),
-        Game(home_team_id=t2_id, away_team_id=t6_id, date=date(2025, 10, 5),  time=time(10, 0), status="final", game_type="non_league", home_score=4, away_score=2),
-        Game(home_team_id=t4_id, away_team_id=t6_id, date=date(2025, 10, 12), time=time(9, 0),  status="final", game_type="league",     home_score=5, away_score=2),
-        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 10, 19), time=time(9, 0),  status="final", game_type="league",     home_score=3, away_score=1),
-        Game(home_team_id=t2_id, away_team_id=t6_id, date=date(2025, 10, 26), time=time(9, 0),  status="final", game_type="league",     home_score=3, away_score=1),
-        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 11, 2),  time=time(9, 0),  status="final", game_type="non_league", home_score=5, away_score=3),
-        Game(home_team_id=t6_id, away_team_id=t2_id, date=date(2025, 11, 9),  time=time(9, 0),  status="final", game_type="non_league", home_score=2, away_score=3),
-        Game(home_team_id=t2_id, away_team_id=t4_id, date=date(2025, 11, 16), time=time(9, 0),  status="final", game_type="league",     home_score=2, away_score=3),
-        Game(home_team_id=t4_id, away_team_id=t6_id, date=date(2025, 11, 23), time=time(9, 0),  status="final", game_type="league",     home_score=4, away_score=1),
-        Game(home_team_id=t6_id, away_team_id=t4_id, date=date(2025, 12, 7),  time=time(9, 0),  status="final", game_type="non_league", home_score=0, away_score=3),
+        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 10, 5),  time=time(9, 0),  status="final", game_type="league",     home_score=4, away_score=2, season_id=s2_id),
+        Game(home_team_id=t2_id, away_team_id=t6_id, date=date(2025, 10, 5),  time=time(10, 0), status="final", game_type="non_league", home_score=4, away_score=2, season_id=s1_id),
+        Game(home_team_id=t4_id, away_team_id=t6_id, date=date(2025, 10, 12), time=time(9, 0),  status="final", game_type="league",     home_score=5, away_score=2, season_id=s2_id),
+        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 10, 19), time=time(9, 0),  status="final", game_type="league",     home_score=3, away_score=1, season_id=s2_id),
+        Game(home_team_id=t2_id, away_team_id=t6_id, date=date(2025, 10, 26), time=time(9, 0),  status="final", game_type="league",     home_score=3, away_score=1, season_id=s1_id),
+        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 11, 2),  time=time(9, 0),  status="final", game_type="non_league", home_score=5, away_score=3, season_id=s2_id),
+        Game(home_team_id=t6_id, away_team_id=t2_id, date=date(2025, 11, 9),  time=time(9, 0),  status="final", game_type="non_league", home_score=2, away_score=3, season_id=s3_id),
+        Game(home_team_id=t2_id, away_team_id=t4_id, date=date(2025, 11, 16), time=time(9, 0),  status="final", game_type="league",     home_score=2, away_score=3, season_id=s1_id),
+        Game(home_team_id=t4_id, away_team_id=t6_id, date=date(2025, 11, 23), time=time(9, 0),  status="final", game_type="league",     home_score=4, away_score=1, season_id=s2_id),
+        Game(home_team_id=t6_id, away_team_id=t4_id, date=date(2025, 12, 7),  time=time(9, 0),  status="final", game_type="non_league", home_score=0, away_score=3, season_id=s3_id),
         # Feb 2026 (recent)
-        Game(home_team_id=t2_id, away_team_id=t4_id, date=date(2026, 2, 14),  time=time(9, 0),  status="final", game_type="league",     home_score=5, away_score=3),
+        Game(home_team_id=t2_id, away_team_id=t4_id, date=date(2026, 2, 14),  time=time(9, 0),  status="final", game_type="league",     home_score=5, away_score=3, season_id=s1_id),
 
         # ── 8U season (t7=Northshore Intermediate, t8=Mission Beginner, t9=Team IL Advanced) ──
         # Target records: t7 3-2-0 | t8 0-5-0 | t9 4-0-0
-        Game(home_team_id=t9_id, away_team_id=t7_id, date=date(2025, 10, 11), time=time(8, 0),  status="final", game_type="non_league", home_score=3, away_score=1),
-        Game(home_team_id=t7_id, away_team_id=t8_id, date=date(2025, 10, 18), time=time(8, 0),  status="final", game_type="non_league", home_score=3, away_score=1),
-        Game(home_team_id=t9_id, away_team_id=t8_id, date=date(2025, 10, 25), time=time(8, 0),  status="final", game_type="non_league", home_score=4, away_score=1),
-        Game(home_team_id=t7_id, away_team_id=t8_id, date=date(2025, 11, 1),  time=time(8, 0),  status="final", game_type="non_league", home_score=2, away_score=1),
-        Game(home_team_id=t8_id, away_team_id=t7_id, date=date(2025, 11, 15), time=time(8, 0),  status="final", game_type="non_league", home_score=1, away_score=3),
-        Game(home_team_id=t8_id, away_team_id=t9_id, date=date(2025, 12, 6),  time=time(8, 0),  status="final", game_type="non_league", home_score=0, away_score=3),
+        Game(home_team_id=t9_id, away_team_id=t7_id, date=date(2025, 10, 11), time=time(8, 0),  status="final", game_type="non_league", home_score=3, away_score=1, season_id=s3_id),
+        Game(home_team_id=t7_id, away_team_id=t8_id, date=date(2025, 10, 18), time=time(8, 0),  status="final", game_type="non_league", home_score=3, away_score=1, season_id=s1_id),
+        Game(home_team_id=t9_id, away_team_id=t8_id, date=date(2025, 10, 25), time=time(8, 0),  status="final", game_type="non_league", home_score=4, away_score=1, season_id=s3_id),
+        Game(home_team_id=t7_id, away_team_id=t8_id, date=date(2025, 11, 1),  time=time(8, 0),  status="final", game_type="non_league", home_score=2, away_score=1, season_id=s1_id),
+        Game(home_team_id=t8_id, away_team_id=t7_id, date=date(2025, 11, 15), time=time(8, 0),  status="final", game_type="non_league", home_score=1, away_score=3, season_id=s2_id),
+        Game(home_team_id=t8_id, away_team_id=t9_id, date=date(2025, 12, 6),  time=time(8, 0),  status="final", game_type="non_league", home_score=0, away_score=3, season_id=s2_id),
         # Feb 2026 (recent)
-        Game(home_team_id=t7_id, away_team_id=t9_id, date=date(2026, 2, 21),  time=time(8, 0),  status="final", game_type="non_league", home_score=2, away_score=4),
+        Game(home_team_id=t7_id, away_team_id=t9_id, date=date(2026, 2, 21),  time=time(8, 0),  status="final", game_type="non_league", home_score=2, away_score=4, season_id=s1_id),
     ]
     db.add_all(games)
     db.commit()
@@ -535,6 +560,32 @@ def seed_demo_data(db: Session):
         team.ties = ties
     db.commit()
 
+    # Compute and store per-season records
+    all_seasons = [s1_id, s2_id, s3_id]
+    for season_id in all_seasons:
+        for team_id in all_team_ids:
+            season_games = db.query(Game).filter(
+                (Game.home_team_id == team_id) | (Game.away_team_id == team_id),
+                Game.season_id == season_id,
+                Game.status == "final",
+                Game.home_score.isnot(None),
+                Game.away_score.isnot(None),
+            ).all()
+            if not season_games:
+                continue
+            sw = sl = st = 0
+            for g in season_games:
+                my_score = g.home_score if g.home_team_id == team_id else g.away_score
+                opp_score = g.away_score if g.home_team_id == team_id else g.home_score
+                if my_score > opp_score:
+                    sw += 1
+                elif my_score < opp_score:
+                    sl += 1
+                else:
+                    st += 1
+            db.add(TeamSeasonRecord(team_id=team_id, season_id=season_id, wins=sw, losses=sl, ties=st))
+    db.commit()
+
     return {
         "associations": 3,
         "teams": 10,
@@ -542,6 +593,7 @@ def seed_demo_data(db: Session):
         "schedule_entries": len(entries),
         "proposals": len(proposals),
         "games": len(games),
+        "seasons": 3,
         "rinks": 3,
         "ice_slots": len(ice_slots),
     }

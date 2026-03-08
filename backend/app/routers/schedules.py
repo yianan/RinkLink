@@ -9,6 +9,7 @@ from ..models.game import Game
 from ..schemas import ScheduleEntryCreate, ScheduleEntryUpdate, ScheduleEntryOut
 from ..schemas.schedule_entry import ScheduleUploadPreview, ScheduleConfirmUpload
 from ..services.csv_parser import parse_csv
+from ..services.season_utils import resolve_season_id
 
 router = APIRouter(tags=["schedules"])
 
@@ -20,6 +21,7 @@ def list_schedule(
     entry_type: str | None = Query(None),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
+    season_id: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     if not db.get(Team, team_id):
@@ -33,6 +35,8 @@ def list_schedule(
         q = q.filter(ScheduleEntry.date >= date_from)
     if date_to:
         q = q.filter(ScheduleEntry.date <= date_to)
+    if season_id:
+        q = q.filter(ScheduleEntry.season_id == season_id)
     entries = q.order_by(ScheduleEntry.date, ScheduleEntry.time).all()
 
     entry_ids = [e.id for e in entries]
@@ -56,9 +60,13 @@ def list_schedule(
 
 @router.post("/teams/{team_id}/schedule", response_model=ScheduleEntryOut, status_code=201)
 def create_schedule_entry(team_id: str, body: ScheduleEntryCreate, db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
-    entry = ScheduleEntry(team_id=team_id, **body.model_dump())
+    data = body.model_dump()
+    if not data.get("season_id"):
+        data["season_id"] = resolve_season_id(db, team.association_id, body.date)
+    entry = ScheduleEntry(team_id=team_id, **data)
     db.add(entry)
     db.commit()
     db.refresh(entry)
@@ -75,11 +83,14 @@ async def upload_schedule(team_id: str, file: UploadFile = File(...), db: Sessio
 
 @router.post("/teams/{team_id}/schedule/confirm-upload", response_model=list[ScheduleEntryOut], status_code=201)
 def confirm_upload(team_id: str, body: ScheduleConfirmUpload, db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
     created = []
     for row in body.entries:
-        entry = ScheduleEntry(team_id=team_id, **row.model_dump())
+        data = row.model_dump()
+        data["season_id"] = resolve_season_id(db, team.association_id, row.date)
+        entry = ScheduleEntry(team_id=team_id, **data)
         db.add(entry)
         created.append(entry)
     db.commit()

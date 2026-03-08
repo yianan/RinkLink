@@ -7,6 +7,7 @@ from ..database import get_db
 from ..models import GameProposal, ScheduleEntry, Team, Association, Game, ProposalRinkPreference
 from ..models.rink import IceSlot, Rink
 from ..schemas import ProposalCreate, ProposalOut, ProposalRescheduleCreate
+from ..services.season_utils import resolve_season_id
 
 router = APIRouter(tags=["proposals"])
 
@@ -311,6 +312,10 @@ def accept_proposal(id: str, db: Session = Depends(get_db)):
             game_time = home_entry.time
         if game_time is None and away_entry and away_entry.time is not None:
             game_time = away_entry.time
+        # Resolve season from the home team's association
+        game_season_id = None
+        if home_team:
+            game_season_id = resolve_season_id(db, home_team.association_id, proposal.proposed_date)
         db.add(Game(
             home_team_id=proposal.home_team_id,
             away_team_id=proposal.away_team_id,
@@ -321,6 +326,7 @@ def accept_proposal(id: str, db: Session = Depends(get_db)):
             date=proposal.proposed_date,
             time=game_time,
             status="scheduled",
+            season_id=game_season_id,
         ))
 
     db.commit()

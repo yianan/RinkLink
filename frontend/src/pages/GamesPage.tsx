@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Save } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
+import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
 import { Game } from '../types';
 import { Alert } from '../components/ui/Alert';
@@ -39,6 +40,7 @@ function formatDateLabel(d: string) {
 
 export default function GamesPage() {
   const { activeTeam } = useTeam();
+  const { activeSeason } = useSeason();
   const navigate = useNavigate();
   const [tab, setTab] = useState(0);
   const [games, setGames] = useState<Game[]>([]);
@@ -46,7 +48,9 @@ export default function GamesPage() {
 
   useEffect(() => {
     if (!activeTeam) return;
-    api.getGames(activeTeam.id).then((gs) => {
+    const params: Record<string, string> = {};
+    if (activeSeason) params.season_id = activeSeason.id;
+    api.getGames(activeTeam.id, params).then((gs) => {
       setGames(gs);
       const edits: Record<string, { home: string; away: string }> = {};
       gs.forEach((g) => {
@@ -57,7 +61,7 @@ export default function GamesPage() {
       });
       setScoreEdits(edits);
     });
-  }, [activeTeam]);
+  }, [activeTeam, activeSeason]);
 
   const handleTypeChange = async (gameId: string, game_type: string) => {
     const updated = await api.updateGame(gameId, { game_type: (game_type || null) as Game['game_type'] });

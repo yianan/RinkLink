@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router
 import {
   Building2,
   Calendar,
+  CalendarRange,
   ClipboardList,
   ClipboardSignature,
   Dumbbell,
@@ -11,11 +12,14 @@ import {
   Menu,
   Search,
   Snowflake,
+  Trophy,
   Users,
   X,
 } from 'lucide-react';
 import { TeamProvider } from './context/TeamContext';
+import { SeasonProvider } from './context/SeasonContext';
 import TeamSwitcher from './components/TeamSwitcher';
+import SeasonSwitcher from './components/SeasonSwitcher';
 import ThemeToggle from './components/ThemeToggle';
 import HomePage from './pages/HomePage';
 import AssociationListPage from './pages/AssociationListPage';
@@ -29,11 +33,15 @@ import ProposalsPage from './pages/ProposalsPage';
 import PracticePage from './pages/PracticePage';
 import RinkListPage from './pages/RinkListPage';
 import IceSlotsPage from './pages/IceSlotsPage';
+import SeasonsPage from './pages/SeasonsPage';
+import StandingsPage from './pages/StandingsPage';
 import { cn } from './lib/cn';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: Home },
   { path: '/associations', label: 'Associations', icon: Building2 },
+  { path: '/seasons', label: 'Seasons', icon: CalendarRange },
+  { path: '/standings', label: 'Standings', icon: Trophy },
   { path: '/teams', label: 'Teams', icon: Users },
   { path: '/roster', label: 'Roster', icon: ClipboardList },
   { path: '/schedule', label: 'Schedule', icon: Calendar },
@@ -121,6 +129,7 @@ function AppContent() {
           <div className="ml-auto">
             <div className="flex items-center gap-2">
               <TeamSwitcher />
+              <SeasonSwitcher />
               <ThemeToggle />
             </div>
           </div>
@@ -136,6 +145,8 @@ function AppContent() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/associations" element={<AssociationListPage />} />
+            <Route path="/seasons" element={<SeasonsPage />} />
+            <Route path="/standings" element={<StandingsPage />} />
             <Route path="/teams" element={<TeamListPage />} />
             <Route path="/roster" element={<RosterPage />} />
             <Route path="/schedule" element={<SchedulePage />} />
@@ -187,9 +198,11 @@ function AppContent() {
 export default function App() {
   return (
     <TeamProvider>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
+      <SeasonProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </SeasonProvider>
     </TeamProvider>
   );
 }

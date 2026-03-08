@@ -4,14 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Game, Team, ScheduleEntry
+from ..models import Game, Team, ScheduleEntry, TeamSeasonRecord
 from ..models.rink import IceSlot
 from ..schemas import GameOut, GameUpdate, WeeklyConfirmUpdate
 from ..services.game_view import enrich_game
 
 
-def _update_team_record(team_id: str, db: Session) -> None:
-    """Recompute and store wins/losses/ties for a team from all final games."""
+def _update_team_record(team_id: str, db: Session, season_id: str | None = None) -> None:
+    """Recompute and store wins/losses/ties for a team from all final games.
+    Also updates the per-season record if season_id is provided."""
     team = db.get(Team, team_id)
     if not team:
         return
@@ -35,6 +36,30 @@ def _update_team_record(team_id: str, db: Session) -> None:
     team.losses = losses
     team.ties = ties
 
+    # Update per-season record
+    if season_id:
+        season_games = [g for g in final_games if g.season_id == season_id]
+        sw = sl = st = 0
+        for g in season_games:
+            my_score = g.home_score if g.home_team_id == team_id else g.away_score
+            opp_score = g.away_score if g.home_team_id == team_id else g.home_score
+            if my_score > opp_score:
+                sw += 1
+            elif my_score < opp_score:
+                sl += 1
+            else:
+                st += 1
+        rec = db.query(TeamSeasonRecord).filter(
+            TeamSeasonRecord.team_id == team_id,
+            TeamSeasonRecord.season_id == season_id,
+        ).first()
+        if rec:
+            rec.wins = sw
+            rec.losses = sl
+            rec.ties = st
+        else:
+            db.add(TeamSeasonRecord(team_id=team_id, season_id=season_id, wins=sw, losses=sl, ties=st))
+
 router = APIRouter(tags=["games"])
 
 
@@ -44,6 +69,7 @@ def list_games(
     status: str | None = Query(None),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
+    season_id: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     if not db.get(Team, team_id):
@@ -56,6 +82,8 @@ def list_games(
         q = q.filter(Game.date >= date_from)
     if date_to:
         q = q.filter(Game.date <= date_to)
+    if season_id:
+        q = q.filter(Game.season_id == season_id)
 
     games = q.order_by(Game.date, Game.time).all()
     return [enrich_game(g, db) for g in games]
@@ -81,8 +109,8 @@ def update_game(id: str, body: GameUpdate, db: Session = Depends(get_db)):
         g.status = "final"
     db.flush()
     if g.status == "final":
-        _update_team_record(g.home_team_id, db)
-        _update_team_record(g.away_team_id, db)
+        _update_team_record(g.home_team_id, db, g.season_id)
+        _update_team_record(g.away_team_id, db, g.season_id)
     db.commit()
     db.refresh(g)
     return enrich_game(g, db)
