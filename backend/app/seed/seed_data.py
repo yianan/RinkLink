@@ -461,6 +461,45 @@ def seed_demo_data(db: Session):
     db.add_all(ice_slots)
     db.commit()
 
+    # Seed a couple of active practices so the Practice page has demo content.
+    ns_practice_slot = db.query(IceSlot).filter(
+        IceSlot.rink_id == r1_id,
+        IceSlot.date == date(2026, 3, 22),
+        IceSlot.start_time == time(12, 0),
+    ).first()
+    mission_practice_slot = db.query(IceSlot).filter(
+        IceSlot.rink_id == r2_id,
+        IceSlot.date == date(2026, 4, 12),
+        IceSlot.start_time == time(15, 0),
+    ).first()
+
+    practice_bookings: list[PracticeBooking] = []
+    if ns_practice_slot:
+        ns_practice_slot.status = "booked"
+        ns_practice_slot.booked_by_team_id = t1_id
+        practice_bookings.append(
+            PracticeBooking(
+                team_id=t1_id,
+                ice_slot_id=ns_practice_slot.id,
+                notes="Full-sheet skills skate and goalie work",
+                status="active",
+            )
+        )
+    if mission_practice_slot:
+        mission_practice_slot.status = "booked"
+        mission_practice_slot.booked_by_team_id = t4_id
+        practice_bookings.append(
+            PracticeBooking(
+                team_id=t4_id,
+                ice_slot_id=mission_practice_slot.id,
+                notes="Pre-tournament tune-up practice",
+                status="active",
+            )
+        )
+    if practice_bookings:
+        db.add_all(practice_bookings)
+        db.commit()
+
     # Create the Game record for the accepted proposal (enables scoresheet + weekly confirm UI)
     accepted_slot = db.query(IceSlot).filter(
         IceSlot.rink_id == r1_id,
@@ -486,6 +525,43 @@ def seed_demo_data(db: Session):
             status="scheduled",
             game_type="non_league",
             season_id=team_season[p_accepted.home_team_id],
+        ),
+        # Additional upcoming games so more team dashboards have live future data.
+        Game(
+            home_team_id=t2_id,
+            away_team_id=t4_id,
+            date=date(2026, 3, 14),
+            time=time(11, 0),
+            status="confirmed",
+            game_type="league",
+            season_id=s1_id,
+        ),
+        Game(
+            home_team_id=t6_id,
+            away_team_id=t2_id,
+            date=date(2026, 3, 21),
+            time=time(10, 0),
+            status="scheduled",
+            game_type="non_league",
+            season_id=s3_id,
+        ),
+        Game(
+            home_team_id=t7_id,
+            away_team_id=t8_id,
+            date=date(2026, 3, 28),
+            time=time(9, 0),
+            status="scheduled",
+            game_type="non_league",
+            season_id=s1_id,
+        ),
+        Game(
+            home_team_id=t9_id,
+            away_team_id=t7_id,
+            date=date(2026, 4, 11),
+            time=time(8, 30),
+            status="confirmed",
+            game_type="non_league",
+            season_id=s3_id,
         ),
         # ── 14U AA season (t1=Northshore, t3=Mission, t5=Team IL) ──────────────
         # Target records: t1 4-4-1 | t3 7-1-1 | t5 1-7-0
@@ -560,30 +636,27 @@ def seed_demo_data(db: Session):
         team.ties = ties
     db.commit()
 
-    # Compute and store per-season records
-    all_seasons = [s1_id, s2_id, s3_id]
-    for season_id in all_seasons:
-        for team_id in all_team_ids:
-            season_games = db.query(Game).filter(
-                (Game.home_team_id == team_id) | (Game.away_team_id == team_id),
-                Game.season_id == season_id,
-                Game.status == "final",
-                Game.home_score.isnot(None),
-                Game.away_score.isnot(None),
-            ).all()
-            if not season_games:
-                continue
-            sw = sl = st = 0
-            for g in season_games:
-                my_score = g.home_score if g.home_team_id == team_id else g.away_score
-                opp_score = g.away_score if g.home_team_id == team_id else g.home_score
-                if my_score > opp_score:
-                    sw += 1
-                elif my_score < opp_score:
-                    sl += 1
-                else:
-                    st += 1
-            db.add(TeamSeasonRecord(team_id=team_id, season_id=season_id, wins=sw, losses=sl, ties=st))
+    # Compute and store per-season records for every team assigned to a season,
+    # including teams that have not played yet so the UI can still show 0-0-0.
+    for team_id, season_id in team_season.items():
+        season_games = db.query(Game).filter(
+            (Game.home_team_id == team_id) | (Game.away_team_id == team_id),
+            Game.season_id == season_id,
+            Game.status == "final",
+            Game.home_score.isnot(None),
+            Game.away_score.isnot(None),
+        ).all()
+        sw = sl = st = 0
+        for g in season_games:
+            my_score = g.home_score if g.home_team_id == team_id else g.away_score
+            opp_score = g.away_score if g.home_team_id == team_id else g.home_score
+            if my_score > opp_score:
+                sw += 1
+            elif my_score < opp_score:
+                sl += 1
+            else:
+                st += 1
+        db.add(TeamSeasonRecord(team_id=team_id, season_id=season_id, wins=sw, losses=sl, ties=st))
     db.commit()
 
     return {
@@ -596,4 +669,5 @@ def seed_demo_data(db: Session):
         "seasons": 3,
         "rinks": 3,
         "ice_slots": len(ice_slots),
+        "practice_bookings": len(practice_bookings),
     }

@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { Player } from '../types';
 import RosterCsvUploader from '../components/RosterCsvUploader';
 import { Alert } from '../components/ui/Alert';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
@@ -18,6 +19,13 @@ const emptyForm = {
   jersey_number: '',
   position: '',
 };
+
+function positionBadgeVariant(position: string | null | undefined): 'info' | 'success' | 'warning' | 'neutral' {
+  if (position === 'G') return 'info';
+  if (position === 'D') return 'warning';
+  if (position === 'F') return 'success';
+  return 'neutral';
+}
 
 export default function RosterPage() {
   const { activeTeam } = useTeam();
@@ -112,24 +120,74 @@ export default function RosterPage() {
 
       {tab === 0 && (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
+            {players.map((p) => (
+              <div key={p.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/80 dark:bg-slate-900/70 dark:text-slate-100 dark:ring-slate-800/80">
+                        {p.jersey_number ?? '—'}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          {p.first_name} {p.last_name}
+                        </div>
+                        <div className="mt-1">
+                          <Badge variant={positionBadgeVariant(p.position)}>
+                            {p.position === 'G' ? 'Goalie' : p.position === 'D' ? 'Defense' : p.position === 'F' ? 'Forward' : 'Unassigned'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete">
+                      <Trash2 className="h-4 w-4 text-rose-600" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {players.length === 0 && (
+              <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                No players yet. Upload a CSV or add players manually.
+              </div>
+            )}
+          </div>
+
+          <div className="hidden md:block">
+            <table className="w-full table-fixed text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-300">
                 <tr>
-                  <th className="px-4 py-3">#</th>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Pos</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="w-20 px-4 py-3">#</th>
+                  <th className="w-[38%] px-4 py-3">Player</th>
+                  <th className="w-32 px-4 py-3">Position</th>
+                  <th className="w-28 px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                 {players.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
-                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{p.jersey_number ?? '-'}</td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                      {p.first_name} {p.last_name}
+                    <td className="px-4 py-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/80 dark:bg-slate-900/70 dark:text-slate-100 dark:ring-slate-800/80">
+                        {p.jersey_number ?? '—'}
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.position || '-'}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                      <div className="font-medium text-slate-900 dark:text-slate-100">
+                        {p.first_name} {p.last_name}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                      <Badge variant={positionBadgeVariant(p.position)}>
+                        {p.position === 'G' ? 'Goalie' : p.position === 'D' ? 'Defense' : p.position === 'F' ? 'Forward' : 'Unassigned'}
+                      </Badge>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
                         <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit">

@@ -1,12 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MapPin, Save, ShieldCheck, Trash2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Navigation, Plus, Save, ShieldCheck, Trash2, UtensilsCrossed } from 'lucide-react';
 
 const GAME_TYPES = [
   { value: '', label: '—' },
   { value: 'league', label: 'League' },
   { value: 'non_league', label: 'Non-League' },
   { value: 'tournament', label: 'Tournament' },
+];
+
+const PENALTY_OPTIONS = [
+  'Tripping',
+  'Hooking',
+  'Slashing',
+  'Holding',
+  'Interference',
+  'Roughing',
+  'Cross-checking',
+  'Boarding',
+  'Checking from behind',
+  'Charging',
+  'High-sticking',
+  'Too many players',
+  'Unsportsmanlike conduct',
+  'Delay of game',
+  'Other',
 ];
 import { api } from '../api/client';
 import {
@@ -40,6 +58,25 @@ function mapsQueryUrl(query: string) {
   return url.toString();
 }
 
+function getStatusLabel(game: Game) {
+  if (game.status === 'confirmed') return 'Both confirmed';
+  if (game.status === 'final') return 'Final';
+  if (game.status === 'cancelled') return 'Cancelled';
+  if (game.home_weekly_confirmed) return 'Home confirmed';
+  if (game.away_weekly_confirmed) return 'Away confirmed';
+  return 'Scheduled';
+}
+
+function digitsOnly(value: string) {
+  return value.replace(/\D+/g, '');
+}
+
+function blockNonIntegerNumberKeys(event: React.KeyboardEvent<HTMLInputElement>) {
+  if (['e', 'E', '+', '-', '.'].includes(event.key)) {
+    event.preventDefault();
+  }
+}
+
 export default function GamePage() {
   const { gameId } = useParams();
   const navigate = useNavigate();
@@ -52,7 +89,7 @@ export default function GamePage() {
   const [scoreDraft, setScoreDraft] = useState({ home: '', away: '' });
   const [statDraft, setStatDraft] = useState<Record<string, { goals: number; assists: number; shots: number; team_id: string }>>({});
 
-  const [penaltyForm, setPenaltyForm] = useState({ team_id: '', player_id: '', penalty_type: '', minutes: '2' });
+  const [penaltyForm, setPenaltyForm] = useState({ team_id: '', player_id: '', penalty_type: '', custom_penalty_type: '', minutes: '' });
 
   const [goalieDraft, setGoalieDraft] = useState<Record<string, { player_id: string; saves: string; shootout_shots: string; shootout_saves: string }>>({});
 
@@ -162,20 +199,23 @@ export default function GamePage() {
 
   const handleAddPenalty = async () => {
     if (!gameId || !game) return;
-    if (!penaltyForm.team_id || !penaltyForm.penalty_type.trim()) return;
+    const resolvedPenaltyType =
+      penaltyForm.penalty_type === 'Other' ? penaltyForm.custom_penalty_type.trim() : penaltyForm.penalty_type.trim();
+    if (!penaltyForm.team_id || !resolvedPenaltyType) return;
     const created = await api.createPenalty(gameId, {
       team_id: penaltyForm.team_id,
       player_id: penaltyForm.player_id || null,
-      penalty_type: penaltyForm.penalty_type.trim(),
-      minutes: Number(penaltyForm.minutes || '2'),
+      penalty_type: resolvedPenaltyType,
+      minutes: Number(penaltyForm.minutes),
     });
     setScoresheet((ss) => (ss ? { ...ss, penalties: [...ss.penalties, created] } : ss));
-    setPenaltyForm({ team_id: penaltyForm.team_id, player_id: '', penalty_type: '', minutes: '2' });
+    setPenaltyForm({ team_id: '', player_id: '', penalty_type: '', custom_penalty_type: '', minutes: '' });
   };
 
   const handleDeletePenalty = async (id: string) => {
     await api.deletePenalty(id);
     setScoresheet((ss) => (ss ? { ...ss, penalties: ss.penalties.filter((p) => p.id !== id) } : ss));
+    setPenaltyForm({ team_id: '', player_id: '', penalty_type: '', custom_penalty_type: '', minutes: '' });
   };
 
   const handleSaveGoalies = async () => {
@@ -232,6 +272,7 @@ export default function GamePage() {
   const restaurantsUrl = rinkLabel ? mapsQueryUrl(`restaurants near ${rinkLabel}`) : null;
   const thingsUrl = rinkLabel ? mapsQueryUrl(`things to do near ${rinkLabel}`) : null;
   const directionsUrl = rinkLabel ? mapsQueryUrl(rinkLabel) : null;
+  const statusLabel = getStatusLabel(game);
 
   const thisWeekStart = (() => {
     const d = new Date();
@@ -251,26 +292,40 @@ export default function GamePage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate('/games')}
+            aria-label="Back to Games"
+            title="Back to Games"
+            className="shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
           <div className="page-title">Game Scoresheet</div>
           <div className="page-subtitle">
             {formatDateLabel(game.date)} {formatTimeHHMM(game.time) || ''} • {homeName} vs {awayName}
             {isThisWeek && <span className="ml-2 text-xs font-medium text-brand-700 dark:text-cyan-300">This week</span>}
           </div>
         </div>
-        <Button type="button" variant="outline" onClick={() => navigate('/games')}>
-          Back to Games
-        </Button>
       </div>
 
-      <Card className="p-4">
+      <Card className="overflow-hidden border-cyan-200/40 bg-gradient-to-br from-white via-cyan-50/50 to-violet-50/40 p-4 dark:border-cyan-900/30 dark:from-slate-950 dark:via-cyan-950/15 dark:to-violet-950/20">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Game Details</div>
-            <div className="text-sm text-slate-700 dark:text-slate-300">
-              <span className="font-medium text-slate-900 dark:text-slate-100">{homeName}</span> (Home) vs{' '}
-              <span className="font-medium text-slate-900 dark:text-slate-100">{awayName}</span> (Away)
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Game Details</div>
+            <div className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+              <span>{homeName}</span>
+              <span className="mx-2 text-slate-400 dark:text-slate-500">vs</span>
+              <span>{awayName}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Badge variant={game.home_weekly_confirmed ? 'success' : 'outline'}>{homeName} confirmed</Badge>
+              <Badge variant={game.away_weekly_confirmed ? 'success' : 'outline'}>{awayName} confirmed</Badge>
+              <Badge variant="outline">{statusLabel}</Badge>
             </div>
             {rinkLabel ? (
               <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
@@ -283,9 +338,6 @@ export default function GamePage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={game.home_weekly_confirmed ? 'success' : 'outline'}>{homeName} confirmed</Badge>
-            <Badge variant={game.away_weekly_confirmed ? 'success' : 'outline'}>{awayName} confirmed</Badge>
-            <Badge variant="outline">{game.status}</Badge>
             <Select
               value={game.game_type ?? ''}
               onChange={(e) => handleTypeChange(e.target.value)}
@@ -300,17 +352,38 @@ export default function GamePage() {
 
         {directionsUrl && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" onClick={() => window.open(directionsUrl, '_blank', 'noopener,noreferrer')}>
-              Directions
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => window.open(directionsUrl, '_blank', 'noopener,noreferrer')}
+              aria-label="Open directions"
+              title="Directions"
+            >
+              <Navigation className="h-4 w-4" />
             </Button>
             {restaurantsUrl && (
-              <Button type="button" variant="outline" onClick={() => window.open(restaurantsUrl, '_blank', 'noopener,noreferrer')}>
-                Restaurants Nearby
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => window.open(restaurantsUrl, '_blank', 'noopener,noreferrer')}
+                aria-label="Open restaurants nearby"
+                title="Restaurants Nearby"
+              >
+                <UtensilsCrossed className="h-4 w-4" />
               </Button>
             )}
             {thingsUrl && (
-              <Button type="button" variant="outline" onClick={() => window.open(thingsUrl, '_blank', 'noopener,noreferrer')}>
-                Things To Do Nearby
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => window.open(thingsUrl, '_blank', 'noopener,noreferrer')}
+                aria-label="Open things to do nearby"
+                title="Things To Do Nearby"
+              >
+                <MapPin className="h-4 w-4" />
               </Button>
             )}
           </div>
@@ -321,11 +394,12 @@ export default function GamePage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Score</div>
-            <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Update the score as the game progresses.</div>
+            <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Update the score as the game progresses. Final scores remain editable for corrections.
+            </div>
           </div>
-          <Button type="button" onClick={handleSaveScore}>
+          <Button type="button" size="icon" onClick={handleSaveScore} aria-label="Save score" title="Save score">
             <Save className="h-4 w-4" />
-            Save Score
           </Button>
         </div>
 
@@ -334,10 +408,13 @@ export default function GamePage() {
             <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{homeName}</div>
             <div className="mt-2">
               <Input
+                type="text"
                 inputMode="numeric"
+                pattern="[0-9]*"
                 value={scoreDraft.home}
-                onChange={(e) => setScoreDraft((s) => ({ ...s, home: e.target.value }))}
+                onChange={(e) => setScoreDraft((s) => ({ ...s, home: digitsOnly(e.target.value) }))}
                 placeholder="0"
+                className="max-w-xs"
               />
             </div>
           </div>
@@ -345,10 +422,13 @@ export default function GamePage() {
             <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{awayName}</div>
             <div className="mt-2">
               <Input
+                type="text"
                 inputMode="numeric"
+                pattern="[0-9]*"
                 value={scoreDraft.away}
-                onChange={(e) => setScoreDraft((s) => ({ ...s, away: e.target.value }))}
+                onChange={(e) => setScoreDraft((s) => ({ ...s, away: digitsOnly(e.target.value) }))}
                 placeholder="0"
+                className="max-w-xs"
               />
             </div>
           </div>
@@ -361,9 +441,8 @@ export default function GamePage() {
             <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Player Stats</div>
             <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Goals, assists, shots on goal.</div>
           </div>
-          <Button type="button" onClick={handleSaveStats}>
+          <Button type="button" size="icon" onClick={handleSaveStats} aria-label="Save player stats" title="Save player stats">
             <Save className="h-4 w-4" />
-            Save Stats
           </Button>
         </div>
 
@@ -399,33 +478,45 @@ export default function GamePage() {
                           </td>
                           <td className="px-4 py-2">
                             <Input
+                              type="number"
+                              min="0"
+                              step="1"
                               inputMode="numeric"
                               value={String(v.goals)}
+                              onKeyDown={blockNonIntegerNumberKeys}
                               onChange={(e) => setStatDraft((d) => ({
                                 ...d,
-                                [p.id]: { ...v, team_id: t.teamId, goals: Number(e.target.value || '0') },
+                                [p.id]: { ...v, team_id: t.teamId, goals: Number(digitsOnly(e.target.value) || '0') },
                               }))}
                               className="h-9 w-16"
                             />
                           </td>
                           <td className="px-4 py-2">
                             <Input
+                              type="number"
+                              min="0"
+                              step="1"
                               inputMode="numeric"
                               value={String(v.assists)}
+                              onKeyDown={blockNonIntegerNumberKeys}
                               onChange={(e) => setStatDraft((d) => ({
                                 ...d,
-                                [p.id]: { ...v, team_id: t.teamId, assists: Number(e.target.value || '0') },
+                                [p.id]: { ...v, team_id: t.teamId, assists: Number(digitsOnly(e.target.value) || '0') },
                               }))}
                               className="h-9 w-16"
                             />
                           </td>
                           <td className="px-4 py-2">
                             <Input
+                              type="number"
+                              min="0"
+                              step="1"
                               inputMode="numeric"
                               value={String(v.shots)}
+                              onKeyDown={blockNonIntegerNumberKeys}
                               onChange={(e) => setStatDraft((d) => ({
                                 ...d,
-                                [p.id]: { ...v, team_id: t.teamId, shots: Number(e.target.value || '0') },
+                                [p.id]: { ...v, team_id: t.teamId, shots: Number(digitsOnly(e.target.value) || '0') },
                               }))}
                               className="h-9 w-16"
                             />
@@ -482,23 +573,58 @@ export default function GamePage() {
           </div>
           <div className="lg:col-span-4">
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Penalty Type</label>
-            <Textarea
-              value={penaltyForm.penalty_type}
-              onChange={(e) => setPenaltyForm((f) => ({ ...f, penalty_type: e.target.value }))}
-              rows={1}
-            />
+            <div className="space-y-2">
+              <Select
+                value={penaltyForm.penalty_type}
+                onChange={(e) => setPenaltyForm((f) => ({
+                  ...f,
+                  penalty_type: e.target.value,
+                  custom_penalty_type: e.target.value === 'Other' ? f.custom_penalty_type : '',
+                }))}
+              >
+                <option value="">Select…</option>
+                {PENALTY_OPTIONS.map((penalty) => (
+                  <option key={penalty} value={penalty}>{penalty}</option>
+                ))}
+              </Select>
+              {penaltyForm.penalty_type === 'Other' && (
+                <Textarea
+                  value={penaltyForm.custom_penalty_type}
+                  onChange={(e) => setPenaltyForm((f) => ({ ...f, custom_penalty_type: e.target.value }))}
+                  rows={1}
+                  placeholder="Enter custom penalty"
+                />
+              )}
+            </div>
           </div>
           <div className="lg:col-span-1">
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Min</label>
             <Input
+              type="text"
               inputMode="numeric"
+              pattern="[0-9]*"
               value={penaltyForm.minutes}
-              onChange={(e) => setPenaltyForm((f) => ({ ...f, minutes: e.target.value }))}
+              onChange={(e) => setPenaltyForm((f) => ({ ...f, minutes: digitsOnly(e.target.value) }))}
             />
           </div>
           <div className="lg:col-span-1">
-            <Button type="button" onClick={handleAddPenalty} disabled={!penaltyForm.team_id || !penaltyForm.penalty_type.trim()}>
-              Add
+            <Button
+              type="button"
+              size="icon"
+              onClick={handleAddPenalty}
+              disabled={
+                !penaltyForm.team_id ||
+                !(
+                  penaltyForm.penalty_type.trim() &&
+                  (penaltyForm.penalty_type !== 'Other' || penaltyForm.custom_penalty_type.trim()) &&
+                  penaltyForm.minutes.trim() &&
+                  Number(penaltyForm.minutes) >= 1
+                )
+              }
+              aria-label="Add penalty"
+              title="Add penalty"
+            >
+              <Plus className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -549,9 +675,8 @@ export default function GamePage() {
             <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Goaltender Stats</div>
             <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Saves and shootouts.</div>
           </div>
-          <Button type="button" onClick={handleSaveGoalies}>
+          <Button type="button" size="icon" onClick={handleSaveGoalies} aria-label="Save goalie stats" title="Save goalie stats">
             <Save className="h-4 w-4" />
-            Save Goalies
           </Button>
         </div>
 
@@ -584,25 +709,37 @@ export default function GamePage() {
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Saves</label>
                       <Input
+                        type="number"
+                        min="0"
+                        step="1"
                         inputMode="numeric"
                         value={d.saves}
-                        onChange={(e) => setGoalieDraft((g) => ({ ...g, [t.teamId]: { ...d, saves: e.target.value } }))}
+                        onKeyDown={blockNonIntegerNumberKeys}
+                        onChange={(e) => setGoalieDraft((g) => ({ ...g, [t.teamId]: { ...d, saves: digitsOnly(e.target.value) } }))}
                       />
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">SO Shots</label>
                       <Input
+                        type="number"
+                        min="0"
+                        step="1"
                         inputMode="numeric"
                         value={d.shootout_shots}
-                        onChange={(e) => setGoalieDraft((g) => ({ ...g, [t.teamId]: { ...d, shootout_shots: e.target.value } }))}
+                        onKeyDown={blockNonIntegerNumberKeys}
+                        onChange={(e) => setGoalieDraft((g) => ({ ...g, [t.teamId]: { ...d, shootout_shots: digitsOnly(e.target.value) } }))}
                       />
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">SO Saves</label>
                       <Input
+                        type="number"
+                        min="0"
+                        step="1"
                         inputMode="numeric"
                         value={d.shootout_saves}
-                        onChange={(e) => setGoalieDraft((g) => ({ ...g, [t.teamId]: { ...d, shootout_saves: e.target.value } }))}
+                        onKeyDown={blockNonIntegerNumberKeys}
+                        onChange={(e) => setGoalieDraft((g) => ({ ...g, [t.teamId]: { ...d, shootout_saves: digitsOnly(e.target.value) } }))}
                       />
                     </div>
                   </div>
@@ -637,14 +774,21 @@ export default function GamePage() {
                   {existing ? <ShieldCheck className="h-5 w-5 text-emerald-600" /> : <div className="h-5 w-5" />}
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2">
+                <div className="mt-3 flex items-center gap-2">
                   <Input
                     value={signatureDraft[r.role] || ''}
                     onChange={(e) => setSignatureDraft((d) => ({ ...d, [r.role]: e.target.value }))}
                     placeholder="Type full name"
+                    className="min-w-0 flex-1"
                   />
-                  <Button type="button" onClick={() => handleSign(r.role, r.team_id)}>
-                    Sign
+                  <Button
+                    type="button"
+                    size="icon"
+                    onClick={() => handleSign(r.role, r.team_id)}
+                    aria-label={`Sign as ${r.label}`}
+                    title={`Sign as ${r.label}`}
+                  >
+                    <ShieldCheck className="h-4 w-4" />
                   </Button>
                 </div>
               </Card>

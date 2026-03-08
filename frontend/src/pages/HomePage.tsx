@@ -6,7 +6,7 @@ import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
 import { ScheduleEntry, GameProposal, Game, PracticeBooking, StandingsEntry } from '../types';
 import { cn } from '../lib/cn';
-import { formatTimeHHMM } from '../lib/time';
+import { formatDate, formatTimeHHMM } from '../lib/time';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -57,17 +57,24 @@ export default function HomePage() {
   const [seasonRecord, setSeasonRecord] = useState<StandingsEntry | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedError, setSeedError] = useState('');
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   useEffect(() => {
     if (!activeTeam) return;
     const schedParams: Record<string, string> = {};
     if (activeSeason) schedParams.season_id = activeSeason.id;
     api.getSchedule(activeTeam.id, schedParams).then(setSchedule);
-    api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }).then(setProposals);
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const gameParams: Record<string, string> = { date_from: todayStr };
-    if (activeSeason) gameParams.season_id = activeSeason.id;
-    api.getGames(activeTeam.id, gameParams).then(setGames);
+    Promise.all([
+      api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }),
+      api.getProposals(activeTeam.id, { direction: 'outgoing', status: 'proposed' }),
+    ]).then(([incoming, outgoing]) => {
+      const merged = [...incoming, ...outgoing]
+        .filter((proposal, index, all) => all.findIndex((candidate) => candidate.id === proposal.id) === index)
+        .sort((a, b) => (a.proposed_date + (a.proposed_time || '')).localeCompare(b.proposed_date + (b.proposed_time || '')));
+      setProposals(merged);
+    });
+    api.getGames(activeTeam.id, { date_from: todayStr }).then(setGames);
     api.getPracticeBookings(activeTeam.id, { status: 'active' }).then(setPractices);
 
     if (activeSeason) {
@@ -80,10 +87,13 @@ export default function HomePage() {
     }
   }, [activeTeam, activeSeason]);
 
-  const today = new Date().toISOString().slice(0, 10);
   const openDates = schedule.filter((e) => e.status === 'open');
-  const upcomingPractices = practices.filter((p) => p.slot_date && p.slot_date >= today);
-  const upcoming = games
+  const upcomingPractices = practices.filter((p) => p.slot_date && p.slot_date >= todayStr);
+  const seasonScopedGames = games.filter((g) => {
+    if (!activeSeason) return true;
+    return g.date >= activeSeason.start_date && g.date <= activeSeason.end_date;
+  });
+  const upcoming = seasonScopedGames
     .slice()
     .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
     .slice(0, 5);
@@ -175,6 +185,13 @@ export default function HomePage() {
           />
         )}
         <StatCard
+          title="Upcoming Games"
+          value={upcoming.length}
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          color="text-sky-700"
+          onClick={() => navigate('/games')}
+        />
+        <StatCard
           title="Open Dates"
           value={openDates.length}
           icon={<Calendar className="h-4 w-4" />}
@@ -187,13 +204,6 @@ export default function HomePage() {
           icon={<Inbox className="h-4 w-4" />}
           color="text-amber-700"
           onClick={() => navigate('/proposals')}
-        />
-        <StatCard
-          title="Upcoming Games"
-          value={upcoming.length}
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          color="text-sky-700"
-          onClick={() => navigate('/games')}
         />
         <StatCard
           title="Upcoming Practices"
@@ -232,10 +242,13 @@ export default function HomePage() {
           ) : (
             <ul className="mt-3 divide-y divide-slate-200 dark:divide-slate-800">
               {upcoming.map((g) => (
-                <li key={g.id} className="flex items-center justify-between gap-3 px-2 py-3">
+                <li key={g.id} className="flex items-start justify-between gap-3 px-2 py-3">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {g.date} {formatTimeHHMM(g.time) || ''} — {g.home_team_name} vs {g.away_team_name}
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      {formatDate(g.date)} {formatTimeHHMM(g.time) || ''}
+                    </div>
+                    <div className="mt-1 truncate text-sm text-slate-700 dark:text-slate-300">
+                      {g.home_team_name} vs {g.away_team_name}
                     </div>
                     <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{g.rink_name || g.location_label || 'No location yet'}</div>
                   </div>
@@ -280,6 +293,9 @@ export default function HomePage() {
                     </div>
                     <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{p.message || '—'}</div>
                   </div>
+                  <Badge variant={p.proposed_by_team_id === activeTeam.id ? 'info' : 'warning'}>
+                    {p.proposed_by_team_id === activeTeam.id ? 'Sent' : 'Received'}
+                  </Badge>
                 </li>
               ))}
             </ul>

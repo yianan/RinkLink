@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Pencil, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import { Association, Team } from '../types';
@@ -6,10 +7,13 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import { useTeam } from '../context/TeamContext';
 
-const emptyForm = { name: '', home_rink_address: '', city: '', state: '', zip_code: '', league_affiliation: '' };
+const emptyForm = { name: '', home_rink_address: '', city: '', state: '', zip_code: '' };
 
 export default function AssociationListPage() {
+  const navigate = useNavigate();
+  const { setActiveTeam } = useTeam();
   const [associations, setAssociations] = useState<Association[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [open, setOpen] = useState(false);
@@ -48,7 +52,7 @@ export default function AssociationListPage() {
 
   const handleEdit = (a: Association) => {
     setEditId(a.id);
-    setForm({ name: a.name, home_rink_address: a.home_rink_address, city: a.city, state: a.state, zip_code: a.zip_code, league_affiliation: a.league_affiliation || '' });
+    setForm({ name: a.name, home_rink_address: a.home_rink_address, city: a.city, state: a.state, zip_code: a.zip_code });
     setOpen(true);
   };
 
@@ -60,6 +64,10 @@ export default function AssociationListPage() {
   };
 
   const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const openTeamDashboard = (team: Team) => {
+    setActiveTeam(team);
+    navigate('/');
+  };
 
   return (
     <div className="space-y-4">
@@ -87,19 +95,18 @@ export default function AssociationListPage() {
                     <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                       {a.city}, {a.state} {a.zip_code}
                     </div>
-                    {a.league_affiliation ? (
-                      <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">League: {a.league_affiliation}</div>
-                    ) : null}
                     <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">Teams: {assocTeams.length}</div>
                     {assocTeams.length ? (
                       <div className="mt-1 space-y-1">
                         {assocTeams.slice(0, 3).map((t) => (
-                          <div key={t.id} className="truncate text-xs text-slate-700 dark:text-slate-300">
-                            {t.name}{' '}
-                            <span className="text-slate-500 dark:text-slate-400">
-                              ({t.age_group} {t.level})
-                            </span>
-                          </div>
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => openTeamDashboard(t)}
+                            className="block cursor-pointer truncate text-left text-xs font-medium text-brand-700 hover:text-brand-800 dark:text-cyan-300 dark:hover:text-cyan-200"
+                          >
+                            {t.name}
+                          </button>
                         ))}
                         {extraTeams ? (
                           <div className="text-xs text-slate-500 dark:text-slate-400">+ {extraTeams} more</div>
@@ -136,7 +143,6 @@ export default function AssociationListPage() {
                 <th className="px-4 py-3">City</th>
                 <th className="px-4 py-3">State</th>
                 <th className="px-4 py-3">Zip</th>
-                <th className="px-4 py-3">League</th>
                 <th className="px-4 py-3">Teams</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -148,17 +154,18 @@ export default function AssociationListPage() {
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{a.city}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{a.state}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{a.zip_code}</td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{a.league_affiliation || '-'}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                     {teamsByAssociation[a.id]?.length ? (
                       <div className="space-y-1">
                         {teamsByAssociation[a.id].map((t) => (
-                          <div key={t.id} className="truncate">
-                            {t.name}{' '}
-                            <span className="text-xs text-slate-500 dark:text-slate-400">
-                              ({t.age_group} {t.level})
-                            </span>
-                          </div>
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => openTeamDashboard(t)}
+                            className="block cursor-pointer truncate text-left font-medium text-brand-700 hover:text-brand-800 dark:text-cyan-300 dark:hover:text-cyan-200"
+                          >
+                            {t.name}
+                          </button>
                         ))}
                       </div>
                     ) : (
@@ -180,7 +187,7 @@ export default function AssociationListPage() {
 
               {associations.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No associations yet. Add one or seed demo data.
                   </td>
                 </tr>
@@ -228,11 +235,6 @@ export default function AssociationListPage() {
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Zip</label>
               <Input value={form.zip_code} onChange={(e) => setField('zip_code', e.target.value)} />
             </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">League Affiliation</label>
-            <Input value={form.league_affiliation} onChange={(e) => setField('league_affiliation', e.target.value)} />
           </div>
         </div>
       </Modal>

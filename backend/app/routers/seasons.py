@@ -164,7 +164,8 @@ def get_standings(
             records[g.home_team_id]["ties"] += 1
             records[g.away_team_id]["ties"] += 1
 
-    # Build standings entries
+    # Build standings entries, including teams that have not played yet so
+    # season views and dashboards can still show a 0-0-0 record.
     entries = []
     team_cache: dict[str, Team] = {t.id: t for t in teams}
     for tid, rec in records.items():
@@ -178,8 +179,6 @@ def get_standings(
             continue
         assoc = db.get(Association, team.association_id)
         gp = rec["wins"] + rec["losses"] + rec["ties"]
-        if gp == 0:
-            continue
         entries.append(StandingsEntry(
             team_id=tid,
             team_name=team.name,

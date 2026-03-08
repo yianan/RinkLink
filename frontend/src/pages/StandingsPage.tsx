@@ -132,9 +132,6 @@ export default function StandingsPage() {
                       <span className="text-lg font-bold text-slate-400 dark:text-slate-500">#{i + 1}</span>
                       <span className="font-medium text-slate-900 dark:text-slate-100">{s.team_name}</span>
                     </div>
-                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {s.association_name} &middot; {s.age_group} {s.level}
-                    </div>
                   </div>
                   <Badge variant="info">{s.points} pts</Badge>
                 </div>
@@ -170,7 +167,6 @@ export default function StandingsPage() {
                       <td className="px-4 py-3 font-bold text-slate-400 dark:text-slate-500">{i + 1}</td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-900 dark:text-slate-100">{s.team_name}</div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">{s.age_group} {s.level}</div>
                       </td>
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{s.association_name || '—'}</td>
                       <td className="px-4 py-3 text-center text-slate-700 dark:text-slate-300">{s.games_played}</td>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { CalendarClock, XCircle } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { api } from '../api/client';
 import { GameProposal, IceSlot, Rink } from '../types';
@@ -183,7 +184,7 @@ export default function ProposalsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {p.proposed_date} {formatTimeHHMM(p.proposed_time) || ''}
+                      {formatDate(p.proposed_date)} {formatTimeHHMM(p.proposed_time) || ''}
                     </div>
                     <div className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-300">
                       <div className="truncate">
@@ -229,21 +230,30 @@ export default function ProposalsPage() {
                     </Button>
                   )}
                   {canReschedule && (
-                    <Button type="button" size="sm" variant="outline" onClick={() => handleRequestReschedule(p)}>
-                      Request Reschedule
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRequestReschedule(p)}
+                      aria-label="Request reschedule"
+                      title="Request reschedule"
+                    >
+                      <CalendarClock className="h-4 w-4" />
                     </Button>
                   )}
                   {canCancelAccepted && (
                     <Button
                       type="button"
-                      size="sm"
-                      variant="outline"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => {
                         if (!confirm('Cancel this accepted game?')) return;
                         handleCancel(p.id);
                       }}
+                      aria-label="Cancel game"
+                      title="Cancel game"
                     >
-                      Cancel Game
+                      <XCircle className="h-4 w-4 text-rose-500" />
                     </Button>
                   )}
                 </div>
@@ -258,18 +268,19 @@ export default function ProposalsPage() {
           )}
         </div>
 
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-left text-sm">
+        <div className="hidden md:block">
+          <table className="w-full table-fixed text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
-              <tr>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Home</th>
-                <th className="px-4 py-3">Away</th>
-                <th className="px-4 py-3">Rink</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Message</th>
-                <th className="px-4 py-3">Created</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <tr>
+                  <th className="w-24 px-3 py-3">Date</th>
+                  <th className="w-24 px-3 py-3">Time</th>
+                  <th className="w-[16%] px-3 py-3">Home</th>
+                  <th className="w-[16%] px-3 py-3">Away</th>
+                  <th className="w-[18%] px-3 py-3">Rink</th>
+                  <th className="w-24 px-3 py-3">Status</th>
+                  <th className="w-[14%] px-3 py-3">Message</th>
+                <th className="w-24 px-3 py-3">Created</th>
+                <th className="w-20 px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
@@ -282,41 +293,52 @@ export default function ProposalsPage() {
 
                 return (
                   <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
-                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
-                      {p.proposed_date} {formatTimeHHMM(p.proposed_time) || ''}
+                    <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-900 dark:text-slate-100">
+                      {formatDate(p.proposed_date)}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-slate-900 dark:text-slate-100">{p.home_team_name}</div>
-                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{p.home_team_association}</div>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-300">
+                      {formatTimeHHMM(p.proposed_time) || '-'}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-slate-900 dark:text-slate-100">{p.away_team_name}</div>
-                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{p.away_team_association}</div>
+                    <td className="px-3 py-3">
+                      <div className="break-words font-medium text-slate-900 dark:text-slate-100">{p.home_team_name}</div>
+                      <div className="mt-0.5 break-words text-xs text-slate-500 dark:text-slate-400">{p.home_team_association}</div>
                     </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                    <td className="px-3 py-3">
+                      <div className="break-words font-medium text-slate-900 dark:text-slate-100">{p.away_team_name}</div>
+                      <div className="mt-0.5 break-words text-xs text-slate-500 dark:text-slate-400">{p.away_team_association}</div>
+                    </td>
+                    <td className="whitespace-normal break-words px-3 py-3 align-top text-slate-700 dark:text-slate-300">
                       {p.rink_name ? (
                         <div>
-                          <div className="font-medium text-slate-900 dark:text-slate-100">{p.rink_name}</div>
-                          <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                            {p.rink_city}, {p.rink_state}
-                            {p.ice_slot_start_time && ` • ${formatTimeHHMM(p.ice_slot_start_time) || p.ice_slot_start_time}${p.ice_slot_end_time ? '-' + (formatTimeHHMM(p.ice_slot_end_time) || p.ice_slot_end_time) : ''}`}
+                          <div className="break-words font-medium text-slate-900 dark:text-slate-100">{p.rink_name}</div>
+                          <div className="mt-0.5 break-words text-xs leading-5 text-slate-500 dark:text-slate-400">
+                            {[p.rink_city, p.rink_state].filter(Boolean).join(', ')}
+                            {p.ice_slot_start_time && (
+                              <>
+                                {' · '}
+                                {formatTimeHHMM(p.ice_slot_start_time) || p.ice_slot_start_time}
+                                {p.ice_slot_end_time ? `-${formatTimeHHMM(p.ice_slot_end_time) || p.ice_slot_end_time}` : ''}
+                              </>
+                            )}
                           </div>
                         </div>
                       ) : p.location_label ? (
-                        <div className="max-w-[320px] truncate text-slate-700 dark:text-slate-300" title={p.location_label}>
+                        <div className="break-words text-slate-700 dark:text-slate-300" title={p.location_label}>
                           {p.location_label}
                         </div>
                       ) : (
                         '—'
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 pr-5">
                       <Badge variant={statusColors[p.status] || 'neutral'}>{p.status}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.message || '-'}</td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatDate(p.created_at)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
+                    <td className="px-3 py-3 align-top text-slate-700 dark:text-slate-300">
+                      <div className="break-words text-sm leading-5">{p.message || '-'}</div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-300">{formatDate(p.created_at)}</td>
+                    <td className="px-3 py-3 align-top">
+                      <div className="flex flex-wrap justify-end gap-1.5">
                         {canRespond && (
                           <>
                             <Button type="button" size="sm" onClick={() => handleAccept(p.id)}>
@@ -333,21 +355,30 @@ export default function ProposalsPage() {
                           </Button>
                         )}
                         {canReschedule && (
-                          <Button type="button" size="sm" variant="outline" onClick={() => handleRequestReschedule(p)}>
-                            Request Reschedule
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRequestReschedule(p)}
+                            aria-label="Request reschedule"
+                            title="Request reschedule"
+                          >
+                            <CalendarClock className="h-4 w-4" />
                           </Button>
                         )}
                         {canCancelAccepted && (
                           <Button
                             type="button"
-                            size="sm"
-                            variant="outline"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => {
                               if (!confirm('Cancel this accepted game?')) return;
                               handleCancel(p.id);
                             }}
+                            aria-label="Cancel game"
+                            title="Cancel game"
                           >
-                            Cancel Game
+                            <XCircle className="h-4 w-4 text-rose-500" />
                           </Button>
                         )}
                       </div>
@@ -358,7 +389,7 @@ export default function ProposalsPage() {
 
               {proposals.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                  <td colSpan={9} className="px-3 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No {tabDef.label.toLowerCase()} proposals.
                   </td>
                 </tr>
