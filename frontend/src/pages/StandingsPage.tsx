@@ -5,6 +5,7 @@ import { StandingsEntry } from '../types';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
+import PageHeader from '../components/PageHeader';
 import { cn } from '../lib/cn';
 
 function ToggleChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
@@ -75,10 +76,7 @@ export default function StandingsPage() {
   if (!activeSeason) {
     return (
       <div className="space-y-4">
-        <div>
-          <div className="page-title">Standings</div>
-          <div className="page-subtitle">Select a season from the header to view standings.</div>
-        </div>
+        <PageHeader title="Standings" subtitle="Select a season from the header to view standings." />
         <Alert variant="info">
           {seasons.length === 0
             ? 'No seasons have been created yet. Create one from the Seasons page.'
@@ -90,10 +88,7 @@ export default function StandingsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <div className="page-title">Standings</div>
-        <div className="page-subtitle">{activeSeason.name} season standings.</div>
-      </div>
+      <PageHeader title="Standings" subtitle={`${activeSeason.name} season standings.`} />
 
       {allStandings.length > 0 && (
         <div className="space-y-2">

@@ -11,6 +11,7 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
+import PageHeader from '../components/PageHeader';
 import { cn } from '../lib/cn';
 
 const emptyForm = {
@@ -87,15 +88,15 @@ export default function RosterPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="page-title">Roster</div>
-          <div className="page-subtitle">Manage your USA Hockey roster and use it for stats tracking.</div>
-        </div>
-        <Button type="button" onClick={() => { setEditId(null); setForm({ ...emptyForm }); setOpen(true); }}>
-          Add Player
-        </Button>
-      </div>
+      <PageHeader
+        title="Roster"
+        subtitle="Manage your USA Hockey roster and use it for stats tracking."
+        actions={(
+          <Button type="button" onClick={() => { setEditId(null); setForm({ ...emptyForm }); setOpen(true); }}>
+            Add Player
+          </Button>
+        )}
+      />
 
       <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/40">
         {[

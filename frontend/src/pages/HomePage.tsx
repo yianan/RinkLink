@@ -10,6 +10,7 @@ import { formatDate, formatTimeHHMM } from '../lib/time';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import PageHeader from '../components/PageHeader';
 
 const clickableCard =
   'cursor-pointer text-left transition-shadow transition-colors hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:hover:border-slate-700 dark:focus-visible:ring-offset-slate-950';
@@ -137,33 +138,31 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="page-title">{activeTeam.name} Dashboard</div>
-          <div className="page-subtitle">
-            {activeSeason ? `${activeSeason.name} season` : 'Quick stats and what needs your attention.'}
-          </div>
-        </div>
-        <Button
-          type="button"
-          disabled={seedLoading}
-          onClick={async () => {
-            if (!confirm('Reset demo data? This will wipe your local database and re-seed everything.')) return;
-            setSeedError('');
-            setSeedLoading(true);
-            try {
-              await api.seed();
-              window.location.reload();
-            } catch (e) {
-              setSeedError(String(e));
-            } finally {
-              setSeedLoading(false);
-            }
-          }}
-        >
-          {seedLoading ? 'Seeding…' : 'Reset Demo Data'}
-        </Button>
-      </div>
+      <PageHeader
+        title={`${activeTeam.name} Dashboard`}
+        subtitle={activeSeason ? `${activeSeason.name} season` : 'Quick stats and what needs your attention.'}
+        actions={(
+          <Button
+            type="button"
+            disabled={seedLoading}
+            onClick={async () => {
+              if (!confirm('Reset demo data? This will wipe your local database and re-seed everything.')) return;
+              setSeedError('');
+              setSeedLoading(true);
+              try {
+                await api.seed();
+                window.location.reload();
+              } catch (e) {
+                setSeedError(String(e));
+              } finally {
+                setSeedLoading(false);
+              }
+            }}
+          >
+            {seedLoading ? 'Seeding…' : 'Reset Demo Data'}
+          </Button>
+        )}
+      />
 
       {seedError && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100">

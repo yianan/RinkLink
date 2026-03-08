@@ -17,6 +17,42 @@
   --shadow-soft: 0 1px 0 0 rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
+:root {
+  --app-bg-accent-primary: rgba(124, 58, 237, 0.14);
+  --app-bg-accent-secondary: rgba(56, 189, 248, 0.12);
+  --app-bg-accent-tertiary: rgba(96, 165, 250, 0.10);
+  --app-bg-base-start: #f8fafc;
+  --app-bg-base-mid: #ffffff;
+  --app-bg-base-end: #f5f3ff;
+  --app-surface: rgba(255, 255, 255, 0.88);
+  --app-surface-strong: rgba(255, 255, 255, 0.96);
+  --app-surface-dark: rgba(2, 6, 23, 0.45);
+  --app-border-subtle: rgba(148, 163, 184, 0.22);
+  --app-border-strong: rgba(148, 163, 184, 0.34);
+  --app-focus-ring: rgba(34, 211, 238, 0.5);
+  --app-tooltip-bg: rgba(15, 23, 42, 0.92);
+  --app-range-track-color: rgba(226, 232, 240, 1);
+  --app-range-fill-color: rgba(124, 58, 237, 1);
+  --app-range-progress: 50%;
+}
+
+html.dark {
+  --app-bg-accent-primary: rgba(34, 211, 238, 0.18);
+  --app-bg-accent-secondary: rgba(167, 139, 250, 0.16);
+  --app-bg-accent-tertiary: rgba(96, 165, 250, 0.10);
+  --app-bg-base-start: #05080f;
+  --app-bg-base-mid: #070b14;
+  --app-bg-base-end: #0b1020;
+  --app-surface: rgba(2, 6, 23, 0.42);
+  --app-surface-strong: rgba(2, 6, 23, 0.62);
+  --app-surface-dark: rgba(2, 6, 23, 0.68);
+  --app-border-subtle: rgba(51, 65, 85, 0.55);
+  --app-border-strong: rgba(71, 85, 105, 0.7);
+  --app-tooltip-bg: rgba(2, 6, 23, 0.96);
+  --app-range-track-color: rgba(51, 65, 85, 1);
+  --app-range-fill-color: rgba(34, 211, 238, 1);
+}
+
 @layer base {
   html,
   body,
@@ -38,18 +74,18 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background:
-      radial-gradient(1100px circle at 12% 8%, rgba(124, 58, 237, 0.14), transparent 55%),
-      radial-gradient(900px circle at 85% 18%, rgba(56, 189, 248, 0.12), transparent 50%),
-      linear-gradient(to bottom right, #f8fafc, #ffffff, #f5f3ff);
+      radial-gradient(1100px circle at 12% 8%, var(--app-bg-accent-primary), transparent 55%),
+      radial-gradient(900px circle at 85% 18%, var(--app-bg-accent-secondary), transparent 50%),
+      linear-gradient(to bottom right, var(--app-bg-base-start), var(--app-bg-base-mid), var(--app-bg-base-end));
   }
 
   html.dark body {
     color: var(--color-slate-100);
     background:
-      radial-gradient(1000px circle at 22% 10%, rgba(34, 211, 238, 0.18), transparent 55%),
-      radial-gradient(900px circle at 78% 18%, rgba(167, 139, 250, 0.16), transparent 60%),
-      radial-gradient(800px circle at 70% 86%, rgba(96, 165, 250, 0.10), transparent 60%),
-      linear-gradient(to bottom, #05080f, #070b14 45%, #0b1020);
+      radial-gradient(1000px circle at 22% 10%, var(--app-bg-accent-primary), transparent 55%),
+      radial-gradient(900px circle at 78% 18%, var(--app-bg-accent-secondary), transparent 60%),
+      radial-gradient(800px circle at 70% 86%, var(--app-bg-accent-tertiary), transparent 60%),
+      linear-gradient(to bottom, var(--app-bg-base-start), var(--app-bg-base-mid) 45%, var(--app-bg-base-end));
   }
 
   ::selection {
@@ -64,45 +100,6 @@
 }
 
 @layer components {
-  .container-page {
-    margin-inline: auto;
-    width: 100%;
-    max-width: 72rem;
-    padding-inline: 1rem;
-  }
-
-  .page-title {
-    color: var(--color-slate-900);
-    font-size: 1.25rem;
-    font-weight: 600;
-    letter-spacing: -0.025em;
-    line-height: 1.2;
-  }
-
-  .page-subtitle {
-    color: var(--color-slate-600);
-    font-size: 0.875rem;
-    line-height: 1.4;
-  }
-
-  html.dark .page-title {
-    color: var(--color-slate-100);
-  }
-
-  html.dark .page-subtitle {
-    color: var(--color-slate-400);
-  }
-
-  @media (min-width: 40rem) {
-    .container-page {
-      padding-inline: 1.5rem;
-    }
-
-    .page-title {
-      font-size: 1.5rem;
-    }
-  }
-
   .rl-tooltip {
     position: relative;
   }
@@ -115,7 +112,7 @@
     transform: translateX(-50%) translateY(2px);
     padding: 6px 10px;
     border-radius: 9999px;
-    background: rgba(15, 23, 42, 0.92);
+    background: var(--app-tooltip-bg);
     color: white;
     font-size: 12px;
     line-height: 1;
@@ -134,26 +131,26 @@
     bottom: calc(100% + 2px);
     transform: translateX(-50%);
     border: 6px solid transparent;
-    border-top-color: rgba(15, 23, 42, 0.92);
+    border-top-color: var(--app-tooltip-bg);
     opacity: 0;
     pointer-events: none;
     transition: opacity 120ms ease;
     z-index: 60;
   }
 
+  .rl-tooltip:hover::after,
+  .rl-tooltip:hover::before,
   .rl-tooltip:focus-visible::after,
   .rl-tooltip:focus-visible::before {
     opacity: 1;
   }
 
+  .rl-tooltip:hover::after,
   .rl-tooltip:focus-visible::after {
     transform: translateX(-50%) translateY(0);
   }
 
   .rl-range {
-    --rl-range-track: rgba(226, 232, 240, 1);
-    --rl-range-fill: rgba(124, 58, 237, 1);
-    --rl-range-progress: 50%;
     appearance: none;
     -webkit-appearance: none;
     height: 0.5rem;
@@ -162,20 +159,15 @@
     cursor: pointer;
   }
 
-  html.dark .rl-range {
-    --rl-range-track: rgba(51, 65, 85, 1);
-    --rl-range-fill: rgba(34, 211, 238, 1);
-  }
-
   .rl-range::-webkit-slider-runnable-track {
     height: 0.5rem;
     border-radius: 9999px;
     background: linear-gradient(
       to right,
-      var(--rl-range-fill) 0,
-      var(--rl-range-fill) var(--rl-range-progress),
-      var(--rl-range-track) var(--rl-range-progress),
-      var(--rl-range-track) 100%
+      var(--app-range-fill-color) 0,
+      var(--app-range-fill-color) var(--app-range-progress),
+      var(--app-range-track-color) var(--app-range-progress),
+      var(--app-range-track-color) 100%
     );
   }
 
@@ -186,7 +178,7 @@
     height: 18px;
     width: 18px;
     border-radius: 9999px;
-    background: var(--rl-range-fill);
+    background: var(--app-range-fill-color);
     border: 2px solid rgba(255, 255, 255, 0.9);
     box-shadow: 0 10px 24px rgba(2, 6, 23, 0.25);
   }
@@ -199,20 +191,20 @@
   .rl-range::-moz-range-track {
     height: 0.5rem;
     border-radius: 9999px;
-    background: var(--rl-range-track);
+    background: var(--app-range-track-color);
   }
 
   .rl-range::-moz-range-progress {
     height: 0.5rem;
     border-radius: 9999px;
-    background: var(--rl-range-fill);
+    background: var(--app-range-fill-color);
   }
 
   .rl-range::-moz-range-thumb {
     height: 18px;
     width: 18px;
     border-radius: 9999px;
-    background: var(--rl-range-fill);
+    background: var(--app-range-fill-color);
     border: 2px solid rgba(255, 255, 255, 0.9);
     box-shadow: 0 10px 24px rgba(2, 6, 23, 0.25);
   }

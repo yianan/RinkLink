@@ -12,6 +12,7 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
+import PageHeader from '../components/PageHeader';
 import { cn } from '../lib/cn';
 import { formatTimeHHMM } from '../lib/time';
 
@@ -209,14 +210,11 @@ export default function SearchPage() {
   const rangeMin = 10;
   const rangeMax = 200;
   const rangeProgress = Math.min(100, Math.max(0, ((maxDistance - rangeMin) / (rangeMax - rangeMin)) * 100));
-  const rangeStyle = { '--rl-range-progress': `${rangeProgress}%` } as CSSProperties;
+  const rangeStyle = { '--app-range-progress': `${rangeProgress}%` } as CSSProperties;
 
   return (
     <div className="space-y-4">
-      <div>
-        <div className="page-title">Find Opponents</div>
-        <div className="page-subtitle">Search by open date or use auto-match suggestions.</div>
-      </div>
+      <PageHeader title="Find Opponents" subtitle="Search by open date or use auto-match suggestions." />
 
       <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
         {[

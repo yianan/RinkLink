@@ -9,6 +9,7 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
+import PageHeader from '../components/PageHeader';
 
 const emptyForm = {
   association_id: '', name: '', age_group: '', level: '',
@@ -71,15 +72,15 @@ export default function TeamListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="page-title">Teams</div>
-          <div className="page-subtitle">Create teams and manage contact details.</div>
-        </div>
-        <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
-          Add Team
-        </Button>
-      </div>
+      <PageHeader
+        title="Teams"
+        subtitle="Create teams and manage contact details."
+        actions={(
+          <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
+            Add Team
+          </Button>
+        )}
+      />
 
       <Card className="overflow-hidden">
         <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">

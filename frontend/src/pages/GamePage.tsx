@@ -39,6 +39,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
+import PageHeader from '../components/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { formatTimeHHMM } from '../lib/time';
@@ -292,8 +293,15 @@ export default function GamePage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
+      <PageHeader
+        title="Game Scoresheet"
+        subtitle={(
+          <>
+            {formatDateLabel(game.date)} {formatTimeHHMM(game.time) || ''} • {homeName} vs {awayName}
+            {isThisWeek && <span className="ml-2 text-xs font-medium text-brand-700 dark:text-cyan-300">This week</span>}
+          </>
+        )}
+        actions={(
           <Button
             type="button"
             variant="outline"
@@ -305,13 +313,8 @@ export default function GamePage() {
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
-          <div className="page-title">Game Scoresheet</div>
-          <div className="page-subtitle">
-            {formatDateLabel(game.date)} {formatTimeHHMM(game.time) || ''} • {homeName} vs {awayName}
-            {isThisWeek && <span className="ml-2 text-xs font-medium text-brand-700 dark:text-cyan-300">This week</span>}
-          </div>
-        </div>
-      </div>
+        )}
+      />
 
       <Card className="overflow-hidden border-cyan-200/40 bg-gradient-to-br from-white via-cyan-50/50 to-violet-50/40 p-4 dark:border-cyan-900/30 dark:from-slate-950 dark:via-cyan-950/15 dark:to-violet-950/20">
         <div className="flex flex-wrap items-start justify-between gap-3">

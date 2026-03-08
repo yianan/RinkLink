@@ -11,6 +11,7 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
+import PageHeader from '../components/PageHeader';
 import { cn } from '../lib/cn';
 import { formatTimeHHMM, formatDate } from '../lib/time';
 
@@ -143,10 +144,7 @@ export default function ProposalsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <div className="page-title">Game Proposals</div>
-        <div className="page-subtitle">Accept, decline, cancel, or request a reschedule.</div>
-      </div>
+      <PageHeader title="Game Proposals" subtitle="Accept, decline, cancel, or request a reschedule." />
 
       <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
         {TABS.map((t, i) => (

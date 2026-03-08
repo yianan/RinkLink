@@ -12,6 +12,7 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Textarea } from '../components/ui/Textarea';
+import PageHeader from '../components/PageHeader';
 import { cn } from '../lib/cn';
 import { formatTimeHHMM } from '../lib/time';
 
@@ -166,14 +167,10 @@ export default function IceSlotsPage() {
           <Button type="button" variant="ghost" size="icon" onClick={() => navigate('/rinks')} aria-label="Back to rinks">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <div className="page-title">{rink ? `${rink.name} — Ice Slots` : 'Ice Slots'}</div>
-            {rink && (
-              <div className="page-subtitle">
-                {rink.address}, {rink.city}, {rink.state} {rink.zip_code}
-              </div>
-            )}
-          </div>
+          <PageHeader
+            title={rink ? `${rink.name} — Ice Slots` : 'Ice Slots'}
+            subtitle={rink ? `${rink.address}, ${rink.city}, ${rink.state} ${rink.zip_code}` : undefined}
+          />
         </div>
       </div>
 

@@ -11,6 +11,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
+import PageHeader from '../components/PageHeader';
 import { cn } from '../lib/cn';
 import { formatDate, formatTimeHHMM } from '../lib/time';
 
@@ -131,10 +132,7 @@ export default function GamesPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <div className="page-title">Games</div>
-        <div className="page-subtitle">Accepted non-league games with scoresheets and weekly confirmation.</div>
-      </div>
+      <PageHeader title="Games" subtitle="Accepted non-league games with scoresheets and weekly confirmation." />
 
       <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
         {[
@@ -248,7 +246,7 @@ export default function GamesPage() {
                 <th className="w-[24%] px-3 py-3">Opponent</th>
                 <th className="w-[18%] px-3 py-3">Rink</th>
                 <th className="w-44 px-3 py-3">Score</th>
-                <th className="w-40 px-3 py-3">Type</th>
+                <th className="w-44 px-3 py-3">Type</th>
                 <th className="w-32 px-3 py-3">Status</th>
               </tr>
             </thead>

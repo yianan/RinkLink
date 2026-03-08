@@ -13,6 +13,7 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
+import PageHeader from '../components/PageHeader';
 import { cn } from '../lib/cn';
 import { formatTimeHHMM } from '../lib/time';
 
@@ -93,15 +94,11 @@ export default function SchedulePage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="page-title">{activeTeam.name} Schedule</div>
-          <div className="page-subtitle">Track open dates and confirmed games.</div>
-        </div>
-        <Button type="button" onClick={() => setAddOpen(true)}>
-          Add Entry
-        </Button>
-      </div>
+      <PageHeader
+        title={`${activeTeam.name} Schedule`}
+        subtitle="Track open dates and confirmed games."
+        actions={<Button type="button" onClick={() => setAddOpen(true)}>Add Entry</Button>}
+      />
 
       <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
         {['List View', 'Calendar View', 'Upload CSV'].map((label, i) => (

@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import PageHeader from '../components/PageHeader';
 
 const emptyForm = { name: '', address: '', city: '', state: '', zip_code: '', phone: '', contact_email: '', website: '' };
 
@@ -59,15 +60,15 @@ export default function RinkListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="page-title">Rinks</div>
-          <div className="page-subtitle">Manage rinks and their ice slots.</div>
-        </div>
-        <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
-          Add Rink
-        </Button>
-      </div>
+      <PageHeader
+        title="Rinks"
+        subtitle="Manage rinks and their ice slots."
+        actions={(
+          <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
+            Add Rink
+          </Button>
+        )}
+      />
 
       <Card className="overflow-hidden">
         <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">

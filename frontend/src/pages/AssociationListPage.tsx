@@ -8,6 +8,7 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { useTeam } from '../context/TeamContext';
+import PageHeader from '../components/PageHeader';
 
 const emptyForm = { name: '', home_rink_address: '', city: '', state: '', zip_code: '' };
 
@@ -71,15 +72,15 @@ export default function AssociationListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="page-title">Associations</div>
-          <div className="page-subtitle">Organizations that manage teams.</div>
-        </div>
-        <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
-          Add Association
-        </Button>
-      </div>
+      <PageHeader
+        title="Associations"
+        subtitle="Organizations that manage teams."
+        actions={(
+          <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
+            Add Association
+          </Button>
+        )}
+      />
 
       <Card className="overflow-hidden">
         <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">

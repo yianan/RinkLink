@@ -11,6 +11,7 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { useTeam } from '../context/TeamContext';
+import PageHeader from '../components/PageHeader';
 
 export default function SeasonsPage() {
   const { activeTeam } = useTeam();
@@ -106,15 +107,11 @@ export default function SeasonsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="page-title">Seasons</div>
-          <div className="page-subtitle">Manage seasons{selectedAssocName ? ` for ${selectedAssocName}` : ''}.</div>
-        </div>
-        <Button type="button" onClick={openCreate} disabled={!selectedAssocId}>
-          Create Season
-        </Button>
-      </div>
+      <PageHeader
+        title="Seasons"
+        subtitle={`Manage seasons${selectedAssocName ? ` for ${selectedAssocName}` : ''}.`}
+        actions={<Button type="button" onClick={openCreate} disabled={!selectedAssocId}>Create Season</Button>}
+      />
 
       <div className="flex items-center gap-2">
         <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Association</label>

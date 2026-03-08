@@ -10,6 +10,7 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
+import PageHeader from '../components/PageHeader';
 import { cn } from '../lib/cn';
 import { formatTimeHHMM, formatDate } from '../lib/time';
 
@@ -107,15 +108,11 @@ export default function PracticePage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="page-title">Practice Bookings</div>
-          <div className="page-subtitle">Reserve ice time for practice — no opponent needed.</div>
-        </div>
-        <Button type="button" onClick={openModal}>
-          Book Practice
-        </Button>
-      </div>
+      <PageHeader
+        title="Practice Bookings"
+        subtitle="Reserve ice time for practice — no opponent needed."
+        actions={<Button type="button" onClick={openModal}>Book Practice</Button>}
+      />
 
       <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
         {(['upcoming', 'history'] as const).map((t) => (
