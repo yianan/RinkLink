@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from .config import settings
 from .database import engine  # noqa: F401 — imported to ensure engine is initialised
@@ -70,4 +70,6 @@ if _STATIC.is_dir():
         candidate = _STATIC / full_path
         if candidate.is_file():
             return FileResponse(str(candidate))
-        return FileResponse(str(_STATIC / "index.html"))
+        # Serve index.html with no-cache so browsers always get the latest
+        html = (_STATIC / "index.html").read_text()
+        return HTMLResponse(html, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
