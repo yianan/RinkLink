@@ -17,6 +17,7 @@ from ..models import (
 )
 from ..models.rink import Rink, IceSlot
 from ..models.practice_booking import PracticeBooking
+from ..services.records import recompute_team_records
 
 
 def _id():
@@ -609,54 +610,10 @@ def seed_demo_data(db: Session):
     db.add_all(games)
     db.commit()
 
-    # Compute and store W/T/L for all teams from the seeded final games
+    # Compute canonical overall + per-season records from the seeded final games.
     all_team_ids = [t1_id, t2_id, t3_id, t4_id, t5_id, t6_id, t7_id, t8_id, t9_id, t10_id]
     for team_id in all_team_ids:
-        team = db.get(Team, team_id)
-        if not team:
-            continue
-        final_games = db.query(Game).filter(
-            (Game.home_team_id == team_id) | (Game.away_team_id == team_id),
-            Game.status == "final",
-            Game.home_score.isnot(None),
-            Game.away_score.isnot(None),
-        ).all()
-        wins = losses = ties = 0
-        for g in final_games:
-            my_score = g.home_score if g.home_team_id == team_id else g.away_score
-            opp_score = g.away_score if g.home_team_id == team_id else g.home_score
-            if my_score > opp_score:
-                wins += 1
-            elif my_score < opp_score:
-                losses += 1
-            else:
-                ties += 1
-        team.wins = wins
-        team.losses = losses
-        team.ties = ties
-    db.commit()
-
-    # Compute and store per-season records for every team assigned to a season,
-    # including teams that have not played yet so the UI can still show 0-0-0.
-    for team_id, season_id in team_season.items():
-        season_games = db.query(Game).filter(
-            (Game.home_team_id == team_id) | (Game.away_team_id == team_id),
-            Game.season_id == season_id,
-            Game.status == "final",
-            Game.home_score.isnot(None),
-            Game.away_score.isnot(None),
-        ).all()
-        sw = sl = st = 0
-        for g in season_games:
-            my_score = g.home_score if g.home_team_id == team_id else g.away_score
-            opp_score = g.away_score if g.home_team_id == team_id else g.home_score
-            if my_score > opp_score:
-                sw += 1
-            elif my_score < opp_score:
-                sl += 1
-            else:
-                st += 1
-        db.add(TeamSeasonRecord(team_id=team_id, season_id=season_id, wins=sw, losses=sl, ties=st))
+        recompute_team_records(db, team_id)
     db.commit()
 
     return {

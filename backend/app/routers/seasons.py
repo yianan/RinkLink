@@ -3,8 +3,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Game, Team, Association, Season, TeamSeasonRecord
+from ..models import Game, Team, Association, Season
 from ..schemas.season import SeasonCreate, SeasonUpdate, SeasonOut, StandingsEntry
+from ..services.records import final_games_for_season_window
 
 
 def _season_with_game_count(db: Session, season: Season) -> dict:
@@ -128,17 +129,10 @@ def get_standings(
 
     team_ids = [t.id for t in teams]
 
-    # Compute standings from final games in this season
-    games = (
-        db.query(Game)
-        .filter(
-            Game.season_id == id,
-            Game.status == "final",
-            Game.home_score.isnot(None),
-            Game.away_score.isnot(None),
-        )
-        .all()
-    )
+    # Compute standings from all final games inside this season's date window
+    # that involve one of this association's teams. This keeps away games
+    # attached to an opponent's season_id in the correct season record.
+    games = final_games_for_season_window(db, season, team_ids)
 
     # Collect all team IDs that participated
     all_team_ids = set(team_ids)

@@ -4,61 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Game, Team, ScheduleEntry, TeamSeasonRecord
+from ..models import Game, Team, ScheduleEntry
 from ..models.rink import IceSlot
 from ..schemas import GameOut, GameUpdate, WeeklyConfirmUpdate
 from ..services.game_view import enrich_game
-
-
-def _update_team_record(team_id: str, db: Session, season_id: str | None = None) -> None:
-    """Recompute and store wins/losses/ties for a team from all final games.
-    Also updates the per-season record if season_id is provided."""
-    team = db.get(Team, team_id)
-    if not team:
-        return
-    final_games = db.query(Game).filter(
-        (Game.home_team_id == team_id) | (Game.away_team_id == team_id),
-        Game.status == "final",
-        Game.home_score.isnot(None),
-        Game.away_score.isnot(None),
-    ).all()
-    wins = losses = ties = 0
-    for g in final_games:
-        my_score = g.home_score if g.home_team_id == team_id else g.away_score
-        opp_score = g.away_score if g.home_team_id == team_id else g.home_score
-        if my_score > opp_score:
-            wins += 1
-        elif my_score < opp_score:
-            losses += 1
-        else:
-            ties += 1
-    team.wins = wins
-    team.losses = losses
-    team.ties = ties
-
-    # Update per-season record
-    if season_id:
-        season_games = [g for g in final_games if g.season_id == season_id]
-        sw = sl = st = 0
-        for g in season_games:
-            my_score = g.home_score if g.home_team_id == team_id else g.away_score
-            opp_score = g.away_score if g.home_team_id == team_id else g.home_score
-            if my_score > opp_score:
-                sw += 1
-            elif my_score < opp_score:
-                sl += 1
-            else:
-                st += 1
-        rec = db.query(TeamSeasonRecord).filter(
-            TeamSeasonRecord.team_id == team_id,
-            TeamSeasonRecord.season_id == season_id,
-        ).first()
-        if rec:
-            rec.wins = sw
-            rec.losses = sl
-            rec.ties = st
-        else:
-            db.add(TeamSeasonRecord(team_id=team_id, season_id=season_id, wins=sw, losses=sl, ties=st))
+from ..services.records import is_recordable_game, recompute_team_records
 
 router = APIRouter(tags=["games"])
 
@@ -102,15 +52,16 @@ def update_game(id: str, body: GameUpdate, db: Session = Depends(get_db)):
     g = db.get(Game, id)
     if not g:
         raise HTTPException(404, "Game not found")
+    was_recordable = is_recordable_game(g)
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(g, k, v)
     # Auto-finalize when both scores are provided and status wasn't explicitly set
     if body.home_score is not None and body.away_score is not None and "status" not in body.model_fields_set:
         g.status = "final"
     db.flush()
-    if g.status == "final":
-        _update_team_record(g.home_team_id, db, g.season_id)
-        _update_team_record(g.away_team_id, db, g.season_id)
+    if was_recordable or is_recordable_game(g):
+        recompute_team_records(db, g.home_team_id)
+        recompute_team_records(db, g.away_team_id)
     db.commit()
     db.refresh(g)
     return enrich_game(g, db)
@@ -121,6 +72,7 @@ def cancel_game(id: str, db: Session = Depends(get_db)):
     g = db.get(Game, id)
     if not g:
         raise HTTPException(404, "Game not found")
+    was_recordable = is_recordable_game(g)
     g.status = "cancelled"
     g.home_weekly_confirmed = False
     g.away_weekly_confirmed = False
@@ -139,6 +91,9 @@ def cancel_game(id: str, db: Session = Depends(get_db)):
         if slot:
             slot.status = "available"
             slot.booked_by_team_id = None
+    if was_recordable:
+        recompute_team_records(db, g.home_team_id)
+        recompute_team_records(db, g.away_team_id)
     db.commit()
     db.refresh(g)
     return enrich_game(g, db)

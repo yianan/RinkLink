@@ -11,6 +11,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import PageHeader from '../components/PageHeader';
+import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
 
 const clickableCard =
   'cursor-pointer text-left transition-shadow transition-colors hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:hover:border-slate-700 dark:focus-visible:ring-offset-slate-950';
@@ -48,14 +49,14 @@ function StatCard({ title, value, icon, color, onClick }: {
 }
 
 export default function HomePage() {
-  const { activeTeam } = useTeam();
-  const { activeSeason } = useSeason();
+  const { activeTeam, teams } = useTeam();
+  const { activeSeason, seasons } = useSeason();
   const navigate = useNavigate();
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
   const [proposals, setProposals] = useState<GameProposal[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [practices, setPractices] = useState<PracticeBooking[]>([]);
-  const [seasonRecord, setSeasonRecord] = useState<StandingsEntry | null>(null);
+  const [record, setRecord] = useState<StandingsEntry | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedError, setSeedError] = useState('');
   const today = new Date();
@@ -81,12 +82,42 @@ export default function HomePage() {
     if (activeSeason) {
       api.getStandings(activeSeason.id).then((standings) => {
         const myRecord = standings.find((s) => s.team_id === activeTeam.id) || null;
-        setSeasonRecord(myRecord);
+        setRecord(myRecord);
       });
-    } else {
-      setSeasonRecord(null);
+      return;
     }
-  }, [activeTeam, activeSeason]);
+
+    if (seasons.length === 0) {
+      setRecord(null);
+      return;
+    }
+
+    Promise.all(seasons.map((season) => api.getStandings(season.id))).then((seasonStandings) => {
+      const aggregate = seasonStandings.reduce(
+        (totals, standings) => {
+          const myRecord = standings.find((entry) => entry.team_id === activeTeam.id);
+          if (!myRecord) return totals;
+          totals.wins += myRecord.wins;
+          totals.losses += myRecord.losses;
+          totals.ties += myRecord.ties;
+          return totals;
+        },
+        { wins: 0, losses: 0, ties: 0 },
+      );
+      setRecord({
+        team_id: activeTeam.id,
+        team_name: activeTeam.name,
+        association_name: activeTeam.association_name,
+        age_group: activeTeam.age_group,
+        level: activeTeam.level,
+        wins: aggregate.wins,
+        losses: aggregate.losses,
+        ties: aggregate.ties,
+        points: 2 * aggregate.wins + aggregate.ties,
+        games_played: aggregate.wins + aggregate.losses + aggregate.ties,
+      });
+    });
+  }, [activeTeam, activeSeason, seasons]);
 
   const openDates = schedule.filter((e) => e.status === 'open');
   const upcomingPractices = practices.filter((p) => p.slot_date && p.slot_date >= todayStr);
@@ -99,6 +130,20 @@ export default function HomePage() {
     .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
     .slice(0, 5);
   if (!activeTeam) {
+    if (teams.length > 0) {
+      return (
+        <div className="space-y-6">
+          <PageHeader title="Dashboard" subtitle="Choose an active team to view its schedule, games, proposals, and practices." />
+          <Card className="mx-auto max-w-2xl p-6">
+            <div className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">No active team selected</div>
+            <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Use the team dropdown in the header to choose which team you want to manage.
+            </div>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <div className="mx-auto max-w-2xl pt-12">
         <Card className="p-6">
@@ -140,7 +185,7 @@ export default function HomePage() {
     <div className="space-y-6">
       <PageHeader
         title={`${activeTeam.name} Dashboard`}
-        subtitle={activeSeason ? `${activeSeason.name} season` : 'Quick stats and what needs your attention.'}
+        subtitle={activeSeason ? `${activeSeason.name} season` : 'All Seasons'}
         actions={(
           <Button
             type="button"
@@ -172,12 +217,12 @@ export default function HomePage() {
 
       <div className={cn(
         'grid grid-cols-1 gap-3 sm:grid-cols-2',
-        seasonRecord ? 'lg:grid-cols-5' : 'lg:grid-cols-4',
+        record ? 'lg:grid-cols-5' : 'lg:grid-cols-4',
       )}>
-        {seasonRecord && (
+        {record && (
           <StatCard
-            title="Season Record"
-            value={`${seasonRecord.wins}-${seasonRecord.losses}-${seasonRecord.ties}`}
+            title={activeSeason ? 'Season Record' : 'Overall Record'}
+            value={`${record.wins}-${record.losses}-${record.ties}`}
             icon={<Trophy className="h-4 w-4" />}
             color="text-fuchsia-700"
             onClick={() => navigate('/standings')}
@@ -251,7 +296,7 @@ export default function HomePage() {
                     </div>
                     <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{g.rink_name || g.location_label || 'No location yet'}</div>
                   </div>
-                  <Badge variant="outline">{g.status}</Badge>
+                  <Badge variant={getGameStatusVariant(g)}>{getGameStatusLabel(g)}</Badge>
                 </li>
               ))}
             </ul>
