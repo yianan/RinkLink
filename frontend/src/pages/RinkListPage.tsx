@@ -8,6 +8,8 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import PageHeader from '../components/PageHeader';
+import { cn } from '../lib/cn';
+import { accentLinkClass } from '../lib/uiClasses';
 
 const emptyForm = { name: '', address: '', city: '', state: '', zip_code: '', phone: '', contact_email: '', website: '' };
 
@@ -95,7 +97,7 @@ export default function RinkListPage() {
                         href={r.website}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-brand-700 hover:underline dark:text-cyan-300"
+                        className={accentLinkClass}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {r.name}
@@ -113,7 +115,7 @@ export default function RinkListPage() {
                     {r.contact_email ? (
                       <a
                         href={`mailto:${r.contact_email}`}
-                        className="break-all text-brand-700 hover:underline dark:text-cyan-300"
+                        className={cn('break-all', accentLinkClass)}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {r.contact_email}
@@ -189,7 +191,7 @@ export default function RinkListPage() {
                         href={r.website}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-brand-700 hover:underline dark:text-cyan-300"
+                        className={accentLinkClass}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {r.name}
@@ -207,7 +209,7 @@ export default function RinkListPage() {
                     {r.contact_email ? (
                       <a
                         href={`mailto:${r.contact_email}`}
-                        className="text-brand-700 hover:underline dark:text-cyan-300"
+                        className={accentLinkClass}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {r.contact_email}

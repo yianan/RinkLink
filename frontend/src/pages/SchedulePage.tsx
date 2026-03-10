@@ -14,7 +14,9 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import PageHeader from '../components/PageHeader';
+import SegmentedTabs from '../components/SegmentedTabs';
 import { cn } from '../lib/cn';
+import { accentActionClass } from '../lib/uiClasses';
 import { formatTimeHHMM } from '../lib/time';
 
 const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
@@ -100,23 +102,11 @@ export default function SchedulePage() {
         actions={<Button type="button" onClick={() => setAddOpen(true)}>Add Entry</Button>}
       />
 
-      <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
-        {['List View', 'Calendar View', 'Upload CSV'].map((label, i) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => setTab(i)}
-            className={cn(
-              'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === i
-                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100 dark:shadow-none dark:ring-1 dark:ring-slate-800/70'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        items={['List View', 'Calendar View', 'Upload CSV'].map((label, value) => ({ label, value }))}
+        value={tab}
+        onChange={setTab}
+      />
 
       {tab === 0 && (
         <Card className="overflow-hidden">
@@ -148,7 +138,7 @@ export default function SchedulePage() {
                         <button
                           type="button"
                           onClick={() => findOpponents(e.id)}
-                          className="flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-cyan-300"
+                          className={cn('flex items-center gap-1 text-xs', accentActionClass)}
                         >
                           <Search className="h-3 w-3" />
                           Find Opponents
@@ -360,7 +350,7 @@ export default function SchedulePage() {
                           <button
                             type="button"
                             onClick={() => findOpponents(e.id)}
-                            className="flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-cyan-300"
+                            className={cn('flex items-center gap-1 text-xs', accentActionClass)}
                           >
                             <Search className="h-3 w-3" />
                             Find Opponents

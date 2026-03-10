@@ -13,7 +13,9 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Textarea } from '../components/ui/Textarea';
 import PageHeader from '../components/PageHeader';
+import SegmentedTabs from '../components/SegmentedTabs';
 import { cn } from '../lib/cn';
+import { accentActionClass } from '../lib/uiClasses';
 import { formatTimeHHMM } from '../lib/time';
 
 const statusColors: Record<string, 'success' | 'warning' | 'info' | 'neutral'> = {
@@ -178,27 +180,17 @@ export default function IceSlotsPage() {
         <Alert variant="info">Select a team to book ice slots.</Alert>
       )}
 
-      <div className="grid w-full grid-cols-1 gap-1 rounded-xl bg-slate-100 p-1 sm:grid-cols-3 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
-        {[
+      <SegmentedTabs
+        className="grid w-full grid-cols-1 gap-1 sm:grid-cols-3"
+        itemClassName="w-full justify-center"
+        items={[
           { label: `List View (${slots.length})`, value: 0 },
           { label: 'Calendar View', value: 1 },
           { label: 'Upload CSV', value: 2 },
-        ].map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            onClick={() => setTab(t.value)}
-            className={cn(
-              'w-full rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === t.value
-                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100 dark:shadow-none dark:ring-1 dark:ring-slate-800/70'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
 
       {tab === 0 && (
         <div className="space-y-3">
@@ -255,7 +247,7 @@ export default function IceSlotsPage() {
                       <button
                         type="button"
                         onClick={() => openBooking(s)}
-                        className="text-xs font-medium text-brand-700 hover:underline dark:text-cyan-300"
+                        className={cn('text-xs', accentActionClass)}
                       >
                         Book
                       </button>

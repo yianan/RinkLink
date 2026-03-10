@@ -9,6 +9,8 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { useTeam } from '../context/TeamContext';
 import PageHeader from '../components/PageHeader';
+import { cn } from '../lib/cn';
+import { accentLinkClass } from '../lib/uiClasses';
 
 const emptyForm = { name: '', home_rink_address: '', city: '', state: '', zip_code: '' };
 
@@ -104,7 +106,7 @@ export default function AssociationListPage() {
                             key={t.id}
                             type="button"
                             onClick={() => openTeamDashboard(t)}
-                            className="block cursor-pointer truncate text-left text-xs font-medium text-brand-700 hover:text-brand-800 dark:text-cyan-300 dark:hover:text-cyan-200"
+                            className={cn('block cursor-pointer truncate text-left text-xs font-medium', accentLinkClass)}
                           >
                             {t.name}
                           </button>
@@ -163,7 +165,7 @@ export default function AssociationListPage() {
                             key={t.id}
                             type="button"
                             onClick={() => openTeamDashboard(t)}
-                            className="block cursor-pointer truncate text-left font-medium text-brand-700 hover:text-brand-800 dark:text-cyan-300 dark:hover:text-cyan-200"
+                            className={cn('block cursor-pointer truncate text-left font-medium', accentLinkClass)}
                           >
                             {t.name}
                           </button>

@@ -12,7 +12,7 @@ import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import PageHeader from '../components/PageHeader';
-import { cn } from '../lib/cn';
+import SegmentedTabs from '../components/SegmentedTabs';
 import { formatTimeHHMM, formatDate } from '../lib/time';
 
 const statusColors: Record<string, 'warning' | 'success' | 'danger' | 'neutral'> = {
@@ -146,23 +146,11 @@ export default function ProposalsPage() {
     <div className="space-y-4">
       <PageHeader title="Game Proposals" subtitle="Accept, decline, cancel, or request a reschedule." />
 
-      <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
-        {TABS.map((t, i) => (
-          <button
-            key={t.label}
-            type="button"
-            onClick={() => setTab(i)}
-            className={cn(
-              'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === i
-                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100 dark:shadow-none dark:ring-1 dark:ring-slate-800/70'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        items={TABS.map((t, i) => ({ label: t.label, value: i }))}
+        value={tab}
+        onChange={setTab}
+      />
 
       <Card className="overflow-hidden">
         <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">

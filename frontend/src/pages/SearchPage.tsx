@@ -13,6 +13,7 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import PageHeader from '../components/PageHeader';
+import SegmentedTabs from '../components/SegmentedTabs';
 import { cn } from '../lib/cn';
 import { formatTimeHHMM } from '../lib/time';
 
@@ -216,26 +217,14 @@ export default function SearchPage() {
     <div className="space-y-4">
       <PageHeader title="Find Opponents" subtitle="Search by open date or use auto-match suggestions." />
 
-      <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
-        {[
+      <SegmentedTabs
+        items={[
           { label: 'Search by Date', value: 0 },
           { label: `Auto-Matches (${autoMatches.length})`, value: 1 },
-        ].map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            onClick={() => setTab(t.value)}
-            className={cn(
-              'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === t.value
-                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100 dark:shadow-none dark:ring-1 dark:ring-slate-800/70'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
 
       {tab === 0 && (
         <div className="space-y-3">

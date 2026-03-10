@@ -58,7 +58,7 @@ export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: str
           className={cn(
             'rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors',
             dragOver
-              ? 'border-brand-500 bg-brand-50/60 dark:border-cyan-400 dark:bg-cyan-950/25'
+              ? 'border-[color:var(--app-accent-link)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_72%,white)] dark:bg-cyan-950/25'
               : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/20',
           )}
         >
@@ -105,7 +105,7 @@ export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: str
             <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-950/20 dark:focus:ring-cyan-400"
+                className="h-4 w-4 rounded border-slate-300 text-[color:var(--app-accent-link)] focus:ring-[color:var(--app-focus-ring)] dark:border-slate-700 dark:bg-slate-950/20"
                 checked={replaceExisting}
                 onChange={(e) => setReplaceExisting(e.target.checked)}
               />

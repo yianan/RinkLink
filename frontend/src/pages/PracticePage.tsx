@@ -11,7 +11,7 @@ import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import PageHeader from '../components/PageHeader';
-import { cn } from '../lib/cn';
+import SegmentedTabs from '../components/SegmentedTabs';
 import { formatTimeHHMM, formatDate } from '../lib/time';
 
 const today = new Date().toISOString().slice(0, 10);
@@ -114,23 +114,11 @@ export default function PracticePage() {
         actions={<Button type="button" onClick={openModal}>Book Practice</Button>}
       />
 
-      <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
-        {(['upcoming', 'history'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={cn(
-              'rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors',
-              tab === t
-                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100 dark:shadow-none dark:ring-1 dark:ring-slate-800/70'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
-            )}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        items={(['upcoming', 'history'] as const).map((value) => ({ label: value, value }))}
+        value={tab}
+        onChange={setTab}
+      />
 
       <Card className="overflow-hidden">
         <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">

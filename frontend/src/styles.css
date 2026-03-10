@@ -31,6 +31,11 @@
   --app-border-strong: rgba(148, 163, 184, 0.34);
   --app-focus-ring: rgba(34, 211, 238, 0.5);
   --app-tooltip-bg: rgba(15, 23, 42, 0.92);
+  --app-overlay: rgba(2, 6, 23, 0.4);
+  --app-disabled-surface: rgba(226, 232, 240, 0.92);
+  --app-disabled-text: rgba(100, 116, 139, 1);
+  --app-accent-link: rgba(109, 40, 217, 1);
+  --app-accent-link-hover: rgba(76, 29, 149, 1);
   --app-range-track-color: rgba(226, 232, 240, 1);
   --app-range-fill-color: rgba(124, 58, 237, 1);
   --app-range-progress: 50%;
@@ -49,6 +54,11 @@ html.dark {
   --app-border-subtle: rgba(51, 65, 85, 0.55);
   --app-border-strong: rgba(71, 85, 105, 0.7);
   --app-tooltip-bg: rgba(2, 6, 23, 0.96);
+  --app-overlay: rgba(2, 6, 23, 0.58);
+  --app-disabled-surface: rgba(30, 41, 59, 0.9);
+  --app-disabled-text: rgba(148, 163, 184, 1);
+  --app-accent-link: rgba(103, 232, 249, 1);
+  --app-accent-link-hover: rgba(165, 243, 252, 1);
   --app-range-track-color: rgba(51, 65, 85, 1);
   --app-range-fill-color: rgba(34, 211, 238, 1);
 }

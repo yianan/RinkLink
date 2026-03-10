@@ -12,7 +12,9 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import PageHeader from '../components/PageHeader';
+import SegmentedTabs from '../components/SegmentedTabs';
 import { cn } from '../lib/cn';
+import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
 import { formatDate, formatTimeHHMM } from '../lib/time';
 
 const GAME_TYPES = [
@@ -37,15 +39,6 @@ const statusColors: Record<string, 'info' | 'warning' | 'success' | 'neutral'> =
 
 function digitsOnly(value: string) {
   return value.replace(/\D+/g, '');
-}
-
-function getStatusLabel(game: Game) {
-  if (game.status === 'confirmed') return 'Both confirmed';
-  if (game.status === 'final') return 'Final';
-  if (game.status === 'cancelled') return 'Cancelled';
-  if (game.home_weekly_confirmed) return 'Home confirmed';
-  if (game.away_weekly_confirmed) return 'Away confirmed';
-  return 'Scheduled';
 }
 
 export default function GamesPage() {
@@ -134,27 +127,15 @@ export default function GamesPage() {
     <div className="space-y-4">
       <PageHeader title="Games" subtitle="Accepted non-league games with scoresheets and weekly confirmation." />
 
-      <div className="inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900/50 dark:ring-1 dark:ring-slate-800/60">
-        {[
+      <SegmentedTabs
+        items={[
           { label: `Upcoming (${counts.upcoming})`, value: 0 },
           { label: `Past (${counts.past})`, value: 1 },
           { label: `All (${counts.all})`, value: 2 },
-        ].map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            onClick={() => setTab(t.value)}
-            className={cn(
-              'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === t.value
-                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950/40 dark:text-slate-100 dark:shadow-none dark:ring-1 dark:ring-slate-800/70'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
 
       {error && <Alert variant="error">{error}</Alert>}
 
@@ -171,7 +152,7 @@ export default function GamesPage() {
             const opponent = isHome ? g.away_team_name : g.home_team_name;
             const edit = scoreEdits[g.id] || { home: '', away: '' };
             const gameTypeLabel = GAME_TYPES.find((t) => t.value === g.game_type)?.label ?? g.game_type;
-            const statusLabel = getStatusLabel(g);
+            const statusLabel = getGameStatusLabel(g);
 
             return (
               <div key={g.id} className="px-4 py-4">
@@ -186,7 +167,7 @@ export default function GamesPage() {
                         {formatTimeHHMM(g.time) || 'Time TBD'}
                       </div>
                     </div>
-                    <Badge variant={statusColors[g.status] || 'neutral'}>
+                    <Badge variant={getGameStatusVariant(g)}>
                       {statusLabel}
                     </Badge>
                   </div>
@@ -263,7 +244,7 @@ export default function GamesPage() {
                 const isHome = activeTeam.id === g.home_team_id;
                 const opponent = isHome ? g.away_team_name : g.home_team_name;
                 const edit = scoreEdits[g.id] || { home: '', away: '' };
-                const statusLabel = getStatusLabel(g);
+                const statusLabel = getGameStatusLabel(g);
 
                 return (
                   <tr
@@ -340,7 +321,7 @@ export default function GamesPage() {
                     </td>
                     <td className="px-3 py-3">
                       <Badge
-                        variant={statusColors[g.status] || 'neutral'}
+                        variant={getGameStatusVariant(g)}
                         className="px-2 py-0.5 text-[11px]"
                       >
                         {statusLabel}

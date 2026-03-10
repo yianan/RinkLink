@@ -64,7 +64,7 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
           className={cn(
             'rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors',
             dragOver
-              ? 'border-brand-500 bg-brand-50/60 dark:border-cyan-400 dark:bg-cyan-950/25'
+              ? 'border-[color:var(--app-accent-link)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_72%,white)] dark:bg-cyan-950/25'
               : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/20',
           )}
         >

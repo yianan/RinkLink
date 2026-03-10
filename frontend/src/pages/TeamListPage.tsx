@@ -10,6 +10,7 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import PageHeader from '../components/PageHeader';
+import { accentLinkClass } from '../lib/uiClasses';
 
 const emptyForm = {
   association_id: '', name: '', age_group: '', level: '',
@@ -106,7 +107,7 @@ export default function TeamListPage() {
                       {t.manager_email ? (
                         <a
                           href={`mailto:${t.manager_email}`}
-                          className="text-brand-700 hover:underline dark:text-cyan-300 dark:hover:text-cyan-200"
+                          className={accentLinkClass}
                         >
                           {t.manager_name || 'Email'}
                         </a>

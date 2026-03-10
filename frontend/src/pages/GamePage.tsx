@@ -42,6 +42,8 @@ import { Input } from '../components/ui/Input';
 import PageHeader from '../components/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
+import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
+import { accentActionClass } from '../lib/uiClasses';
 import { formatTimeHHMM } from '../lib/time';
 
 function formatDateLabel(d: string) {
@@ -57,15 +59,6 @@ function mapsQueryUrl(query: string) {
   url.searchParams.set('api', '1');
   url.searchParams.set('query', query);
   return url.toString();
-}
-
-function getStatusLabel(game: Game) {
-  if (game.status === 'confirmed') return 'Both confirmed';
-  if (game.status === 'final') return 'Final';
-  if (game.status === 'cancelled') return 'Cancelled';
-  if (game.home_weekly_confirmed) return 'Home confirmed';
-  if (game.away_weekly_confirmed) return 'Away confirmed';
-  return 'Scheduled';
 }
 
 function digitsOnly(value: string) {
@@ -273,7 +266,7 @@ export default function GamePage() {
   const restaurantsUrl = rinkLabel ? mapsQueryUrl(`restaurants near ${rinkLabel}`) : null;
   const thingsUrl = rinkLabel ? mapsQueryUrl(`things to do near ${rinkLabel}`) : null;
   const directionsUrl = rinkLabel ? mapsQueryUrl(rinkLabel) : null;
-  const statusLabel = getStatusLabel(game);
+  const statusLabel = getGameStatusLabel(game);
 
   const thisWeekStart = (() => {
     const d = new Date();
@@ -298,7 +291,7 @@ export default function GamePage() {
         subtitle={(
           <>
             {formatDateLabel(game.date)} {formatTimeHHMM(game.time) || ''} • {homeName} vs {awayName}
-            {isThisWeek && <span className="ml-2 text-xs font-medium text-brand-700 dark:text-cyan-300">This week</span>}
+            {isThisWeek && <span className={`ml-2 text-xs font-medium ${accentActionClass}`}>This week</span>}
           </>
         )}
         actions={(
@@ -328,7 +321,7 @@ export default function GamePage() {
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <Badge variant={game.home_weekly_confirmed ? 'success' : 'outline'}>{homeName} confirmed</Badge>
               <Badge variant={game.away_weekly_confirmed ? 'success' : 'outline'}>{awayName} confirmed</Badge>
-              <Badge variant="outline">{statusLabel}</Badge>
+              <Badge variant={getGameStatusVariant(game)}>{statusLabel}</Badge>
             </div>
             {rinkLabel ? (
               <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
