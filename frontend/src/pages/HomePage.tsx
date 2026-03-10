@@ -185,7 +185,7 @@ export default function HomePage() {
     <div className="space-y-6">
       <PageHeader
         title={`${activeTeam.name} Dashboard`}
-        subtitle={activeSeason ? `${activeSeason.name} season` : 'All Seasons'}
+        subtitle={activeSeason ? `${activeSeason.name} Season` : 'All Seasons'}
         actions={(
           <Button
             type="button"

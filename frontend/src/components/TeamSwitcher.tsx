@@ -1,9 +1,16 @@
 import { useTeam } from '../context/TeamContext';
 import { Select } from './ui/Select';
+import { useLocation } from 'react-router-dom';
+
+const HIDE_TEAM_SWITCHER_PATHS = ['/associations', '/rinks'];
 
 export default function TeamSwitcher() {
   const { teams, activeTeam, setActiveTeam, loading } = useTeam();
+  const location = useLocation();
   const showPlaceholder = loading || teams.length === 0;
+  const hideTeamSwitcher = HIDE_TEAM_SWITCHER_PATHS.some((path) => location.pathname.startsWith(path));
+
+  if (hideTeamSwitcher) return null;
 
   return (
     <div className="flex items-center gap-2">

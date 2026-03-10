@@ -26,19 +26,24 @@ function ToggleChip({ label, active, onClick }: { label: string; active: boolean
 }
 
 export default function StandingsPage() {
-  const { activeSeason, seasons } = useSeason();
+  const { activeSeason, seasons, setActiveSeason } = useSeason();
+  const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const [allStandings, setAllStandings] = useState<StandingsEntry[]>([]);
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<Set<string>>(new Set());
   const [selectedLevels, setSelectedLevels] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!activeSeason) {
+    if (!activeSeason && effectiveSeason) {
+      setActiveSeason(effectiveSeason);
+      return;
+    }
+    if (!effectiveSeason) {
       setAllStandings([]);
       return;
     }
     setLoading(true);
-    api.getStandings(activeSeason.id)
+    api.getStandings(effectiveSeason.id)
       .then((data) => {
         setAllStandings(data);
         // Select all by default
@@ -46,7 +51,7 @@ export default function StandingsPage() {
         setSelectedLevels(new Set(data.map((s) => s.level)));
       })
       .finally(() => setLoading(false));
-  }, [activeSeason]);
+  }, [activeSeason, effectiveSeason, setActiveSeason]);
 
   const ageGroups = useMemo(() => [...new Set(allStandings.map((s) => s.age_group))].sort(), [allStandings]);
   const levels = useMemo(() => [...new Set(allStandings.map((s) => s.level))].sort(), [allStandings]);
@@ -73,22 +78,18 @@ export default function StandingsPage() {
     );
   }, [allStandings, selectedAgeGroups, selectedLevels]);
 
-  if (!activeSeason) {
+  if (!effectiveSeason) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Standings" subtitle="Select a season from the header to view standings." />
-        <Alert variant="info">
-          {seasons.length === 0
-            ? 'No seasons have been created yet. Create one from the Seasons page.'
-            : 'Select a season from the dropdown in the header to view standings.'}
-        </Alert>
+        <PageHeader title="Standings" subtitle="No season is available yet." />
+        <Alert variant="info">No seasons are available yet.</Alert>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Standings" subtitle={`${activeSeason.name} season standings.`} />
+      <PageHeader title="Standings" subtitle={`${effectiveSeason.name} Season Standings.`} />
 
       {allStandings.length > 0 && (
         <div className="space-y-2">

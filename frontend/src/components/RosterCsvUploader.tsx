@@ -7,7 +7,17 @@ import { Alert } from './ui/Alert';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 
-export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: string; onConfirmed: () => void }) {
+export default function RosterCsvUploader({
+  teamId,
+  seasonId,
+  seasonName,
+  onConfirmed,
+}: {
+  teamId: string;
+  seasonId: string;
+  seasonName: string;
+  onConfirmed: () => void;
+}) {
   const [preview, setPreview] = useState<PlayerUploadPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,7 +41,7 @@ export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: str
     if (!preview) return;
     setLoading(true);
     try {
-      await api.confirmRosterUpload(teamId, preview.entries, replaceExisting);
+      await api.confirmRosterUpload(teamId, seasonId, preview.entries, replaceExisting);
       setPreview(null);
       onConfirmed();
     } catch (e) {
@@ -99,7 +109,9 @@ export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: str
               <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 Preview <span className="text-slate-500 dark:text-slate-400">({preview.entries.length} player(s))</span>
               </div>
-              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Confirm to import this roster.</div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                Confirm to import this roster into the {seasonName} season.
+              </div>
             </div>
 
             <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
@@ -109,7 +121,7 @@ export default function RosterCsvUploader({ teamId, onConfirmed }: { teamId: str
                 checked={replaceExisting}
                 onChange={(e) => setReplaceExisting(e.target.checked)}
               />
-              Replace existing roster
+              Replace existing {seasonName} roster
             </label>
           </div>
 

@@ -12,11 +12,12 @@ from ..database import Base
 class Player(Base):
     __tablename__ = "players"
     __table_args__ = (
-        Index("ix_players_team_last_first", "team_id", "last_name", "first_name"),
+        Index("ix_players_team_season_last_first", "team_id", "season_id", "last_name", "first_name"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     team_id: Mapped[str] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
+    season_id: Mapped[str] = mapped_column(ForeignKey("seasons.id", ondelete="CASCADE"), nullable=False)
 
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -31,4 +32,4 @@ class Player(Base):
     )
 
     team = relationship("Team", foreign_keys=[team_id])
-
+    season = relationship("Season", foreign_keys=[season_id])

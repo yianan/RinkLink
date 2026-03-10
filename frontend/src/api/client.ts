@@ -37,7 +37,10 @@ export const api = {
     request<void>(`/teams/${id}`, { method: 'DELETE' }),
 
   // Players / Roster
-  getPlayers: (teamId: string) => request<import('../types').Player[]>(`/teams/${teamId}/players`),
+  getPlayers: (teamId: string, params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<import('../types').Player[]>(`/teams/${teamId}/players${qs}`);
+  },
   createPlayer: (teamId: string, data: Partial<import('../types').Player>) =>
     request<import('../types').Player>(`/teams/${teamId}/players`, { method: 'POST', body: JSON.stringify(data) }),
   updatePlayer: (id: string, data: Partial<import('../types').Player>) =>
@@ -51,9 +54,14 @@ export const api = {
     if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
     return res.json() as Promise<import('../types').PlayerUploadPreview>;
   },
-  confirmRosterUpload: (teamId: string, entries: import('../types').PlayerUploadRow[], replace_existing: boolean) =>
+  confirmRosterUpload: (
+    teamId: string,
+    season_id: string,
+    entries: import('../types').PlayerUploadRow[],
+    replace_existing: boolean,
+  ) =>
     request<import('../types').Player[]>(`/teams/${teamId}/players/confirm-upload`, {
-      method: 'POST', body: JSON.stringify({ entries, replace_existing }),
+      method: 'POST', body: JSON.stringify({ season_id, entries, replace_existing }),
     }),
 
   // Schedule
@@ -216,17 +224,8 @@ export const api = {
     request<void>(`/practice-bookings/${bookingId}`, { method: 'DELETE' }),
 
   // Seasons
-  getSeasons: (params: Record<string, string>) => {
-    const qs = new URLSearchParams(params).toString();
-    return request<import('../types').Season[]>(`/seasons?${qs}`);
-  },
+  getSeasons: () => request<import('../types').Season[]>('/seasons'),
   getSeason: (id: string) => request<import('../types').Season>(`/seasons/${id}`),
-  createSeason: (data: Partial<import('../types').Season>) =>
-    request<import('../types').Season>('/seasons', { method: 'POST', body: JSON.stringify(data) }),
-  updateSeason: (id: string, data: Partial<import('../types').Season>) =>
-    request<import('../types').Season>(`/seasons/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteSeason: (id: string) =>
-    request<void>(`/seasons/${id}`, { method: 'DELETE' }),
   getStandings: (seasonId: string, params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return request<import('../types').StandingsEntry[]>(`/seasons/${seasonId}/standings${qs}`);

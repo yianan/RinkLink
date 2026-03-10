@@ -32,12 +32,14 @@ def _require_team_in_game(team_id: str, g: Game):
         raise HTTPException(400, "Team is not part of this game")
 
 
-def _require_player_on_team(player_id: str, team_id: str, db: Session):
+def _require_player_on_team(player_id: str, team_id: str, game: Game, db: Session):
     p = db.get(Player, player_id)
     if not p:
         raise HTTPException(400, "Player not found")
     if p.team_id != team_id:
         raise HTTPException(400, "Player does not belong to team")
+    if game.season_id and p.season_id != game.season_id:
+        raise HTTPException(400, "Player is not on this team's roster for the game's season")
 
 
 @router.get("/games/{game_id}/scoresheet", response_model=GameScoresheetOut)
@@ -63,7 +65,7 @@ def upsert_player_stats(game_id: str, body: UpsertPlayerStats, db: Session = Dep
 
     for s in body.stats:
         _require_team_in_game(s.team_id, g)
-        _require_player_on_team(s.player_id, s.team_id, db)
+        _require_player_on_team(s.player_id, s.team_id, g, db)
 
         existing = (
             db.query(GamePlayerStat)
@@ -103,7 +105,7 @@ def create_penalty(game_id: str, body: GamePenaltyCreate, db: Session = Depends(
         raise HTTPException(404, "Game not found")
     _require_team_in_game(body.team_id, g)
     if body.player_id:
-        _require_player_on_team(body.player_id, body.team_id, db)
+        _require_player_on_team(body.player_id, body.team_id, g, db)
 
     p = GamePenalty(
         game_id=game_id,
@@ -135,7 +137,7 @@ def upsert_goalie_stats(game_id: str, body: UpsertGoalieStats, db: Session = Dep
 
     for s in body.stats:
         _require_team_in_game(s.team_id, g)
-        _require_player_on_team(s.player_id, s.team_id, db)
+        _require_player_on_team(s.player_id, s.team_id, g, db)
 
         existing = (
             db.query(GameGoalieStat)
@@ -197,4 +199,3 @@ def sign(game_id: str, body: GameSignatureCreate, db: Session = Depends(get_db))
     db.commit()
     db.refresh(s)
     return s
-

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CalendarClock, XCircle } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
+import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
 import { GameProposal, IceSlot, Rink } from '../types';
 import { Alert } from '../components/ui/Alert';
@@ -55,6 +56,8 @@ function dedupeAcceptedProposals(ps: GameProposal[]) {
 
 export default function ProposalsPage() {
   const { activeTeam } = useTeam();
+  const { activeSeason, seasons } = useSeason();
+  const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const [tab, setTab] = useState(0);
   const [proposals, setProposals] = useState<GameProposal[]>([]);
   const [rinks, setRinks] = useState<Rink[]>([]);
@@ -69,18 +72,23 @@ export default function ProposalsPage() {
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
 
   const load = () => {
-    if (!activeTeam) return;
+    if (!activeTeam || !effectiveSeason) return;
     const t = TABS[tab] || TABS[0];
     const params: Record<string, string> = { direction: t.direction };
     if (t.status) params.status = t.status;
     api.getProposals(activeTeam.id, params).then((ps) => {
-      setProposals(t.status === 'accepted' ? dedupeAcceptedProposals(ps) : ps);
+      const seasonScoped = ps.filter(
+        (proposal) =>
+          proposal.proposed_date >= effectiveSeason.start_date &&
+          proposal.proposed_date <= effectiveSeason.end_date,
+      );
+      setProposals(t.status === 'accepted' ? dedupeAcceptedProposals(seasonScoped) : seasonScoped);
     });
   };
   useEffect(() => {
     load();
     api.getRinks().then(setRinks);
-  }, [activeTeam, tab]); // eslint-disable-line
+  }, [activeTeam, effectiveSeason, tab]); // eslint-disable-line
 
   const handleAccept = async (id: string) => {
     await api.acceptProposal(id);
@@ -138,6 +146,9 @@ export default function ProposalsPage() {
 
   if (!activeTeam) {
     return <Alert variant="info">Select a team to view proposals.</Alert>;
+  }
+  if (!effectiveSeason) {
+    return <Alert variant="info">No season is available yet.</Alert>;
   }
 
   const tabDef = TABS[tab] || TABS[0];

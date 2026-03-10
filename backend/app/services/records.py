@@ -80,7 +80,7 @@ def recompute_team_records(db: Session, team_id: str) -> None:
     team.losses = losses
     team.ties = ties
 
-    seasons = db.query(Season).filter(Season.association_id == team.association_id).all()
+    seasons = db.query(Season).all()
     existing_records = {
         record.season_id: record
         for record in db.query(TeamSeasonRecord).filter(TeamSeasonRecord.team_id == team_id).all()

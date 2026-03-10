@@ -104,8 +104,8 @@ export default function GamePage() {
         });
 
         const [hp, ap] = await Promise.all([
-          api.getPlayers(ss.game.home_team_id),
-          api.getPlayers(ss.game.away_team_id),
+          api.getPlayers(ss.game.home_team_id, ss.game.season_id ? { season_id: ss.game.season_id } : undefined),
+          api.getPlayers(ss.game.away_team_id, ss.game.season_id ? { season_id: ss.game.season_id } : undefined),
         ]);
         setHomePlayers(hp);
         setAwayPlayers(ap);

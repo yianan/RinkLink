@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 
 class PlayerCreate(BaseModel):
+    season_id: str
     first_name: str
     last_name: str
     jersey_number: int | None = None
@@ -22,6 +23,7 @@ class PlayerUpdate(BaseModel):
 class PlayerOut(BaseModel):
     id: str
     team_id: str
+    season_id: str
     first_name: str
     last_name: str
     jersey_number: int | None
@@ -45,6 +47,6 @@ class PlayerUploadPreview(BaseModel):
 
 
 class PlayerConfirmUpload(BaseModel):
+    season_id: str
     entries: list[PlayerUploadRow]
     replace_existing: bool = False
-

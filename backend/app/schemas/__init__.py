@@ -35,7 +35,7 @@ from .rink import (
     IceSlotUploadPreview, IceSlotConfirmUpload,
 )
 from .practice_booking import PracticeBookingCreate, PracticeBookingOut
-from .season import SeasonCreate, SeasonUpdate, SeasonOut, TeamSeasonRecordOut, StandingsEntry
+from .season import SeasonOut, TeamSeasonRecordOut, StandingsEntry
 
 __all__ = [
     "AssociationCreate", "AssociationUpdate", "AssociationOut",
@@ -55,5 +55,5 @@ __all__ = [
     "IceSlotCreate", "IceSlotUpdate", "IceSlotOut",
     "IceSlotUploadPreview", "IceSlotConfirmUpload",
     "PracticeBookingCreate", "PracticeBookingOut",
-    "SeasonCreate", "SeasonUpdate", "SeasonOut", "TeamSeasonRecordOut", "StandingsEntry",
+    "SeasonOut", "TeamSeasonRecordOut", "StandingsEntry",
 ]

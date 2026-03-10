@@ -17,7 +17,7 @@ import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
 import { cn } from '../lib/cn';
 import { accentActionClass } from '../lib/uiClasses';
-import { formatTimeHHMM } from '../lib/time';
+import { formatMonthYear, formatTimeHHMM, formatWeekdayDate } from '../lib/time';
 
 const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
   open: 'success',
@@ -27,20 +27,21 @@ const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> =
 
 export default function SchedulePage() {
   const { activeTeam } = useTeam();
-  const { activeSeason } = useSeason();
+  const { activeSeason, seasons } = useSeason();
+  const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const navigate = useNavigate();
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState<'upcoming' | 'past' | 'calendar' | 'upload'>('upcoming');
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({ date: '', time: '', entry_type: 'home' });
 
   const load = () => {
     if (!activeTeam) return;
     const params: Record<string, string> = {};
-    if (activeSeason) params.season_id = activeSeason.id;
+    if (effectiveSeason) params.season_id = effectiveSeason.id;
     api.getSchedule(activeTeam.id, params).then(setEntries);
   };
-  useEffect(() => { load(); }, [activeTeam, activeSeason]); // eslint-disable-line
+  useEffect(() => { load(); }, [activeTeam, effectiveSeason]); // eslint-disable-line
 
   const handleAdd = async () => {
     if (!activeTeam) return;
@@ -86,10 +87,29 @@ export default function SchedulePage() {
   if (!activeTeam) {
     return <Alert variant="info">Select a team to view the schedule.</Alert>;
   }
+  if (!effectiveSeason) {
+    return <Alert variant="info">No season is available yet.</Alert>;
+  }
+
+  const todayLocal = new Date();
+  const todayStr = [
+    todayLocal.getFullYear(),
+    String(todayLocal.getMonth() + 1).padStart(2, '0'),
+    String(todayLocal.getDate()).padStart(2, '0'),
+  ].join('-');
+
+  const sortedEntries = [...entries].sort((a, b) => {
+    const dateCompare = a.date.localeCompare(b.date);
+    if (dateCompare !== 0) return dateCompare;
+    return (a.time || '').localeCompare(b.time || '');
+  });
+  const upcomingEntries = sortedEntries.filter((entry) => entry.date >= todayStr);
+  const pastEntries = [...sortedEntries.filter((entry) => entry.date < todayStr)].reverse();
+  const displayedEntries = tab === 'past' ? pastEntries : upcomingEntries;
 
   // Calendar view: group by month
   const byMonth: Record<string, ScheduleEntry[]> = {};
-  entries.forEach((e) => {
+  sortedEntries.forEach((e) => {
     const month = e.date.substring(0, 7);
     (byMonth[month] ??= []).push(e);
   });
@@ -98,20 +118,25 @@ export default function SchedulePage() {
     <div className="space-y-4">
       <PageHeader
         title={`${activeTeam.name} Schedule`}
-        subtitle="Track open dates and confirmed games."
+        subtitle="Manage upcoming dates, review past dates, and scan the full season calendar."
         actions={<Button type="button" onClick={() => setAddOpen(true)}>Add Entry</Button>}
       />
 
       <SegmentedTabs
-        items={['List View', 'Calendar View', 'Upload CSV'].map((label, value) => ({ label, value }))}
+        items={[
+          { label: 'Upcoming Dates', value: 'upcoming' as const },
+          { label: 'Past Dates', value: 'past' as const },
+          { label: 'Season Calendar', value: 'calendar' as const },
+          { label: 'Upload CSV', value: 'upload' as const },
+        ]}
         value={tab}
         onChange={setTab}
       />
 
-      {tab === 0 && (
+      {(tab === 'upcoming' || tab === 'past') && (
         <Card className="overflow-hidden">
           <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
-            {entries.map((e) => (
+            {displayedEntries.map((e) => (
               <div key={e.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -132,74 +157,77 @@ export default function SchedulePage() {
                         {e.notes ? <div className="text-xs text-slate-500 dark:text-slate-400">{e.notes}</div> : null}
                       </div>
                     )}
-
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {e.status === 'open' && e.time && !e.blocked && (
-                        <button
-                          type="button"
-                          onClick={() => findOpponents(e.id)}
-                          className={cn('flex items-center gap-1 text-xs', accentActionClass)}
-                        >
-                          <Search className="h-3 w-3" />
-                          Find Opponents
-                        </button>
-                      )}
-                      {e.status === 'open' && (
-                        <button
-                          type="button"
-                          onClick={() => toggleBlocked(e)}
-                          className={cn(
-                            'flex items-center gap-1 text-xs font-medium hover:underline',
-                            e.blocked
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-slate-500 dark:text-slate-400',
-                          )}
-                        >
-                          {e.blocked ? <Eye className="h-3 w-3" /> : <Ban className="h-3 w-3" />}
-                          {e.blocked ? 'Unblock' : 'Block'}
-                        </button>
-                      )}
-                      {(e.status === 'scheduled' || e.status === 'confirmed') && e.game_id && (
-                        <>
-                          {!e.weekly_confirmed && (
-                            <button
-                              type="button"
-                              onClick={() => handleConfirm(e)}
-                              className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
-                            >
-                              <CheckCircle2 className="h-3 w-3" />
-                              Confirm
-                            </button>
-                          )}
-                          {e.weekly_confirmed && (
-                            <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Confirmed
-                            </span>
-                          )}
+                    {tab === 'upcoming' && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {e.status === 'open' && e.time && !e.blocked && (
                           <button
                             type="button"
-                            onClick={() => handleCancelGame(e)}
-                            className="flex items-center gap-1 text-xs font-medium text-rose-600 hover:underline dark:text-rose-400"
+                            onClick={() => findOpponents(e.id)}
+                            className={cn('flex items-center gap-1 text-xs', accentActionClass)}
                           >
-                            <XCircle className="h-3 w-3" />
-                            Cancel Game
+                            <Search className="h-3 w-3" />
+                            Find Opponents
                           </button>
-                        </>
-                      )}
-                    </div>
+                        )}
+                        {e.status === 'open' && (
+                          <button
+                            type="button"
+                            onClick={() => toggleBlocked(e)}
+                            className={cn(
+                              'flex items-center gap-1 text-xs font-medium hover:underline',
+                              e.blocked
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-slate-500 dark:text-slate-400',
+                            )}
+                          >
+                            {e.blocked ? <Eye className="h-3 w-3" /> : <Ban className="h-3 w-3" />}
+                            {e.blocked ? 'Unblock' : 'Block'}
+                          </button>
+                        )}
+                        {(e.status === 'scheduled' || e.status === 'confirmed') && e.game_id && (
+                          <>
+                            {!e.weekly_confirmed && (
+                              <button
+                                type="button"
+                                onClick={() => handleConfirm(e)}
+                                className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                                Confirm
+                              </button>
+                            )}
+                            {e.weekly_confirmed && (
+                              <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Confirmed
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleCancelGame(e)}
+                              className="flex items-center gap-1 text-xs font-medium text-rose-600 hover:underline dark:text-rose-400"
+                            >
+                              <XCircle className="h-3 w-3" />
+                              Cancel Game
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete">
-                    <Trash2 className="h-4 w-4 text-rose-600" />
-                  </Button>
+                  {tab === 'upcoming' ? (
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete">
+                      <Trash2 className="h-4 w-4 text-rose-600" />
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             ))}
 
-            {entries.length === 0 && (
+            {displayedEntries.length === 0 && (
               <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                No schedule entries. Upload a CSV or add entries manually.
+                {tab === 'past' ? 'No past schedule entries for this season.' : 'No upcoming schedule entries for this season.'}
               </div>
             )}
           </div>
@@ -215,11 +243,11 @@ export default function SchedulePage() {
                   <th className="px-4 py-3">Opponent</th>
                   <th className="px-4 py-3">Location</th>
                   <th className="px-4 py-3">Notes</th>
-                  <th className="px-4 py-3 text-right"></th>
+                  {tab === 'upcoming' ? <th className="px-4 py-3 text-right"></th> : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
-                {entries.map((e) => (
+                {displayedEntries.map((e) => (
                   <tr key={e.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{e.date}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatTimeHHMM(e.time) || '-'}</td>
@@ -234,72 +262,74 @@ export default function SchedulePage() {
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{e.opponent_name || '-'}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{e.location || '-'}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{e.notes || '-'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        {e.status === 'open' && e.time && !e.blocked && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => findOpponents(e.id)}
-                            aria-label="Find opponents"
-                            title="Find Opponents"
-                          >
-                            <Search className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {e.status === 'open' && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => toggleBlocked(e)}
-                            aria-label={e.blocked ? 'Unblock' : 'Block'}
-                            title={e.blocked ? 'Unblock' : 'Block'}
-                          >
-                            {e.blocked
-                              ? <Eye className="h-4 w-4 text-amber-500" />
-                              : <Ban className="h-4 w-4 text-slate-400" />}
-                          </Button>
-                        )}
-                        {(e.status === 'scheduled' || e.status === 'confirmed') && e.game_id && (
-                          <>
-                            {!e.weekly_confirmed && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleConfirm(e)}
-                                title="Confirm Game"
-                                aria-label="Confirm Game"
-                              >
-                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                              </Button>
-                            )}
+                    {tab === 'upcoming' ? (
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          {e.status === 'open' && e.time && !e.blocked && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => findOpponents(e.id)}
+                              aria-label="Find opponents"
+                              title="Find Opponents"
+                            >
+                              <Search className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {e.status === 'open' && (
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleCancelGame(e)}
-                              title="Cancel Game"
-                              aria-label="Cancel Game"
+                              onClick={() => toggleBlocked(e)}
+                              aria-label={e.blocked ? 'Unblock' : 'Block'}
+                              title={e.blocked ? 'Unblock' : 'Block'}
                             >
-                              <XCircle className="h-4 w-4 text-rose-500" />
+                              {e.blocked
+                                ? <Eye className="h-4 w-4 text-amber-500" />
+                                : <Ban className="h-4 w-4 text-slate-400" />}
                             </Button>
-                          </>
-                        )}
-                        <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete">
-                          <Trash2 className="h-4 w-4 text-rose-600" />
-                        </Button>
-                      </div>
-                    </td>
+                          )}
+                          {(e.status === 'scheduled' || e.status === 'confirmed') && e.game_id && (
+                            <>
+                              {!e.weekly_confirmed && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleConfirm(e)}
+                                  title="Confirm Game"
+                                  aria-label="Confirm Game"
+                                >
+                                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                </Button>
+                              )}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleCancelGame(e)}
+                                title="Cancel Game"
+                                aria-label="Cancel Game"
+                              >
+                                <XCircle className="h-4 w-4 text-rose-500" />
+                              </Button>
+                            </>
+                          )}
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete">
+                            <Trash2 className="h-4 w-4 text-rose-600" />
+                          </Button>
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
 
-                {entries.length === 0 && (
+                {displayedEntries.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                      No schedule entries. Upload a CSV or add entries manually.
+                    <td colSpan={tab === 'upcoming' ? 8 : 7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                      {tab === 'past' ? 'No past schedule entries for this season.' : 'No upcoming schedule entries for this season.'}
                     </td>
                   </tr>
                 )}
@@ -309,19 +339,19 @@ export default function SchedulePage() {
         </Card>
       )}
 
-      {tab === 1 && (
+      {tab === 'calendar' && (
         <div className="space-y-4">
           {Object.entries(byMonth).sort().map(([month, monthEntries]) => (
-            <div key={month} className="space-y-2">
+              <div key={month} className="space-y-2">
               <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                {new Date(month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                {formatMonthYear(month) || month}
               </div>
               <div className="flex flex-wrap gap-2">
                 {monthEntries.map((e) => (
                   <Card
                     key={e.id}
                     className={cn(
-                      'w-[160px] p-3',
+                      'w-[184px] p-3',
                       e.status === 'open'
                         ? e.entry_type === 'home'
                           ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/25'
@@ -330,11 +360,7 @@ export default function SchedulePage() {
                     )}
                   >
                     <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {new Date(e.date + 'T00:00').toLocaleDateString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
+                      {formatWeekdayDate(e.date) || e.date}
                     </div>
                     <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{formatTimeHHMM(e.time) || '—'}</div>
                     <div className="mt-2 flex flex-wrap gap-1">
@@ -342,58 +368,8 @@ export default function SchedulePage() {
                       <Badge variant="outline">{e.status}</Badge>
                     </div>
                     {e.opponent_name && (
-                      <div className="mt-2 truncate text-xs text-slate-700 dark:text-slate-300">vs {e.opponent_name}</div>
-                    )}
-                    {e.status === 'open' && (
-                      <div className="mt-2 space-y-1">
-                        {e.time && !e.blocked && (
-                          <button
-                            type="button"
-                            onClick={() => findOpponents(e.id)}
-                            className={cn('flex items-center gap-1 text-xs', accentActionClass)}
-                          >
-                            <Search className="h-3 w-3" />
-                            Find Opponents
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => toggleBlocked(e)}
-                          className={cn(
-                            'flex items-center gap-1 text-xs font-medium hover:underline',
-                            e.blocked ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400',
-                          )}
-                        >
-                          {e.blocked ? <Eye className="h-3 w-3" /> : <Ban className="h-3 w-3" />}
-                          {e.blocked ? 'Unblock' : 'Block'}
-                        </button>
-                      </div>
-                    )}
-                    {(e.status === 'scheduled' || e.status === 'confirmed') && e.game_id && (
-                      <div className="mt-2 space-y-1">
-                        {!e.weekly_confirmed ? (
-                          <button
-                            type="button"
-                            onClick={() => handleConfirm(e)}
-                            className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
-                          >
-                            <CheckCircle2 className="h-3 w-3" />
-                            Confirm
-                          </button>
-                        ) : (
-                          <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Confirmed
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleCancelGame(e)}
-                          className="flex items-center gap-1 text-xs font-medium text-rose-600 hover:underline dark:text-rose-400"
-                        >
-                          <XCircle className="h-3 w-3" />
-                          Cancel Game
-                        </button>
+                      <div className="mt-2 whitespace-normal break-words text-xs leading-snug text-slate-700 dark:text-slate-300">
+                        vs {e.opponent_name}
                       </div>
                     )}
                   </Card>
@@ -401,11 +377,11 @@ export default function SchedulePage() {
               </div>
             </div>
           ))}
-          {entries.length === 0 && <div className="text-sm text-slate-600 dark:text-slate-400">No schedule entries yet.</div>}
+          {sortedEntries.length === 0 && <div className="text-sm text-slate-600 dark:text-slate-400">No schedule entries yet.</div>}
         </div>
       )}
 
-      {tab === 2 && <CsvUploader teamId={activeTeam.id} onConfirmed={() => { load(); setTab(0); }} />}
+      {tab === 'upload' && <CsvUploader teamId={activeTeam.id} onConfirmed={() => { load(); setTab('upcoming'); }} />}
 
       <Modal
         open={addOpen}

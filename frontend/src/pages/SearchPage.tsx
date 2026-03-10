@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search as SearchIcon } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
+import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
 import { AutoMatchResult, IceSlot, OpponentResult, Rink, ScheduleEntry } from '../types';
 import { Alert } from '../components/ui/Alert';
@@ -36,6 +37,8 @@ function standardLevelsForAgeGroup(ageGroup: string) {
 
 export default function SearchPage() {
   const { activeTeam } = useTeam();
+  const { activeSeason, seasons } = useSeason();
+  const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(0);
@@ -48,6 +51,7 @@ export default function SearchPage() {
   const [results, setResults] = useState<OpponentResult[]>([]);
   const [autoMatches, setAutoMatches] = useState<AutoMatchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [rinks, setRinks] = useState<Rink[]>([]);
   const [selectedRink, setSelectedRink] = useState('');
   const [availableSlots, setAvailableSlots] = useState<IceSlot[]>([]);
@@ -75,18 +79,25 @@ export default function SearchPage() {
     '';
 
   useEffect(() => {
-    if (!activeTeam) return;
+    if (!activeTeam || !effectiveSeason) return;
+    setResults([]);
+    setHasSearched(false);
+    setSearchError('');
     const entryParam = searchParams.get('entry');
-    api.getSchedule(activeTeam.id, { status: 'open' }).then((data) => {
+    api.getSchedule(activeTeam.id, { status: 'open', season_id: effectiveSeason.id }).then((data) => {
       const filtered = data.filter((e) => !!e.time);
       setOpenDates(filtered);
       if (entryParam && filtered.some((e) => e.id === entryParam)) {
         setSelectedEntryId(entryParam);
       }
     });
-    api.getAutoMatches(activeTeam.id).then(setAutoMatches);
+    api.getAutoMatches(activeTeam.id).then((data) => {
+      setAutoMatches(
+        data.filter((match) => match.date >= effectiveSeason.start_date && match.date <= effectiveSeason.end_date),
+      );
+    });
     api.getRinks().then(setRinks);
-  }, [activeTeam]); // eslint-disable-line
+  }, [activeTeam, effectiveSeason, searchParams]); // eslint-disable-line
 
   // Fetch available ice slots when a rink and date are selected
   useEffect(() => {
@@ -105,9 +116,16 @@ export default function SearchPage() {
     api.getAvailableSlots(proposalRinkId, proposalDate).then(setProposalSlots).catch(() => setProposalSlots([]));
   }, [proposalDialog.open, proposalRinkId, proposalDate]);
 
+  useEffect(() => {
+    setResults([]);
+    setHasSearched(false);
+    setSearchError('');
+  }, [selectedEntryId]);
+
   const handleSearch = async () => {
     if (!activeTeam || !selectedEntry) return;
     setLoading(true);
+    setHasSearched(true);
     setSearchError('');
     try {
       const params: Record<string, string> = {
@@ -205,6 +223,9 @@ export default function SearchPage() {
 
   if (!activeTeam) {
     return <Alert variant="info">Select a team to search for opponents.</Alert>;
+  }
+  if (!effectiveSeason) {
+    return <Alert variant="info">No season is available yet.</Alert>;
   }
 
   const standardLevels = standardLevelsForAgeGroup(activeTeam.age_group);
@@ -371,7 +392,7 @@ export default function SearchPage() {
                 </div>
               ))}
 
-              {results.length === 0 && selectedEntry && !loading && (
+              {results.length === 0 && hasSearched && selectedEntry && !loading && (
                 <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                   No matching opponents found for this date/time. Matches require an exact time match and opposite home/away.
                 </div>
@@ -434,7 +455,7 @@ export default function SearchPage() {
                     </tr>
                   ))}
 
-                  {results.length === 0 && selectedEntry && !loading && (
+                  {results.length === 0 && hasSearched && selectedEntry && !loading && (
                     <tr>
                       <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                         No matching opponents found for this date/time. Matches require an exact time match and opposite home/away.

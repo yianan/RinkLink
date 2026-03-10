@@ -5,24 +5,8 @@ import datetime as dt
 from pydantic import BaseModel
 
 
-class SeasonCreate(BaseModel):
-    association_id: str
-    name: str
-    start_date: dt.date
-    end_date: dt.date
-    is_active: bool = False
-
-
-class SeasonUpdate(BaseModel):
-    name: str | None = None
-    start_date: dt.date | None = None
-    end_date: dt.date | None = None
-    is_active: bool | None = None
-
-
 class SeasonOut(BaseModel):
     id: str
-    association_id: str
     name: str
     start_date: dt.date
     end_date: dt.date

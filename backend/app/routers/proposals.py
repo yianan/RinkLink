@@ -312,10 +312,10 @@ def accept_proposal(id: str, db: Session = Depends(get_db)):
             game_time = home_entry.time
         if game_time is None and away_entry and away_entry.time is not None:
             game_time = away_entry.time
-        # Resolve season from the home team's association
+        # Resolve the global season from the proposed date
         game_season_id = None
-        if home_team:
-            game_season_id = resolve_season_id(db, home_team.association_id, proposal.proposed_date)
+        if proposal.proposed_date:
+            game_season_id = resolve_season_id(db, proposal.proposed_date)
         db.add(Game(
             home_team_id=proposal.home_team_id,
             away_team_id=proposal.away_team_id,

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTeam } from '../context/TeamContext';
+import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
 import { PracticeBooking, IceSlot, Rink } from '../types';
 import { Alert } from '../components/ui/Alert';
@@ -18,6 +19,8 @@ const today = new Date().toISOString().slice(0, 10);
 
 export default function PracticePage() {
   const { activeTeam } = useTeam();
+  const { activeSeason, seasons } = useSeason();
+  const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const [tab, setTab] = useState<'upcoming' | 'history'>('upcoming');
   const [bookings, setBookings] = useState<PracticeBooking[]>([]);
 
@@ -91,17 +94,26 @@ export default function PracticePage() {
   if (!activeTeam) {
     return <Alert variant="info">Select a team to view practice bookings.</Alert>;
   }
+  if (!effectiveSeason) {
+    return <Alert variant="info">No season is available yet.</Alert>;
+  }
 
   const sorted = [...bookings].sort((a, b) => {
     const da = a.slot_date ?? '';
     const db_ = b.slot_date ?? '';
     return da < db_ ? -1 : da > db_ ? 1 : 0;
   });
+  const seasonScopedBookings = sorted.filter(
+    (booking) =>
+      !!booking.slot_date &&
+      booking.slot_date >= effectiveSeason.start_date &&
+      booking.slot_date <= effectiveSeason.end_date,
+  );
 
-  const upcomingBookings = sorted.filter(
+  const upcomingBookings = seasonScopedBookings.filter(
     (b) => b.status === 'active' && b.slot_date && b.slot_date >= today,
   );
-  const historyBookings = sorted.filter(
+  const historyBookings = seasonScopedBookings.filter(
     (b) => b.status === 'cancelled' || (b.slot_date && b.slot_date < today),
   );
   const displayed = tab === 'upcoming' ? upcomingBookings : historyBookings;
@@ -115,7 +127,10 @@ export default function PracticePage() {
       />
 
       <SegmentedTabs
-        items={(['upcoming', 'history'] as const).map((value) => ({ label: value, value }))}
+        items={[
+          { label: 'Upcoming', value: 'upcoming' as const },
+          { label: 'History', value: 'history' as const },
+        ]}
         value={tab}
         onChange={setTab}
       />

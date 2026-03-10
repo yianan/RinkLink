@@ -3,6 +3,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import { Team, Association } from '../types';
 import { useTeam } from '../context/TeamContext';
+import { useSeason } from '../context/SeasonContext';
 import AgeLevelSelect from '../components/AgeLevelSelect';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -21,6 +22,7 @@ const emptyForm = {
 
 export default function TeamListPage() {
   const { refreshTeams } = useTeam();
+  const { activeSeason } = useSeason();
   const [teams, setTeams] = useState<Team[]>([]);
   const [associations, setAssociations] = useState<Association[]>([]);
   const [open, setOpen] = useState(false);
@@ -75,7 +77,11 @@ export default function TeamListPage() {
     <div className="space-y-4">
       <PageHeader
         title="Teams"
-        subtitle="Create teams and manage contact details."
+        subtitle={
+          activeSeason
+            ? `Create teams and manage contact details for the ${activeSeason.name} Season.`
+            : 'Create teams and manage contact details.'
+        }
         actions={(
           <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
             Add Team

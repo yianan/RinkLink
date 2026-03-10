@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Player, Team
+from ..models import Player, Team, Season
 from ..schemas.player import (
     PlayerCreate,
     PlayerUpdate,
@@ -16,10 +16,14 @@ router = APIRouter(tags=["players"])
 
 
 @router.get("/teams/{team_id}/players", response_model=list[PlayerOut])
-def list_players(team_id: str, db: Session = Depends(get_db)):
+def list_players(team_id: str, season_id: str | None = Query(None), db: Session = Depends(get_db)):
     if not db.get(Team, team_id):
         raise HTTPException(404, "Team not found")
+    if season_id and not db.get(Season, season_id):
+        raise HTTPException(404, "Season not found")
     q = db.query(Player).filter(Player.team_id == team_id)
+    if season_id:
+        q = q.filter(Player.season_id == season_id)
     q = q.order_by(Player.jersey_number.is_(None), Player.jersey_number, Player.last_name, Player.first_name)
     return q.all()
 
@@ -28,6 +32,8 @@ def list_players(team_id: str, db: Session = Depends(get_db)):
 def create_player(team_id: str, body: PlayerCreate, db: Session = Depends(get_db)):
     if not db.get(Team, team_id):
         raise HTTPException(404, "Team not found")
+    if not db.get(Season, body.season_id):
+        raise HTTPException(404, "Season not found")
     p = Player(team_id=team_id, **body.model_dump())
     db.add(p)
     db.commit()
@@ -68,18 +74,19 @@ async def upload_roster(team_id: str, file: UploadFile = File(...), db: Session 
 def confirm_roster_upload(team_id: str, body: PlayerConfirmUpload, db: Session = Depends(get_db)):
     if not db.get(Team, team_id):
         raise HTTPException(404, "Team not found")
+    if not db.get(Season, body.season_id):
+        raise HTTPException(404, "Season not found")
 
     if body.replace_existing:
-        db.query(Player).filter(Player.team_id == team_id).delete()
+        db.query(Player).filter(Player.team_id == team_id, Player.season_id == body.season_id).delete()
         db.commit()
 
     created: list[Player] = []
     for row in body.entries:
-        p = Player(team_id=team_id, **row.model_dump())
+        p = Player(team_id=team_id, season_id=body.season_id, **row.model_dump())
         db.add(p)
         created.append(p)
     db.commit()
     for p in created:
         db.refresh(p)
     return created
-

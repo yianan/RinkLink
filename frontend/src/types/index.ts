@@ -174,6 +174,7 @@ export interface AutoMatchResult {
 export interface Player {
   id: string;
   team_id: string;
+  season_id: string;
   first_name: string;
   last_name: string;
   jersey_number: number | null;
@@ -227,7 +228,6 @@ export interface Game {
 
 export interface Season {
   id: string;
-  association_id: string;
   name: string;
   start_date: string;
   end_date: string;

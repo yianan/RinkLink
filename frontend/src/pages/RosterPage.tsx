@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pencil, Trash2, Users } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
+import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
 import { Player } from '../types';
 import RosterCsvUploader from '../components/RosterCsvUploader';
@@ -30,6 +31,8 @@ function positionBadgeVariant(position: string | null | undefined): 'info' | 'su
 
 export default function RosterPage() {
   const { activeTeam } = useTeam();
+  const { activeSeason, seasons } = useSeason();
+  const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const [tab, setTab] = useState(0);
   const [players, setPlayers] = useState<Player[]>([]);
   const [open, setOpen] = useState(false);
@@ -37,13 +40,13 @@ export default function RosterPage() {
   const [form, setForm] = useState({ ...emptyForm });
 
   const load = () => {
-    if (!activeTeam) return;
-    api.getPlayers(activeTeam.id).then(setPlayers);
+    if (!activeTeam || !effectiveSeason) return;
+    api.getPlayers(activeTeam.id, { season_id: effectiveSeason.id }).then(setPlayers);
   };
 
   useEffect(() => {
     load();
-  }, [activeTeam]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTeam, effectiveSeason]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleEdit = (p: Player) => {
     setEditId(p.id);
@@ -57,8 +60,9 @@ export default function RosterPage() {
   };
 
   const handleSave = async () => {
-    if (!activeTeam) return;
+    if (!activeTeam || !effectiveSeason) return;
     const payload = {
+      season_id: effectiveSeason.id,
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
       jersey_number: form.jersey_number ? Number(form.jersey_number) : null,
@@ -85,12 +89,15 @@ export default function RosterPage() {
   if (!activeTeam) {
     return <Alert variant="info">Select a team to manage the roster.</Alert>;
   }
+  if (!effectiveSeason) {
+    return <Alert variant="info">No season is available yet.</Alert>;
+  }
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="Roster"
-        subtitle="Manage your USA Hockey roster and use it for stats tracking."
+        subtitle={`Manage the ${effectiveSeason.name} Season roster and use it for stats tracking.`}
         actions={(
           <Button type="button" onClick={() => { setEditId(null); setForm({ ...emptyForm }); setOpen(true); }}>
             Add Player
@@ -204,7 +211,12 @@ export default function RosterPage() {
       )}
 
       {tab === 1 && (
-        <RosterCsvUploader teamId={activeTeam.id} onConfirmed={() => { load(); setTab(0); }} />
+        <RosterCsvUploader
+          teamId={activeTeam.id}
+          seasonId={effectiveSeason.id}
+          seasonName={effectiveSeason.name}
+          onConfirmed={() => { load(); setTab(0); }}
+        />
       )}
 
       <Modal
