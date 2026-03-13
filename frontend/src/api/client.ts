@@ -107,7 +107,7 @@ export const api = {
     proposed_time?: string | null;
     proposed_by_team_id: string;
     ice_slot_id?: string | null;
-    rink_id?: string | null;
+    rink_id: string;
     message?: string | null;
   }) =>
     request<import('../types').GameProposal>('/proposals', { method: 'POST', body: JSON.stringify(data) }),
@@ -128,7 +128,7 @@ export const api = {
       proposed_time?: string | null;
       proposed_by_team_id: string;
       ice_slot_id?: string | null;
-      rink_id?: string | null;
+      rink_id: string;
       message?: string | null;
     },
   ) =>

@@ -11,6 +11,7 @@ from ..models import (
     Team,
     ScheduleEntry,
     GameProposal,
+    ProposalRinkPreference,
     Game,
     Notification,
     Player,
@@ -53,6 +54,7 @@ def seed_demo_data(db: Session):
     # Clear existing data (order matters: delete dependents before parents)
     db.query(TeamSeasonRecord).delete()
     db.query(Game).delete()
+    db.query(ProposalRinkPreference).delete()
     db.query(GameProposal).delete()
     db.query(Notification).delete()
     db.query(Player).delete()
@@ -567,69 +569,7 @@ def seed_demo_data(db: Session):
         ScheduleEntry.team_id == t5_id, ScheduleEntry.date == date(2026, 3, 22), ScheduleEntry.entry_type == "away"
     ).first()
 
-    proposals: list[GameProposal] = []
-
-    # Accepted game this week (drives weekly-confirm reminder on app load)
-    p_accepted = GameProposal(
-        id=_id(),
-        home_team_id=t1_id,
-        away_team_id=t3_id,
-        home_schedule_entry_id=ns14_home_mar8.id,
-        away_schedule_entry_id=mi14_away_mar8.id,
-        proposed_date=date(2026, 3, 8),
-        proposed_time=time(17, 0),
-        status="accepted",
-        proposed_by_team_id=t1_id,
-        message="Booked ice — see you Sunday!",
-    )
-    proposals.append(p_accepted)
-
-    # Proposed: Mission requests a game with Team IL (shows proposal workflow)
-    if mi14_home_mar29 and ti14_away_mar29:
-        proposals.append(GameProposal(
-            id=_id(),
-            home_team_id=t3_id,
-            away_team_id=t5_id,
-            home_schedule_entry_id=mi14_home_mar29.id,
-            away_schedule_entry_id=ti14_away_mar29.id,
-            proposed_date=date(2026, 3, 29),
-            proposed_time=time(16, 0),
-            status="proposed",
-            proposed_by_team_id=t3_id,
-            message="Looking for a competitive matchup — interested?",
-        ))
-
-    # Declined: Team IL proposed to Northshore, declined
-    if ns14_home_mar22 and ti14_away_mar22:
-        proposals.append(GameProposal(
-            id=_id(),
-            home_team_id=t1_id,
-            away_team_id=t5_id,
-            home_schedule_entry_id=ns14_home_mar22.id,
-            away_schedule_entry_id=ti14_away_mar22.id,
-            proposed_date=date(2026, 3, 22),
-            proposed_time=time(10, 0),
-            status="declined",
-            proposed_by_team_id=t5_id,
-            message="Too far to travel this week.",
-        ))
-
-    db.add_all(proposals)
-    db.commit()
-
-    # Mark accepted game entries as scheduled (as if the proposal was accepted)
-    if ns14_home_mar8 and mi14_away_mar8:
-        ns14_home_mar8.status = "scheduled"
-        ns14_home_mar8.opponent_team_id = t3_id
-        ns14_home_mar8.opponent_name = "Mission 14U AA"
-        ns14_home_mar8.time = time(17, 0)
-
-        mi14_away_mar8.status = "scheduled"
-        mi14_away_mar8.opponent_team_id = t1_id
-        mi14_away_mar8.opponent_name = "Northshore 14U AA"
-        mi14_away_mar8.time = time(17, 0)
-
-    db.commit()
+    p_accepted: GameProposal | None = None
 
     # --- Rinks & Ice Slots ---
     r1_id, r2_id, r3_id = _id(), _id(), _id()
@@ -739,7 +679,84 @@ def seed_demo_data(db: Session):
     if accepted_slot:
         accepted_slot.status = "booked"
         accepted_slot.booked_by_team_id = t1_id
-        p_accepted.ice_slot_id = accepted_slot.id
+
+    proposals: list[GameProposal] = []
+    proposal_rink_preferences: list[ProposalRinkPreference] = []
+
+    # Accepted game this week (drives weekly-confirm reminder on app load)
+    if ns14_home_mar8 and mi14_away_mar8:
+        p_accepted = GameProposal(
+            id=_id(),
+            home_team_id=t1_id,
+            away_team_id=t3_id,
+            home_schedule_entry_id=ns14_home_mar8.id,
+            away_schedule_entry_id=mi14_away_mar8.id,
+            proposed_date=date(2026, 3, 8),
+            proposed_time=time(17, 0),
+            status="accepted",
+            proposed_by_team_id=t1_id,
+            ice_slot_id=accepted_slot.id if accepted_slot else None,
+            message="Booked ice — see you Sunday!",
+        )
+        proposals.append(p_accepted)
+        proposal_rink_preferences.append(ProposalRinkPreference(proposal_id=p_accepted.id, rink_id=r1_id))
+
+        ns14_home_mar8.status = "scheduled"
+        ns14_home_mar8.opponent_team_id = t3_id
+        ns14_home_mar8.opponent_name = "Mission 14U AA"
+        ns14_home_mar8.time = time(17, 0)
+        ns14_home_mar8.location = "Johnny's IceHouse East — Chicago, IL"
+
+        mi14_away_mar8.status = "scheduled"
+        mi14_away_mar8.opponent_team_id = t1_id
+        mi14_away_mar8.opponent_name = "Northshore 14U AA"
+        mi14_away_mar8.time = time(17, 0)
+        mi14_away_mar8.location = "Johnny's IceHouse East — Chicago, IL"
+
+    # Proposed: Mission requests a game with Team IL (shows proposal workflow)
+    if mi14_home_mar29 and ti14_away_mar29:
+        proposal_id = _id()
+        proposals.append(
+            GameProposal(
+                id=proposal_id,
+                home_team_id=t3_id,
+                away_team_id=t5_id,
+                home_schedule_entry_id=mi14_home_mar29.id,
+                away_schedule_entry_id=ti14_away_mar29.id,
+                proposed_date=date(2026, 3, 29),
+                proposed_time=time(16, 0),
+                status="proposed",
+                proposed_by_team_id=t3_id,
+                message="Looking for a competitive matchup — interested?",
+            )
+        )
+        proposal_rink_preferences.append(ProposalRinkPreference(proposal_id=proposal_id, rink_id=r2_id))
+
+    # Declined: Team IL proposed to Northshore, declined
+    if ns14_home_mar22 and ti14_away_mar22:
+        proposal_id = _id()
+        proposals.append(
+            GameProposal(
+                id=proposal_id,
+                home_team_id=t1_id,
+                away_team_id=t5_id,
+                home_schedule_entry_id=ns14_home_mar22.id,
+                away_schedule_entry_id=ti14_away_mar22.id,
+                proposed_date=date(2026, 3, 22),
+                proposed_time=time(10, 0),
+                status="declined",
+                proposed_by_team_id=t5_id,
+                message="Too far to travel this week.",
+            )
+        )
+        proposal_rink_preferences.append(ProposalRinkPreference(proposal_id=proposal_id, rink_id=r1_id))
+
+    db.add_all(proposals)
+    db.add_all(proposal_rink_preferences)
+    db.commit()
+
+    if p_accepted is None:
+        raise RuntimeError("Expected accepted demo proposal to be created")
 
     team_name_map = {team.id: team.name for team in teams}
 

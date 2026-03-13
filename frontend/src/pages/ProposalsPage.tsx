@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { CalendarClock, XCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { CalendarClock, SlidersHorizontal, XCircle } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -8,6 +8,7 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
@@ -54,13 +55,34 @@ function dedupeAcceptedProposals(ps: GameProposal[]) {
   return Array.from(byKey.values());
 }
 
+function toggleFilterValue(values: string[], nextValue: string) {
+  return values.includes(nextValue)
+    ? values.filter((value) => value !== nextValue)
+    : [...values, nextValue];
+}
+
+function opponentNameForProposal(proposal: GameProposal, activeTeamId: string) {
+  if (proposal.home_team_id === activeTeamId) return proposal.away_team_name || 'Unknown opponent';
+  if (proposal.away_team_id === activeTeamId) return proposal.home_team_name || 'Unknown opponent';
+  return [proposal.home_team_name, proposal.away_team_name].filter(Boolean).join(' vs ') || 'Unknown matchup';
+}
+
+function venueLabelForProposal(proposal: GameProposal) {
+  return proposal.rink_name || 'Unknown rink';
+}
+
 export default function ProposalsPage() {
   const { activeTeam } = useTeam();
   const { activeSeason, seasons } = useSeason();
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const [tab, setTab] = useState(0);
   const [proposals, setProposals] = useState<GameProposal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [rinks, setRinks] = useState<Rink[]>([]);
+  const [selectedOpponents, setSelectedOpponents] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedVenues, setSelectedVenues] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [rescheduleDialog, setRescheduleDialog] = useState<{ open: boolean; proposal?: GameProposal }>({ open: false });
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleTime, setRescheduleTime] = useState('');
@@ -70,24 +92,33 @@ export default function ProposalsPage() {
   const [rescheduleMessage, setRescheduleMessage] = useState('');
   const [rescheduleError, setRescheduleError] = useState('');
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const filterButtonClass = 'h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25';
 
   const load = () => {
     if (!activeTeam || !effectiveSeason) return;
+    let cancelled = false;
     const t = TABS[tab] || TABS[0];
     const params: Record<string, string> = { direction: t.direction };
     if (t.status) params.status = t.status;
+    setLoading(true);
     api.getProposals(activeTeam.id, params).then((ps) => {
       const seasonScoped = ps.filter(
         (proposal) =>
           proposal.proposed_date >= effectiveSeason.start_date &&
           proposal.proposed_date <= effectiveSeason.end_date,
       );
-      setProposals(t.status === 'accepted' ? dedupeAcceptedProposals(seasonScoped) : seasonScoped);
+      if (!cancelled) setProposals(t.status === 'accepted' ? dedupeAcceptedProposals(seasonScoped) : seasonScoped);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
     });
+    return () => {
+      cancelled = true;
+    };
   };
   useEffect(() => {
-    load();
+    const cleanup = load();
     api.getRinks().then(setRinks);
+    return cleanup;
   }, [activeTeam, effectiveSeason, tab]); // eslint-disable-line
 
   const handleAccept = async (id: string) => {
@@ -124,6 +155,10 @@ export default function ProposalsPage() {
 
   const submitReschedule = async () => {
     if (!activeTeam || !rescheduleDialog.proposal) return;
+    if (!rescheduleRinkId) {
+      setRescheduleError('Select a rink before sending a reschedule request.');
+      return;
+    }
     setRescheduleLoading(true);
     setRescheduleError('');
     try {
@@ -132,7 +167,7 @@ export default function ProposalsPage() {
         proposed_time: rescheduleTime || null,
         proposed_by_team_id: activeTeam.id,
         ice_slot_id: rescheduleSlotId || null,
-        rink_id: rescheduleRinkId || null,
+        rink_id: rescheduleRinkId,
         message: rescheduleMessage || null,
       });
       setRescheduleDialog({ open: false });
@@ -152,10 +187,148 @@ export default function ProposalsPage() {
   }
 
   const tabDef = TABS[tab] || TABS[0];
+  const opponentOptions = useMemo<FilterOption[]>(
+    () =>
+      Array.from(new Set(proposals.map((proposal) => opponentNameForProposal(proposal, activeTeam.id)).filter(Boolean)))
+        .sort((left, right) => left.localeCompare(right))
+        .map((opponent) => ({ value: opponent, label: opponent })),
+    [activeTeam.id, proposals],
+  );
+  const statusOptions = useMemo<FilterOption[]>(
+    () =>
+      Array.from(new Set(proposals.map((proposal) => proposal.status)))
+        .sort((left, right) => left.localeCompare(right))
+        .map((status) => ({ value: status, label: status })),
+    [proposals],
+  );
+  const venueOptions = useMemo<FilterOption[]>(
+    () =>
+      Array.from(new Set(proposals.map((proposal) => venueLabelForProposal(proposal)).filter(Boolean)))
+        .sort((left, right) => left.localeCompare(right))
+        .map((venue) => ({ value: venue, label: venue })),
+    [proposals],
+  );
+
+  const filteredProposals = useMemo(
+    () =>
+      proposals.filter((proposal) => {
+        const opponent = opponentNameForProposal(proposal, activeTeam.id);
+        const venue = venueLabelForProposal(proposal);
+        return (selectedOpponents.length === 0 || selectedOpponents.includes(opponent)) &&
+          (selectedStatuses.length === 0 || selectedStatuses.includes(proposal.status)) &&
+          (selectedVenues.length === 0 || selectedVenues.includes(venue));
+      }),
+    [activeTeam.id, proposals, selectedOpponents, selectedStatuses, selectedVenues],
+  );
+
+  const activeFilterBadges = useMemo(() => {
+    const labelsFor = (options: FilterOption[], selectedValues: string[]) =>
+      options.filter((option) => selectedValues.includes(option.value)).map((option) => option.label);
+    return [
+      ...labelsFor(opponentOptions, selectedOpponents),
+      ...labelsFor(statusOptions, selectedStatuses),
+      ...labelsFor(venueOptions, selectedVenues),
+    ];
+  }, [opponentOptions, selectedOpponents, selectedStatuses, selectedVenues, statusOptions, venueOptions]);
+
+  const hasActiveFilters = activeFilterBadges.length > 0;
+
+  const clearFilters = () => {
+    setSelectedOpponents([]);
+    setSelectedStatuses([]);
+    setSelectedVenues([]);
+  };
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Game Proposals" subtitle="Accept, decline, cancel, or request a reschedule." />
+      <PageHeader
+        title="Game Proposals"
+        subtitle="Accept, decline, cancel, or request a reschedule."
+        actions={(
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setFiltersOpen((openState) => !openState)}
+            className={filterButtonClass}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+            {hasActiveFilters ? ` (${activeFilterBadges.length})` : ''}
+          </Button>
+        )}
+      />
+
+      {hasActiveFilters && !filtersOpen ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {activeFilterBadges.map((label, index) => (
+            <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
+              {label}
+            </Badge>
+          ))}
+          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+            Clear all
+          </Button>
+        </div>
+      ) : null}
+
+      {filtersOpen ? (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter proposals</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                Narrow the current proposal list by opponent, status, and venue.
+              </div>
+            </div>
+            {hasActiveFilters ? (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+                Clear all
+              </Button>
+            ) : null}
+          </div>
+
+          {hasActiveFilters ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {activeFilterBadges.map((label, index) => (
+                <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
+                  {label}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="mt-4 grid gap-4 border-t border-[color:var(--app-border-subtle)] pt-4 xl:grid-cols-2">
+            {opponentOptions.length > 0 ? (
+              <FilterPillGroup
+                label="Opponent"
+                options={opponentOptions}
+                values={selectedOpponents}
+                onToggle={(value) => setSelectedOpponents((current) => toggleFilterValue(current, value))}
+                tone="sky"
+              />
+            ) : null}
+            {statusOptions.length > 0 ? (
+              <FilterPillGroup
+                label="Status"
+                options={statusOptions}
+                values={selectedStatuses}
+                onToggle={(value) => setSelectedStatuses((current) => toggleFilterValue(current, value))}
+                tone="violet"
+              />
+            ) : null}
+            {venueOptions.length > 0 ? (
+              <FilterPillGroup
+                label="Venue"
+                options={venueOptions}
+                values={selectedVenues}
+                onToggle={(value) => setSelectedVenues((current) => toggleFilterValue(current, value))}
+                tone="emerald"
+              />
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
 
       <SegmentedTabs
         items={TABS.map((t, i) => ({ label: t.label, value: i }))}
@@ -165,7 +338,7 @@ export default function ProposalsPage() {
 
       <Card className="overflow-hidden">
         <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
-          {proposals.map((p) => {
+          {filteredProposals.map((p) => {
             const isIncoming = p.proposed_by_team_id !== activeTeam.id;
             const canRespond = isIncoming && p.status === 'proposed';
             const canCancel = !isIncoming && p.status === 'proposed';
@@ -258,9 +431,16 @@ export default function ProposalsPage() {
             );
           })}
 
-          {proposals.length === 0 && (
+          {loading && (
             <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-              No {tabDef.label.toLowerCase()} proposals.
+              Loading proposals…
+            </div>
+          )}
+          {!loading && filteredProposals.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+              {hasActiveFilters
+                ? 'No proposals match the current filters.'
+                : `No ${tabDef.label.toLowerCase()} proposals.`}
             </div>
           )}
         </div>
@@ -281,7 +461,7 @@ export default function ProposalsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
-              {proposals.map((p) => {
+              {filteredProposals.map((p) => {
                 const isIncoming = p.proposed_by_team_id !== activeTeam.id;
                 const canRespond = isIncoming && p.status === 'proposed';
                 const canCancel = !isIncoming && p.status === 'proposed';
@@ -384,10 +564,19 @@ export default function ProposalsPage() {
                 );
               })}
 
-              {proposals.length === 0 && (
+              {loading && (
                 <tr>
                   <td colSpan={9} className="px-3 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                    No {tabDef.label.toLowerCase()} proposals.
+                    Loading proposals…
+                  </td>
+                </tr>
+              )}
+              {!loading && filteredProposals.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-3 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                    {hasActiveFilters
+                      ? 'No proposals match the current filters.'
+                      : `No ${tabDef.label.toLowerCase()} proposals.`}
                   </td>
                 </tr>
               )}
@@ -402,7 +591,7 @@ export default function ProposalsPage() {
         title="Request Reschedule"
         footer={
           <>
-            <Button type="button" onClick={submitReschedule} disabled={rescheduleLoading || !rescheduleDate || !rescheduleTime}>
+            <Button type="button" onClick={submitReschedule} disabled={rescheduleLoading || !rescheduleDate || !rescheduleTime || !rescheduleRinkId}>
               {rescheduleLoading ? 'Sending…' : 'Send Request'}
             </Button>
             <Button type="button" variant="outline" onClick={() => setRescheduleDialog({ open: false })} disabled={rescheduleLoading}>
@@ -427,9 +616,9 @@ export default function ProposalsPage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink (optional)</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink</label>
               <Select value={rescheduleRinkId} onChange={(e) => { setRescheduleRinkId(e.target.value); setRescheduleSlotId(''); }}>
-                <option value="">No rink</option>
+                <option value="">Select a rink…</option>
                 {rinks.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name} — {r.city}, {r.state}

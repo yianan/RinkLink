@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Map, Pencil, Trash2, Utensils } from 'lucide-react';
+import { Map, Pencil, SlidersHorizontal, Trash2, Utensils } from 'lucide-react';
 import { api } from '../api/client';
 import { Rink } from '../types';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import PageHeader from '../components/PageHeader';
@@ -12,6 +14,12 @@ import { cn } from '../lib/cn';
 import { accentLinkClass } from '../lib/uiClasses';
 
 const emptyForm = { name: '', address: '', city: '', state: '', zip_code: '', phone: '', contact_email: '', website: '' };
+
+function toggleFilterValue(values: string[], nextValue: string) {
+  return values.includes(nextValue)
+    ? values.filter((value) => value !== nextValue)
+    : [...values, nextValue];
+}
 
 function mapsQueryUrl(query: string) {
   const url = new URL('https://www.google.com/maps/search/');
@@ -23,12 +31,30 @@ function mapsQueryUrl(query: string) {
 export default function RinkListPage() {
   const navigate = useNavigate();
   const [rinks, setRinks] = useState<Rink[]>([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [selectedStates, setSelectedStates] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterButtonClass = 'h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25';
 
-  const load = () => api.getRinks().then(setRinks);
-  useEffect(() => { load(); }, []);
+  const load = () => {
+    let cancelled = false;
+    setLoading(true);
+    api.getRinks()
+      .then((data) => {
+        if (!cancelled) setRinks(data);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  };
+  useEffect(() => load(), []);
 
   const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -60,21 +86,138 @@ export default function RinkListPage() {
     }
   };
 
+  const cityOptions = useMemo<FilterOption[]>(
+    () =>
+      Array.from(new Set(rinks.map((rink) => rink.city).filter(Boolean)))
+        .sort((left, right) => left.localeCompare(right))
+        .map((city) => ({ value: city, label: city })),
+    [rinks],
+  );
+
+  const stateOptions = useMemo<FilterOption[]>(
+    () =>
+      Array.from(new Set(rinks.map((rink) => rink.state).filter(Boolean)))
+        .sort((left, right) => left.localeCompare(right))
+        .map((state) => ({ value: state, label: state })),
+    [rinks],
+  );
+
+  const filteredRinks = useMemo(
+    () =>
+      rinks.filter(
+        (rink) =>
+          (selectedCities.length === 0 || selectedCities.includes(rink.city)) &&
+          (selectedStates.length === 0 || selectedStates.includes(rink.state)),
+      ),
+    [rinks, selectedCities, selectedStates],
+  );
+
+  const activeFilterBadges = useMemo(() => {
+    const labelsFor = (options: FilterOption[], selectedValues: string[]) =>
+      options.filter((option) => selectedValues.includes(option.value)).map((option) => option.label);
+    return [
+      ...labelsFor(cityOptions, selectedCities),
+      ...labelsFor(stateOptions, selectedStates),
+    ];
+  }, [cityOptions, selectedCities, stateOptions, selectedStates]);
+
+  const hasActiveFilters = activeFilterBadges.length > 0;
+
+  const clearFilters = () => {
+    setSelectedCities([]);
+    setSelectedStates([]);
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="Rinks"
         subtitle="Manage rinks and their ice slots."
         actions={(
-          <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
-            Add Rink
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setFiltersOpen((openState) => !openState)}
+              className={filterButtonClass}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
+              {hasActiveFilters ? ` (${activeFilterBadges.length})` : ''}
+            </Button>
+            <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
+              Add Rink
+            </Button>
+          </>
         )}
       />
 
+      {hasActiveFilters && !filtersOpen ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {activeFilterBadges.map((label, index) => (
+            <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
+              {label}
+            </Badge>
+          ))}
+          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+            Clear all
+          </Button>
+        </div>
+      ) : null}
+
+      {filtersOpen ? (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter rinks</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                Narrow the list by city and state.
+              </div>
+            </div>
+            {hasActiveFilters ? (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+                Clear all
+              </Button>
+            ) : null}
+          </div>
+
+          {hasActiveFilters ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {activeFilterBadges.map((label, index) => (
+                <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
+                  {label}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="mt-4 grid gap-4 border-t border-[color:var(--app-border-subtle)] pt-4 xl:grid-cols-2">
+            {cityOptions.length > 0 ? (
+              <FilterPillGroup
+                label="City"
+                options={cityOptions}
+                values={selectedCities}
+                onToggle={(value) => setSelectedCities((current) => toggleFilterValue(current, value))}
+                tone="sky"
+              />
+            ) : null}
+            {stateOptions.length > 0 ? (
+              <FilterPillGroup
+                label="State"
+                options={stateOptions}
+                values={selectedStates}
+                onToggle={(value) => setSelectedStates((current) => toggleFilterValue(current, value))}
+                tone="violet"
+              />
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
+
       <Card className="overflow-hidden">
         <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
-          {rinks.map((r) => (
+          {filteredRinks.map((r) => (
             <div
               key={r.id}
               role="button"
@@ -160,9 +303,19 @@ export default function RinkListPage() {
             </div>
           ))}
 
-          {rinks.length === 0 && (
+          {loading && (
+            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+              Loading rinks…
+            </div>
+          )}
+          {!loading && rinks.length === 0 && (
             <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
               No rinks yet. Add one or seed demo data.
+            </div>
+          )}
+          {!loading && rinks.length > 0 && filteredRinks.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+              No rinks match the current filters.
             </div>
           )}
         </div>
@@ -179,7 +332,7 @@ export default function RinkListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
-              {rinks.map((r) => (
+              {filteredRinks.map((r) => (
                 <tr
                   key={r.id}
                   className="cursor-pointer hover:bg-slate-50/60 dark:hover:bg-slate-900/40"
@@ -255,10 +408,24 @@ export default function RinkListPage() {
                 </tr>
               ))}
 
-              {rinks.length === 0 && (
+              {loading && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                    Loading rinks…
+                  </td>
+                </tr>
+              )}
+              {!loading && rinks.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No rinks yet. Add one or seed demo data.
+                  </td>
+                </tr>
+              )}
+              {!loading && rinks.length > 0 && filteredRinks.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                    No rinks match the current filters.
                   </td>
                 </tr>
               )}

@@ -191,6 +191,11 @@ export default function SearchPage() {
       return;
     }
 
+    if (!proposalRinkId) {
+      setProposalError('Select a rink before sending a proposal.');
+      return;
+    }
+
     setProposalLoading(true);
     setProposalError('');
     try {
@@ -202,7 +207,7 @@ export default function SearchPage() {
         proposed_date: date,
         proposed_by_team_id: activeTeam.id,
         ice_slot_id: selectedIceSlotId || null,
-        rink_id: proposalRinkId || null,
+        rink_id: proposalRinkId,
         message: message || null,
       });
 
@@ -624,7 +629,7 @@ export default function SearchPage() {
         title="Propose Game"
         footer={
           <>
-            <Button type="button" onClick={handlePropose} disabled={proposalLoading}>
+            <Button type="button" onClick={handlePropose} disabled={proposalLoading || !proposalRinkId}>
               {proposalLoading ? 'Sending…' : 'Send Proposal'}
             </Button>
             <Button type="button" variant="outline" onClick={() => { setProposalDialog({ open: false }); setProposalError(''); }} disabled={proposalLoading}>
@@ -645,7 +650,7 @@ export default function SearchPage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink (optional)</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink</label>
               <Select
                 value={proposalRinkId}
                 onChange={(e) => {
@@ -653,7 +658,7 @@ export default function SearchPage() {
                   setSelectedIceSlotId('');
                 }}
               >
-                <option value="">No rink</option>
+                <option value="">Select a rink…</option>
                 {rinks.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name} — {r.city}, {r.state}
@@ -661,7 +666,7 @@ export default function SearchPage() {
                 ))}
               </Select>
               <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Pick a rink to attach a location even if you don&apos;t have a specific ice slot yet.
+                A rink is required. Ice slot selection is optional.
               </div>
             </div>
 

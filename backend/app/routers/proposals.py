@@ -32,6 +32,32 @@ def _location_label_from_association(a: Association) -> str | None:
         return None
     return f"{a.name} Home Rink — {', '.join(parts)}" if a.name else ", ".join(parts)
 
+
+def _validate_rink_selection(
+    db: Session,
+    *,
+    rink_id: str,
+    ice_slot_id: str | None,
+    proposed_date,
+):
+    rink = db.get(Rink, rink_id)
+    if not rink:
+        raise HTTPException(404, "Rink not found")
+
+    slot = None
+    if ice_slot_id:
+        slot = db.get(IceSlot, ice_slot_id)
+        if not slot:
+            raise HTTPException(404, "Ice slot not found")
+        if slot.rink_id != rink.id:
+            raise HTTPException(400, "Selected ice slot does not belong to the chosen rink")
+        if slot.date != proposed_date:
+            raise HTTPException(400, "Selected ice slot does not match the proposed date")
+        if slot.status != "available":
+            raise HTTPException(400, "Selected ice slot is no longer available")
+
+    return rink, slot
+
 def _enrich(p: GameProposal, db: Session) -> ProposalOut:
     home = db.get(Team, p.home_team_id)
     away = db.get(Team, p.away_team_id)
@@ -109,17 +135,21 @@ def create_proposal(body: ProposalCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(409, "A proposal already exists for these schedule entries")
 
-    data = body.model_dump()
-    rink_id = data.pop("rink_id", None)
-    if rink_id and data.get("ice_slot_id") is None and not db.get(Rink, rink_id):
-        raise HTTPException(404, "Rink not found")
+    rink, slot = _validate_rink_selection(
+        db,
+        rink_id=body.rink_id,
+        ice_slot_id=body.ice_slot_id,
+        proposed_date=body.proposed_date,
+    )
+
+    data = body.model_dump(exclude={"rink_id"})
+    if slot:
+        data["proposed_time"] = slot.start_time
 
     proposal = GameProposal(**data)
     db.add(proposal)
-
-    if rink_id and proposal.ice_slot_id is None:
-        db.flush()
-        db.add(ProposalRinkPreference(proposal_id=proposal.id, rink_id=rink_id))
+    db.flush()
+    db.add(ProposalRinkPreference(proposal_id=proposal.id, rink_id=rink.id))
 
     db.commit()
     db.refresh(proposal)
@@ -148,9 +178,12 @@ def request_reschedule(id: str, body: ProposalRescheduleCreate, db: Session = De
     if existing:
         raise HTTPException(400, "A reschedule request is already pending for this game")
 
-    requested_rink_id = body.rink_id
-    if requested_rink_id and body.ice_slot_id is None and not db.get(Rink, requested_rink_id):
-        raise HTTPException(404, "Rink not found")
+    rink, slot = _validate_rink_selection(
+        db,
+        rink_id=body.rink_id,
+        ice_slot_id=body.ice_slot_id,
+        proposed_date=body.proposed_date,
+    )
 
     # Create a new proposal that reuses the same schedule entries and teams.
     proposal = GameProposal(
@@ -159,17 +192,15 @@ def request_reschedule(id: str, body: ProposalRescheduleCreate, db: Session = De
         home_schedule_entry_id=base.home_schedule_entry_id,
         away_schedule_entry_id=base.away_schedule_entry_id,
         proposed_date=body.proposed_date,
-        proposed_time=body.proposed_time,
+        proposed_time=slot.start_time if slot else body.proposed_time,
         status="proposed",
         proposed_by_team_id=body.proposed_by_team_id,
         ice_slot_id=body.ice_slot_id,
         message=body.message,
     )
     db.add(proposal)
-
-    if requested_rink_id and proposal.ice_slot_id is None:
-        db.flush()
-        db.add(ProposalRinkPreference(proposal_id=proposal.id, rink_id=requested_rink_id))
+    db.flush()
+    db.add(ProposalRinkPreference(proposal_id=proposal.id, rink_id=rink.id))
 
     db.commit()
     db.refresh(proposal)

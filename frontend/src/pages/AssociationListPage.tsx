@@ -1,10 +1,12 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import { Association, Team } from '../types';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { useTeam } from '../context/TeamContext';
@@ -14,21 +16,51 @@ import { accentLinkClass } from '../lib/uiClasses';
 
 const emptyForm = { name: '', home_rink_address: '', city: '', state: '', zip_code: '' };
 
+function toggleFilterValue(values: string[], nextValue: string) {
+  return values.includes(nextValue)
+    ? values.filter((value) => value !== nextValue)
+    : [...values, nextValue];
+}
+
+function ageGroupSortValue(value: string) {
+  const match = value.match(/(\d+)/);
+  if (!match) return Number.NEGATIVE_INFINITY;
+  return Number(match[1]);
+}
+
 export default function AssociationListPage() {
   const navigate = useNavigate();
   const { setActiveTeam } = useTeam();
   const [associations, setAssociations] = useState<Association[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [selectedStates, setSelectedStates] = useState<string[]>([]);
+  const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
+  const [selectedCompetitionNames, setSelectedCompetitionNames] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterButtonClass = 'h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25';
 
-  const load = async () => {
-    const [a, t] = await Promise.all([api.getAssociations(), api.getTeams()]);
-    setAssociations(a);
-    setTeams(t);
+  const load = () => {
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([api.getAssociations(), api.getTeams()])
+      .then(([a, t]) => {
+        if (cancelled) return;
+        setAssociations(a);
+        setTeams(t);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => load(), []);
 
   const teamsByAssociation = useMemo(() => {
     const by: Record<string, Team[]> = {};
@@ -40,6 +72,81 @@ export default function AssociationListPage() {
     }
     return by;
   }, [teams]);
+
+  const cityOptions = useMemo<FilterOption[]>(
+    () =>
+      Array.from(new Set(associations.map((association) => association.city).filter(Boolean)))
+        .sort((left, right) => left.localeCompare(right))
+        .map((city) => ({ value: city, label: city })),
+    [associations],
+  );
+
+  const stateOptions = useMemo<FilterOption[]>(
+    () =>
+      Array.from(new Set(associations.map((association) => association.state).filter(Boolean)))
+        .sort((left, right) => left.localeCompare(right))
+        .map((state) => ({ value: state, label: state })),
+    [associations],
+  );
+
+  const ageGroupOptions = useMemo<FilterOption[]>(
+    () =>
+      Array.from(new Set(teams.map((team) => team.age_group).filter(Boolean)))
+        .sort((left, right) => ageGroupSortValue(right) - ageGroupSortValue(left) || left.localeCompare(right))
+        .map((ageGroup) => ({ value: ageGroup, label: ageGroup })),
+    [teams],
+  );
+
+  const competitionOptions = useMemo<FilterOption[]>(
+    () =>
+      Array.from(
+        new Set(
+          teams
+            .flatMap((team) => team.memberships)
+            .map((membership) => membership.competition_short_name || membership.competition_name || '')
+            .filter(Boolean),
+        ),
+      )
+        .sort((left, right) => left.localeCompare(right))
+        .map((competitionName) => ({ value: competitionName, label: competitionName })),
+    [teams],
+  );
+
+  const filteredAssociations = useMemo(
+    () =>
+      associations.filter((association) => {
+        const assocTeams = teamsByAssociation[association.id] || [];
+        const competitionNames = assocTeams
+          .flatMap((team) => team.memberships)
+          .map((membership) => membership.competition_short_name || membership.competition_name || '')
+          .filter(Boolean);
+        return (selectedCities.length === 0 || selectedCities.includes(association.city)) &&
+          (selectedStates.length === 0 || selectedStates.includes(association.state)) &&
+          (selectedAgeGroups.length === 0 || assocTeams.some((team) => selectedAgeGroups.includes(team.age_group))) &&
+          (selectedCompetitionNames.length === 0 || competitionNames.some((competitionName) => selectedCompetitionNames.includes(competitionName)));
+      }),
+    [associations, selectedAgeGroups, selectedCities, selectedCompetitionNames, selectedStates, teamsByAssociation],
+  );
+
+  const activeFilterBadges = useMemo(() => {
+    const labelsFor = (options: FilterOption[], selectedValues: string[]) =>
+      options.filter((option) => selectedValues.includes(option.value)).map((option) => option.label);
+    return [
+      ...labelsFor(cityOptions, selectedCities),
+      ...labelsFor(stateOptions, selectedStates),
+      ...labelsFor(ageGroupOptions, selectedAgeGroups),
+      ...labelsFor(competitionOptions, selectedCompetitionNames),
+    ];
+  }, [ageGroupOptions, cityOptions, competitionOptions, selectedAgeGroups, selectedCities, selectedCompetitionNames, selectedStates, stateOptions]);
+
+  const hasActiveFilters = activeFilterBadges.length > 0;
+
+  const clearFilters = () => {
+    setSelectedCities([]);
+    setSelectedStates([]);
+    setSelectedAgeGroups([]);
+    setSelectedCompetitionNames([]);
+  };
 
   const handleSave = async () => {
     if (editId) {
@@ -78,15 +185,108 @@ export default function AssociationListPage() {
         title="Associations"
         subtitle="Organizations that manage teams."
         actions={(
-          <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
-            Add Association
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setFiltersOpen((openState) => !openState)}
+              className={filterButtonClass}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
+              {hasActiveFilters ? ` (${activeFilterBadges.length})` : ''}
+            </Button>
+            <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
+              Add Association
+            </Button>
+          </>
         )}
       />
 
+      {hasActiveFilters && !filtersOpen ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {activeFilterBadges.map((label, index) => (
+            <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
+              {label}
+            </Badge>
+          ))}
+          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+            Clear all
+          </Button>
+        </div>
+      ) : null}
+
+      {filtersOpen ? (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter associations</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                Narrow the list by location, age groups, and competition presence.
+              </div>
+            </div>
+            {hasActiveFilters ? (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+                Clear all
+              </Button>
+            ) : null}
+          </div>
+
+          {hasActiveFilters ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {activeFilterBadges.map((label, index) => (
+                <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
+                  {label}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="mt-4 grid gap-4 border-t border-[color:var(--app-border-subtle)] pt-4 xl:grid-cols-2">
+            {cityOptions.length > 0 ? (
+              <FilterPillGroup
+                label="City"
+                options={cityOptions}
+                values={selectedCities}
+                onToggle={(value) => setSelectedCities((current) => toggleFilterValue(current, value))}
+                tone="sky"
+              />
+            ) : null}
+            {stateOptions.length > 0 ? (
+              <FilterPillGroup
+                label="State"
+                options={stateOptions}
+                values={selectedStates}
+                onToggle={(value) => setSelectedStates((current) => toggleFilterValue(current, value))}
+                tone="violet"
+              />
+            ) : null}
+            {ageGroupOptions.length > 0 ? (
+              <FilterPillGroup
+                label="Age Group"
+                options={ageGroupOptions}
+                values={selectedAgeGroups}
+                onToggle={(value) => setSelectedAgeGroups((current) => toggleFilterValue(current, value))}
+                tone="emerald"
+              />
+            ) : null}
+            {competitionOptions.length > 0 ? (
+              <FilterPillGroup
+                label="Competition"
+                options={competitionOptions}
+                values={selectedCompetitionNames}
+                onToggle={(value) => setSelectedCompetitionNames((current) => toggleFilterValue(current, value))}
+                tone="amber"
+              />
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
+
       <Card className="overflow-hidden">
         <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
-          {associations.map((a) => {
+          {filteredAssociations.map((a) => {
             const assocTeams = teamsByAssociation[a.id] || [];
             const extraTeams = Math.max(0, assocTeams.length - 3);
 
@@ -131,9 +331,19 @@ export default function AssociationListPage() {
             );
           })}
 
-          {associations.length === 0 && (
+          {loading && (
+            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+              Loading associations…
+            </div>
+          )}
+          {!loading && associations.length === 0 && (
             <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
               No associations yet. Add one or seed demo data.
+            </div>
+          )}
+          {!loading && associations.length > 0 && filteredAssociations.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+              No associations match the current filters.
             </div>
           )}
         </div>
@@ -151,7 +361,7 @@ export default function AssociationListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
-              {associations.map((a) => (
+              {filteredAssociations.map((a) => (
                 <tr key={a.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                   <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{a.name}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{a.city}</td>
@@ -188,10 +398,24 @@ export default function AssociationListPage() {
                 </tr>
               ))}
 
-              {associations.length === 0 && (
+              {loading && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                    Loading associations…
+                  </td>
+                </tr>
+              )}
+              {!loading && associations.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No associations yet. Add one or seed demo data.
+                  </td>
+                </tr>
+              )}
+              {!loading && associations.length > 0 && filteredAssociations.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                    No associations match the current filters.
                   </td>
                 </tr>
               )}

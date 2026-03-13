@@ -13,7 +13,7 @@ class ProposalCreate(BaseModel):
     proposed_time: Optional[dt.time] = None
     proposed_by_team_id: str
     ice_slot_id: Optional[str] = None
-    rink_id: Optional[str] = None
+    rink_id: str
     message: Optional[str] = None
 
 
@@ -55,5 +55,5 @@ class ProposalRescheduleCreate(BaseModel):
     proposed_time: Optional[dt.time] = None
     proposed_by_team_id: str
     ice_slot_id: Optional[str] = None
-    rink_id: Optional[str] = None
+    rink_id: str
     message: Optional[str] = None
