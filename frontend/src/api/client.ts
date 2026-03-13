@@ -28,7 +28,10 @@ export const api = {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return request<import('../types').Team[]>(`/teams${qs}`);
   },
-  getTeam: (id: string) => request<import('../types').Team>(`/teams/${id}`),
+  getTeam: (id: string, params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<import('../types').Team>(`/teams/${id}${qs}`);
+  },
   createTeam: (data: Partial<import('../types').Team>) =>
     request<import('../types').Team>('/teams', { method: 'POST', body: JSON.stringify(data) }),
   updateTeam: (id: string, data: Partial<import('../types').Team>) =>
@@ -229,6 +232,22 @@ export const api = {
   getStandings: (seasonId: string, params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return request<import('../types').StandingsEntry[]>(`/seasons/${seasonId}/standings${qs}`);
+  },
+
+  // Competitions
+  getCompetitions: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<import('../types').Competition[]>(`/competitions${qs}`);
+  },
+  getCompetitionDivisions: (params: Record<string, string>) => {
+    const qs = '?' + new URLSearchParams(params).toString();
+    return request<import('../types').CompetitionDivision[]>(`/competition-divisions${qs}`);
+  },
+  getCompetitionDivisionStandings: (divisionId: string) =>
+    request<import('../types').StandingsEntry[]>(`/competition-divisions/${divisionId}/standings`),
+  getTeamCompetitionMemberships: (teamId: string, params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<import('../types').TeamCompetitionMembership[]>(`/teams/${teamId}/competition-memberships${qs}`);
   },
 
   // Seed

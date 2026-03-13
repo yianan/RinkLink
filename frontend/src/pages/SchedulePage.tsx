@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ban, CheckCircle2, Eye, Search, Trash2, XCircle } from 'lucide-react';
+import { Ban, CheckCircle2, Eye, Search, SlidersHorizontal, Trash2, XCircle } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -10,6 +10,7 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
@@ -25,23 +26,50 @@ const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> =
   confirmed: 'warning',
 };
 
+function toggleFilterValue(values: string[], nextValue: string) {
+  return values.includes(nextValue)
+    ? values.filter((value) => value !== nextValue)
+    : [...values, nextValue];
+}
+
+function getEntryStatusLabel(entry: ScheduleEntry) {
+  if (entry.blocked) return 'Blocked';
+  if (entry.status === 'confirmed') return 'Confirmed';
+  if (entry.status === 'scheduled') return 'Scheduled';
+  return 'Open';
+}
+
 export default function SchedulePage() {
   const { activeTeam } = useTeam();
   const { activeSeason, seasons } = useSeason();
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const navigate = useNavigate();
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'upcoming' | 'past' | 'calendar' | 'upload'>('upcoming');
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({ date: '', time: '', entry_type: 'home' });
+  const [selectedEntryTypes, setSelectedEntryTypes] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterButtonClass = 'h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25';
 
   const load = () => {
     if (!activeTeam) return;
+    let cancelled = false;
     const params: Record<string, string> = {};
     if (effectiveSeason) params.season_id = effectiveSeason.id;
-    api.getSchedule(activeTeam.id, params).then(setEntries);
+    setLoading(true);
+    api.getSchedule(activeTeam.id, params).then((data) => {
+      if (!cancelled) setEntries(data);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   };
-  useEffect(() => { load(); }, [activeTeam, effectiveSeason]); // eslint-disable-line
+  useEffect(() => load(), [activeTeam, effectiveSeason]); // eslint-disable-line
 
   const handleAdd = async () => {
     if (!activeTeam) return;
@@ -103,13 +131,48 @@ export default function SchedulePage() {
     if (dateCompare !== 0) return dateCompare;
     return (a.time || '').localeCompare(b.time || '');
   });
-  const upcomingEntries = sortedEntries.filter((entry) => entry.date >= todayStr);
-  const pastEntries = [...sortedEntries.filter((entry) => entry.date < todayStr)].reverse();
+  const entryTypeOptions = useMemo<FilterOption[]>(() => {
+    const values = Array.from(new Set(sortedEntries.map((entry) => entry.entry_type)));
+    return values.map((value) => ({ value, label: value === 'home' ? 'Home' : 'Away' }));
+  }, [sortedEntries]);
+
+  const statusOptions = useMemo<FilterOption[]>(() => {
+    const values = Array.from(new Set(sortedEntries.map((entry) => getEntryStatusLabel(entry))));
+    const order = ['Open', 'Scheduled', 'Confirmed', 'Blocked'];
+    return values
+      .sort((left, right) => order.indexOf(left) - order.indexOf(right))
+      .map((value) => ({ value, label: value }));
+  }, [sortedEntries]);
+
+  const filteredEntries = useMemo(() => sortedEntries.filter((entry) => {
+    const statusLabel = getEntryStatusLabel(entry);
+    return (selectedEntryTypes.length === 0 || selectedEntryTypes.includes(entry.entry_type))
+      && (selectedStatuses.length === 0 || selectedStatuses.includes(statusLabel));
+  }), [selectedEntryTypes, selectedStatuses, sortedEntries]);
+
+  const activeFilterBadges = useMemo(() => {
+    const labelsFor = (options: FilterOption[], selectedValues: string[]) =>
+      options.filter((option) => selectedValues.includes(option.value)).map((option) => option.label);
+    return [
+      ...labelsFor(entryTypeOptions, selectedEntryTypes),
+      ...labelsFor(statusOptions, selectedStatuses),
+    ];
+  }, [entryTypeOptions, selectedEntryTypes, selectedStatuses, statusOptions]);
+
+  const hasActiveFilters = activeFilterBadges.length > 0;
+
+  const clearFilters = () => {
+    setSelectedEntryTypes([]);
+    setSelectedStatuses([]);
+  };
+
+  const upcomingEntries = filteredEntries.filter((entry) => entry.date >= todayStr);
+  const pastEntries = [...filteredEntries.filter((entry) => entry.date < todayStr)].reverse();
   const displayedEntries = tab === 'past' ? pastEntries : upcomingEntries;
 
   // Calendar view: group by month
   const byMonth: Record<string, ScheduleEntry[]> = {};
-  sortedEntries.forEach((e) => {
+  filteredEntries.forEach((e) => {
     const month = e.date.substring(0, 7);
     (byMonth[month] ??= []).push(e);
   });
@@ -119,8 +182,81 @@ export default function SchedulePage() {
       <PageHeader
         title={`${activeTeam.name} Schedule`}
         subtitle="Manage upcoming dates, review past dates, and scan the full season calendar."
-        actions={<Button type="button" onClick={() => setAddOpen(true)}>Add Entry</Button>}
+        actions={(
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setFiltersOpen((open) => !open)}
+              className={filterButtonClass}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
+              {hasActiveFilters ? ` (${activeFilterBadges.length})` : ''}
+            </Button>
+            <Button type="button" onClick={() => setAddOpen(true)}>Add Entry</Button>
+          </>
+        )}
       />
+
+      {hasActiveFilters && !filtersOpen ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {activeFilterBadges.map((label, index) => (
+            <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
+              {label}
+            </Badge>
+          ))}
+          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+            Clear all
+          </Button>
+        </div>
+      ) : null}
+
+      {filtersOpen ? (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter schedule</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                Narrow the schedule by entry type and status across list and calendar views.
+              </div>
+            </div>
+            {hasActiveFilters ? (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+                Clear all
+              </Button>
+            ) : null}
+          </div>
+
+          {hasActiveFilters ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {activeFilterBadges.map((label, index) => (
+                <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
+                  {label}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="mt-4 grid gap-4 border-t border-[color:var(--app-border-subtle)] pt-4 xl:grid-cols-2">
+            <FilterPillGroup
+              label="Type"
+              options={entryTypeOptions}
+              values={selectedEntryTypes}
+              onToggle={(value) => setSelectedEntryTypes((current) => toggleFilterValue(current, value))}
+              tone="sky"
+            />
+            <FilterPillGroup
+              label="Status"
+              options={statusOptions}
+              values={selectedStatuses}
+              onToggle={(value) => setSelectedStatuses((current) => toggleFilterValue(current, value))}
+              tone="violet"
+            />
+          </div>
+        </Card>
+      ) : null}
 
       <SegmentedTabs
         items={[
@@ -136,7 +272,13 @@ export default function SchedulePage() {
       {(tab === 'upcoming' || tab === 'past') && (
         <Card className="overflow-hidden">
           <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
-            {displayedEntries.map((e) => (
+            {loading && (
+              <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                Loading schedule…
+              </div>
+            )}
+
+            {!loading && displayedEntries.map((e) => (
               <div key={e.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -225,9 +367,13 @@ export default function SchedulePage() {
               </div>
             ))}
 
-            {displayedEntries.length === 0 && (
+            {!loading && displayedEntries.length === 0 && (
               <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                {tab === 'past' ? 'No past schedule entries for this season.' : 'No upcoming schedule entries for this season.'}
+                {hasActiveFilters
+                  ? 'No schedule entries match the current filters.'
+                  : tab === 'past'
+                    ? 'No past schedule entries for this season.'
+                    : 'No upcoming schedule entries for this season.'}
               </div>
             )}
           </div>
@@ -247,7 +393,14 @@ export default function SchedulePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
-                {displayedEntries.map((e) => (
+                {loading && (
+                  <tr>
+                    <td colSpan={tab === 'upcoming' ? 8 : 7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                      Loading schedule…
+                    </td>
+                  </tr>
+                )}
+                {!loading && displayedEntries.map((e) => (
                   <tr key={e.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{e.date}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatTimeHHMM(e.time) || '-'}</td>
@@ -326,10 +479,14 @@ export default function SchedulePage() {
                   </tr>
                 ))}
 
-                {displayedEntries.length === 0 && (
+                {!loading && displayedEntries.length === 0 && (
                   <tr>
                     <td colSpan={tab === 'upcoming' ? 8 : 7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                      {tab === 'past' ? 'No past schedule entries for this season.' : 'No upcoming schedule entries for this season.'}
+                      {hasActiveFilters
+                        ? 'No schedule entries match the current filters.'
+                        : tab === 'past'
+                          ? 'No past schedule entries for this season.'
+                          : 'No upcoming schedule entries for this season.'}
                     </td>
                   </tr>
                 )}
@@ -341,7 +498,8 @@ export default function SchedulePage() {
 
       {tab === 'calendar' && (
         <div className="space-y-4">
-          {Object.entries(byMonth).sort().map(([month, monthEntries]) => (
+          {loading ? <div className="text-sm text-slate-600 dark:text-slate-400">Loading schedule…</div> : null}
+          {!loading && Object.entries(byMonth).sort().map(([month, monthEntries]) => (
               <div key={month} className="space-y-2">
               <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 {formatMonthYear(month) || month}
@@ -377,7 +535,11 @@ export default function SchedulePage() {
               </div>
             </div>
           ))}
-          {sortedEntries.length === 0 && <div className="text-sm text-slate-600 dark:text-slate-400">No schedule entries yet.</div>}
+          {!loading && filteredEntries.length === 0 && (
+            <div className="text-sm text-slate-600 dark:text-slate-400">
+              {hasActiveFilters ? 'No schedule entries match the current filters.' : 'No schedule entries yet.'}
+            </div>
+          )}
         </div>
       )}
 

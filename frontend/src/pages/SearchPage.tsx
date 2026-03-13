@@ -355,6 +355,11 @@ export default function SearchPage() {
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{r.team_name}</div>
                       <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{r.association_name}</div>
+                      {r.primary_competition_short_name && r.primary_division_name && (
+                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          {r.primary_competition_short_name} • {r.primary_division_name}
+                        </div>
+                      )}
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
                         <span className="whitespace-nowrap">{r.age_group} {r.level}</span>
                         <span className="whitespace-nowrap">Ranking: {r.myhockey_ranking ?? '—'}</span>
@@ -415,7 +420,14 @@ export default function SearchPage() {
                 <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                   {results.map((r) => (
                     <tr key={r.schedule_entry_id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
-                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{r.team_name}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-slate-900 dark:text-slate-100">{r.team_name}</div>
+                        {r.primary_competition_short_name && r.primary_division_name && (
+                          <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            {r.primary_competition_short_name} • {r.primary_division_name}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{r.association_name}</td>
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                         {r.age_group} {r.level}
@@ -483,6 +495,11 @@ export default function SearchPage() {
                       <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         {m.home_association_name} {m.home_time && `@ ${formatTimeHHMM(m.home_time) || m.home_time}`}
                       </div>
+                      {m.home_primary_competition_short_name && m.home_primary_division_name && (
+                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          {m.home_primary_competition_short_name} • {m.home_primary_division_name}
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-2">
@@ -490,6 +507,11 @@ export default function SearchPage() {
                       <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         {m.away_association_name} {m.away_time && `@ ${formatTimeHHMM(m.away_time) || m.away_time}`}
                       </div>
+                      {m.away_primary_competition_short_name && m.away_primary_division_name && (
+                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          {m.away_primary_competition_short_name} • {m.away_primary_division_name}
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
@@ -544,12 +566,22 @@ export default function SearchPage() {
                       <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         {m.home_association_name} {m.home_time && `@ ${formatTimeHHMM(m.home_time) || m.home_time}`}
                       </div>
+                      {m.home_primary_competition_short_name && m.home_primary_division_name && (
+                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          {m.home_primary_competition_short_name} • {m.home_primary_division_name}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900 dark:text-slate-100">{m.away_team_name}</div>
                       <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         {m.away_association_name} {m.away_time && `@ ${formatTimeHHMM(m.away_time) || m.away_time}`}
                       </div>
+                      {m.away_primary_competition_short_name && m.away_primary_division_name && (
+                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          {m.away_primary_competition_short_name} • {m.away_primary_division_name}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{m.distance_miles != null ? `${m.distance_miles} mi` : '-'}</td>
                     <td className="px-4 py-3">

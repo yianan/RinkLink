@@ -8,6 +8,8 @@ Create Date: 2026-03-10 16:25:00.000000
 
 from __future__ import annotations
 
+import uuid
+from datetime import date
 from typing import Sequence, Union
 
 from alembic import op
@@ -31,7 +33,18 @@ def upgrade() -> None:
         .limit(1)
     ).scalar()
     if not default_season_id:
-        raise RuntimeError("Cannot backfill players.season_id without at least one season")
+        today = date.today()
+        season_start_year = today.year if today.month >= 8 else today.year - 1
+        default_season_id = str(uuid.uuid4())
+        bind.execute(
+            sa.insert(seasons).values(
+                id=default_season_id,
+                name=f"{season_start_year}-{season_start_year + 1}",
+                start_date=date(season_start_year, 8, 1),
+                end_date=date(season_start_year + 1, 7, 31),
+                is_active=True,
+            )
+        )
 
     with op.batch_alter_table("players") as batch_op:
         batch_op.add_column(sa.Column("season_id", sa.String(length=36), nullable=True))

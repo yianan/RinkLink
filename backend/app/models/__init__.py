@@ -11,6 +11,7 @@ from .rink import Rink, IceSlot
 from .proposal_rink_preference import ProposalRinkPreference
 from .practice_booking import PracticeBooking
 from .season import Season, TeamSeasonRecord
+from .competition import Competition, CompetitionDivision, TeamCompetitionMembership
 
 __all__ = [
     "Association",
@@ -31,4 +32,7 @@ __all__ = [
     "PracticeBooking",
     "Season",
     "TeamSeasonRecord",
+    "Competition",
+    "CompetitionDivision",
+    "TeamCompetitionMembership",
 ]

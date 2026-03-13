@@ -32,3 +32,4 @@ class Team(Base):
 
     association = relationship("Association", back_populates="teams")
     schedule_entries = relationship("ScheduleEntry", back_populates="team", cascade="all, delete-orphan", foreign_keys="[ScheduleEntry.team_id]")
+    competition_memberships = relationship("TeamCompetitionMembership", back_populates="team", cascade="all, delete-orphan", foreign_keys="[TeamCompetitionMembership.team_id]")

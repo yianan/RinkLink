@@ -6,7 +6,11 @@ const GAME_TYPES = [
   { value: '', label: '—' },
   { value: 'league', label: 'League' },
   { value: 'non_league', label: 'Non-League' },
+  { value: 'showcase', label: 'Showcase' },
   { value: 'tournament', label: 'Tournament' },
+  { value: 'state_tournament', label: 'State Tournament' },
+  { value: 'district', label: 'District' },
+  { value: 'scrimmage', label: 'Scrimmage' },
 ];
 
 const PENALTY_OPTIONS = [
@@ -42,6 +46,7 @@ import { Input } from '../components/ui/Input';
 import PageHeader from '../components/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
+import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
 import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
 import { accentActionClass } from '../lib/uiClasses';
 import { formatTimeHHMM } from '../lib/time';
@@ -322,7 +327,13 @@ export default function GamePage() {
               <Badge variant={game.home_weekly_confirmed ? 'success' : 'outline'}>{homeName} confirmed</Badge>
               <Badge variant={game.away_weekly_confirmed ? 'success' : 'outline'}>{awayName} confirmed</Badge>
               <Badge variant={getGameStatusVariant(game)}>{statusLabel}</Badge>
+              {game.game_type && <Badge variant={getCompetitionBadgeVariant(game.game_type)}>{getCompetitionLabel(game.game_type)}</Badge>}
             </div>
+            {game.competition_short_name && game.division_name && (
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                {game.competition_short_name} • {game.division_name}
+              </div>
+            )}
             {rinkLabel ? (
               <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
                 <MapPin className="mt-0.5 h-4 w-4 text-slate-500 dark:text-slate-400" />

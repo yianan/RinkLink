@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from ..models import Team, ScheduleEntry, Association, GameProposal
 from ..schemas.search import AutoMatchResult
 from .distance import get_distance
+from .competitions import primary_membership_for_team
 
 
 def find_auto_matches(db: Session, team_id: str) -> list[AutoMatchResult]:
@@ -39,6 +40,8 @@ def find_auto_matches(db: Session, team_id: str) -> list[AutoMatchResult]:
             )
             .all()
         )
+        if entry.season_id:
+            matches = [match for match in matches if match.season_id == entry.season_id]
 
         for m in matches:
             opp_team = db.get(Team, m.team_id)
@@ -46,15 +49,19 @@ def find_auto_matches(db: Session, team_id: str) -> list[AutoMatchResult]:
                 continue
             opp_assoc = db.get(Association, opp_team.association_id)
             my_assoc = db.get(Association, team.association_id)
+            my_membership = primary_membership_for_team(db, team.id, entry.season_id)
+            opp_membership = primary_membership_for_team(db, opp_team.id, m.season_id)
 
             if entry.entry_type == "home":
                 home_team, away_team = team, opp_team
                 home_entry, away_entry = entry, m
                 home_assoc, away_assoc = my_assoc, opp_assoc
+                home_membership, away_membership = my_membership, opp_membership
             else:
                 home_team, away_team = opp_team, team
                 home_entry, away_entry = m, entry
                 home_assoc, away_assoc = opp_assoc, my_assoc
+                home_membership, away_membership = opp_membership, my_membership
 
             dist = get_distance(db, team.rink_zip, opp_team.rink_zip)
 
@@ -71,6 +78,10 @@ def find_auto_matches(db: Session, team_id: str) -> list[AutoMatchResult]:
                 home_time=home_entry.time,
                 away_time=away_entry.time,
                 distance_miles=dist,
+                home_primary_competition_short_name=home_membership.competition_short_name if home_membership else None,
+                home_primary_division_name=home_membership.division_name if home_membership else None,
+                away_primary_competition_short_name=away_membership.competition_short_name if away_membership else None,
+                away_primary_division_name=away_membership.division_name if away_membership else None,
             ))
 
     if results:

@@ -67,4 +67,11 @@ def enrich_game(g: Game, db: Session) -> GameOut:
         elif home_assoc:
             out.location_label = _location_label_from_association(home_assoc)
 
+    if g.competition_division:
+        out.competition_division_id = g.competition_division.id
+        out.division_name = g.competition_division.name
+        if g.competition_division.competition:
+            out.competition_name = g.competition_division.competition.name
+            out.competition_short_name = g.competition_division.competition.short_name
+
     return out

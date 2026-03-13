@@ -4,10 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Game, Team, ScheduleEntry
+from ..models import Game, Team, ScheduleEntry, CompetitionDivision
 from ..models.rink import IceSlot
 from ..schemas import GameOut, GameUpdate, WeeklyConfirmUpdate
 from ..services.game_view import enrich_game
+from ..services.competitions import normalize_game_competition
 from ..services.records import is_recordable_game, recompute_team_records
 
 router = APIRouter(tags=["games"])
@@ -54,7 +55,12 @@ def update_game(id: str, body: GameUpdate, db: Session = Depends(get_db)):
         raise HTTPException(404, "Game not found")
     was_recordable = is_recordable_game(g)
     for k, v in body.model_dump(exclude_unset=True).items():
+        if k == "competition_division_id" and v is not None and not db.get(CompetitionDivision, v):
+            raise HTTPException(400, "Competition division not found")
         setattr(g, k, v)
+    normalize_game_competition(g, db)
+    if body.counts_for_standings is not None and g.competition_division_id:
+        g.counts_for_standings = body.counts_for_standings
     # Auto-finalize when both scores are provided and status wasn't explicitly set
     if body.home_score is not None and body.away_score is not None and "status" not in body.model_fields_set:
         g.status = "final"

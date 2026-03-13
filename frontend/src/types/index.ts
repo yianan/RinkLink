@@ -5,9 +5,59 @@ export interface Association {
   city: string;
   state: string;
   zip_code: string;
-  league_affiliation: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface TeamCompetitionMembership {
+  id: string;
+  team_id: string;
+  season_id: string;
+  competition_division_id: string;
+  membership_role: string;
+  is_primary: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  competition_name: string | null;
+  competition_short_name: string | null;
+  competition_type: string | null;
+  division_name: string | null;
+  age_group: string | null;
+  level: string | null;
+  standings_enabled: boolean;
+}
+
+export interface CompetitionDivision {
+  id: string;
+  competition_id: string;
+  season_id: string;
+  name: string;
+  age_group: string;
+  level: string;
+  standings_enabled: boolean;
+  sort_order: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  competition_name: string | null;
+  competition_short_name: string | null;
+  competition_type: string | null;
+  member_count: number;
+}
+
+export interface Competition {
+  id: string;
+  name: string;
+  short_name: string;
+  governing_body: string;
+  competition_type: string;
+  region: string;
+  website: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  divisions: CompetitionDivision[];
 }
 
 export interface Team {
@@ -27,6 +77,8 @@ export interface Team {
   losses: number;
   ties: number;
   association_name: string | null;
+  primary_membership: TeamCompetitionMembership | null;
+  memberships: TeamCompetitionMembership[];
   created_at: string;
   updated_at: string;
 }
@@ -108,6 +160,8 @@ export interface OpponentResult {
   entry_date: string;
   entry_time: string | null;
   entry_type: string;
+  primary_competition_short_name: string | null;
+  primary_division_name: string | null;
   has_existing_proposal: boolean;
   existing_proposal_id: string | null;
   existing_proposal_status: string | null;
@@ -166,6 +220,10 @@ export interface AutoMatchResult {
   home_time: string | null;
   away_time: string | null;
   distance_miles: number | null;
+  home_primary_competition_short_name: string | null;
+  home_primary_division_name: string | null;
+  away_primary_competition_short_name: string | null;
+  away_primary_division_name: string | null;
   has_existing_proposal: boolean;
   existing_proposal_id: string | null;
   existing_proposal_status: string | null;
@@ -204,10 +262,12 @@ export interface Game {
   proposal_id: string | null;
   ice_slot_id: string | null;
   season_id: string | null;
+  competition_division_id: string | null;
   date: string;
   time: string | null;
   status: string;
-  game_type: 'league' | 'non_league' | 'tournament' | null;
+  game_type: 'league' | 'non_league' | 'showcase' | 'tournament' | 'state_tournament' | 'district' | 'scrimmage' | null;
+  counts_for_standings: boolean;
   home_weekly_confirmed: boolean;
   away_weekly_confirmed: boolean;
   home_score: number | null;
@@ -224,6 +284,9 @@ export interface Game {
   rink_state: string | null;
   rink_zip: string | null;
   location_label: string | null;
+  competition_name: string | null;
+  competition_short_name: string | null;
+  division_name: string | null;
 }
 
 export interface Season {
@@ -233,17 +296,6 @@ export interface Season {
   end_date: string;
   is_active: boolean;
   game_count: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface TeamSeasonRecord {
-  id: string;
-  team_id: string;
-  season_id: string;
-  wins: number;
-  losses: number;
-  ties: number;
   created_at: string;
   updated_at: string;
 }
@@ -259,6 +311,17 @@ export interface StandingsEntry {
   ties: number;
   points: number;
   games_played: number;
+}
+
+export interface TeamSeasonRecord {
+  id: string;
+  team_id: string;
+  season_id: string;
+  wins: number;
+  losses: number;
+  ties: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Notification {

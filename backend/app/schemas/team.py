@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pydantic import BaseModel
+from .competition import TeamCompetitionMembershipOut
 
 
 class TeamCreate(BaseModel):
@@ -48,6 +49,8 @@ class TeamOut(BaseModel):
     losses: int
     ties: int
     association_name: str | None = None
+    primary_membership: TeamCompetitionMembershipOut | None = None
+    memberships: list[TeamCompetitionMembershipOut] = []
     created_at: datetime
     updated_at: datetime
 

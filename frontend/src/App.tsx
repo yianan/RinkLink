@@ -6,6 +6,7 @@ import {
   ClipboardList,
   ClipboardSignature,
   Dumbbell,
+  Flag,
   Home,
   Inbox,
   Menu,
@@ -33,6 +34,7 @@ import PracticePage from './pages/PracticePage';
 import RinkListPage from './pages/RinkListPage';
 import IceSlotsPage from './pages/IceSlotsPage';
 import StandingsPage from './pages/StandingsPage';
+import CompetitionsPage from './pages/CompetitionsPage';
 import { cn } from './lib/cn';
 import { useTeam } from './context/TeamContext';
 import { useSeason } from './context/SeasonContext';
@@ -40,6 +42,7 @@ import { useSeason } from './context/SeasonContext';
 const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: Home },
   { path: '/associations', label: 'Associations', icon: Building2 },
+  { path: '/competitions', label: 'Competitions', icon: Flag },
   { path: '/standings', label: 'Standings', icon: Trophy },
   { path: '/teams', label: 'Teams', icon: Users },
   { path: '/roster', label: 'Roster', icon: ClipboardList },
@@ -154,6 +157,7 @@ function AppContent() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/associations" element={<AssociationListPage />} />
+              <Route path="/competitions" element={<CompetitionsPage />} />
               <Route path="/standings" element={<StandingsPage />} />
               <Route path="/teams" element={<TeamListPage />} />
               <Route path="/roster" element={<RosterPage />} />

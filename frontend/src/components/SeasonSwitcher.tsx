@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 
 const HIDE_SEASON_SWITCHER_PATHS = ['/associations', '/rinks'];
-const REQUIRE_SPECIFIC_SEASON_PATHS = ['/standings', '/schedule', '/search', '/practice', '/proposals', '/roster'];
+const REQUIRE_SPECIFIC_SEASON_PATHS = ['/standings', '/schedule', '/search', '/practice', '/proposals', '/roster', '/competitions'];
 
 export default function SeasonSwitcher() {
   const { seasons, activeSeason, setActiveSeason, loading } = useSeason();

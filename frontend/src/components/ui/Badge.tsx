@@ -1,7 +1,7 @@
 import type React from 'react';
 import { cn } from '../../lib/cn';
 
-type BadgeVariant = 'neutral' | 'success' | 'info' | 'warning' | 'danger' | 'outline';
+type BadgeVariant = 'neutral' | 'success' | 'info' | 'warning' | 'danger' | 'outline' | 'accent';
 
 export type BadgeProps = React.HTMLAttributes<HTMLSpanElement> & {
   variant?: BadgeVariant;
@@ -14,6 +14,7 @@ const variants: Record<BadgeVariant, string> = {
   warning: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-200',
   danger: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/25 dark:text-rose-200',
   outline: 'border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-950/20 dark:text-slate-300',
+  accent: 'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-900/60 dark:bg-violet-950/25 dark:text-violet-200',
 };
 
 export function Badge({ className, variant = 'neutral', ...props }: BadgeProps) {

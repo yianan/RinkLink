@@ -10,7 +10,6 @@ class AssociationCreate(BaseModel):
     city: str = ""
     state: str = ""
     zip_code: str = ""
-    league_affiliation: str | None = None
 
 
 class AssociationUpdate(BaseModel):
@@ -19,7 +18,6 @@ class AssociationUpdate(BaseModel):
     city: str | None = None
     state: str | None = None
     zip_code: str | None = None
-    league_affiliation: str | None = None
 
 
 class AssociationOut(BaseModel):
@@ -29,7 +27,6 @@ class AssociationOut(BaseModel):
     city: str
     state: str
     zip_code: str
-    league_affiliation: str | None
     created_at: datetime
     updated_at: datetime
 

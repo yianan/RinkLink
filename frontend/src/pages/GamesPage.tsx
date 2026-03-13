@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save } from 'lucide-react';
+import { Save, SlidersHorizontal } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -9,11 +9,13 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
 import { cn } from '../lib/cn';
+import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
 import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
 import { formatDate, formatTimeHHMM } from '../lib/time';
 
@@ -21,14 +23,12 @@ const GAME_TYPES = [
   { value: '', label: '—' },
   { value: 'league', label: 'League' },
   { value: 'non_league', label: 'Non-League' },
+  { value: 'showcase', label: 'Showcase' },
   { value: 'tournament', label: 'Tournament' },
+  { value: 'state_tournament', label: 'State Tournament' },
+  { value: 'district', label: 'District' },
+  { value: 'scrimmage', label: 'Scrimmage' },
 ];
-
-const gameTypeColors: Record<string, 'info' | 'success' | 'warning' | 'neutral'> = {
-  league: 'info',
-  non_league: 'neutral',
-  tournament: 'success',
-};
 
 const statusColors: Record<string, 'info' | 'warning' | 'success' | 'neutral'> = {
   scheduled: 'info',
@@ -41,6 +41,12 @@ function digitsOnly(value: string) {
   return value.replace(/\D+/g, '');
 }
 
+function toggleFilterValue(values: string[], nextValue: string) {
+  return values.includes(nextValue)
+    ? values.filter((value) => value !== nextValue)
+    : [...values, nextValue];
+}
+
 export default function GamesPage() {
   const { activeTeam } = useTeam();
   const { activeSeason } = useSeason();
@@ -50,6 +56,10 @@ export default function GamesPage() {
   const [scoreEdits, setScoreEdits] = useState<Record<string, { home: string; away: string }>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedVenues, setSelectedVenues] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     if (!activeTeam) return;
@@ -107,17 +117,72 @@ export default function GamesPage() {
     return games.filter((g) => g.date >= activeSeason.start_date && g.date <= activeSeason.end_date);
   }, [activeSeason, games]);
 
+  const typeOptions = useMemo<FilterOption[]>(() => {
+    const values = Array.from(new Set(seasonScopedGames.map((game) => game.game_type || '__unset__')));
+    return values.map((value) => ({
+      value,
+      label: value === '__unset__' ? 'Unassigned' : getCompetitionLabel(value),
+    }));
+  }, [seasonScopedGames]);
+
+  const statusOptions = useMemo<FilterOption[]>(() => {
+    const values = Array.from(new Set(seasonScopedGames.map((game) => getGameStatusLabel(game))));
+    const order = ['Scheduled', 'Home confirmed', 'Away confirmed', 'Both confirmed', 'Final', 'Cancelled'];
+    return values
+      .sort((left, right) => order.indexOf(left) - order.indexOf(right))
+      .map((value) => ({ value, label: value }));
+  }, [seasonScopedGames]);
+
+  const venueOptions = useMemo<FilterOption[]>(() => {
+    if (!activeTeam) return [];
+    const values = Array.from(
+      new Set(seasonScopedGames.map((game) => (game.home_team_id === activeTeam.id ? 'Home' : 'Away'))),
+    );
+    return values.map((value) => ({ value, label: value }));
+  }, [activeTeam, seasonScopedGames]);
+
+  const filteredByOptionsGames = useMemo(() => {
+    if (!activeTeam) return seasonScopedGames;
+    return seasonScopedGames.filter((game) => {
+      const gameType = game.game_type || '__unset__';
+      const status = getGameStatusLabel(game);
+      const venue = game.home_team_id === activeTeam.id ? 'Home' : 'Away';
+      return (selectedTypes.length === 0 || selectedTypes.includes(gameType))
+        && (selectedStatuses.length === 0 || selectedStatuses.includes(status))
+        && (selectedVenues.length === 0 || selectedVenues.includes(venue));
+    });
+  }, [activeTeam, seasonScopedGames, selectedStatuses, selectedTypes, selectedVenues]);
+
+  const activeFilterBadges = useMemo(() => {
+    const labelsFor = (options: FilterOption[], selectedValues: string[]) =>
+      options.filter((option) => selectedValues.includes(option.value)).map((option) => option.label);
+    return [
+      ...labelsFor(typeOptions, selectedTypes),
+      ...labelsFor(statusOptions, selectedStatuses),
+      ...labelsFor(venueOptions, selectedVenues),
+    ];
+  }, [selectedStatuses, selectedTypes, selectedVenues, statusOptions, typeOptions, venueOptions]);
+
+  const hasActiveFilters = activeFilterBadges.length > 0;
+  const filterButtonClass = 'h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25';
+
+  const clearFilters = () => {
+    setSelectedTypes([]);
+    setSelectedStatuses([]);
+    setSelectedVenues([]);
+  };
+
   const counts = useMemo(() => {
-    const upcoming = seasonScopedGames.filter((g) => g.date >= todayStr).length;
-    const past = seasonScopedGames.filter((g) => g.date < todayStr).length;
-    return { upcoming, past, all: seasonScopedGames.length };
-  }, [seasonScopedGames, todayStr]);
+    const upcoming = filteredByOptionsGames.filter((g) => g.date >= todayStr).length;
+    const past = filteredByOptionsGames.filter((g) => g.date < todayStr).length;
+    return { upcoming, past, all: filteredByOptionsGames.length };
+  }, [filteredByOptionsGames, todayStr]);
 
   const filtered = useMemo(() => {
-    if (tab === 2) return seasonScopedGames;
-    if (tab === 0) return seasonScopedGames.filter((g) => g.date >= todayStr);
-    return seasonScopedGames.filter((g) => g.date < todayStr);
-  }, [seasonScopedGames, tab, todayStr]);
+    if (tab === 2) return filteredByOptionsGames;
+    if (tab === 0) return filteredByOptionsGames.filter((g) => g.date >= todayStr);
+    return filteredByOptionsGames.filter((g) => g.date < todayStr);
+  }, [filteredByOptionsGames, tab, todayStr]);
 
   if (!activeTeam) {
     return <Alert variant="info">Select a team to view games.</Alert>;
@@ -125,7 +190,89 @@ export default function GamesPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Games" subtitle="Accepted non-league games with scoresheets and weekly confirmation." />
+      <PageHeader
+        title="Games"
+        subtitle="League, showcase, and non-league games with scoresheets and weekly confirmation."
+        actions={(
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setFiltersOpen((open) => !open)}
+            className={filterButtonClass}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+            {hasActiveFilters ? ` (${activeFilterBadges.length})` : ''}
+          </Button>
+        )}
+      />
+
+      {hasActiveFilters && !filtersOpen ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {activeFilterBadges.map((label, index) => (
+            <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
+              {label}
+            </Badge>
+          ))}
+          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+            Clear all
+          </Button>
+        </div>
+      ) : null}
+
+      {filtersOpen ? (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter games</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                Narrow the list by game type, status, and whether the game is home or away.
+              </div>
+            </div>
+            {hasActiveFilters ? (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+                Clear all
+              </Button>
+            ) : null}
+          </div>
+
+          {hasActiveFilters ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {activeFilterBadges.map((label, index) => (
+                <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
+                  {label}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="mt-4 grid gap-4 border-t border-[color:var(--app-border-subtle)] pt-4 xl:grid-cols-3">
+            <FilterPillGroup
+              label="Type"
+              options={typeOptions}
+              values={selectedTypes}
+              onToggle={(value) => setSelectedTypes((current) => toggleFilterValue(current, value))}
+              tone="sky"
+            />
+            <FilterPillGroup
+              label="Status"
+              options={statusOptions}
+              values={selectedStatuses}
+              onToggle={(value) => setSelectedStatuses((current) => toggleFilterValue(current, value))}
+              tone="violet"
+            />
+            <FilterPillGroup
+              label="Venue"
+              options={venueOptions}
+              values={selectedVenues}
+              onToggle={(value) => setSelectedVenues((current) => toggleFilterValue(current, value))}
+              tone="emerald"
+            />
+          </div>
+        </Card>
+      ) : null}
+
 
       <SegmentedTabs
         items={[
@@ -151,7 +298,6 @@ export default function GamesPage() {
             const isHome = activeTeam.id === g.home_team_id;
             const opponent = isHome ? g.away_team_name : g.home_team_name;
             const edit = scoreEdits[g.id] || { home: '', away: '' };
-            const gameTypeLabel = GAME_TYPES.find((t) => t.value === g.game_type)?.label ?? g.game_type;
             const statusLabel = getGameStatusLabel(g);
 
             return (
@@ -174,8 +320,13 @@ export default function GamesPage() {
                   <div className="mt-3 text-base font-semibold text-slate-900 dark:text-slate-100">{opponent || '—'}</div>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Badge variant={isHome ? 'success' : 'info'}>{isHome ? 'Home' : 'Away'}</Badge>
-                    {g.game_type && <Badge variant={gameTypeColors[g.game_type] || 'neutral'}>{gameTypeLabel}</Badge>}
+                    {g.game_type && <Badge variant={getCompetitionBadgeVariant(g.game_type)}>{getCompetitionLabel(g.game_type)}</Badge>}
                   </div>
+                  {g.competition_short_name && g.division_name && (
+                    <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      {g.competition_short_name} • {g.division_name}
+                    </div>
+                  )}
                   <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                     {g.rink_name
                       ? `${g.rink_name}${g.rink_city ? ` • ${g.rink_city}, ${g.rink_state}` : ''}`
@@ -308,16 +459,23 @@ export default function GamesPage() {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <Select
-                        value={g.game_type ?? ''}
-                        onChange={(e) => handleTypeChange(g.id, e.target.value)}
-                        className="w-full"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {GAME_TYPES.map((t) => (
-                          <option key={t.value} value={t.value}>{t.label}</option>
-                        ))}
-                      </Select>
+                      <div className="space-y-1.5">
+                        <Select
+                          value={g.game_type ?? ''}
+                          onChange={(e) => handleTypeChange(g.id, e.target.value)}
+                          className="w-full"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {GAME_TYPES.map((t) => (
+                            <option key={t.value} value={t.value}>{t.label}</option>
+                          ))}
+                        </Select>
+                        {g.competition_short_name && g.division_name && (
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            {g.competition_short_name} • {g.division_name}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       <Badge

@@ -9,6 +9,7 @@ from ..models.rink import Rink, IceSlot
 from ..schemas.search import OpponentResult, AutoMatchResult
 from ..schemas.rink import IceSlotOut
 from ..services.distance import get_distance
+from ..services.competitions import primary_membership_for_team
 from ..services.matching import find_auto_matches
 
 router = APIRouter(tags=["search"])
@@ -73,6 +74,8 @@ def search_opponents(
             Team.id != team_id,
         )
     )
+    if my_entry.season_id:
+        q = q.filter(ScheduleEntry.season_id == my_entry.season_id)
 
     target_age = age_group or team.age_group
     q = q.filter(Team.age_group == target_age)
@@ -117,6 +120,7 @@ def search_opponents(
         if not opp_team:
             continue
         assoc = db.get(Association, opp_team.association_id)
+        membership = primary_membership_for_team(db, opp_team.id, my_entry.season_id)
 
         dist = get_distance(db, base_zip, opp_team.rink_zip)
         if max_distance_miles is not None and dist is not None and dist > max_distance_miles:
@@ -136,6 +140,8 @@ def search_opponents(
             entry_date=entry.date,
             entry_time=entry.time,
             entry_type=entry.entry_type,
+            primary_competition_short_name=membership.competition_short_name if membership else None,
+            primary_division_name=membership.division_name if membership else None,
             has_existing_proposal=existing is not None,
             existing_proposal_id=existing.id if existing else None,
             existing_proposal_status=existing.status if existing else None,

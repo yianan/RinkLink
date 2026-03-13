@@ -18,7 +18,6 @@ class Association(Base):
     city: Mapped[str] = mapped_column(String(100), default="")
     state: Mapped[str] = mapped_column(String(2), default="")
     zip_code: Mapped[str] = mapped_column(String(10), default="")
-    league_affiliation: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

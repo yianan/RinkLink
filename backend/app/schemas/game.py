@@ -14,10 +14,12 @@ class GameOut(BaseModel):
     proposal_id: str | None
     ice_slot_id: str | None
     season_id: str | None = None
+    competition_division_id: str | None = None
     date: dt.date
     time: dt.time | None
     status: str
     game_type: str | None
+    counts_for_standings: bool
     home_weekly_confirmed: bool
     away_weekly_confirmed: bool
     home_score: int | None
@@ -36,6 +38,9 @@ class GameOut(BaseModel):
     rink_state: str | None = None
     rink_zip: str | None = None
     location_label: str | None = None
+    competition_name: str | None = None
+    competition_short_name: str | None = None
+    division_name: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -43,6 +48,8 @@ class GameOut(BaseModel):
 class GameUpdate(BaseModel):
     status: str | None = None
     game_type: str | None = None
+    competition_division_id: str | None = None
+    counts_for_standings: bool | None = None
     home_score: int | None = None
     away_score: int | None = None
 

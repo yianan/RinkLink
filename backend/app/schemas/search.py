@@ -16,6 +16,8 @@ class OpponentResult(BaseModel):
     entry_date: dt.date
     entry_time: Optional[dt.time]
     entry_type: str
+    primary_competition_short_name: Optional[str] = None
+    primary_division_name: Optional[str] = None
     has_existing_proposal: bool = False
     existing_proposal_id: Optional[str] = None
     existing_proposal_status: Optional[str] = None
@@ -34,6 +36,10 @@ class AutoMatchResult(BaseModel):
     home_time: Optional[dt.time]
     away_time: Optional[dt.time]
     distance_miles: Optional[float]
+    home_primary_competition_short_name: Optional[str] = None
+    home_primary_division_name: Optional[str] = None
+    away_primary_competition_short_name: Optional[str] = None
+    away_primary_division_name: Optional[str] = None
     has_existing_proposal: bool = False
     existing_proposal_id: Optional[str] = None
     existing_proposal_status: Optional[str] = None

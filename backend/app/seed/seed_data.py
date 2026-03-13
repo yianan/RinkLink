@@ -5,6 +5,9 @@ from sqlalchemy.orm import Session
 
 from ..models import (
     Association,
+    Competition,
+    CompetitionDivision,
+    TeamCompetitionMembership,
     Team,
     ScheduleEntry,
     GameProposal,
@@ -57,6 +60,9 @@ def seed_demo_data(db: Session):
     db.query(IceSlot).delete()
     db.query(Rink).delete()
     db.query(ScheduleEntry).delete()
+    db.query(TeamCompetitionMembership).delete()
+    db.query(CompetitionDivision).delete()
+    db.query(Competition).delete()
     db.query(Season).delete()
     db.query(Team).delete()
     db.query(Association).delete()
@@ -126,6 +132,211 @@ def seed_demo_data(db: Session):
              rink_city="Wilmette", rink_state="IL", rink_zip="60091"),
     ]
     db.add_all(teams)
+    db.commit()
+
+    csdhl_id = _id()
+    nihl_id = _id()
+    cuhl_id = _id()
+    ahai_state_id = _id()
+    central_district_id = _id()
+    ccm_showcase_id = _id()
+    six_u_jamboree_id = _id()
+    competitions = [
+        Competition(
+            id=csdhl_id,
+            name="Central States Development Hockey League",
+            short_name="CSDHL",
+            governing_body="AHAI",
+            competition_type="league",
+            region="Illinois",
+            website="https://www.csdhl.org",
+            notes="Primary travel league for the seeded 14U AA teams.",
+        ),
+        Competition(
+            id=nihl_id,
+            name="Northern Illinois Hockey League",
+            short_name="NIHL",
+            governing_body="AHAI",
+            competition_type="league",
+            region="Illinois",
+            website="https://www.nihl.info",
+            notes="Primary travel league for the seeded 12U A teams.",
+        ),
+        Competition(
+            id=cuhl_id,
+            name="Chicago United Hockey League",
+            short_name="CUHL",
+            governing_body="AHAI",
+            competition_type="league",
+            region="Illinois",
+            website="https://www.cuhl.org",
+            notes="ADM-style 8U competition that does not keep standings.",
+        ),
+        Competition(
+            id=ahai_state_id,
+            name="AHAI State Championship",
+            short_name="AHAI State",
+            governing_body="AHAI",
+            competition_type="state_tournament",
+            region="Illinois",
+            website="https://www.ahai2.org",
+            notes="Secondary postseason competition for seeded travel teams.",
+        ),
+        Competition(
+            id=central_district_id,
+            name="USA Hockey Central District Championship",
+            short_name="Central District",
+            governing_body="USA Hockey",
+            competition_type="district",
+            region="Central District",
+            website="https://www.usahockey.com/centraldistrict",
+            notes="District pathway for the seeded 14U AA teams.",
+        ),
+        Competition(
+            id=ccm_showcase_id,
+            name="CCM Windy City Showcase",
+            short_name="CCM Showcase",
+            governing_body="Independent",
+            competition_type="showcase",
+            region="Chicago",
+            notes="Showcase weekends that do not affect standings.",
+        ),
+        Competition(
+            id=six_u_jamboree_id,
+            name="AHAI 6U Jamboree Circuit",
+            short_name="6U Jamboree",
+            governing_body="AHAI",
+            competition_type="festival",
+            region="Illinois",
+            website="https://www.ahai2.org",
+            notes="Developmental play for beginner 6U teams.",
+        ),
+    ]
+    db.add_all(competitions)
+    db.commit()
+
+    csdhl_14u_division_id = _id()
+    nihl_12u_division_id = _id()
+    cuhl_8u_division_id = _id()
+    ahai_state_14u_division_id = _id()
+    ahai_state_12u_division_id = _id()
+    central_district_14u_division_id = _id()
+    ccm_showcase_14u_division_id = _id()
+    six_u_jamboree_division_id = _id()
+    divisions = [
+        CompetitionDivision(
+            id=csdhl_14u_division_id,
+            competition_id=csdhl_id,
+            season_id=global_season_id,
+            name="14U Prospects AA",
+            age_group="14U",
+            level="AA",
+            standings_enabled=True,
+            sort_order=10,
+            notes="Standings-enabled division for the seeded 14U AA teams.",
+        ),
+        CompetitionDivision(
+            id=nihl_12u_division_id,
+            competition_id=nihl_id,
+            season_id=global_season_id,
+            name="12U A Gold",
+            age_group="12U",
+            level="A",
+            standings_enabled=True,
+            sort_order=20,
+            notes="Standings-enabled division for the seeded 12U A teams.",
+        ),
+        CompetitionDivision(
+            id=cuhl_8u_division_id,
+            competition_id=cuhl_id,
+            season_id=global_season_id,
+            name="8U ADM Jamboree",
+            age_group="8U",
+            level="Mixed",
+            standings_enabled=False,
+            sort_order=30,
+            notes="8U teams play jamboree-style games with no standings.",
+        ),
+        CompetitionDivision(
+            id=ahai_state_14u_division_id,
+            competition_id=ahai_state_id,
+            season_id=global_season_id,
+            name="14U AA State Playoffs",
+            age_group="14U",
+            level="AA",
+            standings_enabled=False,
+            sort_order=40,
+            notes="Postseason bracket play.",
+        ),
+        CompetitionDivision(
+            id=ahai_state_12u_division_id,
+            competition_id=ahai_state_id,
+            season_id=global_season_id,
+            name="12U A State Playoffs",
+            age_group="12U",
+            level="A",
+            standings_enabled=False,
+            sort_order=41,
+            notes="Postseason bracket play.",
+        ),
+        CompetitionDivision(
+            id=central_district_14u_division_id,
+            competition_id=central_district_id,
+            season_id=global_season_id,
+            name="14U AA District Qualifier",
+            age_group="14U",
+            level="AA",
+            standings_enabled=False,
+            sort_order=50,
+            notes="District play for high-performing 14U AA teams.",
+        ),
+        CompetitionDivision(
+            id=ccm_showcase_14u_division_id,
+            competition_id=ccm_showcase_id,
+            season_id=global_season_id,
+            name="14U Invite Division",
+            age_group="14U",
+            level="AA",
+            standings_enabled=False,
+            sort_order=60,
+            notes="Showcase competition for seeded 14U teams.",
+        ),
+        CompetitionDivision(
+            id=six_u_jamboree_division_id,
+            competition_id=six_u_jamboree_id,
+            season_id=global_season_id,
+            name="6U Beginner Circuit",
+            age_group="6U",
+            level="Beginner",
+            standings_enabled=False,
+            sort_order=70,
+            notes="Developmental schedule for beginner 6U teams.",
+        ),
+    ]
+    db.add_all(divisions)
+    db.commit()
+
+    memberships = []
+    for team_id in (t1_id, t3_id, t5_id):
+        memberships.extend([
+            TeamCompetitionMembership(team_id=team_id, season_id=global_season_id, competition_division_id=csdhl_14u_division_id, membership_role="primary", is_primary=True, sort_order=10),
+            TeamCompetitionMembership(team_id=team_id, season_id=global_season_id, competition_division_id=ahai_state_14u_division_id, membership_role="postseason", is_primary=False, sort_order=20),
+            TeamCompetitionMembership(team_id=team_id, season_id=global_season_id, competition_division_id=central_district_14u_division_id, membership_role="district", is_primary=False, sort_order=30),
+            TeamCompetitionMembership(team_id=team_id, season_id=global_season_id, competition_division_id=ccm_showcase_14u_division_id, membership_role="showcase", is_primary=False, sort_order=40),
+        ])
+    for team_id in (t2_id, t4_id, t6_id):
+        memberships.extend([
+            TeamCompetitionMembership(team_id=team_id, season_id=global_season_id, competition_division_id=nihl_12u_division_id, membership_role="primary", is_primary=True, sort_order=10),
+            TeamCompetitionMembership(team_id=team_id, season_id=global_season_id, competition_division_id=ahai_state_12u_division_id, membership_role="postseason", is_primary=False, sort_order=20),
+        ])
+    for team_id in (t7_id, t8_id, t9_id):
+        memberships.append(
+            TeamCompetitionMembership(team_id=team_id, season_id=global_season_id, competition_division_id=cuhl_8u_division_id, membership_role="primary", is_primary=True, sort_order=10)
+        )
+    memberships.append(
+        TeamCompetitionMembership(team_id=t10_id, season_id=global_season_id, competition_division_id=six_u_jamboree_division_id, membership_role="primary", is_primary=True, sort_order=10)
+    )
+    db.add_all(memberships)
     db.commit()
 
     # Seed basic USA Hockey-style rosters (for scoresheet demo)
@@ -603,6 +814,8 @@ def seed_demo_data(db: Session):
             status="confirmed",
             game_type="league",
             season_id=global_season_id,
+            competition_division_id=nihl_12u_division_id,
+            counts_for_standings=True,
             home_weekly_confirmed=True,
             away_weekly_confirmed=True,
         ),
@@ -621,8 +834,10 @@ def seed_demo_data(db: Session):
             date=date(2026, 3, 28),
             time=time(9, 0),
             status="scheduled",
-            game_type="non_league",
+            game_type="league",
             season_id=global_season_id,
+            competition_division_id=cuhl_8u_division_id,
+            counts_for_standings=False,
         ),
         Game(
             home_team_id=t9_id,
@@ -630,53 +845,55 @@ def seed_demo_data(db: Session):
             date=date(2026, 4, 11),
             time=time(8, 30),
             status="confirmed",
-            game_type="non_league",
+            game_type="league",
             season_id=global_season_id,
+            competition_division_id=cuhl_8u_division_id,
+            counts_for_standings=False,
             home_weekly_confirmed=True,
             away_weekly_confirmed=True,
         ),
         # ── 14U AA season (t1=Northshore, t3=Mission, t5=Team IL) ──────────────
         # Target records: t1 4-4-1 | t3 7-1-1 | t5 1-7-0
-        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 10, 5),  time=time(17, 0), status="final", game_type="league",     home_score=4, away_score=1, season_id=global_season_id),
-        Game(home_team_id=t5_id, away_team_id=t3_id, date=date(2025, 10, 5),  time=time(16, 0), status="final", game_type="league",     home_score=0, away_score=4, season_id=global_season_id),
-        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2025, 10, 12), time=time(17, 0), status="final", game_type="league",     home_score=4, away_score=1, season_id=global_season_id),
-        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 10, 19), time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=2, season_id=global_season_id),
+        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 10, 5),  time=time(17, 0), status="final", game_type="league",     home_score=4, away_score=1, season_id=global_season_id, competition_division_id=csdhl_14u_division_id, counts_for_standings=True),
+        Game(home_team_id=t5_id, away_team_id=t3_id, date=date(2025, 10, 5),  time=time(16, 0), status="final", game_type="league",     home_score=0, away_score=4, season_id=global_season_id, competition_division_id=csdhl_14u_division_id, counts_for_standings=True),
+        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2025, 10, 12), time=time(17, 0), status="final", game_type="league",     home_score=4, away_score=1, season_id=global_season_id, competition_division_id=csdhl_14u_division_id, counts_for_standings=True),
+        Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 10, 19), time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=2, season_id=global_season_id, competition_division_id=csdhl_14u_division_id, counts_for_standings=True),
         Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2025, 10, 26), time=time(17, 0), status="final", game_type="non_league", home_score=3, away_score=2, season_id=global_season_id),
         Game(home_team_id=t3_id, away_team_id=t1_id, date=date(2025, 11, 2),  time=time(17, 0), status="final", game_type="non_league", home_score=5, away_score=2, season_id=global_season_id),
-        Game(home_team_id=t5_id, away_team_id=t1_id, date=date(2025, 11, 9),  time=time(17, 0), status="final", game_type="league",     home_score=2, away_score=3, season_id=global_season_id),
-        Game(home_team_id=t1_id, away_team_id=t3_id, date=date(2025, 11, 16), time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=3, season_id=global_season_id),
+        Game(home_team_id=t5_id, away_team_id=t1_id, date=date(2025, 11, 9),  time=time(17, 0), status="final", game_type="league",     home_score=2, away_score=3, season_id=global_season_id, competition_division_id=csdhl_14u_division_id, counts_for_standings=True),
+        Game(home_team_id=t1_id, away_team_id=t3_id, date=date(2025, 11, 16), time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=3, season_id=global_season_id, competition_division_id=csdhl_14u_division_id, counts_for_standings=True),
         Game(home_team_id=t3_id, away_team_id=t5_id, date=date(2025, 11, 23), time=time(17, 0), status="final", game_type="non_league", home_score=3, away_score=1, season_id=global_season_id),
-        Game(home_team_id=t5_id, away_team_id=t3_id, date=date(2025, 12, 7),  time=time(17, 0), status="final", game_type="league",     home_score=1, away_score=3, season_id=global_season_id),
+        Game(home_team_id=t5_id, away_team_id=t3_id, date=date(2025, 12, 7),  time=time(17, 0), status="final", game_type="league",     home_score=1, away_score=3, season_id=global_season_id, competition_division_id=csdhl_14u_division_id, counts_for_standings=True),
         # Feb 2026 (recent)
-        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2026, 2, 8),   time=time(10, 0), status="final", game_type="tournament",  home_score=2, away_score=3, season_id=global_season_id),
-        Game(home_team_id=t1_id, away_team_id=t3_id, date=date(2026, 2, 15),  time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=2, season_id=global_season_id),
+        Game(home_team_id=t1_id, away_team_id=t5_id, date=date(2026, 2, 8),   time=time(10, 0), status="final", game_type="showcase",   home_score=2, away_score=3, season_id=global_season_id, competition_division_id=ccm_showcase_14u_division_id, counts_for_standings=False),
+        Game(home_team_id=t1_id, away_team_id=t3_id, date=date(2026, 2, 15),  time=time(17, 0), status="final", game_type="league",     home_score=3, away_score=2, season_id=global_season_id, competition_division_id=csdhl_14u_division_id, counts_for_standings=True),
         Game(home_team_id=t3_id, away_team_id=t5_id, date=date(2026, 2, 22),  time=time(14, 0), status="final", game_type="non_league", home_score=4, away_score=1, season_id=global_season_id),
 
         # ── 12U A season (t2=Northshore, t4=Mission, t6=Team IL) ────────────────
         # Target records: t2 4-4-0 | t4 7-1-0 | t6 0-6-0
-        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 10, 5),  time=time(9, 0),  status="final", game_type="league",     home_score=4, away_score=2, season_id=global_season_id),
+        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 10, 5),  time=time(9, 0),  status="final", game_type="league",     home_score=4, away_score=2, season_id=global_season_id, competition_division_id=nihl_12u_division_id, counts_for_standings=True),
         Game(home_team_id=t2_id, away_team_id=t6_id, date=date(2025, 10, 5),  time=time(10, 0), status="final", game_type="non_league", home_score=4, away_score=2, season_id=global_season_id),
-        Game(home_team_id=t4_id, away_team_id=t6_id, date=date(2025, 10, 12), time=time(9, 0),  status="final", game_type="league",     home_score=5, away_score=2, season_id=global_season_id),
-        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 10, 19), time=time(9, 0),  status="final", game_type="league",     home_score=3, away_score=1, season_id=global_season_id),
-        Game(home_team_id=t2_id, away_team_id=t6_id, date=date(2025, 10, 26), time=time(9, 0),  status="final", game_type="league",     home_score=3, away_score=1, season_id=global_season_id),
+        Game(home_team_id=t4_id, away_team_id=t6_id, date=date(2025, 10, 12), time=time(9, 0),  status="final", game_type="league",     home_score=5, away_score=2, season_id=global_season_id, competition_division_id=nihl_12u_division_id, counts_for_standings=True),
+        Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 10, 19), time=time(9, 0),  status="final", game_type="league",     home_score=3, away_score=1, season_id=global_season_id, competition_division_id=nihl_12u_division_id, counts_for_standings=True),
+        Game(home_team_id=t2_id, away_team_id=t6_id, date=date(2025, 10, 26), time=time(9, 0),  status="final", game_type="league",     home_score=3, away_score=1, season_id=global_season_id, competition_division_id=nihl_12u_division_id, counts_for_standings=True),
         Game(home_team_id=t4_id, away_team_id=t2_id, date=date(2025, 11, 2),  time=time(9, 0),  status="final", game_type="non_league", home_score=5, away_score=3, season_id=global_season_id),
         Game(home_team_id=t6_id, away_team_id=t2_id, date=date(2025, 11, 9),  time=time(9, 0),  status="final", game_type="non_league", home_score=2, away_score=3, season_id=global_season_id),
-        Game(home_team_id=t2_id, away_team_id=t4_id, date=date(2025, 11, 16), time=time(9, 0),  status="final", game_type="league",     home_score=2, away_score=3, season_id=global_season_id),
-        Game(home_team_id=t4_id, away_team_id=t6_id, date=date(2025, 11, 23), time=time(9, 0),  status="final", game_type="league",     home_score=4, away_score=1, season_id=global_season_id),
+        Game(home_team_id=t2_id, away_team_id=t4_id, date=date(2025, 11, 16), time=time(9, 0),  status="final", game_type="league",     home_score=2, away_score=3, season_id=global_season_id, competition_division_id=nihl_12u_division_id, counts_for_standings=True),
+        Game(home_team_id=t4_id, away_team_id=t6_id, date=date(2025, 11, 23), time=time(9, 0),  status="final", game_type="league",     home_score=4, away_score=1, season_id=global_season_id, competition_division_id=nihl_12u_division_id, counts_for_standings=True),
         Game(home_team_id=t6_id, away_team_id=t4_id, date=date(2025, 12, 7),  time=time(9, 0),  status="final", game_type="non_league", home_score=0, away_score=3, season_id=global_season_id),
         # Feb 2026 (recent)
-        Game(home_team_id=t2_id, away_team_id=t4_id, date=date(2026, 2, 14),  time=time(9, 0),  status="final", game_type="league",     home_score=5, away_score=3, season_id=global_season_id),
+        Game(home_team_id=t2_id, away_team_id=t4_id, date=date(2026, 2, 14),  time=time(9, 0),  status="final", game_type="league",     home_score=5, away_score=3, season_id=global_season_id, competition_division_id=nihl_12u_division_id, counts_for_standings=True),
 
         # ── 8U season (t7=Northshore Intermediate, t8=Mission Beginner, t9=Team IL Advanced) ──
         # Target records: t7 3-2-0 | t8 0-5-0 | t9 4-0-0
-        Game(home_team_id=t9_id, away_team_id=t7_id, date=date(2025, 10, 11), time=time(8, 0),  status="final", game_type="non_league", home_score=3, away_score=1, season_id=global_season_id),
-        Game(home_team_id=t7_id, away_team_id=t8_id, date=date(2025, 10, 18), time=time(8, 0),  status="final", game_type="non_league", home_score=3, away_score=1, season_id=global_season_id),
-        Game(home_team_id=t9_id, away_team_id=t8_id, date=date(2025, 10, 25), time=time(8, 0),  status="final", game_type="non_league", home_score=4, away_score=1, season_id=global_season_id),
-        Game(home_team_id=t7_id, away_team_id=t8_id, date=date(2025, 11, 1),  time=time(8, 0),  status="final", game_type="non_league", home_score=2, away_score=1, season_id=global_season_id),
-        Game(home_team_id=t8_id, away_team_id=t7_id, date=date(2025, 11, 15), time=time(8, 0),  status="final", game_type="non_league", home_score=1, away_score=3, season_id=global_season_id),
-        Game(home_team_id=t8_id, away_team_id=t9_id, date=date(2025, 12, 6),  time=time(8, 0),  status="final", game_type="non_league", home_score=0, away_score=3, season_id=global_season_id),
+        Game(home_team_id=t9_id, away_team_id=t7_id, date=date(2025, 10, 11), time=time(8, 0),  status="final", game_type="league", home_score=3, away_score=1, season_id=global_season_id, competition_division_id=cuhl_8u_division_id, counts_for_standings=False),
+        Game(home_team_id=t7_id, away_team_id=t8_id, date=date(2025, 10, 18), time=time(8, 0),  status="final", game_type="league", home_score=3, away_score=1, season_id=global_season_id, competition_division_id=cuhl_8u_division_id, counts_for_standings=False),
+        Game(home_team_id=t9_id, away_team_id=t8_id, date=date(2025, 10, 25), time=time(8, 0),  status="final", game_type="league", home_score=4, away_score=1, season_id=global_season_id, competition_division_id=cuhl_8u_division_id, counts_for_standings=False),
+        Game(home_team_id=t7_id, away_team_id=t8_id, date=date(2025, 11, 1),  time=time(8, 0),  status="final", game_type="league", home_score=2, away_score=1, season_id=global_season_id, competition_division_id=cuhl_8u_division_id, counts_for_standings=False),
+        Game(home_team_id=t8_id, away_team_id=t7_id, date=date(2025, 11, 15), time=time(8, 0),  status="final", game_type="league", home_score=1, away_score=3, season_id=global_season_id, competition_division_id=cuhl_8u_division_id, counts_for_standings=False),
+        Game(home_team_id=t8_id, away_team_id=t9_id, date=date(2025, 12, 6),  time=time(8, 0),  status="final", game_type="league", home_score=0, away_score=3, season_id=global_season_id, competition_division_id=cuhl_8u_division_id, counts_for_standings=False),
         # Feb 2026 (recent)
-        Game(home_team_id=t7_id, away_team_id=t9_id, date=date(2026, 2, 21),  time=time(8, 0),  status="final", game_type="non_league", home_score=2, away_score=4, season_id=global_season_id),
+        Game(home_team_id=t7_id, away_team_id=t9_id, date=date(2026, 2, 21),  time=time(8, 0),  status="final", game_type="league", home_score=2, away_score=4, season_id=global_season_id, competition_division_id=cuhl_8u_division_id, counts_for_standings=False),
     ]
     for game in games:
         sync_game_schedule_links(game)
@@ -697,6 +914,9 @@ def seed_demo_data(db: Session):
         "proposals": len(proposals),
         "games": len(games),
         "seasons": 1,
+        "competitions": len(competitions),
+        "competition_divisions": len(divisions),
+        "competition_memberships": len(memberships),
         "rinks": 3,
         "ice_slots": len(ice_slots),
         "practice_bookings": len(practice_bookings),

@@ -4,7 +4,7 @@ import { Calendar, CheckCircle2, Dumbbell, Inbox, Trophy } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
-import { ScheduleEntry, GameProposal, Game, PracticeBooking, StandingsEntry } from '../types';
+import { ScheduleEntry, GameProposal, Game, PracticeBooking, StandingsEntry, TeamCompetitionMembership } from '../types';
 import { cn } from '../lib/cn';
 import { formatDate, formatTimeHHMM } from '../lib/time';
 import { Badge } from '../components/ui/Badge';
@@ -57,6 +57,8 @@ export default function HomePage() {
   const [games, setGames] = useState<Game[]>([]);
   const [practices, setPractices] = useState<PracticeBooking[]>([]);
   const [record, setRecord] = useState<StandingsEntry | null>(null);
+  const [competitionRecord, setCompetitionRecord] = useState<StandingsEntry | null>(null);
+  const [primaryMembership, setPrimaryMembership] = useState<TeamCompetitionMembership | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedError, setSeedError] = useState('');
   const today = new Date();
@@ -80,13 +82,33 @@ export default function HomePage() {
     api.getPracticeBookings(activeTeam.id, { status: 'active' }).then(setPractices);
 
     if (activeSeason) {
-      api.getStandings(activeSeason.id).then((standings) => {
+      Promise.all([
+        api.getStandings(activeSeason.id),
+        api.getTeamCompetitionMemberships(activeTeam.id, { season_id: activeSeason.id }),
+      ]).then(async ([standings, memberships]) => {
         const myRecord = standings.find((s) => s.team_id === activeTeam.id) || null;
+        const primary = memberships.find((membership) => membership.is_primary) ?? memberships[0] ?? null;
+        const standingsMembership =
+          memberships.find((membership) => membership.is_primary && membership.standings_enabled)
+          ?? memberships.find((membership) => membership.standings_enabled)
+          ?? null;
+
         setRecord(myRecord);
+        setPrimaryMembership(primary);
+
+        if (!standingsMembership) {
+          setCompetitionRecord(null);
+          return;
+        }
+
+        const divisionStandings = await api.getCompetitionDivisionStandings(standingsMembership.competition_division_id);
+        setCompetitionRecord(divisionStandings.find((entry) => entry.team_id === activeTeam.id) || null);
       });
       return;
     }
 
+    setCompetitionRecord(null);
+    setPrimaryMembership(null);
     if (seasons.length === 0) {
       setRecord(null);
       return;
@@ -185,7 +207,13 @@ export default function HomePage() {
     <div className="space-y-6">
       <PageHeader
         title={`${activeTeam.name} Dashboard`}
-        subtitle={activeSeason ? `${activeSeason.name} Season` : 'All Seasons'}
+        subtitle={
+          activeSeason
+            ? primaryMembership
+              ? `${activeSeason.name} Season • ${primaryMembership.competition_short_name} ${primaryMembership.division_name}`
+              : `${activeSeason.name} Season`
+            : 'All Seasons'
+        }
         actions={(
           <Button
             type="button"
@@ -219,13 +247,13 @@ export default function HomePage() {
         'grid grid-cols-1 gap-3 sm:grid-cols-2',
         record ? 'lg:grid-cols-5' : 'lg:grid-cols-4',
       )}>
-        {record && (
+        {(competitionRecord || record) && (
           <StatCard
-            title={activeSeason ? 'Season Record' : 'Overall Record'}
-            value={`${record.wins}-${record.losses}-${record.ties}`}
+            title={activeSeason && competitionRecord ? 'League Record' : activeSeason ? 'Season Record' : 'Overall Record'}
+            value={`${(competitionRecord || record)!.wins}-${(competitionRecord || record)!.losses}-${(competitionRecord || record)!.ties}`}
             icon={<Trophy className="h-4 w-4" />}
             color="text-fuchsia-700"
-            onClick={() => navigate('/standings')}
+            onClick={activeSeason && competitionRecord ? () => navigate('/standings') : undefined}
           />
         )}
         <StatCard
