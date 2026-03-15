@@ -18,8 +18,11 @@ export default function EmptyState({
     <Card className={className ?? 'px-6 py-10'}>
       <div className="mx-auto flex max-w-xl flex-col items-center text-center">
         {icon ? (
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
-            {icon}
+          <div className="relative mb-4">
+            <div className="absolute inset-0 -m-1 rounded-2xl bg-gradient-to-br from-cyan-200/30 via-transparent to-violet-200/30 blur-md dark:from-cyan-500/10 dark:to-violet-500/10" />
+            <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 text-slate-500 ring-1 ring-slate-200/60 dark:from-slate-800/80 dark:to-slate-900/80 dark:text-slate-400 dark:ring-slate-700/50">
+              {icon}
+            </div>
           </div>
         ) : null}
         <div className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">{title}</div>

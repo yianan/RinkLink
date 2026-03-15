@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
   Building2,
@@ -25,11 +25,11 @@ import { cn } from './lib/cn';
 import { useTeam } from './context/TeamContext';
 import { useSeason } from './context/SeasonContext';
 import { api } from './api/client';
-import { Badge } from './components/ui/Badge';
 import { sectionLabelClass } from './lib/uiClasses';
 import { addDays, toLocalDateString } from './lib/time';
 import { ConfirmDialogProvider } from './context/ConfirmDialogContext';
 import { ToastProvider } from './context/ToastContext';
+import { NavBadgeProvider, useNavBadgeKey } from './context/NavBadgeContext';
 import { Skeleton } from './components/ui/Skeleton';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -116,6 +116,7 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
   const { activeSeason, seasons } = useSeason();
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const [navBadges, setNavBadges] = useState<Record<string, number>>({});
+  const navBadgeKey = useNavBadgeKey();
 
   useEffect(() => {
     if (!activeTeam) {
@@ -150,12 +151,8 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [activeTeam, effectiveSeason]);
+  }, [activeTeam, effectiveSeason, navBadgeKey]);
 
-  const badgeVariantForPath = useMemo(() => ({
-    '/proposals': 'warning',
-    '/schedule': 'warning',
-  } as const), []);
 
   return (
     <nav className="p-3">
@@ -200,9 +197,8 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
                 />
                 <span className="truncate">{item.label}</span>
                 {badgeCount > 0 ? (
-                  <Badge
-                    variant={badgeVariantForPath[item.path as keyof typeof badgeVariantForPath]}
-                    className="ml-auto min-w-[1.4rem] justify-center px-1.5 py-0.5 text-[10px]"
+                  <span
+                    className="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-sm dark:bg-rose-500"
                     aria-label={
                       item.path === '/proposals'
                         ? `${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
@@ -212,7 +208,7 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
                     }
                   >
                     {badgeCount > 99 ? '99+' : badgeCount}
-                  </Badge>
+                  </span>
                 ) : null}
               </NavLink>
             );
@@ -254,7 +250,7 @@ function AppContent() {
               <Snowflake className="h-5 w-5" />
             </div>
             <div className="leading-tight">
-              <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-white">RinkLink</div>
+              <div className="font-display text-sm font-bold tracking-tight text-slate-900 dark:text-white">RinkLink</div>
               <div className="hidden text-xs text-slate-600 dark:text-white/70 sm:block">Ice time & scheduling</div>
             </div>
           </div>
@@ -289,6 +285,7 @@ function AppContent() {
             </div>
           ) : (
             <Suspense fallback={<RouteFallback />}>
+              <div key={location.pathname} className="animate-fade-slide-in">
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/associations" element={<AssociationListPage />} />
@@ -305,6 +302,7 @@ function AppContent() {
                 <Route path="/rinks" element={<RinkListPage />} />
                 <Route path="/rinks/:rinkId/slots" element={<IceSlotsPage />} />
               </Routes>
+              </div>
             </Suspense>
           )}
         </main>
@@ -354,13 +352,15 @@ export default function App() {
   return (
     <TeamProvider>
       <SeasonProvider>
-        <ToastProvider>
-          <ConfirmDialogProvider>
-            <BrowserRouter>
-              <AppContent />
-            </BrowserRouter>
-          </ConfirmDialogProvider>
-        </ToastProvider>
+        <NavBadgeProvider>
+          <ToastProvider>
+            <ConfirmDialogProvider>
+              <BrowserRouter>
+                <AppContent />
+              </BrowserRouter>
+            </ConfirmDialogProvider>
+          </ToastProvider>
+        </NavBadgeProvider>
       </SeasonProvider>
     </TeamProvider>
   );

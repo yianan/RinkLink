@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDownLeft, ArrowUpRight, CalendarClock, CheckCircle2, Search, SlidersHorizontal, XCircle } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CalendarClock, Check, CheckCircle2, Search, SlidersHorizontal, X, XCircle } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -20,7 +20,9 @@ import EmptyState from '../components/EmptyState';
 import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
-import { filterButtonClass } from '../lib/uiClasses';
+import { useNavBadgeRefresh } from '../context/NavBadgeContext';
+import { cn } from '../lib/cn';
+import { filterButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 import { formatTimeHHMM, formatShortDate } from '../lib/time';
 
 const statusColors: Record<string, 'warning' | 'success' | 'danger' | 'neutral'> = {
@@ -101,8 +103,9 @@ export default function ProposalsPage() {
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const confirm = useConfirmDialog();
   const pushToast = useToast();
+  const refreshNavBadges = useNavBadgeRefresh();
 
-  const load = () => {
+  const load =() => {
     if (!activeTeam || !effectiveSeason) return;
     let cancelled = false;
     const t = TABS[tab] || TABS[0];
@@ -132,16 +135,19 @@ export default function ProposalsPage() {
   const handleAccept = async (id: string) => {
     await api.acceptProposal(id);
     load();
+    refreshNavBadges();
     pushToast({ variant: 'success', title: 'Proposal accepted' });
   };
   const handleDecline = async (id: string) => {
     await api.declineProposal(id);
     load();
+    refreshNavBadges();
     pushToast({ variant: 'success', title: 'Proposal declined' });
   };
   const handleCancel = async (id: string) => {
     await api.cancelProposal(id);
     load();
+    refreshNavBadges();
     pushToast({ variant: 'success', title: 'Proposal cancelled' });
   };
 
@@ -407,43 +413,29 @@ export default function ProposalsPage() {
                   </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap justify-end gap-2">
+                <div className="mt-3 flex flex-wrap justify-end gap-1">
                   {canRespond && (
                     <>
-                      <Button type="button" size="sm" onClick={() => handleAccept(p.id)}>
-                        Accept
+                      <Button type="button" variant="ghost" size="icon" className={tableActionButtonClass} onClick={() => handleAccept(p.id)} aria-label="Accept proposal">
+                        <Check className="h-4 w-4 text-emerald-600" />
                       </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => handleDecline(p.id)}>
-                        Decline
+                      <Button type="button" variant="ghost" size="icon" className={tableActionButtonClass} onClick={() => handleDecline(p.id)} aria-label="Decline proposal">
+                        <X className="h-4 w-4 text-rose-600" />
                       </Button>
                     </>
                   )}
                   {canCancel && (
-                    <Button type="button" size="sm" variant="outline" onClick={() => handleCancel(p.id)}>
-                      Cancel
+                    <Button type="button" variant="ghost" size="icon" className={tableActionButtonClass} onClick={() => handleCancel(p.id)} aria-label="Cancel proposal">
+                      <X className="h-4 w-4 text-rose-600" />
                     </Button>
                   )}
                   {canReschedule && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRequestReschedule(p)}
-                      aria-label="Request reschedule"
-                      title="Request reschedule"
-                    >
+                    <Button type="button" variant="ghost" size="icon" className={tableActionButtonClass} onClick={() => handleRequestReschedule(p)} aria-label="Request reschedule">
                       <CalendarClock className="h-4 w-4" />
                     </Button>
                   )}
                   {isAcceptedTab && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => navigate('/schedule')}
-                      aria-label="View schedule"
-                      title="View Schedule"
-                    >
+                    <Button type="button" variant="ghost" size="icon" className={tableActionButtonClass} onClick={() => navigate('/schedule')} aria-label="View schedule">
                       <CheckCircle2 className="h-4 w-4" />
                     </Button>
                   )}
@@ -452,18 +444,18 @@ export default function ProposalsPage() {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      className={tableActionButtonClass}
                       onClick={async () => {
                         const confirmed = await confirm({
-                          title: 'Cancel accepted game?',
-                          description: 'This removes the accepted game from the proposal flow.',
-                          confirmLabel: 'Cancel game',
+                          title: 'Cancel this game?',
+                          description: 'The game will be removed from both teams\' schedules.',
+                          confirmLabel: 'Yes, cancel game',
                           confirmVariant: 'destructive',
                         });
                         if (!confirmed) return;
                         handleCancel(p.id);
                       }}
                       aria-label="Cancel game"
-                      title="Cancel game"
                     >
                       <XCircle className="h-4 w-4 text-rose-500" />
                     </Button>
@@ -576,17 +568,17 @@ export default function ProposalsPage() {
                       <div className="flex items-start gap-1">
                         {canRespond && (
                           <>
-                            <Button type="button" size="sm" onClick={() => handleAccept(p.id)}>
-                              Accept
+                            <Button type="button" variant="ghost" size="icon" className={cn('h-8 w-8', tableActionButtonClass)} onClick={() => handleAccept(p.id)} aria-label="Accept proposal">
+                              <Check className="h-4 w-4 text-emerald-600" />
                             </Button>
-                            <Button type="button" size="sm" variant="outline" onClick={() => handleDecline(p.id)}>
-                              Decline
+                            <Button type="button" variant="ghost" size="icon" className={cn('h-8 w-8', tableActionButtonClass)} onClick={() => handleDecline(p.id)} aria-label="Decline proposal">
+                              <X className="h-4 w-4 text-rose-600" />
                             </Button>
                           </>
                         )}
                         {canCancel && (
-                          <Button type="button" size="sm" variant="outline" onClick={() => handleCancel(p.id)}>
-                            Cancel
+                          <Button type="button" variant="ghost" size="icon" className={cn('h-8 w-8', tableActionButtonClass)} onClick={() => handleCancel(p.id)} aria-label="Cancel proposal">
+                            <X className="h-4 w-4 text-rose-600" />
                           </Button>
                         )}
                         {canReschedule && (
@@ -594,7 +586,7 @@ export default function ProposalsPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
+                            className={cn('h-8 w-8', tableActionButtonClass)}
                             onClick={() => handleRequestReschedule(p)}
                             aria-label="Request reschedule"
                             title="Request reschedule"
@@ -607,7 +599,7 @@ export default function ProposalsPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
+                            className={cn('h-8 w-8', tableActionButtonClass)}
                             onClick={() => navigate('/schedule')}
                             aria-label="View schedule"
                             title="View Schedule"
@@ -620,7 +612,7 @@ export default function ProposalsPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
+                            className={cn('h-8 w-8', tableActionButtonClass)}
                             onClick={async () => {
                               const confirmed = await confirm({
                                 title: 'Cancel accepted game?',

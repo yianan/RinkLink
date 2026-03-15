@@ -20,6 +20,7 @@ import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton'
 import EmptyState from '../components/EmptyState';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
+import { useNavBadgeRefresh } from '../context/NavBadgeContext';
 import { cn } from '../lib/cn';
 import { filterButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 import { addDays, formatMonthYear, formatShortDate, formatTimeHHMM, formatWeekdayDate, parseLocalDate, toLocalDateString } from '../lib/time';
@@ -58,6 +59,7 @@ export default function SchedulePage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const confirm = useConfirmDialog();
   const pushToast = useToast();
+  const refreshNavBadges = useNavBadgeRefresh();
 
   const load = () => {
     if (!activeTeam) return;
@@ -110,6 +112,7 @@ export default function SchedulePage() {
     if (!activeTeam || !e.game_id) return;
     await api.confirmGame(e.game_id, activeTeam.id, true);
     load();
+    refreshNavBadges();
     pushToast({ variant: 'success', title: 'Game confirmed' });
   };
 
@@ -124,6 +127,7 @@ export default function SchedulePage() {
     if (!confirmed) return;
     await api.cancelGame(e.game_id);
     load();
+    refreshNavBadges();
     pushToast({ variant: 'success', title: 'Game cancelled' });
   };
 

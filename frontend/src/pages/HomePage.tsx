@@ -17,7 +17,7 @@ import { filterButtonClass } from '../lib/uiClasses';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 
 const clickableCard =
-  'cursor-pointer text-left transition-shadow transition-colors hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:hover:border-slate-700 dark:focus-visible:ring-offset-slate-950';
+  'cursor-pointer text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-300/60 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:hover:border-cyan-700/50 dark:hover:shadow-[0_8px_30px_rgba(34,211,238,0.08)] dark:focus-visible:ring-offset-slate-950';
 
 function StatCard({ title, value, icon, color, onClick, subtitle, ariaLabel }: {
   title: string; value: number | string; icon: React.ReactNode; color: string; onClick?: () => void; subtitle?: string; ariaLabel?: string;
@@ -42,12 +42,12 @@ function StatCard({ title, value, icon, color, onClick, subtitle, ariaLabel }: {
       )}
     >
       <div className="flex items-center gap-2">
-        <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-900/50', color)}>
+        <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', color)}>
           {icon}
         </div>
         <div className="text-sm font-medium text-slate-700 dark:text-slate-200">{title}</div>
       </div>
-      <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{value}</div>
+      <div className="mt-3 font-display text-3xl font-bold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">{value}</div>
       {subtitle ? <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{subtitle}</div> : null}
     </Card>
   );
@@ -175,7 +175,7 @@ export default function HomePage() {
         <div className="space-y-6">
           <PageHeader title="Dashboard" subtitle="Choose an active team to view its schedule, games, proposals, and practices." />
           <Card className="mx-auto max-w-2xl p-6">
-            <div className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">No active team selected</div>
+            <div className="font-display text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">No active team selected</div>
             <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               Use the team dropdown in the header to choose which team you want to manage.
             </div>
@@ -302,7 +302,7 @@ export default function HomePage() {
             title={activeSeason && competitionRecord ? 'League Record' : activeSeason ? 'Season Record' : 'Overall Record'}
             value={`${(competitionRecord || record)!.wins}-${(competitionRecord || record)!.losses}-${(competitionRecord || record)!.ties}`}
             icon={<Trophy className="h-4 w-4" />}
-            color="text-fuchsia-700"
+            color="bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-400"
             subtitle={`${(competitionRecord || record)!.points} points`}
             ariaLabel={`${activeSeason && competitionRecord ? 'League' : activeSeason ? 'Season' : 'Overall'} record ${(competitionRecord || record)!.wins} wins, ${(competitionRecord || record)!.losses} losses, ${(competitionRecord || record)!.ties} ties`}
             onClick={activeSeason && competitionRecord ? () => navigate('/standings') : undefined}
@@ -312,7 +312,7 @@ export default function HomePage() {
           title="Upcoming Games"
           value={upcoming.length}
           icon={<CheckCircle2 className="h-4 w-4" />}
-          color="text-sky-700"
+          color="bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400"
           subtitle={gamesThisWeek > 0 ? `${gamesThisWeek} this week` : undefined}
           ariaLabel={`${upcoming.length} upcoming games`}
           onClick={() => navigate('/games')}
@@ -321,7 +321,7 @@ export default function HomePage() {
           title="Open Dates"
           value={openDates.length}
           icon={<Calendar className="h-4 w-4" />}
-          color="text-emerald-700"
+          color="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
           subtitle={openDatesMissingTime > 0 ? `${openDatesMissingTime} missing time` : undefined}
           ariaLabel={`${openDates.length} open dates`}
           onClick={() => navigate('/schedule')}
@@ -330,7 +330,7 @@ export default function HomePage() {
           title="Pending Proposals"
           value={proposals.length}
           icon={<Inbox className="h-4 w-4" />}
-          color="text-amber-700"
+          color="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
           subtitle={proposalsIncoming > 0 ? `${proposalsIncoming} incoming` : undefined}
           ariaLabel={`${proposals.length} pending proposals`}
           onClick={() => navigate('/proposals')}
@@ -339,7 +339,7 @@ export default function HomePage() {
           title="Upcoming Practices"
           value={upcomingPractices.length}
           icon={<Dumbbell className="h-4 w-4" />}
-          color="text-violet-700"
+          color="bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400"
           subtitle={practicesThisWeek > 0 ? `${practicesThisWeek} this week` : undefined}
           ariaLabel={`${upcomingPractices.length} upcoming practices`}
           onClick={() => navigate('/practice')}
@@ -363,7 +363,7 @@ export default function HomePage() {
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-sky-700 dark:bg-slate-900/50">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400">
                 <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
               </div>
               <div className="text-sm font-medium text-slate-700 dark:text-slate-200">Upcoming Games</div>
@@ -425,7 +425,7 @@ export default function HomePage() {
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-amber-700 dark:bg-slate-900/50">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
                 <Inbox className="h-4 w-4" aria-hidden="true" />
               </div>
               <div className="text-sm font-medium text-slate-700 dark:text-slate-200">Pending Proposals</div>

@@ -14,7 +14,7 @@ const base =
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    'bg-gradient-to-r from-cyan-600 via-sky-600 to-violet-600 text-white shadow-soft hover:from-cyan-500 hover:via-sky-500 hover:to-violet-500 hover:shadow-md disabled:border disabled:border-[color:var(--app-border-subtle)] disabled:from-[var(--app-disabled-surface)] disabled:via-[var(--app-disabled-surface)] disabled:to-[var(--app-disabled-surface)] disabled:text-[color:var(--app-disabled-text)] dark:text-slate-950 dark:shadow-[0_0_0_1px_rgba(34,211,238,0.22),0_12px_30px_rgba(34,211,238,0.12)] dark:hover:from-cyan-300 dark:hover:via-sky-300 dark:hover:to-violet-300',
+    'bg-gradient-to-r from-cyan-600 via-sky-600 to-violet-600 text-white shadow-soft hover:from-cyan-500 hover:via-sky-500 hover:to-violet-500 hover:shadow-md disabled:border disabled:border-[color:var(--app-border-subtle)] disabled:from-[var(--app-disabled-surface)] disabled:via-[var(--app-disabled-surface)] disabled:to-[var(--app-disabled-surface)] disabled:text-[color:var(--app-disabled-text)] dark:from-cyan-400 dark:via-sky-400 dark:to-violet-400 dark:text-slate-950 dark:shadow-[0_0_0_1px_rgba(34,211,238,0.22),0_12px_30px_rgba(34,211,238,0.15)] dark:hover:from-cyan-300 dark:hover:via-sky-300 dark:hover:to-violet-300 dark:hover:shadow-[0_0_0_1px_rgba(34,211,238,0.3),0_12px_30px_rgba(34,211,238,0.2)]',
   secondary:
     'bg-slate-900 text-white shadow-soft hover:bg-slate-800 hover:shadow-md disabled:border disabled:border-[color:var(--app-border-subtle)] disabled:bg-[var(--app-disabled-surface)] disabled:text-[color:var(--app-disabled-text)] dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white',
   outline:
