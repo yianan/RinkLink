@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import React, { useEffect, useState, type CSSProperties } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CalendarPlus2, Search as SearchIcon, SlidersHorizontal } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
@@ -19,7 +19,7 @@ import EmptyState from '../components/EmptyState';
 import { useToast } from '../context/ToastContext';
 import { cn } from '../lib/cn';
 import { filterButtonClass } from '../lib/uiClasses';
-import { formatShortDate, formatTimeHHMM } from '../lib/time';
+import { addDays, formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time';
 
 const LEVELS_10U_PLUS = ['AAA', 'AA', 'A', 'B', 'C', 'Rec'];
 const LEVELS_6U_8U = ['Beginner', 'Beginner/Intermediate', 'Intermediate', 'Intermediate/Advanced', 'Advanced'];
@@ -36,6 +36,18 @@ function standardLevelsForAgeGroup(ageGroup: string) {
   const ageNumber = parseAgeNumber(ageGroup);
   const isMite = ageNumber != null ? ageNumber <= 8 : ageGroup === '6U' || ageGroup === '8U';
   return isMite ? LEVELS_6U_8U : LEVELS_10U_PLUS;
+}
+
+function getAutoMatchTimeGroup(date: string): string {
+  const today = new Date();
+  const todayStr = toLocalDateString(today);
+  const dayOfWeek = (today.getDay() + 6) % 7; // Mon=0
+  const thisWeekEnd = toLocalDateString(addDays(today, 6 - dayOfWeek));
+  const nextWeekEnd = toLocalDateString(addDays(today, 13 - dayOfWeek));
+  if (date < todayStr) return 'Past';
+  if (date <= thisWeekEnd) return 'This Week';
+  if (date <= nextWeekEnd) return 'Next Week';
+  return 'Later';
 }
 
 export default function SearchPage() {
@@ -98,7 +110,9 @@ export default function SearchPage() {
     });
     api.getAutoMatches(activeTeam.id).then((data) => {
       setAutoMatches(
-        data.filter((match) => match.date >= effectiveSeason.start_date && match.date <= effectiveSeason.end_date),
+        data
+          .filter((match) => match.date >= effectiveSeason.start_date && match.date <= effectiveSeason.end_date)
+          .sort((a, b) => a.date.localeCompare(b.date)),
       );
     });
     api.getRinks().then(setRinks);
@@ -451,7 +465,7 @@ export default function SearchPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                   {results.map((r) => (
-                    <tr key={r.schedule_entry_id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                    <tr key={r.schedule_entry_id} className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-900 dark:text-slate-100">{r.team_name}</div>
                         {r.primary_competition_short_name && r.primary_division_name && (
@@ -521,8 +535,18 @@ export default function SearchPage() {
       {tab === 1 && (
         <Card className="overflow-hidden">
           <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
-            {autoMatches.map((m, i) => (
-              <div key={i} className="p-4">
+            {autoMatches.map((m, i) => {
+              const group = getAutoMatchTimeGroup(m.date);
+              const prevGroup = i > 0 ? getAutoMatchTimeGroup(autoMatches[i - 1].date) : null;
+              const showGroupHeader = group !== prevGroup;
+              return (
+              <div key={i}>
+              {showGroupHeader && (
+                <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">{group}</span>
+                </div>
+              )}
+              <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{formatShortDate(m.date) || m.date}</div>
@@ -574,7 +598,9 @@ export default function SearchPage() {
                   </div>
                 </div>
               </div>
-            ))}
+              </div>
+              );
+            })}
 
             {autoMatches.length === 0 && (
               <div className="p-4">
@@ -605,8 +631,20 @@ export default function SearchPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
-                {autoMatches.map((m, i) => (
-                  <tr key={i} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                {autoMatches.map((m, i) => {
+                  const group = getAutoMatchTimeGroup(m.date);
+                  const prevGroup = i > 0 ? getAutoMatchTimeGroup(autoMatches[i - 1].date) : null;
+                  const showGroupHeader = group !== prevGroup;
+                  return (
+                  <React.Fragment key={i}>
+                  {showGroupHeader && (
+                    <tr>
+                      <td colSpan={5} className="bg-slate-50 px-4 py-2 dark:bg-slate-900/40">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">{group}</span>
+                      </td>
+                    </tr>
+                  )}
+                  <tr className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{formatShortDate(m.date) || m.date}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900 dark:text-slate-100">{m.home_team_name}</div>
@@ -650,7 +688,9 @@ export default function SearchPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  </React.Fragment>
+                  );
+                })}
 
                 {autoMatches.length === 0 && (
                   <tr>
@@ -692,12 +732,33 @@ export default function SearchPage() {
       >
         <div className="space-y-3">
           {proposalError && <Alert variant="error" title="Proposal failed">{proposalError}</Alert>}
-          <div className="text-sm text-slate-700 dark:text-slate-300">
-            {proposalDialog.autoMatch
-              ? `${proposalDialog.autoMatch.home_team_name} (H) vs ${proposalDialog.autoMatch.away_team_name} (A) on ${formatShortDate(proposalDialog.autoMatch.date) || proposalDialog.autoMatch.date}`
-              : proposalDialog.opponent
-                ? `vs ${proposalDialog.opponent.team_name} on ${formatShortDate(proposalDialog.opponent.entry_date) || proposalDialog.opponent.entry_date}`
-                : ''}
+
+          {/* Match context summary */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+            <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              {proposalDialog.autoMatch
+                ? `${proposalDialog.autoMatch.home_team_name} (H) vs ${proposalDialog.autoMatch.away_team_name} (A)`
+                : proposalDialog.opponent
+                  ? `vs ${proposalDialog.opponent.team_name}`
+                  : ''}
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
+              <span>{formatShortDate(proposalDate) || proposalDate}</span>
+              {proposalDialog.autoMatch && proposalDialog.autoMatch.distance_miles != null && (
+                <span>{proposalDialog.autoMatch.distance_miles} mi</span>
+              )}
+              {proposalDialog.opponent && (
+                <>
+                  {proposalDialog.opponent.distance_miles != null && (
+                    <span>{proposalDialog.opponent.distance_miles} mi</span>
+                  )}
+                  <span>{proposalDialog.opponent.age_group} {proposalDialog.opponent.level}</span>
+                  {proposalDialog.opponent.myhockey_ranking != null && (
+                    <span>Ranking: {proposalDialog.opponent.myhockey_ranking}</span>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

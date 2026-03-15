@@ -384,7 +384,7 @@ export default function TeamListPage() {
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {filteredTeams.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                <tr key={t.id} className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                   <td className="px-3 py-3 font-medium text-slate-900 dark:text-slate-100">{t.name}</td>
                   <td className="px-3 py-3 text-slate-700 dark:text-slate-300">{t.association_name}</td>
                   <td className="px-3 py-3 text-slate-700 dark:text-slate-300">

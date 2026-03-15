@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Trash2 } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -16,6 +17,7 @@ import SegmentedTabs from '../components/SegmentedTabs';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { formatTimeHHMM, formatShortDate } from '../lib/time';
+import { tableActionButtonClass } from '../lib/uiClasses';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -147,8 +149,8 @@ export default function PracticePage() {
         onChange={setTab}
       />
 
-      <Card className="overflow-hidden">
-        <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
+      <Card>
+        <div className="divide-y divide-slate-200 overflow-hidden bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
           {displayed.map((b) => (
             <div key={b.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
@@ -175,11 +177,13 @@ export default function PracticePage() {
                 {b.status === 'active' && (
                   <Button
                     type="button"
-                    size="sm"
-                    variant="outline"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => handleCancel(b.id)}
+                    aria-label="Cancel booking"
+                    className={tableActionButtonClass}
                   >
-                    Cancel
+                    <Trash2 className="h-4 w-4 text-rose-600" />
                   </Button>
                 )}
               </div>
@@ -203,18 +207,18 @@ export default function PracticePage() {
                 <th className="px-4 py-3">Notes</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Booked On</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {displayed.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
-                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{formatShortDate(b.slot_date) || '—'}</td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                  <td className="px-4 py-3 align-top font-medium text-slate-900 dark:text-slate-100">{formatShortDate(b.slot_date) || '—'}</td>
+                  <td className="px-4 py-3 align-top text-slate-700 dark:text-slate-300">
                     {formatTimeHHMM(b.slot_start_time) || '—'}
                     {b.slot_end_time ? `–${formatTimeHHMM(b.slot_end_time) || b.slot_end_time}` : ''}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top">
                     {b.rink_name ? (
                       <div>
                         <div className="font-medium text-slate-900 dark:text-slate-100">{b.rink_name}</div>
@@ -226,26 +230,26 @@ export default function PracticePage() {
                       '—'
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{b.notes || b.slot_notes || '—'}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top text-slate-700 dark:text-slate-300">{b.notes || b.slot_notes || '—'}</td>
+                  <td className="px-4 py-3 align-top">
                     <Badge variant={b.status === 'active' ? 'success' : 'neutral'}>{b.status === 'active' ? 'Confirmed' : b.status}</Badge>
                   </td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                  <td className="px-4 py-3 align-top text-slate-700 dark:text-slate-300">
                     {formatShortDate(b.created_at)}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end">
-                      {b.status === 'active' && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleCancel(b.id)}
-                        >
-                          Cancel
-                        </Button>
-                      )}
-                    </div>
+                  <td className="px-4 py-1.5 align-top">
+                    {b.status === 'active' && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleCancel(b.id)}
+                        aria-label="Cancel booking"
+                        className={tableActionButtonClass}
+                      >
+                        <Trash2 className="h-4 w-4 text-rose-600" />
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}

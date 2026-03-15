@@ -21,7 +21,7 @@ import EmptyState from '../components/EmptyState';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { cn } from '../lib/cn';
-import { accentActionClass, filterButtonClass, tableActionButtonClass } from '../lib/uiClasses';
+import { filterButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 import { addDays, formatMonthYear, formatShortDate, formatTimeHHMM, formatWeekdayDate, parseLocalDate, toLocalDateString } from '../lib/time';
 
 const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
@@ -331,8 +331,8 @@ export default function SchedulePage() {
       />
 
       {(tab === 'upcoming' || tab === 'past') && (
-        <Card className="overflow-hidden">
-          <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
+        <Card>
+          <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
             {loading && <CardListSkeleton count={3} />}
 
             {!loading && displayedEntries.map((e) => (
@@ -357,58 +357,34 @@ export default function SchedulePage() {
                       </div>
                     )}
                     {tab === 'upcoming' && (
-                      <div className="mt-2 flex flex-wrap gap-2">
+                      <div className="mt-3 flex flex-wrap gap-2">
                         {e.status === 'open' && e.time && !e.blocked && (
-                          <button
-                            type="button"
-                            onClick={() => findOpponents(e.id)}
-                            className={cn('flex items-center gap-1 text-xs', accentActionClass)}
-                          >
-                            <Search className="h-3 w-3" />
+                          <Button type="button" size="sm" variant="primary" onClick={() => findOpponents(e.id)}>
+                            <Search className="h-3.5 w-3.5" />
                             Find Opponents
-                          </button>
+                          </Button>
                         )}
                         {e.status === 'open' && (
-                          <button
-                            type="button"
-                            onClick={() => toggleBlocked(e)}
-                            className={cn(
-                              'flex items-center gap-1 text-xs font-medium hover:underline',
-                              e.blocked
-                                ? 'text-amber-600 dark:text-amber-400'
-                                : 'text-slate-500 dark:text-slate-400',
-                            )}
-                          >
-                            {e.blocked ? <Eye className="h-3 w-3" /> : <Ban className="h-3 w-3" />}
+                          <Button type="button" size="sm" variant="outline" onClick={() => toggleBlocked(e)}>
+                            {e.blocked ? <Eye className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}
                             {e.blocked ? 'Unblock' : 'Block'}
-                          </button>
+                          </Button>
                         )}
                         {(e.status === 'scheduled' || e.status === 'confirmed') && e.game_id && (
                           <>
                             {!e.weekly_confirmed && (
-                              <button
-                                type="button"
-                                onClick={() => handleConfirm(e)}
-                                className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
-                              >
-                                <CheckCircle2 className="h-3 w-3" />
+                              <Button type="button" size="sm" variant="primary" onClick={() => handleConfirm(e)}>
+                                <CheckCircle2 className="h-3.5 w-3.5" />
                                 Confirm
-                              </button>
+                              </Button>
                             )}
                             {e.weekly_confirmed && (
-                              <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                                <CheckCircle2 className="h-3 w-3" />
-                                Confirmed
-                              </span>
+                              <Badge variant="success" icon={<CheckCircle2 className="h-3 w-3" />}>Confirmed</Badge>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => handleCancelGame(e)}
-                              className="flex items-center gap-1 text-xs font-medium text-rose-600 hover:underline dark:text-rose-400"
-                            >
-                              <XCircle className="h-3 w-3" />
+                            <Button type="button" size="sm" variant="outline" onClick={() => handleCancelGame(e)}>
+                              <XCircle className="h-3.5 w-3.5" />
                               Cancel Game
-                            </button>
+                            </Button>
                           </>
                         )}
                       </div>
@@ -458,7 +434,7 @@ export default function SchedulePage() {
                   </tr>
                 )}
                 {!loading && displayedEntries.map((e) => (
-                  <tr key={e.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                  <tr key={e.id} className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{formatShortDate(e.date) || e.date}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatTimeHHMM(e.time) || '-'}</td>
                     <td className="px-4 py-3">

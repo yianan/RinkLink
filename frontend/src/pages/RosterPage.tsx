@@ -197,7 +197,7 @@ export default function RosterPage() {
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                 {players.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                  <tr key={p.id} className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                     <td className="px-4 py-3">
                       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/80 dark:bg-slate-900/70 dark:text-slate-100 dark:ring-slate-800/80">
                         {p.jersey_number ?? '—'}

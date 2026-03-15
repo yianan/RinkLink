@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
-import { useTeam } from '../context/TeamContext';
 import { api } from '../api/client';
 import { Rink, IceSlot } from '../types';
 import IceSlotCsvUploader from '../components/IceSlotCsvUploader';
@@ -16,7 +15,7 @@ import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { cn } from '../lib/cn';
-import { accentActionClass, tableActionButtonClass } from '../lib/uiClasses';
+import { tableActionButtonClass } from '../lib/uiClasses';
 import { formatMonthYear, formatShortDate, formatTimeHHMM } from '../lib/time';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
@@ -29,18 +28,11 @@ const statusColors: Record<string, 'success' | 'warning' | 'info' | 'neutral'> =
 
 export default function IceSlotsPage() {
   const { rinkId } = useParams<{ rinkId: string }>();
-  const { activeTeam } = useTeam();
   const [rink, setRink] = useState<Rink | null>(null);
   const [slots, setSlots] = useState<IceSlot[]>([]);
   const [tab, setTab] = useState(0);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ date: '', start_time: '', end_time: '', notes: '' });
-
-  // Booking dialog
-  const [bookingSlot, setBookingSlot] = useState<IceSlot | null>(null);
-  const [bookingNotes, setBookingNotes] = useState('');
-  const [bookingLoading, setBookingLoading] = useState(false);
-  const [bookingError, setBookingError] = useState('');
   const confirm = useConfirmDialog();
   const pushToast = useToast();
 
@@ -84,31 +76,6 @@ export default function IceSlotsPage() {
     pushToast({ variant: 'success', title: 'Ice slot deleted' });
   };
 
-  const openBooking = (slot: IceSlot) => {
-    setBookingSlot(slot);
-    setBookingNotes('');
-    setBookingError('');
-  };
-
-  const handleBook = async () => {
-    if (!activeTeam || !bookingSlot) return;
-    setBookingLoading(true);
-    setBookingError('');
-    try {
-      await api.createPracticeBooking(activeTeam.id, {
-        ice_slot_id: bookingSlot.id,
-        notes: bookingNotes || null,
-      });
-      setBookingSlot(null);
-      load();
-      pushToast({ variant: 'success', title: 'Practice booked' });
-    } catch (e) {
-      setBookingError(String(e));
-    } finally {
-      setBookingLoading(false);
-    }
-  };
-
   if (!rinkId) return <Alert variant="error">No rink ID provided.</Alert>;
 
   // Group slots by month for calendar view
@@ -123,7 +90,7 @@ export default function IceSlotsPage() {
     const endTime = s.end_time ? formatTimeHHMM(s.end_time) ?? s.end_time : null;
 
     return (
-      <tr key={s.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+      <tr key={s.id} className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
         <td className="px-3 py-3 font-medium text-slate-900 sm:px-4 dark:text-slate-100">
           <div className="flex items-start justify-between gap-2">
             <div className="whitespace-nowrap">{formatShortDate(s.date) ?? s.date}</div>
@@ -146,17 +113,7 @@ export default function IceSlotsPage() {
           {s.notes || '-'}
         </td>
         <td className="px-3 py-3 sm:px-4">
-          <div className="flex justify-end gap-1">
-            {s.status === 'available' && activeTeam && (
-              <Button
-                type="button"
-                size="sm"
-                variant="primary"
-                onClick={() => openBooking(s)}
-              >
-                Book
-              </Button>
-            )}
+          <div className="flex items-start gap-1">
             <Button
               type="button"
               variant="ghost"
@@ -180,11 +137,8 @@ export default function IceSlotsPage() {
       <PageHeader
         title={rink ? `${rink.name} — Ice Slots` : 'Ice Slots'}
         subtitle={rink ? `${rink.address}, ${rink.city}, ${rink.state} ${rink.zip_code}` : undefined}
+        actions={tab === 0 ? <Button type="button" onClick={() => setOpen(true)}>Add Slot</Button> : undefined}
       />
-
-      {!activeTeam && (
-        <Alert variant="info">Select a team to book ice slots.</Alert>
-      )}
 
       <SegmentedTabs
         className="grid w-full grid-cols-1 gap-1 sm:grid-cols-3"
@@ -200,13 +154,7 @@ export default function IceSlotsPage() {
 
       {tab === 0 && (
         <div className="space-y-3">
-          <div className="flex justify-end">
-            <Button type="button" onClick={() => setOpen(true)}>
-              Add Slot
-            </Button>
-          </div>
-
-          <Card className="overflow-hidden">
+          <Card>
             <table className="w-full table-fixed text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
                 <tr>
@@ -215,7 +163,7 @@ export default function IceSlotsPage() {
                 <th scope="col" className="hidden px-3 py-3 sm:table-cell sm:px-4">End</th>
                 <th scope="col" className="hidden px-3 py-3 sm:table-cell sm:px-4">Status</th>
                 <th scope="col" className="hidden px-3 py-3 md:table-cell md:px-4">Notes</th>
-                <th scope="col" className="px-3 py-3 text-right sm:px-4"></th>
+                <th scope="col" className="px-3 py-3 sm:px-4">Actions</th>
               </tr>
             </thead>
               <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
@@ -235,34 +183,86 @@ export default function IceSlotsPage() {
       )}
 
       {tab === 1 && (
-        <div className="space-y-3">
-          {Object.entries(byMonth).sort().map(([month, monthSlots]) => (
-            <Card key={month} className="p-4">
-              <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{formatMonthYear(month) ?? month}</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {monthSlots.map((s) => (
-                  <div key={s.id} className="flex items-center gap-1.5">
-                    <Badge
-                      variant={statusColors[s.status] || 'neutral'}
-                      className={cn(s.status === 'available' ? '' : 'bg-white dark:bg-slate-950/40')}
-                    >
-                      {formatShortDate(s.date) ?? s.date} {formatTimeHHMM(s.start_time) ?? s.start_time}
-                      {s.end_time ? `-${formatTimeHHMM(s.end_time) ?? s.end_time}` : ''}
-                    </Badge>
-                    {s.status === 'available' && activeTeam && (
+        <div className="space-y-4">
+          {Object.entries(byMonth).sort().map(([month, monthSlots]) => {
+            const [yearStr, monthStr] = month.split('-');
+            const year = parseInt(yearStr, 10);
+            const monthIdx = parseInt(monthStr, 10) - 1;
+            const firstDay = new Date(year, monthIdx, 1).getDay(); // 0=Sun
+            const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+
+            // Index slots by day number
+            const slotsByDay: Record<number, IceSlot[]> = {};
+            monthSlots.forEach((s) => {
+              const day = parseInt(s.date.substring(8, 10), 10);
+              (slotsByDay[day] ??= []).push(s);
+            });
+
+            const cells: (number | null)[] = [];
+            for (let i = 0; i < firstDay; i++) cells.push(null);
+            for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+            return (
+              <Card key={month} className="p-4">
+                <div className="mb-3 text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                  {formatMonthYear(month) ?? month}
+                </div>
+                <div className="grid grid-cols-7 border-b border-slate-200 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                    <div key={d} className="py-1.5">{d}</div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-px">
+                  {cells.map((day, i) => {
+                    if (day === null) return <div key={`e-${i}`} />;
+                    const daySlots = slotsByDay[day];
+                    const dateStr = `${yearStr}-${monthStr}-${String(day).padStart(2, '0')}`;
+                    return (
                       <button
                         type="button"
-                        onClick={() => openBooking(s)}
-                        className={cn('text-xs', accentActionClass)}
+                        key={day}
+                        onClick={() => {
+                          setForm((f) => ({ ...f, date: dateStr }));
+                          setOpen(true);
+                        }}
+                        className={cn(
+                          'min-h-[3rem] cursor-pointer rounded p-1 text-left text-xs transition-colors sm:min-h-[4rem]',
+                          'hover:bg-sky-50 hover:ring-1 hover:ring-sky-200 dark:hover:bg-sky-950/30 dark:hover:ring-sky-800',
+                          daySlots ? 'bg-slate-50 dark:bg-slate-900/40' : '',
+                        )}
                       >
-                        Book
+                        <div className={cn(
+                          'mb-0.5 text-[11px] font-medium',
+                          daySlots ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-600',
+                        )}>
+                          {day}
+                        </div>
+                        {daySlots && (
+                          <div className="space-y-0.5">
+                            {daySlots.map((s) => (
+                              <div
+                                key={s.id}
+                                className={cn(
+                                  'truncate rounded px-1 py-0.5 text-[10px] leading-tight',
+                                  s.status === 'available' && 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+                                  s.status === 'held' && 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+                                  s.status === 'booked' && 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
+                                  !statusColors[s.status] && 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                                )}
+                                title={`${formatTimeHHMM(s.start_time) ?? s.start_time}${s.end_time ? `–${formatTimeHHMM(s.end_time) ?? s.end_time}` : ''} (${s.status})${s.notes ? ` — ${s.notes}` : ''}`}
+                              >
+                                {formatTimeHHMM(s.start_time) ?? s.start_time}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ))}
+                    );
+                  })}
+                </div>
+              </Card>
+            );
+          })}
 
           {Object.keys(byMonth).length === 0 && <div className="text-sm text-slate-600 dark:text-slate-400">No ice slots to display.</div>}
         </div>
@@ -326,55 +326,6 @@ export default function IceSlotsPage() {
         </div>
       </Modal>
 
-      {/* Book Slot Modal */}
-      <Modal
-        open={!!bookingSlot}
-        onClose={() => setBookingSlot(null)}
-        title="Book Ice Slot"
-        footer={
-          <>
-            <Button type="button" onClick={handleBook} disabled={bookingLoading}>
-              {bookingLoading ? 'Booking…' : 'Confirm Booking'}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setBookingSlot(null)} disabled={bookingLoading}>
-              Cancel
-            </Button>
-          </>
-        }
-      >
-        {bookingSlot && (
-          <div className="space-y-3">
-            {bookingError && <Alert variant="error" title="Booking failed">{bookingError}</Alert>}
-
-            <div className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-900/40">
-              <div className="font-medium text-slate-900 dark:text-slate-100">{rink?.name}</div>
-              <div className="mt-1 text-slate-600 dark:text-slate-400">
-                {bookingSlot.date} &nbsp;·&nbsp; {formatTimeHHMM(bookingSlot.start_time) ?? bookingSlot.start_time}
-                {bookingSlot.end_time ? ` – ${formatTimeHHMM(bookingSlot.end_time) ?? bookingSlot.end_time}` : ''}
-              </div>
-              {bookingSlot.notes && (
-                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{bookingSlot.notes}</div>
-              )}
-            </div>
-
-            {activeTeam && (
-              <div className="text-sm text-slate-700 dark:text-slate-300">
-                Booking for <span className="font-medium text-slate-900 dark:text-slate-100">{activeTeam.name}</span>
-              </div>
-            )}
-
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Notes (optional)</label>
-              <Textarea
-                value={bookingNotes}
-                onChange={(e) => setBookingNotes(e.target.value)}
-                rows={2}
-                placeholder="Any notes for this booking…"
-              />
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }

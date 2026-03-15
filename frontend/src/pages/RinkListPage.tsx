@@ -225,8 +225,8 @@ export default function RinkListPage() {
         </Card>
       ) : null}
 
-      <Card className="overflow-hidden">
-        <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
+      <Card>
+        <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
           {filteredRinks.map((r) => (
             <div
               key={r.id}
@@ -345,7 +345,7 @@ export default function RinkListPage() {
               {filteredRinks.map((r) => (
                 <tr
                   key={r.id}
-                  className="cursor-pointer hover:bg-slate-50/60 dark:hover:bg-slate-900/40"
+                  className="cursor-pointer align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40"
                   onClick={() => navigate(`/rinks/${r.id}/slots`)}
                 >
                   <td className="px-4 py-3 font-medium">

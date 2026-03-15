@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarPlus2, Save, SlidersHorizontal } from 'lucide-react';
+import { CalendarPlus2, Save, SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -18,7 +18,7 @@ import EmptyState from '../components/EmptyState';
 import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
 import { cn } from '../lib/cn';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
-import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
+import { getGameStatusLabel, getGameStatusIcon, getGameStatusVariant } from '../lib/gameStatus';
 import { filterButtonClass } from '../lib/uiClasses';
 import { formatShortDate, formatTimeHHMM } from '../lib/time';
 import { useToast } from '../context/ToastContext';
@@ -301,6 +301,7 @@ export default function GamesPage() {
             const opponent = isHome ? g.away_team_name : g.home_team_name;
             const edit = scoreEdits[g.id] || { home: '', away: '' };
             const statusLabel = getGameStatusLabel(g);
+            const StatusIcon: LucideIcon = getGameStatusIcon(g);
 
             return (
               <div key={g.id} className="px-4 py-4">
@@ -315,7 +316,7 @@ export default function GamesPage() {
                         {formatTimeHHMM(g.time) || 'Time TBD'}
                       </div>
                     </div>
-                    <Badge variant={getGameStatusVariant(g)}>
+                    <Badge variant={getGameStatusVariant(g)} icon={<StatusIcon className="h-3 w-3" />}>
                       {statusLabel}
                     </Badge>
                   </div>
@@ -408,11 +409,12 @@ export default function GamesPage() {
                 const opponent = isHome ? g.away_team_name : g.home_team_name;
                 const edit = scoreEdits[g.id] || { home: '', away: '' };
                 const statusLabel = getGameStatusLabel(g);
+                const StatusIcon: LucideIcon = getGameStatusIcon(g);
 
                 return (
                   <tr
                     key={g.id}
-                    className="cursor-pointer hover:bg-slate-50/60 dark:hover:bg-slate-900/40"
+                    className="cursor-pointer align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40"
                     onClick={() => navigate(`/games/${g.id}`)}
                     title="Open game details"
                   >
@@ -428,7 +430,7 @@ export default function GamesPage() {
                         <Badge variant={isHome ? 'success' : 'info'}>{isHome ? 'Home' : 'Away'}</Badge>
                       </div>
                     </td>
-                    <td className="px-3 py-3 align-top text-slate-700 dark:text-slate-300">
+                    <td className="px-3 py-3 text-slate-700 dark:text-slate-300">
                       {g.rink_name ? (
                         <div>
                           <div className="break-words font-medium text-slate-900 dark:text-slate-100">{g.rink_name}</div>
@@ -492,6 +494,7 @@ export default function GamesPage() {
                     <td className="px-3 py-3">
                       <Badge
                         variant={getGameStatusVariant(g)}
+                        icon={<StatusIcon className="h-3 w-3" />}
                         className="px-2 py-0.5 text-[11px]"
                       >
                         {statusLabel}

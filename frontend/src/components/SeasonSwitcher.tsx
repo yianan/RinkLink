@@ -36,7 +36,7 @@ export default function SeasonSwitcher() {
             }
             if (!requireSpecificSeason) setActiveSeason(null);
           }}
-          className="bg-white/80 text-slate-900 shadow-sm ring-1 ring-slate-200/80 focus:border-cyan-400 focus:ring-cyan-400 dark:bg-slate-950/40 dark:text-slate-100 dark:ring-slate-700/60 dark:focus:border-cyan-400 dark:focus:ring-cyan-400"
+          className="min-h-11 bg-white/80 text-slate-900 shadow-sm ring-1 ring-slate-200/80 focus:border-cyan-400 focus:ring-cyan-400 sm:min-h-10 dark:bg-slate-950/40 dark:text-slate-100 dark:ring-slate-700/60 dark:focus:border-cyan-400 dark:focus:ring-cyan-400"
         >
           {!requireSpecificSeason && <option value="">{loading ? 'Loading seasons…' : 'All Seasons'}</option>}
           {seasons.map((s) => (

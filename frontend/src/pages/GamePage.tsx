@@ -597,11 +597,11 @@ export default function GamePage() {
                 <table className="w-full text-left text-sm">
                   <thead className="bg-white text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-950/20 dark:text-slate-400">
                     <tr>
-                      <th scope="col" className="px-4 py-2">#</th>
-                      <th scope="col" className="px-4 py-2">Player</th>
-                      <th scope="col" className="px-4 py-2">G</th>
-                      <th scope="col" className="px-4 py-2">A</th>
-                      <th scope="col" className="px-4 py-2">SOG</th>
+                      <th scope="col" className="w-10 px-2 py-2 sm:px-4">#</th>
+                      <th scope="col" className="px-2 py-2 sm:px-4">Player</th>
+                      <th scope="col" className="w-16 px-1 py-2 sm:w-20 sm:px-4">G</th>
+                      <th scope="col" className="w-16 px-1 py-2 sm:w-20 sm:px-4">A</th>
+                      <th scope="col" className="w-16 px-1 py-2 sm:w-20 sm:px-4">SOG</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
@@ -610,12 +610,14 @@ export default function GamePage() {
                       const hasStats = v.goals > 0 || v.assists > 0 || v.shots > 0;
                       return (
                         <tr key={p.id} className={hasStats ? 'bg-cyan-50/50 dark:bg-cyan-950/10' : undefined}>
-                          <td className="px-4 py-2 font-medium text-slate-900 dark:text-slate-100">{p.jersey_number ?? '-'}</td>
-                          <td className="px-4 py-2 text-slate-700 dark:text-slate-300">
-                            {p.first_name} {p.last_name}
-                            {p.position ? <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">{p.position}</span> : null}
+                          <td className="px-2 py-2 font-medium text-slate-900 sm:px-4 dark:text-slate-100">{p.jersey_number ?? '-'}</td>
+                          <td className="px-2 py-2 text-slate-700 sm:px-4 dark:text-slate-300">
+                            <div className="truncate">
+                              {p.first_name} {p.last_name}
+                              {p.position ? <span className="ml-1 text-xs text-slate-500 dark:text-slate-400">{p.position}</span> : null}
+                            </div>
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-2 sm:px-4">
                             <Input
                               type="number"
                               min="0"
@@ -627,10 +629,10 @@ export default function GamePage() {
                                 ...d,
                                 [p.id]: { ...v, team_id: t.teamId, goals: Number(digitsOnly(e.target.value) || '0') },
                               }))}
-                              className="h-9 w-16"
+                              className="h-9 w-14 sm:w-16"
                             />
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-2 sm:px-4">
                             <Input
                               type="number"
                               min="0"
@@ -642,10 +644,10 @@ export default function GamePage() {
                                 ...d,
                                 [p.id]: { ...v, team_id: t.teamId, assists: Number(digitsOnly(e.target.value) || '0') },
                               }))}
-                              className="h-9 w-16"
+                              className="h-9 w-14 sm:w-16"
                             />
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-2 sm:px-4">
                             <Input
                               type="number"
                               min="0"
@@ -657,7 +659,7 @@ export default function GamePage() {
                                 ...d,
                                 [p.id]: { ...v, team_id: t.teamId, shots: Number(digitsOnly(e.target.value) || '0') },
                               }))}
-                              className="h-9 w-16"
+                              className="h-9 w-14 sm:w-16"
                             />
                           </td>
                         </tr>
@@ -783,7 +785,7 @@ export default function GamePage() {
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {scoresheet.penalties.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                <tr key={p.id} className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.team_id === game.home_team_id ? homeName : awayName}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{playerName(p.player_id)}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.penalty_type}</td>

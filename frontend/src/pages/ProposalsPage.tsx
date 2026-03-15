@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarClock, Search, SlidersHorizontal, XCircle } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CalendarClock, CheckCircle2, Search, SlidersHorizontal, XCircle } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -348,14 +348,16 @@ export default function ProposalsPage() {
         onChange={setTab}
       />
 
-      <Card className="overflow-hidden">
-        <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
+      <Card>
+        <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
           {filteredProposals.map((p) => {
             const isIncoming = p.proposed_by_team_id !== activeTeam.id;
             const canRespond = isIncoming && p.status === 'proposed';
             const canCancel = !isIncoming && p.status === 'proposed';
             const canReschedule = p.status === 'accepted';
             const canCancelAccepted = p.status === 'accepted';
+            const isHistoryTab = tab === 3;
+            const isAcceptedTab = tab === 2;
 
             const rinkLine = p.rink_name
               ? `${p.rink_name}${p.rink_city ? ` • ${p.rink_city}, ${p.rink_state}` : ''}${p.ice_slot_start_time ? ` • ${formatTimeHHMM(p.ice_slot_start_time) || p.ice_slot_start_time}${p.ice_slot_end_time ? '-' + (formatTimeHHMM(p.ice_slot_end_time) || p.ice_slot_end_time) : ''}` : ''}`
@@ -392,7 +394,17 @@ export default function ProposalsPage() {
                     <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">Created {formatShortDate(p.created_at)}</div>
                   </div>
 
-                  <Badge variant={statusColors[p.status] || 'neutral'}>{p.status}</Badge>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <Badge variant={statusColors[p.status] || 'neutral'}>{p.status}</Badge>
+                    {isHistoryTab && (
+                      <Badge
+                        variant={isIncoming ? 'warning' : 'info'}
+                        icon={isIncoming ? <ArrowDownLeft className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
+                      >
+                        {isIncoming ? 'Received' : 'Sent'}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
@@ -421,6 +433,18 @@ export default function ProposalsPage() {
                       title="Request reschedule"
                     >
                       <CalendarClock className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {isAcceptedTab && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => navigate('/schedule')}
+                      aria-label="View schedule"
+                      title="View Schedule"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
                     </Button>
                   )}
                   {canCancelAccepted && (
@@ -471,15 +495,15 @@ export default function ProposalsPage() {
           <table className="w-full table-fixed text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
                 <tr>
-                  <th className="w-24 px-3 py-3">Date</th>
-                  <th className="w-24 px-3 py-3">Time</th>
-                  <th className="w-[16%] px-3 py-3">Home</th>
-                  <th className="w-[16%] px-3 py-3">Away</th>
-                  <th className="w-[18%] px-3 py-3">Rink</th>
+                  <th className="w-20 px-3 py-3">Date</th>
+                  <th className="w-16 px-3 py-3">Time</th>
+                  <th className="w-[15%] px-3 py-3">Home</th>
+                  <th className="w-[15%] px-3 py-3">Away</th>
+                  <th className="w-[16%] px-3 py-3">Rink</th>
                   <th className="w-24 px-3 py-3">Status</th>
-                  <th className="w-[14%] px-3 py-3">Message</th>
-                <th className="w-24 px-3 py-3">Created</th>
-                <th className="w-20 px-3 py-3 text-right">Actions</th>
+                  <th className="w-[10%] px-3 py-3">Message</th>
+                  <th className="w-20 px-3 py-3">Created</th>
+                  <th className="w-32 px-3 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
@@ -489,9 +513,11 @@ export default function ProposalsPage() {
                 const canCancel = !isIncoming && p.status === 'proposed';
                 const canReschedule = p.status === 'accepted';
                 const canCancelAccepted = p.status === 'accepted';
+                const isHistoryTab = tab === 3;
+                const isAcceptedTab = tab === 2;
 
                 return (
-                  <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                  <tr key={p.id} className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                     <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-900 dark:text-slate-100">
                       {formatShortDate(p.proposed_date)}
                     </td>
@@ -506,7 +532,7 @@ export default function ProposalsPage() {
                       <div className="break-words font-medium text-slate-900 dark:text-slate-100">{p.away_team_name}</div>
                       <div className="mt-0.5 break-words text-xs text-slate-500 dark:text-slate-400">{p.away_team_association}</div>
                     </td>
-                    <td className="whitespace-normal break-words px-3 py-3 align-top text-slate-700 dark:text-slate-300">
+                    <td className="whitespace-normal break-words px-3 py-3 text-slate-700 dark:text-slate-300">
                       {p.rink_name ? (
                         <div>
                           <div className="break-words font-medium text-slate-900 dark:text-slate-100">{p.rink_name}</div>
@@ -530,14 +556,24 @@ export default function ProposalsPage() {
                       )}
                     </td>
                     <td className="px-3 py-3 pr-5">
-                      <Badge variant={statusColors[p.status] || 'neutral'}>{p.status}</Badge>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge variant={statusColors[p.status] || 'neutral'}>{p.status}</Badge>
+                        {isHistoryTab && (
+                          <Badge
+                            variant={isIncoming ? 'warning' : 'info'}
+                            icon={isIncoming ? <ArrowDownLeft className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
+                          >
+                            {isIncoming ? 'Received' : 'Sent'}
+                          </Badge>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-3 py-3 align-top text-slate-700 dark:text-slate-300">
+                    <td className="px-3 py-3 text-slate-700 dark:text-slate-300">
                       <div className="break-words text-sm leading-5">{p.message || '-'}</div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-300">{formatShortDate(p.created_at)}</td>
                     <td className="px-3 py-3 align-top">
-                      <div className="flex flex-wrap justify-end gap-1.5">
+                      <div className="flex items-start gap-1">
                         {canRespond && (
                           <>
                             <Button type="button" size="sm" onClick={() => handleAccept(p.id)}>
@@ -558,6 +594,7 @@ export default function ProposalsPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={() => handleRequestReschedule(p)}
                             aria-label="Request reschedule"
                             title="Request reschedule"
@@ -565,11 +602,25 @@ export default function ProposalsPage() {
                             <CalendarClock className="h-4 w-4" />
                           </Button>
                         )}
+                        {isAcceptedTab && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => navigate('/schedule')}
+                            aria-label="View schedule"
+                            title="View Schedule"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                          </Button>
+                        )}
                         {canCancelAccepted && (
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={async () => {
                               const confirmed = await confirm({
                                 title: 'Cancel accepted game?',
