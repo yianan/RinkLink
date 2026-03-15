@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, MapPin, Navigation, Plus, Save, ShieldCheck, Trash2, UtensilsCrossed } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Clock3, MapPin, Navigation, Plus, ShieldCheck, Trash2, UtensilsCrossed } from 'lucide-react';
 
 const GAME_TYPES = [
   { value: '', label: '—' },
@@ -46,14 +46,13 @@ import { Input } from '../components/ui/Input';
 import PageHeader from '../components/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
+import { CardListSkeleton } from '../components/ui/TableSkeleton';
+import Breadcrumbs from '../components/Breadcrumbs';
+import { useToast } from '../context/ToastContext';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
-import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
-import { accentActionClass } from '../lib/uiClasses';
-import { formatTimeHHMM } from '../lib/time';
-
-function formatDateLabel(d: string) {
-  return new Date(d + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
-}
+import { getGameStatusIcon, getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
+import { accentActionClass, tableActionButtonClass } from '../lib/uiClasses';
+import { formatHeaderDate, formatTimeHHMM } from '../lib/time';
 
 function formatLocalDateISO(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -76,15 +75,26 @@ function blockNonIntegerNumberKeys(event: React.KeyboardEvent<HTMLInputElement>)
   }
 }
 
+function isGoaliePosition(position?: string | null) {
+  const normalized = (position || '').trim().toLowerCase();
+  return normalized === 'g' || normalized === 'goalie';
+}
+
+function getSingleGoalieId(players: Player[]) {
+  const goalieCandidates = players.filter((player) => isGoaliePosition(player.position));
+  return goalieCandidates.length === 1 ? goalieCandidates[0].id : null;
+}
+
 export default function GamePage() {
   const { gameId } = useParams();
-  const navigate = useNavigate();
+  const pushToast = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [scoresheet, setScoresheet] = useState<GameScoresheet | null>(null);
   const [homePlayers, setHomePlayers] = useState<Player[]>([]);
   const [awayPlayers, setAwayPlayers] = useState<Player[]>([]);
 
+  const [gameTypeDraft, setGameTypeDraft] = useState('');
   const [scoreDraft, setScoreDraft] = useState({ home: '', away: '' });
   const [statDraft, setStatDraft] = useState<Record<string, { goals: number; assists: number; shots: number; team_id: string }>>({});
 
@@ -107,6 +117,7 @@ export default function GamePage() {
           home: ss.game.home_score != null ? String(ss.game.home_score) : '',
           away: ss.game.away_score != null ? String(ss.game.away_score) : '',
         });
+        setGameTypeDraft(ss.game.game_type ?? '');
 
         const [hp, ap] = await Promise.all([
           api.getPlayers(ss.game.home_team_id, ss.game.season_id ? { season_id: ss.game.season_id } : undefined),
@@ -134,6 +145,21 @@ export default function GamePage() {
             shootout_saves: String(g.shootout_saves),
           };
         }
+        for (const [teamId, players] of [
+          [ss.game.home_team_id, hp],
+          [ss.game.away_team_id, ap],
+        ] as const) {
+          if (goalieByTeam[teamId]?.player_id) continue;
+          const singleGoalieId = getSingleGoalieId(players);
+          if (singleGoalieId) {
+            goalieByTeam[teamId] = {
+              player_id: singleGoalieId,
+              saves: '0',
+              shootout_shots: '0',
+              shootout_saves: '0',
+            };
+          }
+        }
         setGoalieDraft(goalieByTeam);
       } catch (e) {
         setError(String(e));
@@ -148,6 +174,33 @@ export default function GamePage() {
 
   const homeName = game?.home_team_name || 'Home';
   const awayName = game?.away_team_name || 'Away';
+  const StatusIcon = game ? getGameStatusIcon(game) : Clock3;
+
+  useEffect(() => {
+    if (!game) return;
+    setGoalieDraft((current) => {
+      const next = { ...current };
+      let changed = false;
+      for (const [teamId, players] of [
+        [game.home_team_id, homePlayers],
+        [game.away_team_id, awayPlayers],
+      ] as const) {
+        const singleGoalieId = getSingleGoalieId(players);
+        if (!singleGoalieId) continue;
+        const existing = next[teamId];
+        if (!existing?.player_id) {
+          next[teamId] = {
+            player_id: singleGoalieId,
+            saves: existing?.saves ?? '0',
+            shootout_shots: existing?.shootout_shots ?? '0',
+            shootout_saves: existing?.shootout_saves ?? '0',
+          };
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [game, homePlayers, awayPlayers]);
 
   const rinkLabel = useMemo(() => {
     if (!game) return '';
@@ -167,21 +220,21 @@ export default function GamePage() {
     return `${p.first_name} ${p.last_name}`;
   };
 
-  const handleSaveScore = async () => {
+  const saveGameDetails = async (showToastTitle?: string) => {
     if (!gameId || !game) return;
     const home_score = scoreDraft.home === '' ? null : Number(scoreDraft.home);
     const away_score = scoreDraft.away === '' ? null : Number(scoreDraft.away);
-    const updated = await api.updateGame(gameId, { home_score, away_score });
+    const updated = await api.updateGame(gameId, {
+      home_score,
+      away_score,
+      game_type: (gameTypeDraft || null) as Game['game_type'],
+    });
     setScoresheet((ss) => (ss ? { ...ss, game: { ...ss.game, ...updated } } : ss));
+    setGameTypeDraft(updated.game_type ?? '');
+    if (showToastTitle) pushToast({ variant: 'success', title: showToastTitle });
   };
 
-  const handleTypeChange = async (game_type: string) => {
-    if (!gameId) return;
-    const updated = await api.updateGame(gameId, { game_type: (game_type || null) as Game['game_type'] });
-    setScoresheet((ss) => (ss ? { ...ss, game: { ...ss.game, ...updated } } : ss));
-  };
-
-  const handleSaveStats = async () => {
+  const handleSaveStats = async (showToastTitle = 'Player stats saved') => {
     if (!gameId || !game) return;
     const stats: GamePlayerStatUpsert[] = [];
     for (const p of homePlayers) {
@@ -194,6 +247,7 @@ export default function GamePage() {
     }
     const updated = await api.upsertPlayerStats(gameId, stats);
     setScoresheet((ss) => (ss ? { ...ss, player_stats: updated } : ss));
+    if (showToastTitle) pushToast({ variant: 'success', title: showToastTitle });
   };
 
   const handleAddPenalty = async () => {
@@ -209,15 +263,17 @@ export default function GamePage() {
     });
     setScoresheet((ss) => (ss ? { ...ss, penalties: [...ss.penalties, created] } : ss));
     setPenaltyForm({ team_id: '', player_id: '', penalty_type: '', custom_penalty_type: '', minutes: '' });
+    pushToast({ variant: 'success', title: 'Penalty added' });
   };
 
   const handleDeletePenalty = async (id: string) => {
     await api.deletePenalty(id);
     setScoresheet((ss) => (ss ? { ...ss, penalties: ss.penalties.filter((p) => p.id !== id) } : ss));
     setPenaltyForm({ team_id: '', player_id: '', penalty_type: '', custom_penalty_type: '', minutes: '' });
+    pushToast({ variant: 'success', title: 'Penalty removed' });
   };
 
-  const handleSaveGoalies = async () => {
+  const handleSaveGoalies = async (showToastTitle = 'Goalie stats saved') => {
     if (!gameId || !game) return;
     const stats: GameGoalieStatUpsert[] = [];
     for (const teamId of [game.home_team_id, game.away_team_id]) {
@@ -233,6 +289,7 @@ export default function GamePage() {
     }
     const updated = await api.upsertGoalieStats(gameId, stats);
     setScoresheet((ss) => (ss ? { ...ss, goalie_stats: updated } : ss));
+    if (showToastTitle) pushToast({ variant: 'success', title: showToastTitle });
   };
 
   const handleSign = async (role: string, team_id: string | null) => {
@@ -247,10 +304,16 @@ export default function GamePage() {
       next.sort((a, b) => a.role.localeCompare(b.role));
       return { ...ss, signatures: next };
     });
+    pushToast({ variant: 'success', title: 'Signature saved' });
   };
 
+  const buildPlayerStatSnapshot = (players: Player[], teamId: string) => players.map((player) => {
+    const draft = statDraft[player.id] || { goals: 0, assists: 0, shots: 0, team_id: teamId };
+    return `${player.id}:${draft.goals}:${draft.assists}:${draft.shots}`;
+  }).join('|');
+
   if (loading) {
-    return <Alert variant="info">Loading game…</Alert>;
+    return <CardListSkeleton count={3} />;
   }
 
   if (error) {
@@ -271,7 +334,50 @@ export default function GamePage() {
   const restaurantsUrl = rinkLabel ? mapsQueryUrl(`restaurants near ${rinkLabel}`) : null;
   const thingsUrl = rinkLabel ? mapsQueryUrl(`things to do near ${rinkLabel}`) : null;
   const directionsUrl = rinkLabel ? mapsQueryUrl(rinkLabel) : null;
-  const statusLabel = getGameStatusLabel(game);
+  const persistedGameType = game.game_type ?? '';
+  const persistedHomeScore = game.home_score != null ? String(game.home_score) : '';
+  const persistedAwayScore = game.away_score != null ? String(game.away_score) : '';
+  const statusLabel =
+    game.home_weekly_confirmed && !game.away_weekly_confirmed
+      ? `${homeName} confirmed`
+      : game.away_weekly_confirmed && !game.home_weekly_confirmed
+        ? `${awayName} confirmed`
+        : getGameStatusLabel(game);
+  const gameTypeDirty = gameTypeDraft !== persistedGameType;
+  const scoreDirty = scoreDraft.home !== persistedHomeScore || scoreDraft.away !== persistedAwayScore;
+  const playerStatsDirty = (
+    buildPlayerStatSnapshot(homePlayers, game.home_team_id) !== homePlayers.map((player) => {
+      const stat = scoresheet.player_stats.find((entry) => entry.player_id === player.id);
+      return `${player.id}:${stat?.goals ?? 0}:${stat?.assists ?? 0}:${stat?.shots_on_goal ?? 0}`;
+    }).join('|')
+    || buildPlayerStatSnapshot(awayPlayers, game.away_team_id) !== awayPlayers.map((player) => {
+      const stat = scoresheet.player_stats.find((entry) => entry.player_id === player.id);
+      return `${player.id}:${stat?.goals ?? 0}:${stat?.assists ?? 0}:${stat?.shots_on_goal ?? 0}`;
+    }).join('|')
+  );
+  const goalieStatsDirty = [game.home_team_id, game.away_team_id].some((teamId) => {
+    const latest = [...scoresheet.goalie_stats].reverse().find((entry) => entry.team_id === teamId);
+    const draft = goalieDraft[teamId] || { player_id: '', saves: '0', shootout_shots: '0', shootout_saves: '0' };
+    const rosterPlayers = teamId === game.home_team_id ? homePlayers : awayPlayers;
+    const singleGoalieId = getSingleGoalieId(rosterPlayers);
+    const persistedPlayerId = latest?.player_id ?? (singleGoalieId && !latest ? singleGoalieId : '');
+    const persistedSaves = String(latest?.saves ?? 0);
+    const persistedShootoutShots = String(latest?.shootout_shots ?? 0);
+    const persistedShootoutSaves = String(latest?.shootout_saves ?? 0);
+    return (
+      draft.player_id !== persistedPlayerId
+      || draft.saves !== persistedSaves
+      || draft.shootout_shots !== persistedShootoutShots
+      || draft.shootout_saves !== persistedShootoutSaves
+    );
+  });
+  const dirtySections = [
+    gameTypeDirty ? 'game details' : null,
+    scoreDirty ? 'score' : null,
+    playerStatsDirty ? 'player stats' : null,
+    goalieStatsDirty ? 'goalie stats' : null,
+  ].filter(Boolean) as string[];
+  const hasUnsavedChanges = dirtySections.length > 0;
 
   const thisWeekStart = (() => {
     const d = new Date();
@@ -289,45 +395,65 @@ export default function GamePage() {
   })();
   const isThisWeek = game.date >= formatLocalDateISO(thisWeekStart) && game.date <= formatLocalDateISO(thisWeekEnd);
 
+  const handleSaveAll = async () => {
+    if (gameTypeDirty || scoreDirty) {
+      await saveGameDetails();
+    }
+    if (playerStatsDirty) {
+      await handleSaveStats('');
+    }
+    if (goalieStatsDirty) {
+      await handleSaveGoalies('');
+    }
+    pushToast({
+      variant: 'success',
+      title: dirtySections.length === 1 ? '1 section saved' : `${dirtySections.length} sections saved`,
+    });
+  };
+
   return (
     <div className="space-y-5">
+      <Breadcrumbs items={[{ label: 'Games', to: '/games' }, { label: 'Game Scoresheet' }]} />
       <PageHeader
         title="Game Scoresheet"
         subtitle={(
           <>
-            {formatDateLabel(game.date)} {formatTimeHHMM(game.time) || ''} • {homeName} vs {awayName}
+            {formatHeaderDate(game.date)} {formatTimeHHMM(game.time) || ''} • {homeName} vs {awayName}
             {isThisWeek && <span className={`ml-2 text-xs font-medium ${accentActionClass}`}>This week</span>}
           </>
-        )}
-        actions={(
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate('/games')}
-            aria-label="Back to Games"
-            title="Back to Games"
-            className="shrink-0"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
         )}
       />
 
       <Card className="overflow-hidden border-cyan-200/40 bg-gradient-to-br from-white via-cyan-50/50 to-violet-50/40 p-4 dark:border-cyan-900/30 dark:from-slate-950 dark:via-cyan-950/15 dark:to-violet-950/20">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
+          <div className="space-y-3">
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Game Details</div>
             <div className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
               <span>{homeName}</span>
               <span className="mx-2 text-slate-400 dark:text-slate-500">vs</span>
               <span>{awayName}</span>
             </div>
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 shadow-sm dark:border-white/10 dark:bg-slate-950/35">
+              <div className="min-w-[5rem] text-center">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{homeName}</div>
+                <div className="mt-1 text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                  {scoreDraft.home === '' ? '–' : scoreDraft.home}
+                </div>
+              </div>
+              <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+                {game.status === 'final' ? 'Final' : 'Score'}
+              </div>
+              <div className="min-w-[5rem] text-center">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{awayName}</div>
+                <div className="mt-1 text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                  {scoreDraft.away === '' ? '–' : scoreDraft.away}
+                </div>
+              </div>
+            </div>
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              <Badge variant={game.home_weekly_confirmed ? 'success' : 'outline'}>{homeName} confirmed</Badge>
-              <Badge variant={game.away_weekly_confirmed ? 'success' : 'outline'}>{awayName} confirmed</Badge>
-              <Badge variant={getGameStatusVariant(game)}>{statusLabel}</Badge>
+              <Badge variant={getGameStatusVariant(game)} icon={<StatusIcon className="h-3 w-3" />}>{statusLabel}</Badge>
               {game.game_type && <Badge variant={getCompetitionBadgeVariant(game.game_type)}>{getCompetitionLabel(game.game_type)}</Badge>}
+              {gameTypeDirty ? <Badge variant="warning">Unsaved</Badge> : null}
             </div>
             {game.competition_short_name && game.division_name && (
               <div className="text-sm text-slate-600 dark:text-slate-400">
@@ -335,9 +461,47 @@ export default function GamePage() {
               </div>
             )}
             {rinkLabel ? (
-              <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
-                <MapPin className="mt-0.5 h-4 w-4 text-slate-500 dark:text-slate-400" />
-                <div className="min-w-0">{rinkLabel}</div>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <MapPin className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                <div className="min-w-0 flex-1">{rinkLabel}</div>
+                {directionsUrl ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => window.open(directionsUrl, '_blank', 'noopener,noreferrer')}
+                      aria-label="Open directions"
+                      title="Directions"
+                    >
+                      <Navigation className="h-4 w-4" />
+                    </Button>
+                    {restaurantsUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => window.open(restaurantsUrl, '_blank', 'noopener,noreferrer')}
+                        aria-label="Open restaurants nearby"
+                        title="Restaurants Nearby"
+                      >
+                        <UtensilsCrossed className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {thingsUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => window.open(thingsUrl, '_blank', 'noopener,noreferrer')}
+                        aria-label="Open things to do nearby"
+                        title="Things To Do Nearby"
+                      >
+                        <MapPin className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="text-sm text-slate-600 dark:text-slate-400">No location attached yet. Add a rink or ice slot when proposing a game.</div>
@@ -346,9 +510,10 @@ export default function GamePage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <Select
-              value={game.game_type ?? ''}
-              onChange={(e) => handleTypeChange(e.target.value)}
-              className="w-36"
+              value={gameTypeDraft}
+              onChange={(e) => setGameTypeDraft(e.target.value)}
+              className="min-w-[14rem]"
+              aria-label="Game type"
             >
               {GAME_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -357,57 +522,19 @@ export default function GamePage() {
           </div>
         </div>
 
-        {directionsUrl && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => window.open(directionsUrl, '_blank', 'noopener,noreferrer')}
-              aria-label="Open directions"
-              title="Directions"
-            >
-              <Navigation className="h-4 w-4" />
-            </Button>
-            {restaurantsUrl && (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => window.open(restaurantsUrl, '_blank', 'noopener,noreferrer')}
-                aria-label="Open restaurants nearby"
-                title="Restaurants Nearby"
-              >
-                <UtensilsCrossed className="h-4 w-4" />
-              </Button>
-            )}
-            {thingsUrl && (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => window.open(thingsUrl, '_blank', 'noopener,noreferrer')}
-                aria-label="Open things to do nearby"
-                title="Things To Do Nearby"
-              >
-                <MapPin className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        )}
       </Card>
 
       <Card className="p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Score</div>
+            <div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+              <span>Score</span>
+              {scoreDirty ? <Badge variant="warning">Unsaved</Badge> : null}
+            </div>
             <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               Update the score as the game progresses. Final scores remain editable for corrections.
             </div>
           </div>
-          <Button type="button" size="icon" onClick={handleSaveScore} aria-label="Save score" title="Save score">
-            <Save className="h-4 w-4" />
-          </Button>
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -415,10 +542,12 @@ export default function GamePage() {
             <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{homeName}</div>
             <div className="mt-2">
               <Input
-                type="text"
+                type="number"
+                min="0"
+                step="1"
                 inputMode="numeric"
-                pattern="[0-9]*"
                 value={scoreDraft.home}
+                onKeyDown={blockNonIntegerNumberKeys}
                 onChange={(e) => setScoreDraft((s) => ({ ...s, home: digitsOnly(e.target.value) }))}
                 placeholder="0"
                 className="max-w-xs"
@@ -429,10 +558,12 @@ export default function GamePage() {
             <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{awayName}</div>
             <div className="mt-2">
               <Input
-                type="text"
+                type="number"
+                min="0"
+                step="1"
                 inputMode="numeric"
-                pattern="[0-9]*"
                 value={scoreDraft.away}
+                onKeyDown={blockNonIntegerNumberKeys}
                 onChange={(e) => setScoreDraft((s) => ({ ...s, away: digitsOnly(e.target.value) }))}
                 placeholder="0"
                 className="max-w-xs"
@@ -445,12 +576,12 @@ export default function GamePage() {
       <Card className="p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Player Stats</div>
+            <div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+              <span>Player Stats</span>
+              {playerStatsDirty ? <Badge variant="warning">Unsaved</Badge> : null}
+            </div>
             <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Goals, assists, shots on goal.</div>
           </div>
-          <Button type="button" size="icon" onClick={handleSaveStats} aria-label="Save player stats" title="Save player stats">
-            <Save className="h-4 w-4" />
-          </Button>
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -466,18 +597,19 @@ export default function GamePage() {
                 <table className="w-full text-left text-sm">
                   <thead className="bg-white text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-950/20 dark:text-slate-400">
                     <tr>
-                      <th className="px-4 py-2">#</th>
-                      <th className="px-4 py-2">Player</th>
-                      <th className="px-4 py-2">G</th>
-                      <th className="px-4 py-2">A</th>
-                      <th className="px-4 py-2">SOG</th>
+                      <th scope="col" className="px-4 py-2">#</th>
+                      <th scope="col" className="px-4 py-2">Player</th>
+                      <th scope="col" className="px-4 py-2">G</th>
+                      <th scope="col" className="px-4 py-2">A</th>
+                      <th scope="col" className="px-4 py-2">SOG</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                     {t.players.map((p) => {
                       const v = statDraft[p.id] || { goals: 0, assists: 0, shots: 0, team_id: t.teamId };
+                      const hasStats = v.goals > 0 || v.assists > 0 || v.shots > 0;
                       return (
-                        <tr key={p.id}>
+                        <tr key={p.id} className={hasStats ? 'bg-cyan-50/50 dark:bg-cyan-950/10' : undefined}>
                           <td className="px-4 py-2 font-medium text-slate-900 dark:text-slate-100">{p.jersey_number ?? '-'}</td>
                           <td className="px-4 py-2 text-slate-700 dark:text-slate-300">
                             {p.first_name} {p.last_name}
@@ -551,7 +683,8 @@ export default function GamePage() {
         <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Penalties</div>
         <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Type and duration (minutes).</div>
 
-        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
+        <div className="mt-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/35">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-3">
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Team</label>
             <Select
@@ -635,16 +768,17 @@ export default function GamePage() {
             </Button>
           </div>
         </div>
+        </div>
 
         <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/20">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
               <tr>
-                <th className="px-4 py-3">Team</th>
-                <th className="px-4 py-3">Player</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Min</th>
-                <th className="px-4 py-3 text-right"></th>
+                <th scope="col" className="px-4 py-3">Team</th>
+                <th scope="col" className="px-4 py-3">Player</th>
+                <th scope="col" className="px-4 py-3">Type</th>
+                <th scope="col" className="px-4 py-3">Min</th>
+                <th scope="col" className="px-4 py-3 text-right"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
@@ -656,7 +790,7 @@ export default function GamePage() {
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.minutes}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDeletePenalty(p.id)} aria-label="Delete penalty">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDeletePenalty(p.id)} aria-label="Delete penalty" className={tableActionButtonClass}>
                         <Trash2 className="h-4 w-4 text-rose-600" />
                       </Button>
                     </div>
@@ -679,12 +813,12 @@ export default function GamePage() {
       <Card className="p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Goaltender Stats</div>
+            <div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+              <span>Goaltender Stats</span>
+              {goalieStatsDirty ? <Badge variant="warning">Unsaved</Badge> : null}
+            </div>
             <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Saves and shootouts.</div>
           </div>
-          <Button type="button" size="icon" onClick={handleSaveGoalies} aria-label="Save goalie stats" title="Save goalie stats">
-            <Save className="h-4 w-4" />
-          </Button>
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -693,24 +827,39 @@ export default function GamePage() {
             { teamId: game.away_team_id, title: awayName, players: awayPlayers },
           ].map((t) => {
             const d = goalieDraft[t.teamId] || { player_id: '', saves: '0', shootout_shots: '0', shootout_saves: '0' };
+            const goalieCandidates = t.players.filter((player) => isGoaliePosition(player.position));
+            const selectableGoalies = goalieCandidates.length > 0 ? goalieCandidates : t.players;
+            const autoSelectedGoalieId = getSingleGoalieId(t.players);
             return (
               <Card key={t.teamId} className="border-slate-200 p-4 dark:border-slate-800">
-                <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{t.title}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{t.title}</div>
+                  {autoSelectedGoalieId && d.player_id === autoSelectedGoalieId ? <Badge variant="info">Auto-selected</Badge> : null}
+                </div>
                 <div className="mt-3 grid grid-cols-1 gap-3">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Goalie</label>
                     <Select
                       value={d.player_id}
                       onChange={(e) => setGoalieDraft((g) => ({ ...g, [t.teamId]: { ...d, player_id: e.target.value } }))}
-                      disabled={t.players.length === 0}
+                      disabled={selectableGoalies.length === 0}
                     >
                       <option value="">Select…</option>
-                      {t.players.map((p) => (
+                      {selectableGoalies.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.jersey_number != null ? `#${p.jersey_number} ` : ''}{p.first_name} {p.last_name}
                         </option>
                       ))}
                     </Select>
+                    {goalieCandidates.length === 0 && t.players.length > 0 ? (
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        No goalie is marked on the roster, so the full roster is available.
+                      </div>
+                    ) : autoSelectedGoalieId && d.player_id === autoSelectedGoalieId ? (
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        This team has one goalie on the roster, so it is preselected.
+                      </div>
+                    ) : null}
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div>
@@ -768,11 +917,14 @@ export default function GamePage() {
               <Card key={r.role} className="border-slate-200 p-4 dark:border-slate-800">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{r.label}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{r.label}</div>
+                      {existing ? <Badge variant="success">Signed</Badge> : <Badge variant="outline">Pending</Badge>}
+                    </div>
                     {existing ? (
                       <div className="mt-1 text-sm text-slate-700 dark:text-slate-300">
-                        Signed by <span className="font-medium text-slate-900 dark:text-slate-100">{existing.signer_name}</span>{' '}
-                        <span className="text-slate-500 dark:text-slate-400">({new Date(existing.signed_at).toLocaleString()})</span>
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{existing.signer_name}</span>{' '}
+                        <span className="text-slate-500 dark:text-slate-400">• {new Date(existing.signed_at).toLocaleString()}</span>
                       </div>
                     ) : (
                       <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Not signed yet.</div>
@@ -793,7 +945,7 @@ export default function GamePage() {
                     size="icon"
                     onClick={() => handleSign(r.role, r.team_id)}
                     aria-label={`Sign as ${r.label}`}
-                    title={`Sign as ${r.label}`}
+                    title="Sign"
                   >
                     <ShieldCheck className="h-4 w-4" />
                   </Button>
@@ -803,6 +955,18 @@ export default function GamePage() {
           })}
         </div>
       </Card>
+
+      {hasUnsavedChanges ? (
+        <div className="sticky bottom-4 z-20 flex justify-end">
+          <Card className="max-w-lg border-cyan-200/70 bg-white/95 p-3 shadow-xl backdrop-blur dark:border-cyan-900/40 dark:bg-slate-950/92" role="status" aria-live="polite">
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <Button type="button" onClick={handleSaveAll} aria-label="Save all scoresheet changes">
+                Save All Changes
+              </Button>
+            </div>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }

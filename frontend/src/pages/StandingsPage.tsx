@@ -8,6 +8,7 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import PageHeader from '../components/PageHeader';
+import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
 
 function divisionLabel(division: CompetitionDivision) {
   return `${division.competition_short_name} — ${division.name}`;
@@ -157,7 +158,7 @@ export default function StandingsPage() {
       />
 
       {loadingDivisions ? (
-        <div className="py-10 text-center text-sm text-slate-600 dark:text-slate-400">Loading divisions…</div>
+        <CardListSkeleton count={3} />
       ) : divisions.length === 0 ? (
         <Alert variant="info">No standings-enabled competition divisions are configured for this season.</Alert>
       ) : activeTeam && !activeTeamStandingsDivisionId && !selectedDivisionId ? (
@@ -165,7 +166,14 @@ export default function StandingsPage() {
       ) : !selectedDivisionId ? (
         <Alert variant="info">No standings division is selected for this season.</Alert>
       ) : loadingStandings ? (
-        <div className="py-10 text-center text-sm text-slate-600 dark:text-slate-400">Loading standings…</div>
+        <>
+          <div className="md:hidden">
+            <CardListSkeleton count={3} />
+          </div>
+          <div className="hidden md:block">
+            <TableSkeleton columns={8} rows={5} compact />
+          </div>
+        </>
       ) : standings.length === 0 ? (
         <Alert variant="info">No standings data is available for this division yet.</Alert>
       ) : (

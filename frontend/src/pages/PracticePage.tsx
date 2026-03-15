@@ -13,7 +13,9 @@ import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
-import { formatTimeHHMM, formatDate } from '../lib/time';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
+import { useToast } from '../context/ToastContext';
+import { formatTimeHHMM, formatShortDate } from '../lib/time';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -34,6 +36,8 @@ export default function PracticePage() {
   const [notes, setNotes] = useState('');
   const [modalError, setModalError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const confirm = useConfirmDialog();
+  const pushToast = useToast();
 
   const load = () => {
     if (!activeTeam) return;
@@ -74,6 +78,7 @@ export default function PracticePage() {
       });
       setModalOpen(false);
       load();
+      pushToast({ variant: 'success', title: 'Practice booked' });
     } catch (e) {
       setModalError(String(e));
     } finally {
@@ -82,12 +87,19 @@ export default function PracticePage() {
   };
 
   const handleCancel = async (bookingId: string) => {
-    if (!confirm('Cancel this practice booking?')) return;
+    const confirmed = await confirm({
+      title: 'Cancel practice booking?',
+      description: 'This releases the slot and moves the booking to history.',
+      confirmLabel: 'Cancel booking',
+      confirmVariant: 'destructive',
+    });
+    if (!confirmed) return;
     try {
       await api.cancelPracticeBooking(bookingId);
       load();
+      pushToast({ variant: 'success', title: 'Practice cancelled' });
     } catch (e) {
-      alert(String(e));
+      pushToast({ variant: 'error', title: 'Practice cancellation failed', description: String(e) });
     }
   };
 
@@ -141,7 +153,7 @@ export default function PracticePage() {
             <div key={b.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{formatDate(b.slot_date) || '—'}</div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{formatShortDate(b.slot_date) || '—'}</div>
                   <div className="mt-1 text-sm text-slate-700 dark:text-slate-300">
                     {formatTimeHHMM(b.slot_start_time) || '—'}
                     {b.slot_end_time ? `–${formatTimeHHMM(b.slot_end_time) || b.slot_end_time}` : ''}
@@ -156,7 +168,7 @@ export default function PracticePage() {
                   )}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Badge variant={b.status === 'active' ? 'success' : 'neutral'}>{b.status === 'active' ? 'Confirmed' : b.status}</Badge>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">Booked On {formatDate(b.created_at)}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Booked On {formatShortDate(b.created_at)}</span>
                   </div>
                 </div>
 
@@ -197,7 +209,7 @@ export default function PracticePage() {
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {displayed.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
-                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{formatDate(b.slot_date) || '—'}</td>
+                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{formatShortDate(b.slot_date) || '—'}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                     {formatTimeHHMM(b.slot_start_time) || '—'}
                     {b.slot_end_time ? `–${formatTimeHHMM(b.slot_end_time) || b.slot_end_time}` : ''}
@@ -219,7 +231,7 @@ export default function PracticePage() {
                     <Badge variant={b.status === 'active' ? 'success' : 'neutral'}>{b.status === 'active' ? 'Confirmed' : b.status}</Badge>
                   </td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                    {formatDate(b.created_at)}
+                    {formatShortDate(b.created_at)}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end">

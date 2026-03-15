@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, SlidersHorizontal } from 'lucide-react';
+import { CalendarPlus2, Save, SlidersHorizontal } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -14,10 +14,14 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
+import EmptyState from '../components/EmptyState';
+import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
 import { cn } from '../lib/cn';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
 import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
-import { formatDate, formatTimeHHMM } from '../lib/time';
+import { filterButtonClass } from '../lib/uiClasses';
+import { formatShortDate, formatTimeHHMM } from '../lib/time';
+import { useToast } from '../context/ToastContext';
 
 const GAME_TYPES = [
   { value: '', label: '—' },
@@ -60,6 +64,7 @@ export default function GamesPage() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedVenues, setSelectedVenues] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const pushToast = useToast();
 
   useEffect(() => {
     if (!activeTeam) return;
@@ -98,6 +103,7 @@ export default function GamesPage() {
   const handleTypeChange = async (gameId: string, game_type: string) => {
     const updated = await api.updateGame(gameId, { game_type: (game_type || null) as Game['game_type'] });
     setGames((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
+    pushToast({ variant: 'success', title: 'Game type updated' });
   };
 
   const handleSaveScore = async (gameId: string) => {
@@ -107,6 +113,7 @@ export default function GamesPage() {
     const away_score = edit.away === '' ? null : Number(edit.away);
     const updated = await api.updateGame(gameId, { home_score, away_score });
     setGames((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
+    pushToast({ variant: 'success', title: 'Score saved' });
   };
 
   const today = new Date();
@@ -164,7 +171,6 @@ export default function GamesPage() {
   }, [selectedStatuses, selectedTypes, selectedVenues, statusOptions, typeOptions, venueOptions]);
 
   const hasActiveFilters = activeFilterBadges.length > 0;
-  const filterButtonClass = 'h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25';
 
   const clearFilters = () => {
     setSelectedTypes([]);
@@ -288,11 +294,7 @@ export default function GamesPage() {
 
       <Card className="overflow-hidden">
         <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
-          {loading && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-              Loading games…
-            </div>
-          )}
+          {loading && <CardListSkeleton count={3} />}
 
           {!loading && filtered.map((g) => {
             const isHome = activeTeam.id === g.home_team_id;
@@ -308,7 +310,7 @@ export default function GamesPage() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{formatDate(g.date) || g.date}</div>
+                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{formatShortDate(g.date) || g.date}</div>
                       <div className="mt-0.5 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                         {formatTimeHHMM(g.time) || 'Time TBD'}
                       </div>
@@ -363,8 +365,18 @@ export default function GamesPage() {
           })}
 
           {!loading && filtered.length === 0 && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-              No games to show.
+            <div className="p-4">
+              <EmptyState
+                icon={<CalendarPlus2 className="h-5 w-5" />}
+                title="No games to show"
+                description={tab === 0 ? 'Add or confirm games from the Schedule page.' : 'There are no games in this view yet.'}
+                actions={tab === 0 ? (
+                  <Button type="button" size="sm" onClick={() => navigate('/schedule')}>
+                    Open Schedule
+                  </Button>
+                ) : undefined}
+                className="border-0 shadow-none"
+              />
             </div>
           )}
         </div>
@@ -373,7 +385,7 @@ export default function GamesPage() {
           <table className="w-full table-fixed text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
               <tr>
-                <th className="w-28 px-3 py-3">Date</th>
+                <th className="w-20 px-3 py-3">Date</th>
                 <th className="w-24 px-3 py-3">Time</th>
                 <th className="w-[24%] px-3 py-3">Opponent</th>
                 <th className="w-[18%] px-3 py-3">Rink</th>
@@ -385,8 +397,8 @@ export default function GamesPage() {
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {loading && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                    Loading games…
+                  <td colSpan={7} className="p-0">
+                    <TableSkeleton columns={7} rows={4} compact />
                   </td>
                 </tr>
               )}
@@ -405,7 +417,7 @@ export default function GamesPage() {
                     title="Open game details"
                   >
                     <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-900 dark:text-slate-100">
-                      {formatDate(g.date) || g.date}
+                      {formatShortDate(g.date) || g.date}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-300">
                       {formatTimeHHMM(g.time) || '—'}
@@ -491,8 +503,18 @@ export default function GamesPage() {
 
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                    No games to show.
+                  <td colSpan={7} className="px-4 py-6">
+                    <EmptyState
+                      icon={<CalendarPlus2 className="h-5 w-5" />}
+                      title="No games to show"
+                      description={tab === 0 ? 'Add or confirm games from the Schedule page.' : 'There are no games in this view yet.'}
+                      actions={tab === 0 ? (
+                        <Button type="button" size="sm" onClick={() => navigate('/schedule')}>
+                          Open Schedule
+                        </Button>
+                      ) : undefined}
+                      className="border-0 shadow-none"
+                    />
                   </td>
                 </tr>
               )}

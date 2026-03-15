@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, SlidersHorizontal, XCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CalendarClock, Search, SlidersHorizontal, XCircle } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -15,7 +16,12 @@ import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
-import { formatTimeHHMM, formatDate } from '../lib/time';
+import EmptyState from '../components/EmptyState';
+import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
+import { useToast } from '../context/ToastContext';
+import { filterButtonClass } from '../lib/uiClasses';
+import { formatTimeHHMM, formatShortDate } from '../lib/time';
 
 const statusColors: Record<string, 'warning' | 'success' | 'danger' | 'neutral'> = {
   proposed: 'warning',
@@ -75,6 +81,7 @@ export default function ProposalsPage() {
   const { activeTeam } = useTeam();
   const { activeSeason, seasons } = useSeason();
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
+  const navigate = useNavigate();
   const [tab, setTab] = useState(0);
   const [proposals, setProposals] = useState<GameProposal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,7 +99,8 @@ export default function ProposalsPage() {
   const [rescheduleMessage, setRescheduleMessage] = useState('');
   const [rescheduleError, setRescheduleError] = useState('');
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
-  const filterButtonClass = 'h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25';
+  const confirm = useConfirmDialog();
+  const pushToast = useToast();
 
   const load = () => {
     if (!activeTeam || !effectiveSeason) return;
@@ -124,14 +132,17 @@ export default function ProposalsPage() {
   const handleAccept = async (id: string) => {
     await api.acceptProposal(id);
     load();
+    pushToast({ variant: 'success', title: 'Proposal accepted' });
   };
   const handleDecline = async (id: string) => {
     await api.declineProposal(id);
     load();
+    pushToast({ variant: 'success', title: 'Proposal declined' });
   };
   const handleCancel = async (id: string) => {
     await api.cancelProposal(id);
     load();
+    pushToast({ variant: 'success', title: 'Proposal cancelled' });
   };
 
   const handleRequestReschedule = (p: GameProposal) => {
@@ -172,6 +183,7 @@ export default function ProposalsPage() {
       });
       setRescheduleDialog({ open: false });
       load();
+      pushToast({ variant: 'success', title: 'Reschedule request sent' });
     } catch (e) {
       setRescheduleError(String(e));
     } finally {
@@ -354,7 +366,7 @@ export default function ProposalsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {formatDate(p.proposed_date)} {formatTimeHHMM(p.proposed_time) || ''}
+                      {formatShortDate(p.proposed_date)} {formatTimeHHMM(p.proposed_time) || ''}
                     </div>
                     <div className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-300">
                       <div className="truncate">
@@ -377,7 +389,7 @@ export default function ProposalsPage() {
                     {p.message ? (
                       <div className="mt-2 text-sm text-slate-700 dark:text-slate-300">{p.message}</div>
                     ) : null}
-                    <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">Created {formatDate(p.created_at)}</div>
+                    <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">Created {formatShortDate(p.created_at)}</div>
                   </div>
 
                   <Badge variant={statusColors[p.status] || 'neutral'}>{p.status}</Badge>
@@ -416,8 +428,14 @@ export default function ProposalsPage() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => {
-                        if (!confirm('Cancel this accepted game?')) return;
+                      onClick={async () => {
+                        const confirmed = await confirm({
+                          title: 'Cancel accepted game?',
+                          description: 'This removes the accepted game from the proposal flow.',
+                          confirmLabel: 'Cancel game',
+                          confirmVariant: 'destructive',
+                        });
+                        if (!confirmed) return;
                         handleCancel(p.id);
                       }}
                       aria-label="Cancel game"
@@ -431,16 +449,20 @@ export default function ProposalsPage() {
             );
           })}
 
-          {loading && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-              Loading proposals…
-            </div>
-          )}
+          {loading && <CardListSkeleton count={3} />}
           {!loading && filteredProposals.length === 0 && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-              {hasActiveFilters
-                ? 'No proposals match the current filters.'
-                : `No ${tabDef.label.toLowerCase()} proposals.`}
+            <div className="p-4">
+              <EmptyState
+                icon={<Search className="h-5 w-5" />}
+                title={hasActiveFilters ? 'No proposals match these filters' : `No ${tabDef.label.toLowerCase()} proposals`}
+                description={hasActiveFilters ? 'Clear or change filters to widen the list.' : 'Use Find Opponents to send your next proposal.'}
+                actions={!hasActiveFilters ? (
+                  <Button type="button" size="sm" onClick={() => navigate('/search')}>
+                    Find Opponents
+                  </Button>
+                ) : undefined}
+                className="border-0 shadow-none"
+              />
             </div>
           )}
         </div>
@@ -471,7 +493,7 @@ export default function ProposalsPage() {
                 return (
                   <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                     <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-900 dark:text-slate-100">
-                      {formatDate(p.proposed_date)}
+                      {formatShortDate(p.proposed_date)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-300">
                       {formatTimeHHMM(p.proposed_time) || '-'}
@@ -513,7 +535,7 @@ export default function ProposalsPage() {
                     <td className="px-3 py-3 align-top text-slate-700 dark:text-slate-300">
                       <div className="break-words text-sm leading-5">{p.message || '-'}</div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-300">{formatDate(p.created_at)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-300">{formatShortDate(p.created_at)}</td>
                     <td className="px-3 py-3 align-top">
                       <div className="flex flex-wrap justify-end gap-1.5">
                         {canRespond && (
@@ -548,8 +570,14 @@ export default function ProposalsPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            onClick={() => {
-                              if (!confirm('Cancel this accepted game?')) return;
+                            onClick={async () => {
+                              const confirmed = await confirm({
+                                title: 'Cancel accepted game?',
+                                description: 'This removes the accepted game from the proposal flow.',
+                                confirmLabel: 'Cancel game',
+                                confirmVariant: 'destructive',
+                              });
+                              if (!confirmed) return;
                               handleCancel(p.id);
                             }}
                             aria-label="Cancel game"
@@ -566,17 +594,25 @@ export default function ProposalsPage() {
 
               {loading && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                    Loading proposals…
+                  <td colSpan={9} className="p-0">
+                    <TableSkeleton columns={9} rows={4} compact />
                   </td>
                 </tr>
               )}
               {!loading && filteredProposals.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                    {hasActiveFilters
-                      ? 'No proposals match the current filters.'
-                      : `No ${tabDef.label.toLowerCase()} proposals.`}
+                  <td colSpan={9} className="px-3 py-6">
+                    <EmptyState
+                      icon={<Search className="h-5 w-5" />}
+                      title={hasActiveFilters ? 'No proposals match these filters' : `No ${tabDef.label.toLowerCase()} proposals`}
+                      description={hasActiveFilters ? 'Clear or change filters to widen the list.' : 'Use Find Opponents to send your next proposal.'}
+                      actions={!hasActiveFilters ? (
+                        <Button type="button" size="sm" onClick={() => navigate('/search')}>
+                          Find Opponents
+                        </Button>
+                      ) : undefined}
+                      className="border-0 shadow-none"
+                    />
                   </td>
                 </tr>
               )}

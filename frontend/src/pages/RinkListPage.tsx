@@ -10,8 +10,11 @@ import FilterPillGroup, { type FilterOption } from '../components/FilterPillGrou
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import PageHeader from '../components/PageHeader';
+import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
 import { cn } from '../lib/cn';
-import { accentLinkClass } from '../lib/uiClasses';
+import { accentLinkClass, filterButtonClass, tableActionButtonClass } from '../lib/uiClasses';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
+import { useToast } from '../context/ToastContext';
 
 const emptyForm = { name: '', address: '', city: '', state: '', zip_code: '', phone: '', contact_email: '', website: '' };
 
@@ -38,7 +41,8 @@ export default function RinkListPage() {
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const filterButtonClass = 'h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25';
+  const confirm = useConfirmDialog();
+  const pushToast = useToast();
 
   const load = () => {
     let cancelled = false;
@@ -80,10 +84,16 @@ export default function RinkListPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete this rink and all its ice slots?')) {
-      await api.deleteRink(id);
-      load();
-    }
+    const confirmed = await confirm({
+      title: 'Delete rink?',
+      description: 'This removes the rink and all related ice slots.',
+      confirmLabel: 'Delete rink',
+      confirmVariant: 'destructive',
+    });
+    if (!confirmed) return;
+    await api.deleteRink(id);
+    load();
+    pushToast({ variant: 'success', title: 'Rink deleted' });
   };
 
   const cityOptions = useMemo<FilterOption[]>(
@@ -277,6 +287,7 @@ export default function RinkListPage() {
                       window.open(mapsQueryUrl(`restaurants near ${label}`), '_blank', 'noopener,noreferrer');
                     }}
                     aria-label="Restaurants nearby"
+                    className={tableActionButtonClass}
                   >
                     <Utensils className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                   </Button>
@@ -289,13 +300,14 @@ export default function RinkListPage() {
                       window.open(mapsQueryUrl(`things to do near ${label}`), '_blank', 'noopener,noreferrer');
                     }}
                     aria-label="Things to do nearby"
+                    className={tableActionButtonClass}
                   >
                     <Map className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                   </Button>
-                  <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(r)} aria-label="Edit">
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(r)} aria-label="Edit" className={tableActionButtonClass}>
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(r.id)} aria-label="Delete">
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(r.id)} aria-label="Delete" className={tableActionButtonClass}>
                     <Trash2 className="h-4 w-4 text-rose-600" />
                   </Button>
                 </div>
@@ -304,9 +316,7 @@ export default function RinkListPage() {
           ))}
 
           {loading && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-              Loading rinks…
-            </div>
+            <CardListSkeleton count={3} />
           )}
           {!loading && rinks.length === 0 && (
             <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
@@ -324,11 +334,11 @@ export default function RinkListPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
               <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Address</th>
-                <th className="px-4 py-3 whitespace-nowrap">Phone</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th scope="col" className="px-4 py-3">Name</th>
+                <th scope="col" className="px-4 py-3">Address</th>
+                <th scope="col" className="px-4 py-3 whitespace-nowrap">Phone</th>
+                <th scope="col" className="px-4 py-3">Email</th>
+                <th scope="col" className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
@@ -382,6 +392,7 @@ export default function RinkListPage() {
                           window.open(mapsQueryUrl(`restaurants near ${label}`), '_blank', 'noopener,noreferrer');
                         }}
                         aria-label="Restaurants nearby"
+                        className={tableActionButtonClass}
                       >
                         <Utensils className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                       </Button>
@@ -394,13 +405,14 @@ export default function RinkListPage() {
                           window.open(mapsQueryUrl(`things to do near ${label}`), '_blank', 'noopener,noreferrer');
                         }}
                         aria-label="Things to do nearby"
+                        className={tableActionButtonClass}
                       >
                         <Map className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                       </Button>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(r)} aria-label="Edit">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(r)} aria-label="Edit" className={tableActionButtonClass}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(r.id)} aria-label="Delete">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(r.id)} aria-label="Delete" className={tableActionButtonClass}>
                         <Trash2 className="h-4 w-4 text-rose-600" />
                       </Button>
                     </div>
@@ -410,8 +422,8 @@ export default function RinkListPage() {
 
               {loading && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                    Loading rinks…
+                  <td colSpan={5} className="p-0">
+                    <TableSkeleton columns={5} rows={4} compact />
                   </td>
                 </tr>
               )}

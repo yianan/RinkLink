@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Trash2 } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { api } from '../api/client';
 import { Rink, IceSlot } from '../types';
@@ -14,9 +14,12 @@ import { Modal } from '../components/ui/Modal';
 import { Textarea } from '../components/ui/Textarea';
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
+import Breadcrumbs from '../components/Breadcrumbs';
 import { cn } from '../lib/cn';
-import { accentActionClass } from '../lib/uiClasses';
-import { formatTimeHHMM } from '../lib/time';
+import { accentActionClass, tableActionButtonClass } from '../lib/uiClasses';
+import { formatMonthYear, formatShortDate, formatTimeHHMM } from '../lib/time';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
+import { useToast } from '../context/ToastContext';
 
 const statusColors: Record<string, 'success' | 'warning' | 'info' | 'neutral'> = {
   available: 'success',
@@ -26,7 +29,6 @@ const statusColors: Record<string, 'success' | 'warning' | 'info' | 'neutral'> =
 
 export default function IceSlotsPage() {
   const { rinkId } = useParams<{ rinkId: string }>();
-  const navigate = useNavigate();
   const { activeTeam } = useTeam();
   const [rink, setRink] = useState<Rink | null>(null);
   const [slots, setSlots] = useState<IceSlot[]>([]);
@@ -39,6 +41,8 @@ export default function IceSlotsPage() {
   const [bookingNotes, setBookingNotes] = useState('');
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState('');
+  const confirm = useConfirmDialog();
+  const pushToast = useToast();
 
   const load = () => {
     if (!rinkId) return;
@@ -68,10 +72,16 @@ export default function IceSlotsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete this ice slot?')) {
-      await api.deleteIceSlot(id);
-      load();
-    }
+    const confirmed = await confirm({
+      title: 'Delete ice slot?',
+      description: 'This removes the ice slot from the rink schedule.',
+      confirmLabel: 'Delete slot',
+      confirmVariant: 'destructive',
+    });
+    if (!confirmed) return;
+    await api.deleteIceSlot(id);
+    load();
+    pushToast({ variant: 'success', title: 'Ice slot deleted' });
   };
 
   const openBooking = (slot: IceSlot) => {
@@ -91,6 +101,7 @@ export default function IceSlotsPage() {
       });
       setBookingSlot(null);
       load();
+      pushToast({ variant: 'success', title: 'Practice booked' });
     } catch (e) {
       setBookingError(String(e));
     } finally {
@@ -115,7 +126,7 @@ export default function IceSlotsPage() {
       <tr key={s.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
         <td className="px-3 py-3 font-medium text-slate-900 sm:px-4 dark:text-slate-100">
           <div className="flex items-start justify-between gap-2">
-            <div className="whitespace-nowrap">{s.date}</div>
+            <div className="whitespace-nowrap">{formatShortDate(s.date) ?? s.date}</div>
             <div className="sm:hidden">
               <Badge variant={statusColors[s.status] || 'neutral'}>{s.status}</Badge>
             </div>
@@ -153,6 +164,7 @@ export default function IceSlotsPage() {
               onClick={() => handleDelete(s.id)}
               disabled={s.status === 'booked'}
               aria-label="Delete slot"
+              className={tableActionButtonClass}
             >
               <Trash2 className={cn('h-4 w-4', s.status === 'booked' ? 'text-slate-300 dark:text-slate-600' : 'text-rose-600')} />
             </Button>
@@ -164,17 +176,11 @@ export default function IceSlotsPage() {
 
   return (
     <div className="space-y-4 overflow-x-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="ghost" size="icon" onClick={() => navigate('/rinks')} aria-label="Back to rinks">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <PageHeader
-            title={rink ? `${rink.name} — Ice Slots` : 'Ice Slots'}
-            subtitle={rink ? `${rink.address}, ${rink.city}, ${rink.state} ${rink.zip_code}` : undefined}
-          />
-        </div>
-      </div>
+      <Breadcrumbs items={[{ label: 'Rinks', to: '/rinks' }, { label: rink ? `${rink.name} Ice Slots` : 'Ice Slots' }]} />
+      <PageHeader
+        title={rink ? `${rink.name} — Ice Slots` : 'Ice Slots'}
+        subtitle={rink ? `${rink.address}, ${rink.city}, ${rink.state} ${rink.zip_code}` : undefined}
+      />
 
       {!activeTeam && (
         <Alert variant="info">Select a team to book ice slots.</Alert>
@@ -204,14 +210,14 @@ export default function IceSlotsPage() {
             <table className="w-full table-fixed text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
                 <tr>
-                  <th className="px-3 py-3 sm:px-4">Date</th>
-                  <th className="hidden px-3 py-3 sm:table-cell sm:px-4">Start</th>
-                  <th className="hidden px-3 py-3 sm:table-cell sm:px-4">End</th>
-                  <th className="hidden px-3 py-3 sm:table-cell sm:px-4">Status</th>
-                  <th className="hidden px-3 py-3 md:table-cell md:px-4">Notes</th>
-                  <th className="px-3 py-3 text-right sm:px-4"></th>
-                </tr>
-              </thead>
+                <th scope="col" className="px-3 py-3 sm:px-4">Date</th>
+                <th scope="col" className="hidden px-3 py-3 sm:table-cell sm:px-4">Start</th>
+                <th scope="col" className="hidden px-3 py-3 sm:table-cell sm:px-4">End</th>
+                <th scope="col" className="hidden px-3 py-3 sm:table-cell sm:px-4">Status</th>
+                <th scope="col" className="hidden px-3 py-3 md:table-cell md:px-4">Notes</th>
+                <th scope="col" className="px-3 py-3 text-right sm:px-4"></th>
+              </tr>
+            </thead>
               <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                 {slots.map((s) => <SlotRow key={s.id} s={s} />)}
 
@@ -232,7 +238,7 @@ export default function IceSlotsPage() {
         <div className="space-y-3">
           {Object.entries(byMonth).sort().map(([month, monthSlots]) => (
             <Card key={month} className="p-4">
-              <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{month}</div>
+              <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{formatMonthYear(month) ?? month}</div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {monthSlots.map((s) => (
                   <div key={s.id} className="flex items-center gap-1.5">
@@ -240,7 +246,7 @@ export default function IceSlotsPage() {
                       variant={statusColors[s.status] || 'neutral'}
                       className={cn(s.status === 'available' ? '' : 'bg-white dark:bg-slate-950/40')}
                     >
-                      {s.date.substring(5)} {formatTimeHHMM(s.start_time) ?? s.start_time}
+                      {formatShortDate(s.date) ?? s.date} {formatTimeHHMM(s.start_time) ?? s.start_time}
                       {s.end_time ? `-${formatTimeHHMM(s.end_time) ?? s.end_time}` : ''}
                     </Badge>
                     {s.status === 'available' && activeTeam && (

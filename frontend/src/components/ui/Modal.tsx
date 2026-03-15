@@ -26,6 +26,7 @@ export function Modal({
 }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
+  const lastActiveElementRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -33,6 +34,8 @@ export function Modal({
 
   useEffect(() => {
     if (!open) return;
+
+    lastActiveElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCloseRef.current();
@@ -48,6 +51,7 @@ export function Modal({
       window.clearTimeout(id);
       document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = previousOverflow;
+      lastActiveElementRef.current?.focus?.();
     };
   }, [open]);
 

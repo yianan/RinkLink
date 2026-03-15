@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Trash2, Users } from 'lucide-react';
+import { FileUp, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -14,6 +14,10 @@ import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
+import EmptyState from '../components/EmptyState';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
+import { useToast } from '../context/ToastContext';
+import { tableActionButtonClass } from '../lib/uiClasses';
 
 const emptyForm = {
   first_name: '',
@@ -38,6 +42,8 @@ export default function RosterPage() {
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const confirm = useConfirmDialog();
+  const pushToast = useToast();
 
   const load = () => {
     if (!activeTeam || !effectiveSeason) return;
@@ -80,10 +86,16 @@ export default function RosterPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete this player?')) {
-      await api.deletePlayer(id);
-      load();
-    }
+    const confirmed = await confirm({
+      title: 'Delete player?',
+      description: 'This removes the player from the current season roster.',
+      confirmLabel: 'Delete player',
+      confirmVariant: 'destructive',
+    });
+    if (!confirmed) return;
+    await api.deletePlayer(id);
+    load();
+    pushToast({ variant: 'success', title: 'Player removed from roster' });
   };
 
   if (!activeTeam) {
@@ -138,10 +150,10 @@ export default function RosterPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit" className={tableActionButtonClass}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete" className={tableActionButtonClass}>
                       <Trash2 className="h-4 w-4 text-rose-600" />
                     </Button>
                   </div>
@@ -149,21 +161,38 @@ export default function RosterPage() {
               </div>
             ))}
 
-            {players.length === 0 && (
-              <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                No players yet. Upload a CSV or add players manually.
-              </div>
-            )}
+              {players.length === 0 && (
+                <div className="p-4">
+                  <EmptyState
+                    icon={<Users className="h-5 w-5" />}
+                    title="No players yet"
+                    description="Add players manually or upload a roster CSV."
+                    actions={(
+                      <>
+                        <Button type="button" size="sm" onClick={() => { setEditId(null); setForm({ ...emptyForm }); setOpen(true); }}>
+                          <Plus className="h-4 w-4" />
+                          Add Player
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => setTab(1)}>
+                          <FileUp className="h-4 w-4" />
+                          Upload CSV
+                        </Button>
+                      </>
+                    )}
+                    className="border-0 shadow-none"
+                  />
+                </div>
+              )}
           </div>
 
           <div className="hidden md:block">
             <table className="w-full table-fixed text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-300">
                 <tr>
-                  <th className="w-20 px-4 py-3">#</th>
-                  <th className="w-[38%] px-4 py-3">Player</th>
-                  <th className="w-32 px-4 py-3">Position</th>
-                  <th className="w-28 px-4 py-3 text-right">Actions</th>
+                  <th scope="col" className="w-20 px-4 py-3">#</th>
+                  <th scope="col" className="w-[38%] px-4 py-3">Player</th>
+                  <th scope="col" className="w-32 px-4 py-3">Position</th>
+                  <th scope="col" className="w-28 px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
@@ -186,10 +215,10 @@ export default function RosterPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
-                        <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit" className={tableActionButtonClass}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete" className={tableActionButtonClass}>
                           <Trash2 className="h-4 w-4 text-rose-600" />
                         </Button>
                       </div>
@@ -197,13 +226,30 @@ export default function RosterPage() {
                   </tr>
                 ))}
 
-                {players.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                      No players yet. Upload a CSV or add players manually.
-                    </td>
-                  </tr>
-                )}
+                  {players.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-6">
+                        <EmptyState
+                          icon={<Users className="h-5 w-5" />}
+                          title="No players yet"
+                          description="Add players manually or upload a roster CSV."
+                          actions={(
+                            <>
+                              <Button type="button" size="sm" onClick={() => { setEditId(null); setForm({ ...emptyForm }); setOpen(true); }}>
+                                <Plus className="h-4 w-4" />
+                                Add Player
+                              </Button>
+                              <Button type="button" size="sm" variant="outline" onClick={() => setTab(1)}>
+                                <FileUp className="h-4 w-4" />
+                                Upload CSV
+                              </Button>
+                            </>
+                          )}
+                          className="border-0 shadow-none"
+                        />
+                      </td>
+                    </tr>
+                  )}
               </tbody>
             </table>
           </div>

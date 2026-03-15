@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search as SearchIcon } from 'lucide-react';
+import { CalendarPlus2, Search as SearchIcon, SlidersHorizontal } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -15,8 +15,11 @@ import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
+import EmptyState from '../components/EmptyState';
+import { useToast } from '../context/ToastContext';
 import { cn } from '../lib/cn';
-import { formatTimeHHMM } from '../lib/time';
+import { filterButtonClass } from '../lib/uiClasses';
+import { formatShortDate, formatTimeHHMM } from '../lib/time';
 
 const LEVELS_10U_PLUS = ['AAA', 'AA', 'A', 'B', 'C', 'Rec'];
 const LEVELS_6U_8U = ['Beginner', 'Beginner/Intermediate', 'Intermediate', 'Intermediate/Advanced', 'Advanced'];
@@ -54,6 +57,7 @@ export default function SearchPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [rinks, setRinks] = useState<Rink[]>([]);
   const [selectedRink, setSelectedRink] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<IceSlot[]>([]);
   const [proposalRinkId, setProposalRinkId] = useState('');
   const [proposalSlots, setProposalSlots] = useState<IceSlot[]>([]);
@@ -68,6 +72,7 @@ export default function SearchPage() {
   const [searchError, setSearchError] = useState('');
   const [proposalError, setProposalError] = useState('');
   const [proposalLoading, setProposalLoading] = useState(false);
+  const pushToast = useToast();
 
   const selectedEntry = openDates.find((e) => e.id === selectedEntryId) || null;
   const selectedDate = selectedEntry?.date || '';
@@ -219,6 +224,7 @@ export default function SearchPage() {
       // Refresh
       if (tab === 0 && selectedEntry) handleSearch();
       if (tab === 1) api.getAutoMatches(activeTeam.id).then(setAutoMatches);
+      pushToast({ variant: 'success', title: 'Proposal sent' });
     } catch (e) {
       setProposalError(String(e));
     } finally {
@@ -262,7 +268,7 @@ export default function SearchPage() {
                   <option value="">Select a date…</option>
                   {openDates.map((e) => (
                     <option key={e.id} value={e.id}>
-                      {e.date} ({e.entry_type}) {formatTimeHHMM(e.time) || ''}
+                      {formatShortDate(e.date) || e.date} ({e.entry_type}) {formatTimeHHMM(e.time) || ''}
                     </option>
                   ))}
                 </Select>
@@ -285,55 +291,71 @@ export default function SearchPage() {
                 />
               </div>
 
-              <div className="lg:col-span-3">
-                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink (optional)</label>
-                <Select value={selectedRink} onChange={(e) => setSelectedRink(e.target.value)}>
-                  <option value="">Any rink</option>
-                  {rinks.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} — {r.city}, {r.state}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-
               <div className="lg:col-span-2">
                 <Button type="button" className="w-full" onClick={handleSearch} disabled={!selectedEntry || loading}>
                   <SearchIcon className="h-4 w-4" />
                   {loading ? 'Searching…' : 'Search'}
                 </Button>
               </div>
-
-              <div className="lg:col-span-3">
-                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Level (optional)</label>
-                <Select value={level} onChange={(e) => setLevel(e.target.value)}>
-                  <option value="">Any level</option>
-                  {standardLevels.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="lg:col-span-4">
-                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">MYHockey Ranking (optional)</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    inputMode="numeric"
-                    value={minRanking}
-                    onChange={(e) => setMinRanking(e.target.value)}
-                    placeholder="Min"
-                  />
-                  <Input
-                    inputMode="numeric"
-                    value={maxRanking}
-                    onChange={(e) => setMaxRanking(e.target.value)}
-                    placeholder="Max"
-                  />
-                </div>
+              <div className="lg:col-span-3 lg:justify-self-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={cn('w-full lg:w-auto', filterButtonClass)}
+                  onClick={() => setShowAdvancedFilters((current) => !current)}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  {showAdvancedFilters ? 'Hide Advanced Filters' : 'Advanced Filters'}
+                </Button>
               </div>
             </div>
+
+            {showAdvancedFilters ? (
+              <div className="mt-4 grid grid-cols-1 gap-3 border-t border-[color:var(--app-border-subtle)] pt-4 lg:grid-cols-12 lg:items-end">
+                <div className="lg:col-span-4">
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink (optional)</label>
+                  <Select value={selectedRink} onChange={(e) => setSelectedRink(e.target.value)}>
+                    <option value="">Any rink</option>
+                    {rinks.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} — {r.city}, {r.state}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+
+                <div className="lg:col-span-3">
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Level (optional)</label>
+                  <Select value={level} onChange={(e) => setLevel(e.target.value)}>
+                    <option value="">Any level</option>
+                    {standardLevels.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+
+                <div className="lg:col-span-5">
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">MYHockey Ranking (optional)</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      inputMode="numeric"
+                      value={minRanking}
+                      onChange={(e) => setMinRanking(e.target.value)}
+                      placeholder="Min"
+                    />
+                    <Input
+                      inputMode="numeric"
+                      value={maxRanking}
+                      onChange={(e) => setMaxRanking(e.target.value)}
+                      placeholder="Max"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </Card>
 
           {searchError && <Alert variant="error" title="Search failed">{searchError}</Alert>}
@@ -403,8 +425,13 @@ export default function SearchPage() {
               ))}
 
               {results.length === 0 && hasSearched && selectedEntry && !loading && (
-                <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                  No matching opponents found for this date/time. Matches require an exact time match and opposite home/away.
+                <div className="p-4">
+                  <EmptyState
+                    icon={<SearchIcon className="h-5 w-5" />}
+                    title="No matching opponents found"
+                    description="Matches require an exact time match and opposite home/away availability."
+                    className="border-0 shadow-none"
+                  />
                 </div>
               )}
             </div>
@@ -474,8 +501,13 @@ export default function SearchPage() {
 
                   {results.length === 0 && hasSearched && selectedEntry && !loading && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                        No matching opponents found for this date/time. Matches require an exact time match and opposite home/away.
+                      <td colSpan={7} className="px-4 py-6">
+                        <EmptyState
+                          icon={<SearchIcon className="h-5 w-5" />}
+                          title="No matching opponents found"
+                          description="Matches require an exact time match and opposite home/away availability."
+                          className="border-0 shadow-none"
+                        />
                       </td>
                     </tr>
                   )}
@@ -493,7 +525,7 @@ export default function SearchPage() {
               <div key={i} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{m.date}</div>
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{formatShortDate(m.date) || m.date}</div>
 
                     <div className="mt-2">
                       <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{m.home_team_name} <span className="text-xs font-medium text-slate-500 dark:text-slate-400">(H)</span></div>
@@ -545,8 +577,18 @@ export default function SearchPage() {
             ))}
 
             {autoMatches.length === 0 && (
-              <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                No auto-matches found. Add more open dates to find matches.
+              <div className="p-4">
+                <EmptyState
+                  icon={<CalendarPlus2 className="h-5 w-5" />}
+                  title="No auto-matches found"
+                  description="Add more open dates in Schedule to widen the matching pool."
+                  actions={(
+                    <Button type="button" size="sm" onClick={() => navigate('/schedule')}>
+                      Open Schedule
+                    </Button>
+                  )}
+                  className="border-0 shadow-none"
+                />
               </div>
             )}
           </div>
@@ -565,7 +607,7 @@ export default function SearchPage() {
               <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                 {autoMatches.map((m, i) => (
                   <tr key={i} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
-                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{m.date}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{formatShortDate(m.date) || m.date}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900 dark:text-slate-100">{m.home_team_name}</div>
                       <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
@@ -612,8 +654,18 @@ export default function SearchPage() {
 
                 {autoMatches.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                      No auto-matches found. Add more open dates to find matches.
+                    <td colSpan={5} className="px-4 py-6">
+                      <EmptyState
+                        icon={<CalendarPlus2 className="h-5 w-5" />}
+                        title="No auto-matches found"
+                        description="Add more open dates in Schedule to widen the matching pool."
+                        actions={(
+                          <Button type="button" size="sm" onClick={() => navigate('/schedule')}>
+                            Open Schedule
+                          </Button>
+                        )}
+                        className="border-0 shadow-none"
+                      />
                     </td>
                   </tr>
                 )}
@@ -642,9 +694,9 @@ export default function SearchPage() {
           {proposalError && <Alert variant="error" title="Proposal failed">{proposalError}</Alert>}
           <div className="text-sm text-slate-700 dark:text-slate-300">
             {proposalDialog.autoMatch
-              ? `${proposalDialog.autoMatch.home_team_name} (H) vs ${proposalDialog.autoMatch.away_team_name} (A) on ${proposalDialog.autoMatch.date}`
+              ? `${proposalDialog.autoMatch.home_team_name} (H) vs ${proposalDialog.autoMatch.away_team_name} (A) on ${formatShortDate(proposalDialog.autoMatch.date) || proposalDialog.autoMatch.date}`
               : proposalDialog.opponent
-                ? `vs ${proposalDialog.opponent.team_name} on ${proposalDialog.opponent.entry_date}`
+                ? `vs ${proposalDialog.opponent.team_name} on ${formatShortDate(proposalDialog.opponent.entry_date) || proposalDialog.opponent.entry_date}`
                 : ''}
           </div>
 

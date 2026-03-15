@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
   Building2,
@@ -21,76 +21,204 @@ import { SeasonProvider } from './context/SeasonContext';
 import TeamSwitcher from './components/TeamSwitcher';
 import SeasonSwitcher from './components/SeasonSwitcher';
 import ThemeToggle from './components/ThemeToggle';
-import HomePage from './pages/HomePage';
-import AssociationListPage from './pages/AssociationListPage';
-import TeamListPage from './pages/TeamListPage';
-import RosterPage from './pages/RosterPage';
-import SchedulePage from './pages/SchedulePage';
-import GamesPage from './pages/GamesPage';
-import GamePage from './pages/GamePage';
-import SearchPage from './pages/SearchPage';
-import ProposalsPage from './pages/ProposalsPage';
-import PracticePage from './pages/PracticePage';
-import RinkListPage from './pages/RinkListPage';
-import IceSlotsPage from './pages/IceSlotsPage';
-import StandingsPage from './pages/StandingsPage';
-import CompetitionsPage from './pages/CompetitionsPage';
 import { cn } from './lib/cn';
 import { useTeam } from './context/TeamContext';
 import { useSeason } from './context/SeasonContext';
+import { api } from './api/client';
+import { Badge } from './components/ui/Badge';
+import { sectionLabelClass } from './lib/uiClasses';
+import { addDays, toLocalDateString } from './lib/time';
+import { ConfirmDialogProvider } from './context/ConfirmDialogContext';
+import { ToastProvider } from './context/ToastContext';
+import { Skeleton } from './components/ui/Skeleton';
 
-const NAV_ITEMS = [
-  { path: '/', label: 'Dashboard', icon: Home },
-  { path: '/associations', label: 'Associations', icon: Building2 },
-  { path: '/competitions', label: 'Competitions', icon: Flag },
-  { path: '/standings', label: 'Standings', icon: Trophy },
-  { path: '/teams', label: 'Teams', icon: Users },
-  { path: '/roster', label: 'Roster', icon: ClipboardList },
-  { path: '/schedule', label: 'Schedule', icon: Calendar },
-  { path: '/games', label: 'Games', icon: ClipboardSignature },
-  { path: '/search', label: 'Find Opponents', icon: Search },
-  { path: '/proposals', label: 'Proposals', icon: Inbox },
-  { path: '/practice', label: 'Practice', icon: Dumbbell },
-  { path: '/rinks', label: 'Rinks', icon: Snowflake },
+const HomePage = lazy(() => import('./pages/HomePage'));
+const AssociationListPage = lazy(() => import('./pages/AssociationListPage'));
+const CompetitionsPage = lazy(() => import('./pages/CompetitionsPage'));
+const StandingsPage = lazy(() => import('./pages/StandingsPage'));
+const TeamListPage = lazy(() => import('./pages/TeamListPage'));
+const RosterPage = lazy(() => import('./pages/RosterPage'));
+const SchedulePage = lazy(() => import('./pages/SchedulePage'));
+const GamesPage = lazy(() => import('./pages/GamesPage'));
+const GamePage = lazy(() => import('./pages/GamePage'));
+const SearchPage = lazy(() => import('./pages/SearchPage'));
+const ProposalsPage = lazy(() => import('./pages/ProposalsPage'));
+const PracticePage = lazy(() => import('./pages/PracticePage'));
+const RinkListPage = lazy(() => import('./pages/RinkListPage'));
+const IceSlotsPage = lazy(() => import('./pages/IceSlotsPage'));
+
+function RouteFallback() {
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-4 w-80 max-w-full" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div
+            key={index}
+            className="rounded-2xl border border-[color:var(--app-border-subtle)] bg-[var(--app-surface)] p-5 shadow-soft"
+          >
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-5/6" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const NAV_SECTIONS = [
+  {
+    label: 'Overview',
+    items: [{ path: '/', label: 'Dashboard', icon: Home }],
+  },
+  {
+    label: 'Team',
+    items: [
+      { path: '/roster', label: 'Roster', icon: ClipboardList },
+      { path: '/schedule', label: 'Schedule', icon: Calendar },
+      { path: '/games', label: 'Games', icon: ClipboardSignature },
+      { path: '/practice', label: 'Practice', icon: Dumbbell },
+    ],
+  },
+  {
+    label: 'Matchmaking',
+    items: [
+      { path: '/search', label: 'Find Opponents', icon: Search },
+      { path: '/proposals', label: 'Proposals', icon: Inbox },
+    ],
+  },
+  {
+    label: 'League',
+    items: [
+      { path: '/competitions', label: 'Competitions', icon: Flag },
+      { path: '/standings', label: 'Standings', icon: Trophy },
+      { path: '/teams', label: 'Teams', icon: Users },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { path: '/associations', label: 'Associations', icon: Building2 },
+      { path: '/rinks', label: 'Rinks', icon: Snowflake },
+    ],
+  },
 ];
 
 function AppNav({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
+  const { activeTeam } = useTeam();
+  const { activeSeason, seasons } = useSeason();
+  const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
+  const [navBadges, setNavBadges] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!activeTeam) {
+      setNavBadges({});
+      return;
+    }
+    let cancelled = false;
+    const today = new Date();
+    const todayStr = toLocalDateString(today);
+    const weekEnd = toLocalDateString(addDays(today, 7));
+    const params = effectiveSeason ? { season_id: effectiveSeason.id } : undefined;
+
+    Promise.all([
+      api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }),
+      api.getSchedule(activeTeam.id, params),
+    ]).then(([incomingProposals, schedule]) => {
+      if (cancelled) return;
+      const unconfirmedThisWeek = schedule.filter((entry) =>
+        !!entry.game_id
+        && entry.date >= todayStr
+        && entry.date <= weekEnd
+        && !entry.weekly_confirmed,
+      ).length;
+      setNavBadges({
+        '/proposals': incomingProposals.length,
+        '/schedule': unconfirmedThisWeek,
+      });
+    }).catch(() => {
+      if (!cancelled) setNavBadges({});
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTeam, effectiveSeason]);
+
+  const badgeVariantForPath = useMemo(() => ({
+    '/proposals': 'warning',
+    '/schedule': 'warning',
+  } as const), []);
 
   return (
-    <nav className="space-y-1 p-3">
-      {NAV_ITEMS.map((item) => {
-        const Icon = item.icon;
-        const isActive =
-          item.path === '/'
-            ? location.pathname === '/'
-            : location.pathname.startsWith(item.path);
+    <nav className="p-3">
+      {NAV_SECTIONS.map((section) => (
+        <div key={section.label} className="space-y-1">
+          <div className={sectionLabelClass}>{section.label}</div>
+          {section.items.map((item) => {
+            const Icon = item.icon;
+            const isActive =
+              item.path === '/'
+                ? location.pathname === '/'
+                : location.pathname.startsWith(item.path);
+            const badgeCount = navBadges[item.path] || 0;
 
-        return (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.path === '/'}
-            onClick={onNavigate}
-            className={cn(
-              'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-              isActive
-                ? "bg-gradient-to-r from-white via-white to-[color:color-mix(in_srgb,var(--app-surface-strong)_82%,rgb(237_233_254))] text-slate-900 shadow-sm ring-1 ring-[color:var(--app-border-subtle)] before:absolute before:left-1 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-full before:bg-[color:var(--app-accent-link)] before:content-[''] dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 dark:text-slate-100 dark:shadow-none"
-                : 'text-slate-700 hover:bg-white/70 hover:text-slate-900 hover:ring-1 hover:ring-slate-200/70 dark:text-slate-300 dark:hover:bg-slate-900/40 dark:hover:text-slate-100 dark:hover:ring-slate-700/70',
-            )}
-          >
-            <Icon
-              className={cn(
-                'h-4 w-4',
-                isActive
-                  ? 'text-[color:var(--app-accent-link)]'
-                  : 'text-slate-500 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300',
-              )}
-            />
-            <span className="truncate">{item.label}</span>
-          </NavLink>
-        );
-      })}
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === '/'}
+                onClick={onNavigate}
+                aria-label={
+                  item.path === '/proposals' && badgeCount > 0
+                    ? `${item.label}, ${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
+                    : item.path === '/schedule' && badgeCount > 0
+                      ? `${item.label}, ${badgeCount} game${badgeCount === 1 ? '' : 's'} to confirm`
+                      : item.label
+                }
+                className={cn(
+                  'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? "bg-gradient-to-r from-white via-white to-[color:color-mix(in_srgb,var(--app-surface-strong)_82%,rgb(237_233_254))] text-slate-900 shadow-sm ring-1 ring-[color:var(--app-border-subtle)] before:absolute before:left-1 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-full before:bg-[color:var(--app-accent-link)] before:content-[''] dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 dark:text-slate-100 dark:shadow-none"
+                    : 'text-slate-700 hover:bg-white/70 hover:text-slate-900 hover:ring-1 hover:ring-slate-200/70 dark:text-slate-300 dark:hover:bg-slate-900/40 dark:hover:text-slate-100 dark:hover:ring-slate-700/70',
+                )}
+              >
+                <Icon
+                  className={cn(
+                    'h-4 w-4',
+                    isActive
+                      ? 'text-[color:var(--app-accent-link)]'
+                      : 'text-slate-500 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300',
+                  )}
+                />
+                <span className="truncate">{item.label}</span>
+                {badgeCount > 0 ? (
+                  <Badge
+                    variant={badgeVariantForPath[item.path as keyof typeof badgeVariantForPath]}
+                    className="ml-auto min-w-[1.4rem] justify-center px-1.5 py-0.5 text-[10px]"
+                    aria-label={
+                      item.path === '/proposals'
+                        ? `${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
+                        : item.path === '/schedule'
+                          ? `${badgeCount} game${badgeCount === 1 ? '' : 's'} to confirm`
+                          : undefined
+                    }
+                  >
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </Badge>
+                ) : null}
+              </NavLink>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 }
@@ -127,7 +255,7 @@ function AppContent() {
             </div>
             <div className="leading-tight">
               <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-white">RinkLink</div>
-              <div className="text-xs text-slate-600 dark:text-white/70">Ice time & scheduling</div>
+              <div className="hidden text-xs text-slate-600 dark:text-white/70 sm:block">Ice time & scheduling</div>
             </div>
           </div>
 
@@ -135,41 +263,49 @@ function AppContent() {
             <div className="flex items-center gap-2">
               <TeamSwitcher />
               <SeasonSwitcher />
-              <ThemeToggle />
+              <div className="hidden sm:block">
+                <ThemeToggle />
+              </div>
             </div>
           </div>
         </div>
       </header>
 
       <div className="pt-14">
-        <aside className="hidden lg:fixed lg:inset-y-14 lg:left-0 lg:block lg:w-56 lg:border-r lg:border-slate-200/70 lg:bg-gradient-to-b lg:from-white lg:via-[color:color-mix(in_srgb,var(--app-surface)_82%,rgb(245_243_255))] lg:to-white dark:lg:border-slate-800/70 dark:lg:bg-gradient-to-b dark:lg:from-slate-950 dark:lg:via-slate-950 dark:lg:to-slate-950">
+        <aside className="hidden lg:fixed lg:inset-y-14 lg:left-0 lg:block lg:w-56 lg:overflow-y-auto lg:border-r lg:border-slate-200/70 lg:bg-gradient-to-b lg:from-white lg:via-[color:color-mix(in_srgb,var(--app-surface)_82%,rgb(245_243_255))] lg:to-white dark:lg:border-slate-800/70 dark:lg:bg-gradient-to-b dark:lg:from-slate-950 dark:lg:via-slate-950 dark:lg:to-slate-950">
           <AppNav />
         </aside>
 
         <main className="w-full px-4 py-6 sm:px-6 lg:pl-64 lg:pr-6">
           {appLoading ? (
             <div className="flex min-h-[50vh] items-center justify-center">
-              <div className="rounded-2xl border border-[color:var(--app-border-subtle)] bg-[var(--app-surface)] px-5 py-4 text-sm text-slate-600 shadow-soft dark:text-slate-300">
-                Loading team and season data…
+              <div className="w-full max-w-md rounded-2xl border border-[color:var(--app-border-subtle)] bg-[var(--app-surface)] px-5 py-4 shadow-soft">
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-3/4" />
+                </div>
               </div>
             </div>
           ) : (
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/associations" element={<AssociationListPage />} />
-              <Route path="/competitions" element={<CompetitionsPage />} />
-              <Route path="/standings" element={<StandingsPage />} />
-              <Route path="/teams" element={<TeamListPage />} />
-              <Route path="/roster" element={<RosterPage />} />
-              <Route path="/schedule" element={<SchedulePage />} />
-              <Route path="/games" element={<GamesPage />} />
-              <Route path="/games/:gameId" element={<GamePage />} />
-              <Route path="/search" element={<SearchPage />} />
-              <Route path="/proposals" element={<ProposalsPage />} />
-              <Route path="/practice" element={<PracticePage />} />
-              <Route path="/rinks" element={<RinkListPage />} />
-              <Route path="/rinks/:rinkId/slots" element={<IceSlotsPage />} />
-            </Routes>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/associations" element={<AssociationListPage />} />
+                <Route path="/competitions" element={<CompetitionsPage />} />
+                <Route path="/standings" element={<StandingsPage />} />
+                <Route path="/teams" element={<TeamListPage />} />
+                <Route path="/roster" element={<RosterPage />} />
+                <Route path="/schedule" element={<SchedulePage />} />
+                <Route path="/games" element={<GamesPage />} />
+                <Route path="/games/:gameId" element={<GamePage />} />
+                <Route path="/search" element={<SearchPage />} />
+                <Route path="/proposals" element={<ProposalsPage />} />
+                <Route path="/practice" element={<PracticePage />} />
+                <Route path="/rinks" element={<RinkListPage />} />
+                <Route path="/rinks/:rinkId/slots" element={<IceSlotsPage />} />
+              </Routes>
+            </Suspense>
           )}
         </main>
       </div>
@@ -186,19 +322,25 @@ function AppContent() {
             onMouseDown={() => setMobileNavOpen(false)}
             aria-hidden="true"
           />
-          <div className="relative h-full w-72 max-w-[80vw] bg-gradient-to-b from-white via-[color:color-mix(in_srgb,var(--app-surface)_82%,rgb(245_243_255))] to-white shadow-2xl ring-1 ring-slate-200/70 dark:from-slate-950 dark:via-slate-950 dark:to-slate-950 dark:ring-slate-800/70">
+          <div className="relative h-full w-72 max-w-[80vw] overflow-y-auto bg-gradient-to-b from-white via-[color:color-mix(in_srgb,var(--app-surface)_82%,rgb(245_243_255))] to-white shadow-2xl ring-1 ring-slate-200/70 dark:from-slate-950 dark:via-slate-950 dark:to-slate-950 dark:ring-slate-800/70">
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Menu</div>
-              <button
-                type="button"
-                className="rl-tooltip inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900/60 dark:hover:text-slate-100"
-                onClick={() => setMobileNavOpen(false)}
-                aria-label="Close navigation"
-                data-tooltip="Close navigation"
-                title="Close navigation"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/80 px-2 py-1 text-xs font-medium text-slate-700 dark:border-slate-700/70 dark:bg-slate-900/60 dark:text-slate-200">
+                  <span>Theme</span>
+                  <ThemeToggle />
+                </div>
+                <button
+                  type="button"
+                  className="rl-tooltip inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900/60 dark:hover:text-slate-100"
+                  onClick={() => setMobileNavOpen(false)}
+                  aria-label="Close navigation"
+                  data-tooltip="Close navigation"
+                  title="Close navigation"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
             <AppNav onNavigate={() => setMobileNavOpen(false)} />
           </div>
@@ -212,9 +354,13 @@ export default function App() {
   return (
     <TeamProvider>
       <SeasonProvider>
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
+        <ToastProvider>
+          <ConfirmDialogProvider>
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </ConfirmDialogProvider>
+        </ToastProvider>
       </SeasonProvider>
     </TeamProvider>
   );

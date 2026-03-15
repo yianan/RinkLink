@@ -214,7 +214,23 @@ These should be approached conservatively.
 - **Effort**: Medium to Large
 - **Dependencies**: authentication, role controls, and agreement with USA Hockey if direct sync is desired
 
-#### 14. MYHockey Import
+## Technical Enhancements
+
+These are not end-user features, but they materially improve delivery and runtime quality.
+
+#### 15. Frontend Code Splitting
+
+- **What**: split the frontend into smaller route-level and shared-vendor chunks
+- **Why**: the main app bundle is already large enough to trigger build warnings
+- **User value**: faster initial loads, better cache behavior, and less UI delay on slower devices
+- **Scope**:
+  - route-level lazy loading
+  - shared chunk strategy for heavy page groups
+  - loading fallbacks that match the existing skeleton system
+- **Effort**: Medium
+- **Dependencies**: none
+
+#### 16. MYHockey Import
 
 - **What**: sanctioned rating import from MYHockey
 - **Why**: keeps opponent comparisons and team details current
@@ -274,7 +290,8 @@ If the goal is maximum product value with reasonable implementation risk, build 
 11. Ice marketplace / slot exchange
 12. Tournament and trip mode
 13. USA Hockey import
-14. MYHockey import
+14. Frontend code splitting
+15. MYHockey import
 
 ## Features to Delay Intentionally
 
@@ -295,4 +312,3 @@ When work resumes on this roadmap, the next planning artifact should be a delive
 - frontend screens and components
 - rollout order
 - test cases
-

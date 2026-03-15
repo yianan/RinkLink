@@ -11,8 +11,11 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { useTeam } from '../context/TeamContext';
 import PageHeader from '../components/PageHeader';
+import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
 import { cn } from '../lib/cn';
-import { accentLinkClass } from '../lib/uiClasses';
+import { accentLinkClass, filterButtonClass, tableActionButtonClass } from '../lib/uiClasses';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
+import { useToast } from '../context/ToastContext';
 
 const emptyForm = { name: '', home_rink_address: '', city: '', state: '', zip_code: '' };
 
@@ -42,7 +45,8 @@ export default function AssociationListPage() {
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
   const [selectedCompetitionNames, setSelectedCompetitionNames] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const filterButtonClass = 'h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25';
+  const confirm = useConfirmDialog();
+  const pushToast = useToast();
 
   const load = () => {
     let cancelled = false;
@@ -167,10 +171,16 @@ export default function AssociationListPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete this association and all its teams?')) {
-      await api.deleteAssociation(id);
-      load();
-    }
+    const confirmed = await confirm({
+      title: 'Delete association?',
+      description: 'This removes the association and all teams assigned to it.',
+      confirmLabel: 'Delete association',
+      confirmVariant: 'destructive',
+    });
+    if (!confirmed) return;
+    await api.deleteAssociation(id);
+    load();
+    pushToast({ variant: 'success', title: 'Association deleted' });
   };
 
   const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -319,10 +329,10 @@ export default function AssociationListPage() {
                   </div>
 
                   <div className="flex items-center gap-1">
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(a)} aria-label="Edit">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(a)} aria-label="Edit" className={tableActionButtonClass}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete" className={tableActionButtonClass}>
                       <Trash2 className="h-4 w-4 text-rose-600" />
                     </Button>
                   </div>
@@ -332,9 +342,7 @@ export default function AssociationListPage() {
           })}
 
           {loading && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-              Loading associations…
-            </div>
+            <CardListSkeleton count={3} />
           )}
           {!loading && associations.length === 0 && (
             <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
@@ -352,12 +360,12 @@ export default function AssociationListPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-300">
               <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">City</th>
-                <th className="px-4 py-3">State</th>
-                <th className="px-4 py-3">Zip</th>
-                <th className="px-4 py-3">Teams</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th scope="col" className="px-4 py-3">Name</th>
+                <th scope="col" className="px-4 py-3">City</th>
+                <th scope="col" className="px-4 py-3">State</th>
+                <th scope="col" className="px-4 py-3">Zip</th>
+                <th scope="col" className="px-4 py-3">Teams</th>
+                <th scope="col" className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
@@ -387,10 +395,10 @@ export default function AssociationListPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(a)} aria-label="Edit">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(a)} aria-label="Edit" className={tableActionButtonClass}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete" className={tableActionButtonClass}>
                         <Trash2 className="h-4 w-4 text-rose-600" />
                       </Button>
                     </div>
@@ -400,8 +408,8 @@ export default function AssociationListPage() {
 
               {loading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                    Loading associations…
+                  <td colSpan={6} className="p-0">
+                    <TableSkeleton columns={6} rows={4} compact />
                   </td>
                 </tr>
               )}

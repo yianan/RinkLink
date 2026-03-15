@@ -5,6 +5,7 @@ type BadgeVariant = 'neutral' | 'success' | 'info' | 'warning' | 'danger' | 'out
 
 export type BadgeProps = React.HTMLAttributes<HTMLSpanElement> & {
   variant?: BadgeVariant;
+  icon?: React.ReactNode;
 };
 
 const variants: Record<BadgeVariant, string> = {
@@ -17,15 +18,18 @@ const variants: Record<BadgeVariant, string> = {
   accent: 'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-900/60 dark:bg-violet-950/25 dark:text-violet-200',
 };
 
-export function Badge({ className, variant = 'neutral', ...props }: BadgeProps) {
+export function Badge({ className, variant = 'neutral', icon, children, ...props }: BadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium leading-none',
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium leading-none',
         variants[variant],
         className,
       )}
       {...props}
-    />
+    >
+      {icon ? <span aria-hidden="true" className="shrink-0">{icon}</span> : null}
+      <span>{children}</span>
+    </span>
   );
 }

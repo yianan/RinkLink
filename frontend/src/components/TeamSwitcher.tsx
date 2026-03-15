@@ -15,7 +15,7 @@ export default function TeamSwitcher() {
   return (
     <div className="flex items-center gap-2">
       <div className="hidden text-xs font-medium text-slate-600 sm:block dark:text-white/80">Active team</div>
-      <div className="w-full min-w-0 sm:w-[320px]">
+      <div className="w-[10.5rem] min-w-0 sm:w-[320px]">
         <Select
           value={activeTeam?.id || ''}
           disabled={loading}

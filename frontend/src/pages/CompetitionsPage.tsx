@@ -11,8 +11,9 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
 import PageHeader from '../components/PageHeader';
+import { CardListSkeleton } from '../components/ui/TableSkeleton';
 import { cn } from '../lib/cn';
-import { accentLinkClass } from '../lib/uiClasses';
+import { accentLinkClass, filterButtonClass } from '../lib/uiClasses';
 import {
   getCompetitionBadgeVariant,
   getCompetitionHeaderClass,
@@ -219,7 +220,6 @@ export default function CompetitionsPage() {
   ]);
 
   const hasActiveFilters = activeFilterBadges.length > 0;
-  const filterButtonClass = 'h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25';
 
   if (!effectiveSeason) {
     return <Alert variant="info">No season is available yet.</Alert>;
@@ -255,7 +255,7 @@ export default function CompetitionsPage() {
       />
 
       {loading ? (
-        <Alert variant="info">Loading competitions…</Alert>
+        <CardListSkeleton count={3} />
       ) : competitions.length === 0 ? (
         <Alert variant="info">No competitions have been configured for this season yet.</Alert>
       ) : (

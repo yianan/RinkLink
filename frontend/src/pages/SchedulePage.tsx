@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ban, CheckCircle2, Eye, Search, SlidersHorizontal, Trash2, XCircle } from 'lucide-react';
+import { Ban, CalendarPlus2, CheckCircle2, Eye, Search, SlidersHorizontal, Trash2, XCircle } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -16,9 +16,13 @@ import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
+import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
+import EmptyState from '../components/EmptyState';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
+import { useToast } from '../context/ToastContext';
 import { cn } from '../lib/cn';
-import { accentActionClass } from '../lib/uiClasses';
-import { formatMonthYear, formatTimeHHMM, formatWeekdayDate } from '../lib/time';
+import { accentActionClass, filterButtonClass, tableActionButtonClass } from '../lib/uiClasses';
+import { addDays, formatMonthYear, formatShortDate, formatTimeHHMM, formatWeekdayDate, parseLocalDate, toLocalDateString } from '../lib/time';
 
 const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
   open: 'success',
@@ -52,7 +56,8 @@ export default function SchedulePage() {
   const [selectedEntryTypes, setSelectedEntryTypes] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const filterButtonClass = 'h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25';
+  const confirm = useConfirmDialog();
+  const pushToast = useToast();
 
   const load = () => {
     if (!activeTeam) return;
@@ -81,13 +86,20 @@ export default function SchedulePage() {
     setAddOpen(false);
     setAddForm({ date: '', time: '', entry_type: 'home' });
     load();
+    pushToast({ variant: 'success', title: 'Schedule entry added' });
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete this schedule entry?')) {
-      await api.deleteScheduleEntry(id);
-      load();
-    }
+    const confirmed = await confirm({
+      title: 'Delete schedule entry?',
+      description: 'This removes the date from the team schedule.',
+      confirmLabel: 'Delete entry',
+      confirmVariant: 'destructive',
+    });
+    if (!confirmed) return;
+    await api.deleteScheduleEntry(id);
+    load();
+    pushToast({ variant: 'success', title: 'Schedule entry deleted' });
   };
 
   const findOpponents = (entryId: string) => {
@@ -98,18 +110,27 @@ export default function SchedulePage() {
     if (!activeTeam || !e.game_id) return;
     await api.confirmGame(e.game_id, activeTeam.id, true);
     load();
+    pushToast({ variant: 'success', title: 'Game confirmed' });
   };
 
   const handleCancelGame = async (e: ScheduleEntry) => {
     if (!e.game_id) return;
-    if (!confirm(`Cancel the game vs ${e.opponent_name || 'opponent'}? This cannot be undone.`)) return;
+    const confirmed = await confirm({
+      title: 'Cancel game?',
+      description: `Cancel the game vs ${e.opponent_name || 'opponent'}? This cannot be undone.`,
+      confirmLabel: 'Cancel game',
+      confirmVariant: 'destructive',
+    });
+    if (!confirmed) return;
     await api.cancelGame(e.game_id);
     load();
+    pushToast({ variant: 'success', title: 'Game cancelled' });
   };
 
   const toggleBlocked = async (e: ScheduleEntry) => {
     await api.updateScheduleEntry(e.id, { blocked: !e.blocked });
     load();
+    pushToast({ variant: 'info', title: e.blocked ? 'Date reopened' : 'Date blocked' });
   };
 
   if (!activeTeam) {
@@ -120,11 +141,7 @@ export default function SchedulePage() {
   }
 
   const todayLocal = new Date();
-  const todayStr = [
-    todayLocal.getFullYear(),
-    String(todayLocal.getMonth() + 1).padStart(2, '0'),
-    String(todayLocal.getDate()).padStart(2, '0'),
-  ].join('-');
+  const todayStr = toLocalDateString(todayLocal);
 
   const sortedEntries = [...entries].sort((a, b) => {
     const dateCompare = a.date.localeCompare(b.date);
@@ -171,11 +188,55 @@ export default function SchedulePage() {
   const displayedEntries = tab === 'past' ? pastEntries : upcomingEntries;
 
   // Calendar view: group by month
-  const byMonth: Record<string, ScheduleEntry[]> = {};
-  filteredEntries.forEach((e) => {
-    const month = e.date.substring(0, 7);
-    (byMonth[month] ??= []).push(e);
-  });
+  const entriesByDate = useMemo(() => {
+    const byDate: Record<string, ScheduleEntry[]> = {};
+    filteredEntries.forEach((entry) => {
+      (byDate[entry.date] ??= []).push(entry);
+    });
+    return byDate;
+  }, [filteredEntries]);
+
+  const calendarMonths = useMemo(() => {
+    const seasonStart = parseLocalDate(effectiveSeason.start_date);
+    const seasonEnd = parseLocalDate(effectiveSeason.end_date);
+    if (!seasonStart || !seasonEnd) return [];
+
+    const months: Array<{
+      key: string;
+      label: string;
+      days: Array<{ date: string; inMonth: boolean }>;
+    }> = [];
+
+    let cursor = new Date(seasonStart.getFullYear(), seasonStart.getMonth(), 1);
+    const endCursor = new Date(seasonEnd.getFullYear(), seasonEnd.getMonth(), 1);
+
+    while (cursor <= endCursor) {
+      const firstDayOfMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+      const lastDayOfMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+      const startOffset = (firstDayOfMonth.getDay() + 6) % 7;
+      const gridStart = addDays(firstDayOfMonth, -startOffset);
+      const endOffset = 6 - ((lastDayOfMonth.getDay() + 6) % 7);
+      const gridEnd = addDays(lastDayOfMonth, endOffset);
+
+      const days: Array<{ date: string; inMonth: boolean }> = [];
+      for (let day = new Date(gridStart); day <= gridEnd; day = addDays(day, 1)) {
+        days.push({
+          date: toLocalDateString(day),
+          inMonth: day.getMonth() === cursor.getMonth(),
+        });
+      }
+
+      months.push({
+        key: `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`,
+        label: formatMonthYear(toLocalDateString(cursor)) || '',
+        days,
+      });
+
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
+
+    return months;
+  }, [effectiveSeason.end_date, effectiveSeason.start_date]);
 
   return (
     <div className="space-y-4">
@@ -272,18 +333,14 @@ export default function SchedulePage() {
       {(tab === 'upcoming' || tab === 'past') && (
         <Card className="overflow-hidden">
           <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
-            {loading && (
-              <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                Loading schedule…
-              </div>
-            )}
+            {loading && <CardListSkeleton count={3} />}
 
             {!loading && displayedEntries.map((e) => (
               <div key={e.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {e.date} {formatTimeHHMM(e.time) || ''}
+                      {formatShortDate(e.date) || e.date} {formatTimeHHMM(e.time) || ''}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>{e.entry_type}</Badge>
@@ -359,7 +416,7 @@ export default function SchedulePage() {
                   </div>
 
                   {tab === 'upcoming' ? (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete" className={tableActionButtonClass}>
                       <Trash2 className="h-4 w-4 text-rose-600" />
                     </Button>
                   ) : null}
@@ -395,14 +452,14 @@ export default function SchedulePage() {
               <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                 {loading && (
                   <tr>
-                    <td colSpan={tab === 'upcoming' ? 8 : 7} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                      Loading schedule…
+                    <td colSpan={tab === 'upcoming' ? 8 : 7} className="p-0">
+                      <TableSkeleton columns={tab === 'upcoming' ? 8 : 7} rows={4} compact />
                     </td>
                   </tr>
                 )}
                 {!loading && displayedEntries.map((e) => (
                   <tr key={e.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
-                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{e.date}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{formatShortDate(e.date) || e.date}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatTimeHHMM(e.time) || '-'}</td>
                     <td className="px-4 py-3">
                       <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>{e.entry_type}</Badge>
@@ -454,6 +511,7 @@ export default function SchedulePage() {
                                   onClick={() => handleConfirm(e)}
                                   title="Confirm Game"
                                   aria-label="Confirm Game"
+                                  className={tableActionButtonClass}
                                 >
                                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                                 </Button>
@@ -465,12 +523,13 @@ export default function SchedulePage() {
                                 onClick={() => handleCancelGame(e)}
                                 title="Cancel Game"
                                 aria-label="Cancel Game"
+                                className={tableActionButtonClass}
                               >
                                 <XCircle className="h-4 w-4 text-rose-500" />
                               </Button>
                             </>
                           )}
-                          <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete" className={tableActionButtonClass}>
                             <Trash2 className="h-4 w-4 text-rose-600" />
                           </Button>
                         </div>
@@ -498,47 +557,114 @@ export default function SchedulePage() {
 
       {tab === 'calendar' && (
         <div className="space-y-4">
-          {loading ? <div className="text-sm text-slate-600 dark:text-slate-400">Loading schedule…</div> : null}
-          {!loading && Object.entries(byMonth).sort().map(([month, monthEntries]) => (
-              <div key={month} className="space-y-2">
-              <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                {formatMonthYear(month) || month}
+          {loading ? <CardListSkeleton count={3} /> : null}
+          {!loading && calendarMonths.map((month) => (
+            <Card key={month.key} className="overflow-hidden p-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                  {month.label}
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Click a day to add an open date</div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {monthEntries.map((e) => (
-                  <Card
-                    key={e.id}
-                    className={cn(
-                      'w-[184px] p-3',
-                      e.status === 'open'
-                        ? e.entry_type === 'home'
-                          ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/25'
-                          : 'border-sky-200 bg-sky-50/60 dark:border-sky-900/60 dark:bg-sky-950/25'
-                        : '',
-                    )}
-                  >
-                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {formatWeekdayDate(e.date) || e.date}
-                    </div>
-                    <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{formatTimeHHMM(e.time) || '—'}</div>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>{e.entry_type}</Badge>
-                      <Badge variant="outline">{e.status}</Badge>
-                    </div>
-                    {e.opponent_name && (
-                      <div className="mt-2 whitespace-normal break-words text-xs leading-snug text-slate-700 dark:text-slate-300">
-                        vs {e.opponent_name}
-                      </div>
-                    )}
-                  </Card>
+
+              <div className="grid grid-cols-7 gap-2">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                  <div key={day} className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {day}
+                  </div>
                 ))}
+
+                {month.days.map((day) => {
+                  const dayEntries = entriesByDate[day.date] || [];
+                  const hasEntries = dayEntries.length > 0;
+                  const isToday = day.date === todayStr;
+                  return (
+                    <button
+                      key={day.date}
+                      type="button"
+                      onClick={() => {
+                        setAddForm((current) => ({ ...current, date: day.date }));
+                        setAddOpen(true);
+                      }}
+                      className={cn(
+                        'group min-h-[8.5rem] cursor-pointer rounded-2xl border p-2 text-left transition-colors',
+                        day.inMonth
+                          ? 'border-[color:var(--app-border-subtle)] bg-[var(--app-surface)] hover:border-sky-400/40 hover:bg-[var(--app-surface-strong)]'
+                          : 'border-transparent bg-slate-100/60 text-slate-400 hover:border-slate-300/40 dark:bg-slate-900/30 dark:text-slate-600',
+                        isToday && 'ring-2 ring-sky-400/40',
+                      )}
+                      aria-label={
+                        `${formatWeekdayDate(day.date) || day.date}. `
+                        + (dayEntries.length > 0
+                          ? `${dayEntries.length} schedule ${dayEntries.length === 1 ? 'entry' : 'entries'}.`
+                          : 'No schedule entries. ')
+                        + ' Click to add an open date.'
+                      }
+                      aria-current={isToday ? 'date' : undefined}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={cn(
+                          'text-sm font-semibold',
+                          day.inMonth ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-600',
+                        )}>
+                          {parseLocalDate(day.date)?.getDate()}
+                        </span>
+                        {!hasEntries && day.inMonth ? (
+                          <span className="opacity-0 transition-opacity group-hover:opacity-100">
+                            <CalendarPlus2 className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-2 space-y-1.5">
+                        {dayEntries.slice(0, 3).map((entry) => (
+                          <div
+                            key={entry.id}
+                            className={cn(
+                              'rounded-lg px-2 py-1 text-[11px] leading-tight',
+                              entry.blocked
+                                ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200'
+                                : entry.status === 'open'
+                                  ? entry.entry_type === 'home'
+                                    ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/35 dark:text-emerald-200'
+                                    : 'bg-sky-100 text-sky-900 dark:bg-sky-950/35 dark:text-sky-200'
+                                  : 'bg-slate-100 text-slate-800 dark:bg-slate-900/60 dark:text-slate-200',
+                            )}
+                          >
+                            <div className="whitespace-normal break-words font-medium">
+                              {formatTimeHHMM(entry.time) || 'TBD'} · {entry.entry_type === 'home' ? 'Home' : 'Away'}
+                            </div>
+                            <div className="whitespace-normal break-words">
+                              {entry.opponent_name || getEntryStatusLabel(entry)}
+                            </div>
+                          </div>
+                        ))}
+                        {dayEntries.length > 3 ? (
+                          <div className="px-1 text-[11px] text-slate-500 dark:text-slate-400">+{dayEntries.length - 3} more</div>
+                        ) : null}
+                        {dayEntries.length === 0 && day.inMonth ? (
+                          <div className="px-1 pt-6 text-[11px] text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 dark:text-slate-500">
+                            Add open date
+                          </div>
+                        ) : null}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-            </div>
+            </Card>
           ))}
           {!loading && filteredEntries.length === 0 && (
-            <div className="text-sm text-slate-600 dark:text-slate-400">
-              {hasActiveFilters ? 'No schedule entries match the current filters.' : 'No schedule entries yet.'}
-            </div>
+            <EmptyState
+              icon={<CalendarPlus2 className="h-5 w-5" />}
+              title={hasActiveFilters ? 'No schedule entries match these filters' : 'No schedule entries yet'}
+              description={hasActiveFilters ? 'Clear or change filters to see the calendar again.' : 'Add your first open date to start building the season schedule.'}
+              actions={!hasActiveFilters ? (
+                <Button type="button" size="sm" onClick={() => setAddOpen(true)}>
+                  Add Entry
+                </Button>
+              ) : undefined}
+            />
           )}
         </div>
       )}

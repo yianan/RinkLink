@@ -12,9 +12,12 @@ import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
 import PageHeader from '../components/PageHeader';
-import { accentLinkClass } from '../lib/uiClasses';
+import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
+import { accentLinkClass, filterButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 import { Badge } from '../components/ui/Badge';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
+import { useToast } from '../context/ToastContext';
 
 const emptyForm = {
   association_id: '', name: '', age_group: '', level: '',
@@ -49,9 +52,10 @@ export default function TeamListPage() {
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const confirm = useConfirmDialog();
+  const pushToast = useToast();
 
   const displaySeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
-  const filterButtonClass = 'h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25';
 
   const load = () => {
     let cancelled = false;
@@ -101,11 +105,17 @@ export default function TeamListPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete this team?')) {
-      await api.deleteTeam(id);
-      load();
-      refreshTeams();
-    }
+    const confirmed = await confirm({
+      title: 'Delete team?',
+      description: 'This removes the team and its related local data.',
+      confirmLabel: 'Delete team',
+      confirmVariant: 'destructive',
+    });
+    if (!confirmed) return;
+    await api.deleteTeam(id);
+    load();
+    refreshTeams();
+    pushToast({ variant: 'success', title: 'Team deleted' });
   };
 
   const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -332,10 +342,10 @@ export default function TeamListPage() {
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(t)} aria-label="Edit">
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(t)} aria-label="Edit" className={tableActionButtonClass}>
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(t.id)} aria-label="Delete">
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(t.id)} aria-label="Delete" className={tableActionButtonClass}>
                     <Trash2 className="h-4 w-4 text-rose-600" />
                   </Button>
                 </div>
@@ -344,9 +354,7 @@ export default function TeamListPage() {
           ))}
 
           {loading && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-              Loading teams…
-            </div>
+            <CardListSkeleton count={3} />
           )}
           {!loading && teams.length === 0 && (
             <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
@@ -364,14 +372,14 @@ export default function TeamListPage() {
           <table className="w-full table-fixed text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-300">
               <tr>
-                <th className="w-[21%] px-3 py-3">Name</th>
-                <th className="w-[15%] px-3 py-3">Association</th>
-                <th className="w-[16%] px-3 py-3">Primary Competition</th>
-                <th className="w-[13%] px-3 py-3 leading-tight">Other Comps</th>
-                <th className="w-[7%] px-3 py-3 text-center">Rank</th>
-                <th className="w-[8%] px-3 py-3">Record</th>
-                <th className="w-[13%] px-3 py-3">Manager</th>
-                <th className="w-[8%] px-3 py-3 text-right">Actions</th>
+                <th scope="col" className="w-[21%] px-3 py-3">Name</th>
+                <th scope="col" className="w-[15%] px-3 py-3">Association</th>
+                <th scope="col" className="w-[16%] px-3 py-3">Primary Competition</th>
+                <th scope="col" className="w-[13%] px-3 py-3 leading-tight">Other Comps</th>
+                <th scope="col" className="w-[7%] px-3 py-3 text-center">Rank</th>
+                <th scope="col" className="w-[8%] px-3 py-3">Record</th>
+                <th scope="col" className="w-[13%] px-3 py-3">Manager</th>
+                <th scope="col" className="w-[8%] px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
@@ -429,10 +437,10 @@ export default function TeamListPage() {
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex justify-end gap-0.5">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(t)} aria-label="Edit">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(t)} aria-label="Edit" className={tableActionButtonClass}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(t.id)} aria-label="Delete">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(t.id)} aria-label="Delete" className={tableActionButtonClass}>
                         <Trash2 className="h-4 w-4 text-rose-600" />
                       </Button>
                     </div>
@@ -442,8 +450,8 @@ export default function TeamListPage() {
 
               {loading && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                    Loading teams…
+                  <td colSpan={8} className="p-0">
+                    <TableSkeleton columns={8} rows={4} compact />
                   </td>
                 </tr>
               )}

@@ -18,7 +18,7 @@ const variants: Record<ButtonVariant, string> = {
   secondary:
     'bg-slate-900 text-white shadow-soft hover:bg-slate-800 hover:shadow-md disabled:border disabled:border-[color:var(--app-border-subtle)] disabled:bg-[var(--app-disabled-surface)] disabled:text-[color:var(--app-disabled-text)] dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white',
   outline:
-    'border border-[color:var(--app-border-subtle)] bg-[var(--app-surface)] text-slate-900 shadow-sm backdrop-blur-[1px] hover:border-cyan-400/50 hover:bg-[var(--app-surface-strong)] hover:text-slate-950 hover:ring-1 hover:ring-cyan-400/15 disabled:border-[color:var(--app-border-subtle)] disabled:bg-[var(--app-disabled-surface)] disabled:text-[color:var(--app-disabled-text)] dark:text-slate-100',
+    'border border-slate-300/90 bg-white/95 text-slate-800 shadow-sm backdrop-blur-[1px] hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-1 hover:ring-sky-400/20 disabled:border-[color:var(--app-border-subtle)] disabled:bg-[var(--app-disabled-surface)] disabled:text-[color:var(--app-disabled-text)] dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25',
   ghost:
     'text-slate-800 hover:bg-[var(--app-surface)] disabled:text-[color:var(--app-disabled-text)] dark:text-slate-200 dark:hover:bg-[var(--app-surface)]',
   destructive:

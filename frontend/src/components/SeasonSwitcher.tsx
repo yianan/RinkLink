@@ -24,7 +24,7 @@ export default function SeasonSwitcher() {
   return (
     <div className="flex items-center gap-2">
       <div className="hidden text-xs font-medium text-slate-600 sm:block dark:text-white/80">Season</div>
-      <div className="w-full min-w-0 sm:w-[150px]">
+      <div className="w-[8.5rem] min-w-0 sm:w-[150px]">
         <Select
           value={activeSeason?.id || ''}
           disabled={loading}
