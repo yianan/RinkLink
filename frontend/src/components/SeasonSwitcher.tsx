@@ -22,9 +22,9 @@ export default function SeasonSwitcher() {
   if (hideSeasonSwitcher || (!loading && seasons.length === 0)) return null;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 items-center gap-2">
       <div className="hidden text-xs font-medium text-slate-600 sm:block dark:text-white/80">Season</div>
-      <div className="w-[8.5rem] min-w-0 sm:w-[150px]">
+      <div className="w-full min-w-0 sm:w-[150px]">
         <Select
           value={activeSeason?.id || ''}
           disabled={loading}
@@ -36,7 +36,7 @@ export default function SeasonSwitcher() {
             }
             if (!requireSpecificSeason) setActiveSeason(null);
           }}
-          className="min-h-11 bg-white/80 text-slate-900 shadow-sm ring-1 ring-slate-200/80 focus:border-cyan-400 focus:ring-cyan-400 sm:min-h-10 dark:bg-slate-950/40 dark:text-slate-100 dark:ring-slate-700/60 dark:focus:border-cyan-400 dark:focus:ring-cyan-400"
+          className="min-h-11 w-full bg-white/80 text-slate-900 shadow-sm ring-1 ring-slate-200/80 focus:border-cyan-400 focus:ring-cyan-400 sm:min-h-10 dark:bg-slate-950/40 dark:text-slate-100 dark:ring-slate-700/60 dark:focus:border-cyan-400 dark:focus:ring-cyan-400"
         >
           {!requireSpecificSeason && <option value="">{loading ? 'Loading seasons…' : 'All Seasons'}</option>}
           {seasons.map((s) => (

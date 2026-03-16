@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
   Building2,
@@ -224,50 +224,79 @@ function AppContent() {
   const { loading: seasonsLoading } = useSeason();
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(56);
+  const headerRef = useRef<HTMLElement | null>(null);
   const appLoading = teamsLoading || seasonsLoading;
 
   useEffect(() => {
     setMobileNavOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    const updateHeight = () => {
+      setHeaderHeight(header.getBoundingClientRect().height);
+    };
+
+    updateHeight();
+
+    const observer = new ResizeObserver(() => updateHeight());
+    observer.observe(header);
+    window.addEventListener('resize', updateHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, []);
+
   return (
     <div className="min-h-full">
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-slate-200/70 bg-gradient-to-r from-white via-cyan-50/70 to-violet-50/50 dark:border-white/10 dark:from-slate-950 dark:via-cyan-950/25 dark:to-violet-950/35">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:px-6">
-          <button
-            type="button"
-            className="rl-tooltip inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900/5 text-slate-800 ring-1 ring-slate-200/70 hover:bg-slate-900/10 hover:text-slate-900 lg:hidden dark:bg-white/10 dark:text-white dark:ring-white/15 dark:hover:bg-white/15 dark:hover:text-white"
-            onClick={() => setMobileNavOpen(true)}
-            aria-label="Open navigation"
-            data-tooltip="Open navigation"
-            title="Open navigation"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+      <header
+        ref={headerRef}
+        className="fixed inset-x-0 top-0 z-40 border-b border-slate-200/70 bg-gradient-to-r from-white via-cyan-50/70 to-violet-50/50 dark:border-white/10 dark:from-slate-950 dark:via-cyan-950/25 dark:to-violet-950/35"
+      >
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-3 px-4 py-2 sm:h-14 sm:flex-nowrap sm:px-6 sm:py-0">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <button
+              type="button"
+              className="rl-tooltip inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-900/5 text-slate-800 ring-1 ring-slate-200/70 hover:bg-slate-900/10 hover:text-slate-900 lg:hidden dark:bg-white/10 dark:text-white dark:ring-white/15 dark:hover:bg-white/15 dark:hover:text-white"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open navigation"
+              data-tooltip="Open navigation"
+              title="Open navigation"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
 
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900/5 ring-1 ring-slate-200/70 dark:bg-white/10 dark:ring-white/15">
-              <Snowflake className="h-5 w-5" />
-            </div>
-            <div className="leading-tight">
-              <div className="font-display text-sm font-bold tracking-tight text-slate-900 dark:text-white">RinkLink</div>
-              <div className="hidden text-xs text-slate-600 dark:text-white/70 sm:block">Ice time & scheduling</div>
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900/5 ring-1 ring-slate-200/70 dark:bg-white/10 dark:ring-white/15">
+                <Snowflake className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 leading-tight">
+                <div className="font-display text-sm font-bold tracking-tight text-slate-900 dark:text-white">RinkLink</div>
+                <div className="hidden text-xs text-slate-600 dark:text-white/70 sm:block">Ice time & scheduling</div>
+              </div>
             </div>
           </div>
 
-          <div className="ml-auto">
-            <div className="flex items-center gap-2">
+          <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,9.75rem)] items-center gap-2 sm:ml-auto sm:flex sm:w-auto sm:grid-cols-none">
+            <div className="min-w-0">
               <TeamSwitcher />
+            </div>
+            <div className="min-w-0">
               <SeasonSwitcher />
-              <div className="hidden sm:block">
-                <ThemeToggle />
-              </div>
+            </div>
+            <div className="hidden sm:block">
+              <ThemeToggle />
             </div>
           </div>
         </div>
       </header>
 
-      <div className="pt-14">
+      <div style={{ paddingTop: headerHeight }}>
         <aside className="hidden lg:fixed lg:inset-y-14 lg:left-0 lg:block lg:w-56 lg:overflow-y-auto lg:border-r lg:border-slate-200/70 lg:bg-gradient-to-b lg:from-white lg:via-[color:color-mix(in_srgb,var(--app-surface)_82%,rgb(245_243_255))] lg:to-white dark:lg:border-slate-800/70 dark:lg:bg-gradient-to-b dark:lg:from-slate-950 dark:lg:via-slate-950 dark:lg:to-slate-950">
           <AppNav />
         </aside>

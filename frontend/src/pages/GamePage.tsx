@@ -417,10 +417,15 @@ export default function GamePage() {
       <PageHeader
         title="Game Scoresheet"
         subtitle={(
-          <>
-            {formatHeaderDate(game.date)} {formatTimeHHMM(game.time) || ''} • {homeName} vs {awayName}
-            {isThisWeek && <span className={`ml-2 text-xs font-medium ${accentActionClass}`}>This week</span>}
-          </>
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>{formatHeaderDate(game.date)} {formatTimeHHMM(game.time) || ''}</span>
+              {isThisWeek && <span className={`inline-flex text-xs font-medium ${accentActionClass}`}>This week</span>}
+            </div>
+            <div className="break-words">
+              {homeName} vs {awayName}
+            </div>
+          </div>
         )}
       />
 
@@ -508,11 +513,11 @@ export default function GamePage() {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <Select
               value={gameTypeDraft}
               onChange={(e) => setGameTypeDraft(e.target.value)}
-              className="min-w-[14rem]"
+              className="w-full sm:min-w-[14rem] sm:w-auto"
               aria-label="Game type"
             >
               {GAME_TYPES.map((t) => (
