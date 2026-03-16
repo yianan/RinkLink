@@ -302,6 +302,9 @@ export default function GamesPage() {
             const edit = scoreEdits[g.id] || { home: '', away: '' };
             const statusLabel = getGameStatusLabel(g);
             const StatusIcon: LucideIcon = getGameStatusIcon(g);
+            const hasScoreEdits =
+              edit.home !== (g.home_score != null ? String(g.home_score) : '')
+              || edit.away !== (g.away_score != null ? String(g.away_score) : '');
 
             return (
               <div key={g.id} className="px-4 py-4">
@@ -336,30 +339,51 @@ export default function GamesPage() {
                       : g.location_label || 'No location yet'}
                   </div>
                 </div>
-                <div className="mt-4 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Score</span>
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    className="w-14 text-center text-sm"
-                    value={edit.home}
-                    placeholder="H"
-                    onChange={(e) => setScoreEdits((s) => ({ ...s, [g.id]: { ...edit, home: digitsOnly(e.target.value) } }))}
-                  />
-                  <span className="text-slate-500">–</span>
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    className="w-14 text-center text-sm"
-                    value={edit.away}
-                    placeholder="A"
-                    onChange={(e) => setScoreEdits((s) => ({ ...s, [g.id]: { ...edit, away: digitsOnly(e.target.value) } }))}
-                  />
-                  <Button type="button" size="sm" variant="ghost" onClick={() => handleSaveScore(g.id)} title="Save score">
-                    <Save className="h-3.5 w-3.5" />
-                  </Button>
+                <div
+                  className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/35"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                    Score
+                  </div>
+                  <div className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+                    <div>
+                      <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        {g.home_team_name}
+                      </div>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="h-10 w-full text-center text-sm"
+                        value={edit.home}
+                        placeholder="0"
+                        onChange={(e) => setScoreEdits((s) => ({ ...s, [g.id]: { ...edit, home: digitsOnly(e.target.value) } }))}
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        {g.away_team_name}
+                      </div>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="h-10 w-full text-center text-sm"
+                        value={edit.away}
+                        placeholder="0"
+                        onChange={(e) => setScoreEdits((s) => ({ ...s, [g.id]: { ...edit, away: digitsOnly(e.target.value) } }))}
+                      />
+                    </div>
+                  </div>
+                  {hasScoreEdits ? (
+                    <div className="mt-3 flex justify-end">
+                      <Button type="button" size="sm" variant="outline" onClick={() => handleSaveScore(g.id)} title="Save score">
+                        <Save className="h-3.5 w-3.5" />
+                        Save Score
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             );

@@ -32,14 +32,20 @@ export function ConfirmDialog({
       description={undefined}
       onClose={busy ? () => undefined : onCancel}
       footer={(
-        <>
-          <Button type="button" variant={confirmVariant} onClick={onConfirm} disabled={busy}>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
+          <Button type="button" variant={confirmVariant} onClick={onConfirm} disabled={busy} className="w-full sm:w-auto">
             {confirmLabel}
           </Button>
-          <Button type="button" variant="outline" className={filterButtonClass} onClick={onCancel} disabled={busy}>
+          <Button
+            type="button"
+            variant="outline"
+            className={`w-full sm:w-auto ${filterButtonClass}`}
+            onClick={onCancel}
+            disabled={busy}
+          >
             {cancelLabel}
           </Button>
-        </>
+        </div>
       )}
     >
       <div className="text-sm text-slate-600 dark:text-slate-300">

@@ -49,6 +49,7 @@ import { Textarea } from '../components/ui/Textarea';
 import { CardListSkeleton } from '../components/ui/TableSkeleton';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useToast } from '../context/ToastContext';
+import { cn } from '../lib/cn';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
 import { getGameStatusIcon, getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
 import { accentActionClass, tableActionButtonClass } from '../lib/uiClasses';
@@ -412,7 +413,7 @@ export default function GamePage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className={cn('space-y-5', hasUnsavedChanges && 'pb-[calc(10rem+env(safe-area-inset-bottom))] sm:pb-24')}>
       <Breadcrumbs items={[{ label: 'Games', to: '/games' }, { label: 'Game Scoresheet' }]} />
       <PageHeader
         title="Game Scoresheet"
@@ -430,26 +431,26 @@ export default function GamePage() {
       />
 
       <Card className="overflow-hidden border-cyan-200/40 bg-gradient-to-br from-white via-cyan-50/50 to-violet-50/40 p-4 dark:border-cyan-900/30 dark:from-slate-950 dark:via-cyan-950/15 dark:to-violet-950/20">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-4">
           <div className="space-y-3">
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Game Details</div>
-            <div className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+            <div className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 sm:text-[1.45rem]">
               <span>{homeName}</span>
               <span className="mx-2 text-slate-400 dark:text-slate-500">vs</span>
               <span>{awayName}</span>
             </div>
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 shadow-sm dark:border-white/10 dark:bg-slate-950/35">
-              <div className="min-w-[5rem] text-center">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{homeName}</div>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-white/70 bg-white/70 px-3 py-3 shadow-sm sm:gap-4 sm:px-4 dark:border-white/10 dark:bg-slate-950/35">
+              <div className="min-w-0 text-center">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400 sm:text-[11px]">{homeName}</div>
                 <div className="mt-1 text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                   {scoreDraft.home === '' ? '–' : scoreDraft.home}
                 </div>
               </div>
-              <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+              <div className="px-1 text-center text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500 sm:text-sm">
                 {game.status === 'final' ? 'Final' : 'Score'}
               </div>
-              <div className="min-w-[5rem] text-center">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{awayName}</div>
+              <div className="min-w-0 text-center">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400 sm:text-[11px]">{awayName}</div>
                 <div className="mt-1 text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                   {scoreDraft.away === '' ? '–' : scoreDraft.away}
                 </div>
@@ -466,11 +467,13 @@ export default function GamePage() {
               </div>
             )}
             {rinkLabel ? (
-              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                <MapPin className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                <div className="min-w-0 flex-1">{rinkLabel}</div>
+              <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
+                <div className="flex items-start gap-2">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+                  <div className="min-w-0 leading-relaxed">{rinkLabel}</div>
+                </div>
                 {directionsUrl ? (
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 pl-6">
                     <Button
                       type="button"
                       variant="outline"
@@ -513,7 +516,7 @@ export default function GamePage() {
             )}
           </div>
 
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <div className="w-full">
             <Select
               value={gameTypeDraft}
               onChange={(e) => setGameTypeDraft(e.target.value)}
@@ -598,7 +601,96 @@ export default function GamePage() {
               <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
                 <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{t.title}</div>
               </div>
-              <div className="overflow-x-auto">
+              <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
+                {t.players.map((p) => {
+                  const v = statDraft[p.id] || { goals: 0, assists: 0, shots: 0, team_id: t.teamId };
+                  const hasStats = v.goals > 0 || v.assists > 0 || v.shots > 0;
+                  return (
+                    <div
+                      key={p.id}
+                      className={cn(
+                        'space-y-3 px-4 py-3',
+                        hasStats ? 'bg-cyan-50/50 dark:bg-cyan-950/10' : undefined,
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium text-slate-900 dark:text-slate-100">
+                            {p.first_name} {p.last_name}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <span>#{p.jersey_number ?? '-'}</span>
+                            {p.position ? <span>{p.position}</span> : null}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            G
+                          </label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            inputMode="numeric"
+                            value={String(v.goals)}
+                            onKeyDown={blockNonIntegerNumberKeys}
+                            onChange={(e) => setStatDraft((d) => ({
+                              ...d,
+                              [p.id]: { ...v, team_id: t.teamId, goals: Number(digitsOnly(e.target.value) || '0') },
+                            }))}
+                            className="h-10 w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            A
+                          </label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            inputMode="numeric"
+                            value={String(v.assists)}
+                            onKeyDown={blockNonIntegerNumberKeys}
+                            onChange={(e) => setStatDraft((d) => ({
+                              ...d,
+                              [p.id]: { ...v, team_id: t.teamId, assists: Number(digitsOnly(e.target.value) || '0') },
+                            }))}
+                            className="h-10 w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            SOG
+                          </label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            inputMode="numeric"
+                            value={String(v.shots)}
+                            onKeyDown={blockNonIntegerNumberKeys}
+                            onChange={(e) => setStatDraft((d) => ({
+                              ...d,
+                              [p.id]: { ...v, team_id: t.teamId, shots: Number(digitsOnly(e.target.value) || '0') },
+                            }))}
+                            className="h-10 w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {t.players.length === 0 && (
+                  <div className="px-4 py-6 text-center text-sm text-slate-600 dark:text-slate-400">
+                    No roster for this team yet. Add players on the Roster page.
+                  </div>
+                )}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-white text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-950/20 dark:text-slate-400">
                     <tr>
@@ -964,8 +1056,8 @@ export default function GamePage() {
       </Card>
 
       {hasUnsavedChanges ? (
-        <div className="sticky bottom-4 z-20 flex justify-end">
-          <Card className="max-w-lg border-cyan-200/70 bg-white/95 p-3 shadow-xl backdrop-blur dark:border-cyan-900/40 dark:bg-slate-950/92" role="status" aria-live="polite">
+        <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] z-20 flex justify-end">
+          <Card className="w-full max-w-lg border-cyan-200/70 bg-white/95 p-3 shadow-xl backdrop-blur dark:border-cyan-900/40 dark:bg-slate-950/92" role="status" aria-live="polite">
             <div className="flex flex-wrap items-center justify-end gap-3">
               <Button type="button" onClick={handleSaveAll} aria-label="Save all scoresheet changes">
                 Save All Changes

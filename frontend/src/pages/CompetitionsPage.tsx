@@ -362,7 +362,7 @@ export default function CompetitionsPage() {
                 <div className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-700 dark:text-slate-200">
                   {section.title}
                 </div>
-                <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">{section.description}</div>
+                <div className="mt-1 text-xs text-slate-600 dark:text-slate-400 sm:text-sm">{section.description}</div>
               </div>
 
               <div className="space-y-4">
@@ -401,7 +401,7 @@ export default function CompetitionsPage() {
                             ) : null}
                           </div>
                           {competition.notes ? (
-                            <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">{competition.notes}</div>
+                            <div className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300 sm:text-sm">{competition.notes}</div>
                           ) : null}
                         </div>
 
@@ -453,7 +453,7 @@ export default function CompetitionsPage() {
                                   )}>
                                     Division
                                   </div>
-                                  <div className={cn('mt-2 text-sm font-semibold', getDivisionTitleClass(competition.competition_type))}>
+                                  <div className={cn('mt-2 text-sm font-semibold sm:text-[15px]', getDivisionTitleClass(competition.competition_type))}>
                                     {division.name}
                                   </div>
                                   {meta ? (
@@ -479,38 +479,49 @@ export default function CompetitionsPage() {
                               </div>
                             </div>
 
-                            <div className="space-y-2 p-4">
+                            <div className="space-y-2 p-3 sm:p-4">
                               {displayTeams.length === 0 ? (
                                 <div className="text-sm text-slate-500 dark:text-slate-400">No teams assigned.</div>
                               ) : (
                                 displayTeams.map(({ team, standings }) => (
                                   <div
                                     key={`${division.id}:${team.id}`}
-                                    className="flex items-start justify-between gap-3 rounded-xl border border-white/70 bg-white/80 px-3 py-2.5 dark:border-white/5 dark:bg-slate-950/35"
+                                    className="rounded-xl border border-white/70 bg-white/80 px-3 py-2.5 dark:border-white/5 dark:bg-slate-950/35"
                                   >
-                                    <div className="min-w-0">
-                                      <button
-                                        type="button"
-                                        onClick={() => openTeamDashboard(team)}
-                                        className={`block max-w-full cursor-pointer truncate text-left text-sm font-medium text-slate-900 transition-colors hover:text-[color:var(--app-accent-link-hover)] dark:text-slate-100 ${accentLinkClass}`}
-                                      >
-                                        {team.name}
-                                      </button>
-                                      <div className="truncate text-xs text-slate-500 dark:text-slate-400">{team.association_name}</div>
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <button
+                                          type="button"
+                                          onClick={() => openTeamDashboard(team)}
+                                          className={`block max-w-full cursor-pointer truncate text-left text-sm font-medium text-slate-900 transition-colors hover:text-[color:var(--app-accent-link-hover)] dark:text-slate-100 ${accentLinkClass}`}
+                                        >
+                                          {team.name}
+                                        </button>
+                                        <div className="truncate text-xs text-slate-500 dark:text-slate-400">{team.association_name}</div>
+                                      </div>
                                       {division.standings_enabled && standings ? (
-                                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                          <span>GP {standings.games_played}</span>
-                                          <span>W {standings.wins}</span>
-                                          <span>L {standings.losses}</span>
-                                          <span>T {standings.ties}</span>
-                                        </div>
+                                        <Badge variant="info" className="shrink-0">{standings.points} pts</Badge>
                                       ) : null}
                                     </div>
-                                    <div className="flex shrink-0 items-center gap-2">
-                                      {division.standings_enabled && standings ? (
-                                        <Badge variant="info">{standings.points} pts</Badge>
-                                      ) : null}
-                                    </div>
+                                    {division.standings_enabled && standings ? (
+                                      <div className="mt-2 grid grid-cols-4 gap-2 rounded-lg bg-slate-50/70 px-2.5 py-2 text-center dark:bg-slate-950/30">
+                                        {[
+                                          ['GP', standings.games_played],
+                                          ['W', standings.wins],
+                                          ['L', standings.losses],
+                                          ['T', standings.ties],
+                                        ].map(([label, value]) => (
+                                          <div key={label}>
+                                            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                              {label}
+                                            </div>
+                                            <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                              {value}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : null}
                                   </div>
                                 ))
                               )}

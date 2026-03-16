@@ -93,9 +93,9 @@ export default function SchedulePage() {
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
-      title: 'Delete schedule entry?',
-      description: 'This removes the date from the team schedule.',
-      confirmLabel: 'Delete entry',
+      title: 'Remove date?',
+      description: 'This removes the date from the team schedule entirely.',
+      confirmLabel: 'Remove date',
       confirmVariant: 'destructive',
     });
     if (!confirmed) return;
@@ -119,9 +119,9 @@ export default function SchedulePage() {
   const handleCancelGame = async (e: ScheduleEntry) => {
     if (!e.game_id) return;
     const confirmed = await confirm({
-      title: 'Cancel game?',
-      description: `Cancel the game vs ${e.opponent_name || 'opponent'}? This cannot be undone.`,
-      confirmLabel: 'Cancel game',
+      title: 'Remove matchup?',
+      description: `Remove the scheduled matchup vs ${e.opponent_name || 'opponent'} and return this date to the schedule?`,
+      confirmLabel: 'Remove matchup',
       confirmVariant: 'destructive',
     });
     if (!confirmed) return;
@@ -341,16 +341,17 @@ export default function SchedulePage() {
 
             {!loading && displayedEntries.map((e) => (
               <div key={e.id} className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                <div className="min-w-0">
                     <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
                       {formatShortDate(e.date) || e.date} {formatTimeHHMM(e.time) || ''}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>{e.entry_type}</Badge>
+                      <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>
+                        {e.entry_type === 'home' ? 'Home' : 'Away'}
+                      </Badge>
                       {e.blocked
-                        ? <Badge variant="warning">blocked</Badge>
-                        : <Badge variant={statusColors[e.status] || 'neutral'}>{e.status}</Badge>}
+                        ? <Badge variant="warning">Blocked</Badge>
+                        : <Badge variant={statusColors[e.status] || 'neutral'}>{e.status === 'confirmed' ? 'Confirmed' : e.status === 'scheduled' ? 'Scheduled' : 'Open'}</Badge>}
                     </div>
 
                     {(e.opponent_name || e.location || e.notes) && (
@@ -361,15 +362,15 @@ export default function SchedulePage() {
                       </div>
                     )}
                     {tab === 'upcoming' && (
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-3 grid grid-cols-2 gap-2">
                         {e.status === 'open' && e.time && !e.blocked && (
-                          <Button type="button" size="sm" variant="primary" onClick={() => findOpponents(e.id)}>
+                          <Button type="button" size="sm" variant="primary" onClick={() => findOpponents(e.id)} className="justify-center">
                             <Search className="h-3.5 w-3.5" />
                             Find Opponents
                           </Button>
                         )}
                         {e.status === 'open' && (
-                          <Button type="button" size="sm" variant="outline" onClick={() => toggleBlocked(e)}>
+                          <Button type="button" size="sm" variant="outline" onClick={() => toggleBlocked(e)} className="justify-center">
                             {e.blocked ? <Eye className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}
                             {e.blocked ? 'Unblock' : 'Block'}
                           </Button>
@@ -377,29 +378,36 @@ export default function SchedulePage() {
                         {(e.status === 'scheduled' || e.status === 'confirmed') && e.game_id && (
                           <>
                             {!e.weekly_confirmed && (
-                              <Button type="button" size="sm" variant="primary" onClick={() => handleConfirm(e)}>
+                              <Button type="button" size="sm" variant="primary" onClick={() => handleConfirm(e)} className="justify-center">
                                 <CheckCircle2 className="h-3.5 w-3.5" />
                                 Confirm
                               </Button>
                             )}
                             {e.weekly_confirmed && (
-                              <Badge variant="success" icon={<CheckCircle2 className="h-3 w-3" />}>Confirmed</Badge>
+                              <div className="flex items-center">
+                                <Badge variant="success" icon={<CheckCircle2 className="h-3 w-3" />}>Confirmed</Badge>
+                              </div>
                             )}
-                            <Button type="button" size="sm" variant="outline" onClick={() => handleCancelGame(e)}>
+                            <Button type="button" size="sm" variant="outline" onClick={() => handleCancelGame(e)} className="justify-center">
                               <XCircle className="h-3.5 w-3.5" />
-                              Cancel Game
+                              Remove Matchup
                             </Button>
                           </>
                         )}
+                        <div className="col-span-2 flex justify-center">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDelete(e.id)}
+                            className="w-full max-w-[10.75rem] justify-center border-rose-200/80 px-3 text-rose-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-800 dark:border-rose-900/70 dark:text-rose-200 dark:hover:border-rose-800 dark:hover:bg-rose-950/30 dark:hover:text-rose-100"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Remove Date
+                          </Button>
+                        </div>
                       </div>
                     )}
-                  </div>
-
-                  {tab === 'upcoming' ? (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete" className={tableActionButtonClass}>
-                      <Trash2 className="h-4 w-4 text-rose-600" />
-                    </Button>
-                  ) : null}
                 </div>
               </div>
             ))}
@@ -442,12 +450,14 @@ export default function SchedulePage() {
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{formatShortDate(e.date) || e.date}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatTimeHHMM(e.time) || '-'}</td>
                     <td className="px-4 py-3">
-                      <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>{e.entry_type}</Badge>
+                      <Badge variant={e.entry_type === 'home' ? 'success' : 'info'}>
+                        {e.entry_type === 'home' ? 'Home' : 'Away'}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3">
                       {e.blocked
-                        ? <Badge variant="warning">blocked</Badge>
-                        : <Badge variant={statusColors[e.status] || 'neutral'}>{e.status}</Badge>}
+                        ? <Badge variant="warning">Blocked</Badge>
+                        : <Badge variant={statusColors[e.status] || 'neutral'}>{e.status === 'confirmed' ? 'Confirmed' : e.status === 'scheduled' ? 'Scheduled' : 'Open'}</Badge>}
                     </td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{e.opponent_name || '-'}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{e.location || '-'}</td>
@@ -501,15 +511,15 @@ export default function SchedulePage() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleCancelGame(e)}
-                                title="Cancel Game"
-                                aria-label="Cancel Game"
-                                className={tableActionButtonClass}
-                              >
-                                <XCircle className="h-4 w-4 text-rose-500" />
-                              </Button>
+                                  title="Remove Matchup"
+                                  aria-label="Remove Matchup"
+                                  className={tableActionButtonClass}
+                                >
+                                  <XCircle className="h-4 w-4 text-rose-500" />
+                                </Button>
                             </>
                           )}
-                          <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Delete" className={tableActionButtonClass}>
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(e.id)} aria-label="Remove Date" title="Remove Date" className={tableActionButtonClass}>
                             <Trash2 className="h-4 w-4 text-rose-600" />
                           </Button>
                         </div>
