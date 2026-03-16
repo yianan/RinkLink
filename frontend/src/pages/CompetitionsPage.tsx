@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, SlidersHorizontal, Trophy } from 'lucide-react';
+import { ExternalLink, Trophy } from 'lucide-react';
 import { api } from '../api/client';
 import { Competition, StandingsEntry, Team } from '../types';
 import { useSeason } from '../context/SeasonContext';
@@ -10,10 +10,11 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
+import { FilterPanel, FilterPanelTrigger } from '../components/FilterPanel';
 import PageHeader from '../components/PageHeader';
 import { CardListSkeleton } from '../components/ui/TableSkeleton';
 import { cn } from '../lib/cn';
-import { accentLinkClass, filterButtonClass } from '../lib/uiClasses';
+import { accentLinkClass } from '../lib/uiClasses';
 import {
   getCompetitionBadgeVariant,
   getCompetitionHeaderClass,
@@ -48,12 +49,6 @@ function ageGroupSortValue(value: string) {
   const match = value.match(/(\d+)/);
   if (!match) return Number.NEGATIVE_INFINITY;
   return Number(match[1]);
-}
-
-function toggleFilterValue(values: string[], nextValue: string) {
-  return values.includes(nextValue)
-    ? values.filter((value) => value !== nextValue)
-    : [...values, nextValue];
 }
 
 export default function CompetitionsPage() {
@@ -240,17 +235,9 @@ export default function CompetitionsPage() {
         title="Competitions"
         subtitle={`Leagues and other assigned competitions for the ${effectiveSeason.name} Season.`}
         actions={(
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setFiltersOpen((open) => !open)}
-            className={cn('shrink-0', filterButtonClass)}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filters
-            {hasActiveFilters ? ` (${activeFilterBadges.length})` : ''}
-          </Button>
+          <div className="shrink-0">
+            <FilterPanelTrigger count={activeFilterBadges.length} onClick={() => setFiltersOpen((open) => !open)} />
+          </div>
         )}
       />
 
@@ -260,97 +247,47 @@ export default function CompetitionsPage() {
         <Alert variant="info">No competitions have been configured for this season yet.</Alert>
       ) : (
         <div className="space-y-6">
-          {hasActiveFilters && !filtersOpen ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {activeFilterBadges.map((label, index) => (
-                <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
-                  {label}
-                </Badge>
-              ))}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSelectedCompetitionTypes([]);
-                  setSelectedCompetitionIds([]);
-                  setSelectedAgeGroups([]);
-                  setSelectedLevels([]);
-                }}
-              >
-                Clear all
-              </Button>
-            </div>
-          ) : null}
-
-          {filtersOpen ? (
-            <Card className="p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter competitions</div>
-                  <div className="text-sm text-slate-600 dark:text-slate-400">
-                    Combine filters to narrow the page by type, competition, age group, and level.
-                  </div>
-                </div>
-                {hasActiveFilters ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedCompetitionTypes([]);
-                      setSelectedCompetitionIds([]);
-                      setSelectedAgeGroups([]);
-                      setSelectedLevels([]);
-                    }}
-                  >
-                    Clear all
-                  </Button>
-                ) : null}
-              </div>
-
-              {hasActiveFilters ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {activeFilterBadges.map((label, index) => (
-                    <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
-                      {label}
-                    </Badge>
-                  ))}
-                </div>
-              ) : null}
-
-              <div className="mt-4 grid gap-4 border-t border-[color:var(--app-border-subtle)] pt-4 xl:grid-cols-2">
-                <FilterPillGroup
-                  label="Type"
-                  options={competitionTypeOptions}
-                  values={selectedCompetitionTypes}
-                  onToggle={(value) => setSelectedCompetitionTypes((current) => toggleFilterValue(current, value))}
-                  tone="sky"
-                />
-                <FilterPillGroup
-                  label="Competition"
-                  options={competitionOptions}
-                  values={selectedCompetitionIds}
-                  onToggle={(value) => setSelectedCompetitionIds((current) => toggleFilterValue(current, value))}
-                  tone="violet"
-                />
-                <FilterPillGroup
-                  label="Age Group"
-                  options={ageGroupOptions}
-                  values={selectedAgeGroups}
-                  onToggle={(value) => setSelectedAgeGroups((current) => toggleFilterValue(current, value))}
-                  tone="emerald"
-                />
-                <FilterPillGroup
-                  label="Level"
-                  options={levelOptions}
-                  values={selectedLevels}
-                  onToggle={(value) => setSelectedLevels((current) => toggleFilterValue(current, value))}
-                  tone="amber"
-                />
-              </div>
-            </Card>
-          ) : null}
+          <FilterPanel
+            title="Filter competitions"
+            description="Combine filters to narrow the page by type, competition, age group, and level."
+            open={filtersOpen}
+            badges={activeFilterBadges}
+            onClear={() => {
+              setSelectedCompetitionTypes([]);
+              setSelectedCompetitionIds([]);
+              setSelectedAgeGroups([]);
+              setSelectedLevels([]);
+            }}
+          >
+            <FilterPillGroup
+              label="Type"
+              options={competitionTypeOptions}
+              values={selectedCompetitionTypes}
+              onChange={setSelectedCompetitionTypes}
+              tone="sky"
+            />
+            <FilterPillGroup
+              label="Competition"
+              options={competitionOptions}
+              values={selectedCompetitionIds}
+              onChange={setSelectedCompetitionIds}
+              tone="violet"
+            />
+            <FilterPillGroup
+              label="Age Group"
+              options={ageGroupOptions}
+              values={selectedAgeGroups}
+              onChange={setSelectedAgeGroups}
+              tone="emerald"
+            />
+            <FilterPillGroup
+              label="Level"
+              options={levelOptions}
+              values={selectedLevels}
+              onChange={setSelectedLevels}
+              tone="amber"
+            />
+          </FilterPanel>
 
           {competitionSections.length === 0 ? (
             <Alert variant="info">No competitions match the current filters.</Alert>

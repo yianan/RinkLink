@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ban, CalendarPlus2, CheckCircle2, Eye, Search, SlidersHorizontal, Trash2, XCircle } from 'lucide-react';
+import { Ban, CalendarPlus2, CheckCircle2, Eye, Search, Trash2, XCircle } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -11,6 +11,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
+import { FilterPanel, FilterPanelTrigger } from '../components/FilterPanel';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
@@ -22,7 +23,7 @@ import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { useNavBadgeRefresh } from '../context/NavBadgeContext';
 import { cn } from '../lib/cn';
-import { filterButtonClass, tableActionButtonClass } from '../lib/uiClasses';
+import { tableActionButtonClass } from '../lib/uiClasses';
 import { addDays, formatMonthYear, formatShortDate, formatTimeHHMM, formatWeekdayDate, parseLocalDate, toLocalDateString } from '../lib/time';
 
 const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
@@ -30,12 +31,6 @@ const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> =
   scheduled: 'info',
   confirmed: 'warning',
 };
-
-function toggleFilterValue(values: string[], nextValue: string) {
-  return values.includes(nextValue)
-    ? values.filter((value) => value !== nextValue)
-    : [...values, nextValue];
-}
 
 function getEntryStatusLabel(entry: ScheduleEntry) {
   if (entry.blocked) return 'Blocked';
@@ -249,79 +244,34 @@ export default function SchedulePage() {
         subtitle="Manage upcoming dates, review past dates, and scan the full season calendar."
         actions={(
           <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setFiltersOpen((open) => !open)}
-              className={filterButtonClass}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Filters
-              {hasActiveFilters ? ` (${activeFilterBadges.length})` : ''}
-            </Button>
+            <FilterPanelTrigger count={activeFilterBadges.length} onClick={() => setFiltersOpen((open) => !open)} />
             <Button type="button" onClick={() => setAddOpen(true)}>Add Entry</Button>
           </>
         )}
       />
 
-      {hasActiveFilters && !filtersOpen ? (
-        <div className="flex flex-wrap items-center gap-2">
-          {activeFilterBadges.map((label, index) => (
-            <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
-              {label}
-            </Badge>
-          ))}
-          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-            Clear all
-          </Button>
-        </div>
-      ) : null}
-
-      {filtersOpen ? (
-        <Card className="p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter schedule</div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">
-                Narrow the schedule by entry type and status across list and calendar views.
-              </div>
-            </div>
-            {hasActiveFilters ? (
-              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-                Clear all
-              </Button>
-            ) : null}
-          </div>
-
-          {hasActiveFilters ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {activeFilterBadges.map((label, index) => (
-                <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
-                  {label}
-                </Badge>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="mt-4 grid gap-4 border-t border-[color:var(--app-border-subtle)] pt-4 xl:grid-cols-2">
-            <FilterPillGroup
-              label="Type"
-              options={entryTypeOptions}
-              values={selectedEntryTypes}
-              onToggle={(value) => setSelectedEntryTypes((current) => toggleFilterValue(current, value))}
-              tone="sky"
-            />
-            <FilterPillGroup
-              label="Status"
-              options={statusOptions}
-              values={selectedStatuses}
-              onToggle={(value) => setSelectedStatuses((current) => toggleFilterValue(current, value))}
-              tone="violet"
-            />
-          </div>
-        </Card>
-      ) : null}
+      <FilterPanel
+        title="Filter schedule"
+        description="Narrow the schedule by entry type and status across list and calendar views."
+        open={filtersOpen}
+        badges={activeFilterBadges}
+        onClear={clearFilters}
+      >
+        <FilterPillGroup
+          label="Type"
+          options={entryTypeOptions}
+          values={selectedEntryTypes}
+          onChange={setSelectedEntryTypes}
+          tone="sky"
+        />
+        <FilterPillGroup
+          label="Status"
+          options={statusOptions}
+          values={selectedStatuses}
+          onChange={setSelectedStatuses}
+          tone="violet"
+        />
+      </FilterPanel>
 
       <SegmentedTabs
         items={[

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarPlus2, Save, SlidersHorizontal, type LucideIcon } from 'lucide-react';
+import { CalendarPlus2, Save, type LucideIcon } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
+import { FilterPanel, FilterPanelTrigger } from '../components/FilterPanel';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import PageHeader from '../components/PageHeader';
@@ -19,7 +20,6 @@ import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton'
 import { cn } from '../lib/cn';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
 import { getGameStatusLabel, getGameStatusIcon, getGameStatusVariant } from '../lib/gameStatus';
-import { filterButtonClass } from '../lib/uiClasses';
 import { formatShortDate, formatTimeHHMM } from '../lib/time';
 import { useToast } from '../context/ToastContext';
 
@@ -43,12 +43,6 @@ const statusColors: Record<string, 'info' | 'warning' | 'success' | 'neutral'> =
 
 function digitsOnly(value: string) {
   return value.replace(/\D+/g, '');
-}
-
-function toggleFilterValue(values: string[], nextValue: string) {
-  return values.includes(nextValue)
-    ? values.filter((value) => value !== nextValue)
-    : [...values, nextValue];
 }
 
 export default function GamesPage() {
@@ -200,84 +194,39 @@ export default function GamesPage() {
         title="Games"
         subtitle="League, showcase, and non-league games with scoresheets and weekly confirmation."
         actions={(
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setFiltersOpen((open) => !open)}
-            className={filterButtonClass}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filters
-            {hasActiveFilters ? ` (${activeFilterBadges.length})` : ''}
-          </Button>
+          <FilterPanelTrigger count={activeFilterBadges.length} onClick={() => setFiltersOpen((open) => !open)} />
         )}
       />
 
-      {hasActiveFilters && !filtersOpen ? (
-        <div className="flex flex-wrap items-center gap-2">
-          {activeFilterBadges.map((label, index) => (
-            <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
-              {label}
-            </Badge>
-          ))}
-          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-            Clear all
-          </Button>
-        </div>
-      ) : null}
-
-      {filtersOpen ? (
-        <Card className="p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter games</div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">
-                Narrow the list by game type, status, and whether the game is home or away.
-              </div>
-            </div>
-            {hasActiveFilters ? (
-              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-                Clear all
-              </Button>
-            ) : null}
-          </div>
-
-          {hasActiveFilters ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {activeFilterBadges.map((label, index) => (
-                <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
-                  {label}
-                </Badge>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="mt-4 grid gap-4 border-t border-[color:var(--app-border-subtle)] pt-4 xl:grid-cols-3">
-            <FilterPillGroup
-              label="Type"
-              options={typeOptions}
-              values={selectedTypes}
-              onToggle={(value) => setSelectedTypes((current) => toggleFilterValue(current, value))}
-              tone="sky"
-            />
-            <FilterPillGroup
-              label="Status"
-              options={statusOptions}
-              values={selectedStatuses}
-              onToggle={(value) => setSelectedStatuses((current) => toggleFilterValue(current, value))}
-              tone="violet"
-            />
-            <FilterPillGroup
-              label="Venue"
-              options={venueOptions}
-              values={selectedVenues}
-              onToggle={(value) => setSelectedVenues((current) => toggleFilterValue(current, value))}
-              tone="emerald"
-            />
-          </div>
-        </Card>
-      ) : null}
+      <FilterPanel
+        title="Filter games"
+        description="Narrow the list by game type, status, and whether the game is home or away."
+        open={filtersOpen}
+        badges={activeFilterBadges}
+        onClear={clearFilters}
+      >
+        <FilterPillGroup
+          label="Type"
+          options={typeOptions}
+          values={selectedTypes}
+          onChange={setSelectedTypes}
+          tone="sky"
+        />
+        <FilterPillGroup
+          label="Status"
+          options={statusOptions}
+          values={selectedStatuses}
+          onChange={setSelectedStatuses}
+          tone="violet"
+        />
+        <FilterPillGroup
+          label="Venue"
+          options={venueOptions}
+          values={selectedVenues}
+          onChange={setSelectedVenues}
+          tone="emerald"
+        />
+      </FilterPanel>
 
 
       <SegmentedTabs

@@ -1,5 +1,6 @@
 import type React from 'react';
 import { cn } from '../../lib/cn';
+import { Tooltip } from './Tooltip';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
 type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
@@ -36,14 +37,17 @@ export function Button({ className, variant = 'primary', size = 'md', ...props }
   const ariaLabel = typeof props['aria-label'] === 'string' ? props['aria-label'] : undefined;
   const tooltip = props.title ?? ariaLabel;
   const showTooltip = size === 'icon' && !!tooltip;
-  const title = showTooltip ? tooltip : props.title;
+  const title = showTooltip ? undefined : props.title;
 
-  return (
+  const button = (
     <button
-      className={cn(base, variants[variant], sizes[size], showTooltip && 'rl-tooltip', className)}
+      className={cn(base, variants[variant], sizes[size], className)}
       {...props}
-      data-tooltip={showTooltip ? tooltip : undefined}
       title={title}
     />
   );
+
+  if (!showTooltip || props.disabled) return button;
+
+  return <Tooltip content={tooltip}>{button}</Tooltip>;
 }

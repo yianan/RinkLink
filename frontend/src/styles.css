@@ -32,7 +32,6 @@
   --app-border-subtle: rgba(148, 163, 184, 0.22);
   --app-border-strong: rgba(148, 163, 184, 0.34);
   --app-focus-ring: rgba(34, 211, 238, 0.5);
-  --app-tooltip-bg: rgba(15, 23, 42, 0.92);
   --app-overlay: rgba(2, 6, 23, 0.4);
   --app-disabled-surface: rgba(226, 232, 240, 0.92);
   --app-disabled-text: rgba(100, 116, 139, 1);
@@ -55,7 +54,6 @@ html.dark {
   --app-surface-dark: rgba(2, 6, 23, 0.68);
   --app-border-subtle: rgba(51, 65, 85, 0.55);
   --app-border-strong: rgba(71, 85, 105, 0.7);
-  --app-tooltip-bg: rgba(2, 6, 23, 0.96);
   --app-overlay: rgba(2, 6, 23, 0.58);
   --app-disabled-surface: rgba(30, 41, 59, 0.9);
   --app-disabled-text: rgba(148, 163, 184, 1);
@@ -142,56 +140,6 @@ html.dark {
 }
 
 @layer components {
-
-  .rl-tooltip {
-    position: relative;
-  }
-
-  .rl-tooltip::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 10px);
-    transform: translateX(-50%) translateY(2px);
-    padding: 6px 10px;
-    border-radius: 9999px;
-    background: var(--app-tooltip-bg);
-    color: white;
-    font-size: 12px;
-    line-height: 1;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 120ms ease, transform 120ms ease;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
-    z-index: 60;
-  }
-
-  .rl-tooltip::before {
-    content: '';
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 2px);
-    transform: translateX(-50%);
-    border: 6px solid transparent;
-    border-top-color: var(--app-tooltip-bg);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 120ms ease;
-    z-index: 60;
-  }
-
-  .rl-tooltip:hover::after,
-  .rl-tooltip:hover::before,
-  .rl-tooltip:focus-visible::after,
-  .rl-tooltip:focus-visible::before {
-    opacity: 1;
-  }
-
-  .rl-tooltip:hover::after,
-  .rl-tooltip:focus-visible::after {
-    transform: translateX(-50%) translateY(0);
-  }
 
   .rl-range {
     appearance: none;

@@ -1,6 +1,6 @@
 import type React from 'react';
-import { useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useId, useRef } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { Button } from './Button';
@@ -24,86 +24,72 @@ export function Modal({
   footer,
   className,
 }: ModalProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const onCloseRef = useRef(onClose);
-  const lastActiveElementRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
+  const descriptionId = useId();
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
-
-    lastActiveElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
-    };
-
-    document.addEventListener('keydown', onKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const id = window.setTimeout(() => panelRef.current?.focus(), 0);
-
-    return () => {
-      window.clearTimeout(id);
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
-      lastActiveElementRef.current?.focus?.();
-    };
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   }, [open]);
 
-  if (!open) return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-    >
-      <div
-        className="absolute inset-0 bg-[var(--app-overlay)] backdrop-blur-[2px]"
-        onMouseDown={onClose}
-        aria-hidden="true"
-      />
-
-      <div
-        ref={panelRef}
-        tabIndex={-1}
-        className={cn(
-          'relative flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[color:var(--app-border-strong)] bg-[var(--app-surface-strong)] shadow-xl backdrop-blur-sm',
-          className,
-        )}
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-[color:var(--app-border-subtle)] px-5 py-4">
-          <div>
-            <div className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">{title}</div>
-            {description && <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">{description}</div>}
+  return (
+    <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--app-overlay)] backdrop-blur-[2px]" />
+        <Dialog.Content
+          ref={contentRef}
+          aria-describedby={description ? descriptionId : undefined}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            const firstFocusable = contentRef.current?.querySelector<HTMLElement>(
+              'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]):not([data-dialog-close]), [href], [tabindex]:not([tabindex="-1"])',
+            );
+            firstFocusable?.focus();
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            openerRef.current?.focus();
+          }}
+          className={cn(
+            'fixed left-1/2 top-1/2 z-[60] flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-[color:var(--app-border-strong)] bg-[var(--app-surface-strong)] shadow-xl backdrop-blur-sm focus:outline-none',
+            className,
+          )}
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-[color:var(--app-border-subtle)] px-5 py-4">
+            <div>
+              <Dialog.Title className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                {title}
+              </Dialog.Title>
+              {description && (
+                <Dialog.Description id={descriptionId} className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  {description}
+                </Dialog.Description>
+              )}
+            </div>
+            <Dialog.Close asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                data-dialog-close="true"
+                className="h-9 w-9 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </Dialog.Close>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
 
-        {footer && (
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[color:var(--app-border-subtle)] px-5 py-4">
-            {footer}
-          </div>
-        )}
-      </div>
-    </div>,
-    document.body,
+          {footer && (
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[color:var(--app-border-subtle)] px-5 py-4">
+              {footer}
+            </div>
+          )}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

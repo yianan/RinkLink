@@ -1,28 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Map, Pencil, SlidersHorizontal, Trash2, Utensils } from 'lucide-react';
+import { Map, Pencil, Trash2, Utensils } from 'lucide-react';
 import { api } from '../api/client';
 import { Rink } from '../types';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
+import { FilterPanel, FilterPanelTrigger } from '../components/FilterPanel';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import PageHeader from '../components/PageHeader';
 import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
 import { cn } from '../lib/cn';
-import { accentLinkClass, filterButtonClass, tableActionButtonClass } from '../lib/uiClasses';
+import { accentLinkClass, tableActionButtonClass } from '../lib/uiClasses';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 
 const emptyForm = { name: '', address: '', city: '', state: '', zip_code: '', phone: '', contact_email: '', website: '' };
-
-function toggleFilterValue(values: string[], nextValue: string) {
-  return values.includes(nextValue)
-    ? values.filter((value) => value !== nextValue)
-    : [...values, nextValue];
-}
 
 function mapsQueryUrl(query: string) {
   const url = new URL('https://www.google.com/maps/search/');
@@ -145,17 +140,7 @@ export default function RinkListPage() {
         subtitle="Manage rinks and their ice slots."
         actions={(
           <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setFiltersOpen((openState) => !openState)}
-              className={filterButtonClass}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Filters
-              {hasActiveFilters ? ` (${activeFilterBadges.length})` : ''}
-            </Button>
+            <FilterPanelTrigger count={activeFilterBadges.length} onClick={() => setFiltersOpen((open) => !open)} />
             <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
               Add Rink
             </Button>
@@ -163,67 +148,32 @@ export default function RinkListPage() {
         )}
       />
 
-      {hasActiveFilters && !filtersOpen ? (
-        <div className="flex flex-wrap items-center gap-2">
-          {activeFilterBadges.map((label, index) => (
-            <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
-              {label}
-            </Badge>
-          ))}
-          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-            Clear all
-          </Button>
-        </div>
-      ) : null}
-
-      {filtersOpen ? (
-        <Card className="p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter rinks</div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">
-                Narrow the list by city and state.
-              </div>
-            </div>
-            {hasActiveFilters ? (
-              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-                Clear all
-              </Button>
-            ) : null}
-          </div>
-
-          {hasActiveFilters ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {activeFilterBadges.map((label, index) => (
-                <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
-                  {label}
-                </Badge>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="mt-4 grid gap-4 border-t border-[color:var(--app-border-subtle)] pt-4 xl:grid-cols-2">
-            {cityOptions.length > 0 ? (
-              <FilterPillGroup
-                label="City"
-                options={cityOptions}
-                values={selectedCities}
-                onToggle={(value) => setSelectedCities((current) => toggleFilterValue(current, value))}
-                tone="sky"
-              />
-            ) : null}
-            {stateOptions.length > 0 ? (
-              <FilterPillGroup
-                label="State"
-                options={stateOptions}
-                values={selectedStates}
-                onToggle={(value) => setSelectedStates((current) => toggleFilterValue(current, value))}
-                tone="violet"
-              />
-            ) : null}
-          </div>
-        </Card>
-      ) : null}
+      <FilterPanel
+        title="Filter rinks"
+        description="Narrow the list by city and state."
+        open={filtersOpen}
+        badges={activeFilterBadges}
+        onClear={clearFilters}
+      >
+        {cityOptions.length > 0 ? (
+          <FilterPillGroup
+            label="City"
+            options={cityOptions}
+            values={selectedCities}
+            onChange={setSelectedCities}
+            tone="sky"
+          />
+        ) : null}
+        {stateOptions.length > 0 ? (
+          <FilterPillGroup
+            label="State"
+            options={stateOptions}
+            values={selectedStates}
+            onChange={setSelectedStates}
+            tone="violet"
+          />
+        ) : null}
+      </FilterPanel>
 
       <Card>
         <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">

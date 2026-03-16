@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDownLeft, ArrowUpRight, CalendarClock, Check, CheckCircle2, Search, SlidersHorizontal, X, XCircle } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CalendarClock, Check, CheckCircle2, Search, X, XCircle } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
+import { FilterPanel, FilterPanelTrigger } from '../components/FilterPanel';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
@@ -22,7 +23,7 @@ import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { useNavBadgeRefresh } from '../context/NavBadgeContext';
 import { cn } from '../lib/cn';
-import { filterButtonClass, tableActionButtonClass } from '../lib/uiClasses';
+import { tableActionButtonClass } from '../lib/uiClasses';
 import { formatTimeHHMM, formatShortDate } from '../lib/time';
 
 const statusColors: Record<string, 'warning' | 'success' | 'danger' | 'neutral'> = {
@@ -61,12 +62,6 @@ function dedupeAcceptedProposals(ps: GameProposal[]) {
     }
   }
   return Array.from(byKey.values());
-}
-
-function toggleFilterValue(values: string[], nextValue: string) {
-  return values.includes(nextValue)
-    ? values.filter((value) => value !== nextValue)
-    : [...values, nextValue];
 }
 
 function opponentNameForProposal(proposal: GameProposal, activeTeamId: string) {
@@ -263,90 +258,45 @@ export default function ProposalsPage() {
         title="Game Proposals"
         subtitle="Accept, decline, cancel, or request a reschedule."
         actions={(
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setFiltersOpen((openState) => !openState)}
-            className={filterButtonClass}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filters
-            {hasActiveFilters ? ` (${activeFilterBadges.length})` : ''}
-          </Button>
+          <FilterPanelTrigger count={activeFilterBadges.length} onClick={() => setFiltersOpen((open) => !open)} />
         )}
       />
 
-      {hasActiveFilters && !filtersOpen ? (
-        <div className="flex flex-wrap items-center gap-2">
-          {activeFilterBadges.map((label, index) => (
-            <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
-              {label}
-            </Badge>
-          ))}
-          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-            Clear all
-          </Button>
-        </div>
-      ) : null}
-
-      {filtersOpen ? (
-        <Card className="p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter proposals</div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">
-                Narrow the current proposal list by opponent, status, and venue.
-              </div>
-            </div>
-            {hasActiveFilters ? (
-              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-                Clear all
-              </Button>
-            ) : null}
-          </div>
-
-          {hasActiveFilters ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {activeFilterBadges.map((label, index) => (
-                <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
-                  {label}
-                </Badge>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="mt-4 grid gap-4 border-t border-[color:var(--app-border-subtle)] pt-4 xl:grid-cols-2">
-            {opponentOptions.length > 0 ? (
-              <FilterPillGroup
-                label="Opponent"
-                options={opponentOptions}
-                values={selectedOpponents}
-                onToggle={(value) => setSelectedOpponents((current) => toggleFilterValue(current, value))}
-                tone="sky"
-              />
-            ) : null}
-            {statusOptions.length > 0 ? (
-              <FilterPillGroup
-                label="Status"
-                options={statusOptions}
-                values={selectedStatuses}
-                onToggle={(value) => setSelectedStatuses((current) => toggleFilterValue(current, value))}
-                tone="violet"
-              />
-            ) : null}
-            {venueOptions.length > 0 ? (
-              <FilterPillGroup
-                label="Venue"
-                options={venueOptions}
-                values={selectedVenues}
-                onToggle={(value) => setSelectedVenues((current) => toggleFilterValue(current, value))}
-                tone="emerald"
-              />
-            ) : null}
-          </div>
-        </Card>
-      ) : null}
+      <FilterPanel
+        title="Filter proposals"
+        description="Narrow the current proposal list by opponent, status, and venue."
+        open={filtersOpen}
+        badges={activeFilterBadges}
+        onClear={clearFilters}
+      >
+        {opponentOptions.length > 0 ? (
+          <FilterPillGroup
+            label="Opponent"
+            options={opponentOptions}
+            values={selectedOpponents}
+            onChange={setSelectedOpponents}
+            tone="sky"
+          />
+        ) : null}
+        {statusOptions.length > 0 ? (
+          <FilterPillGroup
+            label="Status"
+            options={statusOptions}
+            values={selectedStatuses}
+            onChange={setSelectedStatuses}
+            tone="violet"
+          />
+        ) : null}
+        {venueOptions.length > 0 ? (
+          <FilterPillGroup
+            label="Venue"
+            options={venueOptions}
+            values={selectedVenues}
+            onChange={setSelectedVenues}
+            tone="emerald"
+          />
+        ) : null}
+      </FilterPanel>
 
       <SegmentedTabs
         items={TABS.map((t, i) => ({ label: t.label, value: i }))}

@@ -1,3 +1,4 @@
+import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { cn } from '../lib/cn';
 
 export type FilterOption = {
@@ -40,7 +41,7 @@ type FilterPillGroupProps = {
   label: string;
   options: FilterOption[];
   values: string[];
-  onToggle: (value: string) => void;
+  onChange: (values: string[]) => void;
   tone: FilterGroupTone;
 };
 
@@ -48,7 +49,7 @@ export default function FilterPillGroup({
   label,
   options,
   values,
-  onToggle,
+  onChange,
   tone,
 }: FilterPillGroupProps) {
   const toneClasses = filterToneClasses(tone);
@@ -63,14 +64,13 @@ export default function FilterPillGroup({
       >
         {label}
       </div>
-      <div className="flex flex-wrap gap-2">
+      <ToggleGroup.Root type="multiple" value={values} onValueChange={onChange} className="flex flex-wrap gap-2">
         {options.map((option) => {
           const selected = values.includes(option.value);
           return (
-            <button
+            <ToggleGroup.Item
               key={option.value}
-              type="button"
-              onClick={() => onToggle(option.value)}
+              value={option.value}
               className={cn(
                 'rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
                 selected
@@ -82,10 +82,10 @@ export default function FilterPillGroup({
               )}
             >
               {option.label}
-            </button>
+            </ToggleGroup.Item>
           );
         })}
-      </div>
+      </ToggleGroup.Root>
     </div>
   );
 }

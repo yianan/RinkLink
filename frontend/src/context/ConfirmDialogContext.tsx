@@ -43,16 +43,18 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
   return (
     <ConfirmDialogContext.Provider value={value}>
       {children}
-      <ConfirmDialog
-        open={!!pending}
-        title={pending?.title || 'Confirm action'}
-        description={pending?.description}
-        confirmLabel={pending?.confirmLabel}
-        cancelLabel={pending?.cancelLabel}
-        confirmVariant={pending?.confirmVariant}
-        onConfirm={() => close(true)}
-        onCancel={() => close(false)}
-      />
+      {pending && (
+        <ConfirmDialog
+          open
+          title={pending.title}
+          description={pending.description}
+          confirmLabel={pending.confirmLabel}
+          cancelLabel={pending.cancelLabel}
+          confirmVariant={pending.confirmVariant}
+          onConfirm={() => close(true)}
+          onCancel={() => close(false)}
+        />
+      )}
     </ConfirmDialogContext.Provider>
   );
 }

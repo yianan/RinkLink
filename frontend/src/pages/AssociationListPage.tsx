@@ -1,29 +1,24 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import { Association, Team } from '../types';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
+import { FilterPanel, FilterPanelTrigger } from '../components/FilterPanel';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { useTeam } from '../context/TeamContext';
 import PageHeader from '../components/PageHeader';
 import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
 import { cn } from '../lib/cn';
-import { accentLinkClass, filterButtonClass, tableActionButtonClass } from '../lib/uiClasses';
+import { accentLinkClass, tableActionButtonClass } from '../lib/uiClasses';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 
 const emptyForm = { name: '', home_rink_address: '', city: '', state: '', zip_code: '' };
-
-function toggleFilterValue(values: string[], nextValue: string) {
-  return values.includes(nextValue)
-    ? values.filter((value) => value !== nextValue)
-    : [...values, nextValue];
-}
 
 function ageGroupSortValue(value: string) {
   const match = value.match(/(\d+)/);
@@ -196,17 +191,7 @@ export default function AssociationListPage() {
         subtitle="Organizations that manage teams."
         actions={(
           <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setFiltersOpen((openState) => !openState)}
-              className={filterButtonClass}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Filters
-              {hasActiveFilters ? ` (${activeFilterBadges.length})` : ''}
-            </Button>
+            <FilterPanelTrigger count={activeFilterBadges.length} onClick={() => setFiltersOpen((open) => !open)} />
             <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
               Add Association
             </Button>
@@ -214,85 +199,50 @@ export default function AssociationListPage() {
         )}
       />
 
-      {hasActiveFilters && !filtersOpen ? (
-        <div className="flex flex-wrap items-center gap-2">
-          {activeFilterBadges.map((label, index) => (
-            <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
-              {label}
-            </Badge>
-          ))}
-          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-            Clear all
-          </Button>
-        </div>
-      ) : null}
-
-      {filtersOpen ? (
-        <Card className="p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter associations</div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">
-                Narrow the list by location, age groups, and competition presence.
-              </div>
-            </div>
-            {hasActiveFilters ? (
-              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-                Clear all
-              </Button>
-            ) : null}
-          </div>
-
-          {hasActiveFilters ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {activeFilterBadges.map((label, index) => (
-                <Badge key={`${label}:${index}`} variant="outline" className="bg-white/80 dark:bg-slate-950/35">
-                  {label}
-                </Badge>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="mt-4 grid gap-4 border-t border-[color:var(--app-border-subtle)] pt-4 xl:grid-cols-2">
-            {cityOptions.length > 0 ? (
-              <FilterPillGroup
-                label="City"
-                options={cityOptions}
-                values={selectedCities}
-                onToggle={(value) => setSelectedCities((current) => toggleFilterValue(current, value))}
-                tone="sky"
-              />
-            ) : null}
-            {stateOptions.length > 0 ? (
-              <FilterPillGroup
-                label="State"
-                options={stateOptions}
-                values={selectedStates}
-                onToggle={(value) => setSelectedStates((current) => toggleFilterValue(current, value))}
-                tone="violet"
-              />
-            ) : null}
-            {ageGroupOptions.length > 0 ? (
-              <FilterPillGroup
-                label="Age Group"
-                options={ageGroupOptions}
-                values={selectedAgeGroups}
-                onToggle={(value) => setSelectedAgeGroups((current) => toggleFilterValue(current, value))}
-                tone="emerald"
-              />
-            ) : null}
-            {competitionOptions.length > 0 ? (
-              <FilterPillGroup
-                label="Competition"
-                options={competitionOptions}
-                values={selectedCompetitionNames}
-                onToggle={(value) => setSelectedCompetitionNames((current) => toggleFilterValue(current, value))}
-                tone="amber"
-              />
-            ) : null}
-          </div>
-        </Card>
-      ) : null}
+      <FilterPanel
+        title="Filter associations"
+        description="Narrow the list by location, age groups, and competition presence."
+        open={filtersOpen}
+        badges={activeFilterBadges}
+        onClear={clearFilters}
+      >
+        {cityOptions.length > 0 ? (
+          <FilterPillGroup
+            label="City"
+            options={cityOptions}
+            values={selectedCities}
+            onChange={setSelectedCities}
+            tone="sky"
+          />
+        ) : null}
+        {stateOptions.length > 0 ? (
+          <FilterPillGroup
+            label="State"
+            options={stateOptions}
+            values={selectedStates}
+            onChange={setSelectedStates}
+            tone="violet"
+          />
+        ) : null}
+        {ageGroupOptions.length > 0 ? (
+          <FilterPillGroup
+            label="Age Group"
+            options={ageGroupOptions}
+            values={selectedAgeGroups}
+            onChange={setSelectedAgeGroups}
+            tone="emerald"
+          />
+        ) : null}
+        {competitionOptions.length > 0 ? (
+          <FilterPillGroup
+            label="Competition"
+            options={competitionOptions}
+            values={selectedCompetitionNames}
+            onChange={setSelectedCompetitionNames}
+            tone="amber"
+          />
+        ) : null}
+      </FilterPanel>
 
       <Card className="overflow-hidden">
         <div className="divide-y divide-slate-200 bg-white md:hidden dark:divide-slate-800 dark:bg-slate-950/20">
