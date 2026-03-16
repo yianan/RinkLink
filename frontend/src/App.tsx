@@ -266,17 +266,15 @@ function AppContent() {
         >
           <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-3 px-4 py-2 sm:h-14 sm:flex-nowrap sm:px-6 sm:py-0">
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <Tooltip content="Open navigation" side="bottom">
-                <DialogPrimitive.Trigger asChild>
-                  <button
-                    type="button"
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-900/5 text-slate-800 ring-1 ring-slate-200/70 hover:bg-slate-900/10 hover:text-slate-900 lg:hidden dark:bg-white/10 dark:text-white dark:ring-white/15 dark:hover:bg-white/15 dark:hover:text-white"
-                    aria-label="Open navigation"
-                  >
-                    <Menu className="h-5 w-5" />
-                  </button>
-                </DialogPrimitive.Trigger>
-              </Tooltip>
+              <DialogPrimitive.Trigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-900/5 text-slate-800 ring-1 ring-slate-200/70 hover:bg-slate-900/10 hover:text-slate-900 lg:hidden dark:bg-white/10 dark:text-white dark:ring-white/15 dark:hover:bg-white/15 dark:hover:text-white"
+                  aria-label="Open navigation"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+              </DialogPrimitive.Trigger>
 
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900/5 ring-1 ring-slate-200/70 dark:bg-white/10 dark:ring-white/15">
@@ -377,17 +375,15 @@ function AppContent() {
                   <span>Theme</span>
                   <ThemeToggle />
                 </div>
-                <Tooltip content="Close navigation" side="bottom">
-                  <DialogPrimitive.Close asChild>
-                    <button
-                      type="button"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900/60 dark:hover:text-slate-100"
-                      aria-label="Close navigation"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
-                  </DialogPrimitive.Close>
-                </Tooltip>
+                <DialogPrimitive.Close asChild>
+                  <button
+                    type="button"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900/60 dark:hover:text-slate-100"
+                    aria-label="Close navigation"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </DialogPrimitive.Close>
               </div>
             </div>
             <div
