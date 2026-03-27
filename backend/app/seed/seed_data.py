@@ -4,7 +4,7 @@ from pathlib import Path
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from ..database import Base
@@ -51,7 +51,7 @@ def _stamp_alembic_head(db: Session) -> None:
             "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL PRIMARY KEY)"
         )
         conn.exec_driver_sql("DELETE FROM alembic_version")
-        conn.exec_driver_sql("INSERT INTO alembic_version (version_num) VALUES (:version_num)", {"version_num": head})
+        conn.execute(text("INSERT INTO alembic_version (version_num) VALUES (:version_num)"), {"version_num": head})
 
 
 def _drop_all_tables(db: Session) -> None:
