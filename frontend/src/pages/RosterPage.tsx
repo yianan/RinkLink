@@ -34,6 +34,43 @@ function positionBadgeVariant(position: string | null | undefined): 'info' | 'su
   return 'neutral';
 }
 
+function positionLabel(position: string | null | undefined) {
+  if (position === 'G') return 'Goalie';
+  if (position === 'D') return 'Defense';
+  if (position === 'F') return 'Forward';
+  return 'Unassigned';
+}
+
+function playerSeasonTotalItems(player: Player) {
+  if (player.position === 'G') {
+    return [
+      { label: 'SV', value: String(player.season_totals.saves) },
+      { label: 'Shootout', value: `${player.season_totals.shootout_saves}/${player.season_totals.shootout_shots}` },
+    ];
+  }
+  return [
+    { label: 'G', value: String(player.season_totals.goals) },
+    { label: 'A', value: String(player.season_totals.assists) },
+    { label: 'Shots', value: String(player.season_totals.shots_on_goal) },
+  ];
+}
+
+function SeasonTotalsChips({ player }: { player: Player }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {playerSeasonTotalItems(player).map((item) => (
+        <span
+          key={item.label}
+          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
+        >
+          <span className="font-semibold text-slate-900 dark:text-slate-100">{item.value}</span>
+          <span className="uppercase tracking-wide text-slate-500 dark:text-slate-400">{item.label}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function RosterPage() {
   const { activeTeam } = useTeam();
   const { activeSeason, seasons } = useSeason();
@@ -141,9 +178,12 @@ export default function RosterPage() {
                         <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                           {p.first_name} {p.last_name}
                         </div>
+                        <div className="mt-2">
+                          <SeasonTotalsChips player={p} />
+                        </div>
                         <div className="mt-1">
                           <Badge variant={positionBadgeVariant(p.position)}>
-                            {p.position === 'G' ? 'Goalie' : p.position === 'D' ? 'Defense' : p.position === 'F' ? 'Forward' : 'Unassigned'}
+                            {positionLabel(p.position)}
                           </Badge>
                         </div>
                       </div>
@@ -190,7 +230,8 @@ export default function RosterPage() {
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-300">
                 <tr>
                   <th scope="col" className="w-20 px-4 py-3">#</th>
-                  <th scope="col" className="w-[38%] px-4 py-3">Player</th>
+                  <th scope="col" className="w-[30%] px-4 py-3">Player</th>
+                  <th scope="col" className="w-[28%] px-4 py-3">Season Totals</th>
                   <th scope="col" className="w-32 px-4 py-3">Position</th>
                   <th scope="col" className="w-28 px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -209,8 +250,11 @@ export default function RosterPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                      <SeasonTotalsChips player={p} />
+                    </td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                       <Badge variant={positionBadgeVariant(p.position)}>
-                        {p.position === 'G' ? 'Goalie' : p.position === 'D' ? 'Defense' : p.position === 'F' ? 'Forward' : 'Unassigned'}
+                        {positionLabel(p.position)}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
@@ -228,7 +272,7 @@ export default function RosterPage() {
 
                   {players.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6">
+                      <td colSpan={5} className="px-4 py-6">
                         <EmptyState
                           icon={<Users className="h-5 w-5" />}
                           title="No players yet"

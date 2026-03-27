@@ -393,6 +393,14 @@ export interface Player {
   last_name: string;
   jersey_number: number | null;
   position: string | null;
+  season_totals: {
+    goals: number;
+    assists: number;
+    shots_on_goal: number;
+    saves: number;
+    shootout_shots: number;
+    shootout_saves: number;
+  };
   created_at: string;
   updated_at: string;
 }

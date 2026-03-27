@@ -20,6 +20,15 @@ class PlayerUpdate(BaseModel):
     position: str | None = None
 
 
+class PlayerSeasonTotalsOut(BaseModel):
+    goals: int = 0
+    assists: int = 0
+    shots_on_goal: int = 0
+    saves: int = 0
+    shootout_shots: int = 0
+    shootout_saves: int = 0
+
+
 class PlayerOut(BaseModel):
     id: str
     team_id: str
@@ -28,6 +37,7 @@ class PlayerOut(BaseModel):
     last_name: str
     jersey_number: int | None
     position: str | None
+    season_totals: PlayerSeasonTotalsOut
     created_at: dt.datetime
     updated_at: dt.datetime
 

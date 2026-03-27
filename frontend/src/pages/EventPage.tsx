@@ -102,6 +102,7 @@ function buildAttendanceSummary(players: EventAttendancePlayer[]): EventAttendan
 }
 
 function attendanceStatusLabel(status: AttendanceStatus) {
+  if (status === 'absent') return 'Out';
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
@@ -672,7 +673,7 @@ export default function EventPage() {
             <div className="flex flex-wrap gap-2">
               {attendanceSummary.attending_count > 0 ? <Badge variant="success">{attendanceSummary.attending_count} Attending</Badge> : null}
               {attendanceSummary.tentative_count > 0 ? <Badge variant="warning">{attendanceSummary.tentative_count} Tentative</Badge> : null}
-              {attendanceSummary.absent_count > 0 ? <Badge variant="danger">{attendanceSummary.absent_count} Absent</Badge> : null}
+              {attendanceSummary.absent_count > 0 ? <Badge variant="danger">{attendanceSummary.absent_count} Out</Badge> : null}
               {attendanceSummary.unknown_count > 0 ? <Badge variant="outline">{attendanceSummary.unknown_count} Unknown</Badge> : null}
             </div>
           </div>
@@ -726,7 +727,7 @@ export default function EventPage() {
                     <option value="unknown">Unknown</option>
                     <option value="attending">Attending</option>
                     <option value="tentative">Tentative</option>
-                    <option value="absent">Absent</option>
+                    <option value="absent">Out</option>
                   </Select>
                 </div>
               ))}

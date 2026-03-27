@@ -31,7 +31,7 @@ function attendanceSummaryLabel(event: Event) {
   const parts = [
     summary.attending_count > 0 ? `${summary.attending_count} Attending` : null,
     summary.tentative_count > 0 ? `${summary.tentative_count} Tentative` : null,
-    summary.absent_count > 0 ? `${summary.absent_count} Absent` : null,
+    summary.absent_count > 0 ? `${summary.absent_count} Out` : null,
     summary.unknown_count > 0 ? `${summary.unknown_count} Unknown` : null,
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : null;

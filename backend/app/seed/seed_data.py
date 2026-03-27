@@ -17,6 +17,8 @@ from ..models import (
     CompetitionDivision,
     Event,
     EventAttendance,
+    EventGoalieStat,
+    EventPlayerStat,
     IceSlot,
     LockerRoom,
     Notification,
@@ -477,6 +479,53 @@ def seed_demo_data(db: Session):
         )
         for player, status in zip(roster, statuses):
             db.add(EventAttendance(event_id=event_id, player_id=player.id, status=status))
+
+    def add_box_score(
+        event_index: int,
+        team_index: int,
+        skater_lines: list[tuple[int, int, int]],
+        goalie_saves: int,
+        shootout_shots: int = 0,
+        shootout_saves: int = 0,
+    ):
+        event = events[event_index]
+        team = teams[team_index]
+        roster = roster_by_team.get(team.id, [])
+        skaters = [player for player in roster if player.position != "G"]
+        goalie = next((player for player in roster if player.position == "G"), None)
+
+        for player, (goals, assists, shots_on_goal) in zip(skaters, skater_lines):
+            db.add(
+                EventPlayerStat(
+                    event_id=event.id,
+                    team_id=team.id,
+                    player_id=player.id,
+                    goals=goals,
+                    assists=assists,
+                    shots_on_goal=shots_on_goal,
+                )
+            )
+
+        if goalie:
+            db.add(
+                EventGoalieStat(
+                    event_id=event.id,
+                    team_id=team.id,
+                    player_id=goalie.id,
+                    saves=goalie_saves,
+                    shootout_shots=shootout_shots,
+                    shootout_saves=shootout_saves,
+                )
+            )
+
+    add_box_score(4, 3, [(1, 0, 4), (0, 1, 2), (0, 0, 1)], goalie_saves=24)
+    add_box_score(4, 1, [(2, 1, 5), (1, 1, 4), (1, 0, 3), (0, 2, 2)], goalie_saves=18)
+    add_box_score(5, 0, [(1, 1, 4), (1, 0, 3), (1, 1, 2)], goalie_saves=27)
+    add_box_score(5, 2, [(1, 1, 4), (1, 0, 3), (0, 1, 2)], goalie_saves=25)
+    add_box_score(6, 5, [(2, 1, 5), (1, 1, 3), (1, 0, 4)], goalie_saves=21)
+    add_box_score(6, 1, [(1, 1, 4), (1, 1, 3), (1, 0, 2)], goalie_saves=19)
+    add_box_score(7, 4, [(1, 1, 4), (1, 0, 3), (0, 1, 2)], goalie_saves=22, shootout_shots=2, shootout_saves=2)
+    add_box_score(7, 0, [(1, 1, 4), (1, 0, 3), (0, 1, 2)], goalie_saves=22, shootout_shots=2, shootout_saves=2)
 
     mark_attendance(events[0].id, teams[0].id, attending=9, tentative=1, absent=1)
     mark_attendance(events[0].id, teams[2].id, attending=8, tentative=2, absent=1)
