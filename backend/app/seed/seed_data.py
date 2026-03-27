@@ -54,6 +54,22 @@ def _stamp_alembic_head(db: Session) -> None:
         conn.exec_driver_sql("INSERT INTO alembic_version (version_num) VALUES (:version_num)", {"version_num": head})
 
 
+def _drop_all_tables(db: Session) -> None:
+    bind = db.get_bind()
+    with bind.begin() as conn:
+        inspector = inspect(conn)
+        table_names = inspector.get_table_names()
+        if bind.dialect.name == "sqlite":
+            conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        for table_name in table_names:
+            if bind.dialect.name == "postgresql":
+                conn.exec_driver_sql(f'DROP TABLE IF EXISTS "{table_name}" CASCADE')
+            else:
+                conn.exec_driver_sql(f'DROP TABLE IF EXISTS "{table_name}"')
+        if bind.dialect.name == "sqlite":
+            conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+
+
 def seed_zip_codes(db: Session):
     zips = [
         ("60091", "Wilmette", "IL", 42.0764, -87.7229),
@@ -69,17 +85,9 @@ def seed_zip_codes(db: Session):
 
 
 def seed_demo_data(db: Session):
-    bind = db.get_bind()
     db.rollback()
-    if bind.dialect.name == "sqlite":
-        with bind.begin() as conn:
-            conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
-            inspector = inspect(conn)
-            for table_name in inspector.get_table_names():
-                conn.exec_driver_sql(f'DROP TABLE IF EXISTS "{table_name}"')
-            conn.exec_driver_sql("PRAGMA foreign_keys=ON")
-    else:
-        Base.metadata.drop_all(bind=bind)
+    _drop_all_tables(db)
+    bind = db.get_bind()
     Base.metadata.create_all(bind=bind)
     _stamp_alembic_head(db)
 
