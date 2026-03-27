@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Notification, Team, Game
+from ..models import Event, Notification, Team
 from ..schemas import NotificationOut
 
 router = APIRouter(tags=["notifications"])
@@ -15,15 +15,16 @@ def _week_start(d: date) -> date:
 
 
 def ensure_weekly_confirm_notification(db: Session, team_id: str) -> None:
-    """Create an in-app weekly confirmation reminder if the team has unconfirmed games this week."""
+    """Create an in-app weekly confirmation reminder if the team has unconfirmed events this week."""
     today = date.today()
     week_start = _week_start(today)
     week_end = week_start + timedelta(days=6)
 
-    q = db.query(Game).filter(
-        Game.date >= week_start,
-        Game.date <= week_end,
-        (Game.home_team_id == team_id) | (Game.away_team_id == team_id),
+    q = db.query(Event).filter(
+        Event.date >= week_start,
+        Event.date <= week_end,
+        Event.away_team_id.isnot(None),
+        (Event.home_team_id == team_id) | (Event.away_team_id == team_id),
     )
     games = q.all()
 
@@ -47,8 +48,8 @@ def ensure_weekly_confirm_notification(db: Session, team_id: str) -> None:
     if existing:
         return
 
-    title = "Weekly game confirmation"
-    message = f"Confirm {len(unconfirmed)} game(s) for the week starting {week_start.isoformat()}."
+    title = "Weekly event confirmation"
+    message = f"Confirm {len(unconfirmed)} scheduled event(s) for the week starting {week_start.isoformat()}."
     db.add(Notification(team_id=team_id, notif_type="weekly_confirm", title=title, message=message, week_start=week_start))
     db.commit()
 
@@ -82,4 +83,3 @@ def mark_read(id: str, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(n)
     return n
-

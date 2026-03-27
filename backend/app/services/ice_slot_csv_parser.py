@@ -3,7 +3,7 @@ import io
 import re
 from datetime import date, time
 
-from ..schemas.rink import IceSlotUploadRow, IceSlotUploadPreview
+from ..schemas.arena import IceSlotUploadRow, IceSlotUploadPreview
 
 HEADER_MAP = {
     "date": "date",

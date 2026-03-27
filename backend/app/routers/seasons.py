@@ -3,14 +3,15 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Association, Game, Season, Team
+from ..models import Association, Event, Season, Team
 from ..schemas.season import SeasonOut, StandingsEntry
 from ..services.records import final_games_for_season_window
 from ..services.season_utils import ensure_standard_seasons
+from ..services.team_logos import effective_team_logo_url
 
 
 def _season_with_game_count(db: Session, season: Season) -> dict:
-    count = db.query(func.count(Game.id)).filter(Game.season_id == season.id).scalar() or 0
+    count = db.query(func.count(Event.id)).filter(Event.season_id == season.id).scalar() or 0
     data = {c.key: getattr(season, c.key) for c in season.__table__.columns}
     data["game_count"] = count
     return data
@@ -94,6 +95,7 @@ def get_standings(
             StandingsEntry(
                 team_id=team_id,
                 team_name=team.name,
+                logo_url=effective_team_logo_url(team, association),
                 association_name=association.name if association else None,
                 age_group=team.age_group,
                 level=team.level,

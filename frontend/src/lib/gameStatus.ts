@@ -1,8 +1,8 @@
 import type { BadgeProps } from '../components/ui/Badge';
-import type { Game } from '../types';
+import type { Event } from '../types';
 import { CheckCircle2, CircleDot, CircleOff, Clock3, type LucideIcon } from 'lucide-react';
 
-type GameStatusSource = Pick<Game, 'status' | 'home_weekly_confirmed' | 'away_weekly_confirmed'>;
+type GameStatusSource = Pick<Event, 'status' | 'home_weekly_confirmed' | 'away_weekly_confirmed'>;
 
 export function getGameStatusLabel(game: GameStatusSource) {
   if (game.status === 'final') return 'Final';

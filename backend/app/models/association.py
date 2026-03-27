@@ -14,10 +14,11 @@ class Association(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
-    home_rink_address: Mapped[str] = mapped_column(String(500), default="")
+    address: Mapped[str] = mapped_column(String(500), default="")
     city: Mapped[str] = mapped_column(String(100), default="")
     state: Mapped[str] = mapped_column(String(2), default="")
     zip_code: Mapped[str] = mapped_column(String(10), default="")
+    logo_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

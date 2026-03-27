@@ -1,8 +1,9 @@
 import { useTeam } from '../context/TeamContext';
 import { Select } from './ui/Select';
 import { useLocation } from 'react-router-dom';
+import TeamLogo from './TeamLogo';
 
-const HIDE_TEAM_SWITCHER_PATHS = ['/associations', '/rinks', '/competitions'];
+const HIDE_TEAM_SWITCHER_PATHS = ['/associations', '/arenas', '/competitions'];
 
 export default function TeamSwitcher() {
   const { teams, activeTeam, setActiveTeam, loading } = useTeam();
@@ -15,6 +16,9 @@ export default function TeamSwitcher() {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <div className="hidden text-xs font-medium text-slate-600 sm:block dark:text-white/80">Active team</div>
+      {activeTeam ? (
+        <TeamLogo name={activeTeam.name} logoUrl={activeTeam.logo_url} className="hidden h-10 w-10 rounded-xl sm:inline-flex" initialsClassName="text-xs" />
+      ) : null}
       <div className="w-full min-w-0 sm:w-[320px]">
         <Select
           value={activeTeam?.id || ''}

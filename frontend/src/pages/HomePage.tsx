@@ -1,26 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Calendar, CheckCircle2, Dumbbell, Inbox, Trophy } from 'lucide-react';
-import { useTeam } from '../context/TeamContext';
-import { useSeason } from '../context/SeasonContext';
+import { Calendar, CheckCircle2, Inbox, Trophy } from 'lucide-react';
 import { api } from '../api/client';
-import { ScheduleEntry, GameProposal, Game, PracticeBooking, StandingsEntry, TeamCompetitionMembership } from '../types';
-import { cn } from '../lib/cn';
-import { addDays, formatContextualDate, formatDate, formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time';
+import { Event, Proposal, StandingsEntry, TeamCompetitionMembership, AvailabilityWindow } from '../types';
+import { useSeason } from '../context/SeasonContext';
+import { useTeam } from '../context/TeamContext';
+import { addDays, formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import PageHeader from '../components/PageHeader';
-import EmptyState from '../components/EmptyState';
-import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
-import { filterButtonClass } from '../lib/uiClasses';
+import TeamLogo from '../components/TeamLogo';
+import { cn } from '../lib/cn';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
+import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
 
 const clickableCard =
   'cursor-pointer text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-300/60 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:hover:border-cyan-700/50 dark:hover:shadow-[0_8px_30px_rgba(34,211,238,0.08)] dark:focus-visible:ring-offset-slate-950';
 
-function StatCard({ title, value, icon, color, onClick, subtitle, ariaLabel }: {
-  title: string; value: number | string; icon: React.ReactNode; color: string; onClick?: () => void; subtitle?: string; ariaLabel?: string;
+function StatCard({
+  title,
+  value,
+  subtitle,
+  onClick,
+  icon,
+  color,
+  ariaLabel,
+}: {
+  title: string;
+  value: number | string;
+  subtitle?: string;
+  onClick?: () => void;
+  icon: ReactNode;
+  color: string;
+  ariaLabel?: string;
 }) {
   return (
     <Card
@@ -28,18 +41,15 @@ function StatCard({ title, value, icon, color, onClick, subtitle, ariaLabel }: {
       tabIndex={onClick ? 0 : undefined}
       aria-label={onClick ? ariaLabel ?? `${title}: ${value}` : undefined}
       onClick={onClick}
-      onKeyDown={(e) => {
+      onKeyDown={(event) => {
         if (!onClick) return;
-        if (e.key === 'Enter') onClick();
-        if (e.key === ' ') {
-          e.preventDefault();
+        if (event.key === 'Enter') onClick();
+        if (event.key === ' ') {
+          event.preventDefault();
           onClick();
         }
       }}
-      className={cn(
-        'p-4 text-left transition-shadow',
-        onClick && clickableCard,
-      )}
+      className={cn('p-4 text-left transition-shadow', onClick && clickableCard)}
     >
       <div className="flex items-center gap-2">
         <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', color)}>
@@ -47,422 +57,370 @@ function StatCard({ title, value, icon, color, onClick, subtitle, ariaLabel }: {
         </div>
         <div className="text-sm font-medium text-slate-700 dark:text-slate-200">{title}</div>
       </div>
-      <div className="mt-3 font-display text-3xl font-bold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">{value}</div>
+      <div className="mt-3 font-display text-3xl font-bold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">
+        {value}
+      </div>
       {subtitle ? <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{subtitle}</div> : null}
     </Card>
   );
 }
 
+function eventTitle(event: Event) {
+  if (event.event_type === 'practice' || !event.away_team_name) {
+    return `${event.home_team_name} Practice`;
+  }
+  return `${event.home_team_name} vs ${event.away_team_name}`;
+}
+
+function eventVenue(event: Event) {
+  return [event.arena_name, event.arena_rink_name].filter(Boolean).join(' • ') || event.location_label || 'Venue TBD';
+}
+
 export default function HomePage() {
+  const navigate = useNavigate();
   const { activeTeam, teams } = useTeam();
   const { activeSeason, seasons } = useSeason();
-  const navigate = useNavigate();
-  const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
-  const [proposals, setProposals] = useState<GameProposal[]>([]);
-  const [games, setGames] = useState<Game[]>([]);
-  const [practices, setPractices] = useState<PracticeBooking[]>([]);
+  const confirm = useConfirmDialog();
+
+  const [availability, setAvailability] = useState<AvailabilityWindow[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
   const [record, setRecord] = useState<StandingsEntry | null>(null);
   const [competitionRecord, setCompetitionRecord] = useState<StandingsEntry | null>(null);
   const [primaryMembership, setPrimaryMembership] = useState<TeamCompetitionMembership | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedError, setSeedError] = useState('');
-  const confirm = useConfirmDialog();
+
+  const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const today = new Date();
   const todayStr = toLocalDateString(today);
+  const weekEndStr = toLocalDateString(addDays(today, 7));
 
   useEffect(() => {
     if (!activeTeam) return;
-    const schedParams: Record<string, string> = {};
-    if (activeSeason) schedParams.season_id = activeSeason.id;
-    api.getSchedule(activeTeam.id, schedParams).then(setSchedule);
+
     Promise.all([
+      api.getAvailability(activeTeam.id),
+      api.getEvents(activeTeam.id, { date_from: todayStr }),
       api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }),
-      api.getProposals(activeTeam.id, { direction: 'outgoing', status: 'proposed' }),
-    ]).then(([incoming, outgoing]) => {
-      const merged = [...incoming, ...outgoing]
-        .filter((proposal, index, all) => all.findIndex((candidate) => candidate.id === proposal.id) === index)
-        .sort((a, b) => (a.proposed_date + (a.proposed_time || '')).localeCompare(b.proposed_date + (b.proposed_time || '')));
-      setProposals(merged);
+      effectiveSeason ? api.getStandings(effectiveSeason.id) : Promise.resolve([]),
+      effectiveSeason ? api.getTeamCompetitionMemberships(activeTeam.id, { season_id: effectiveSeason.id }) : Promise.resolve([]),
+    ]).then(async ([availabilityData, eventData, proposalData, standings, memberships]) => {
+      setAvailability(availabilityData);
+      setEvents(eventData);
+      setProposals(proposalData);
+      setRecord(standings.find((entry) => entry.team_id === activeTeam.id) || null);
+
+      const primary = memberships.find((membership) => membership.is_primary) ?? memberships[0] ?? null;
+      setPrimaryMembership(primary);
+
+      const standingsMembership =
+        memberships.find((membership) => membership.is_primary && membership.standings_enabled)
+        ?? memberships.find((membership) => membership.standings_enabled)
+        ?? null;
+
+      if (!standingsMembership) {
+        setCompetitionRecord(null);
+        return;
+      }
+
+      const divisionStandings = await api.getCompetitionDivisionStandings(standingsMembership.competition_division_id);
+      setCompetitionRecord(divisionStandings.find((entry) => entry.team_id === activeTeam.id) || null);
     });
-    api.getGames(activeTeam.id, { date_from: todayStr }).then(setGames);
-    api.getPracticeBookings(activeTeam.id, { status: 'active' }).then(setPractices);
+  }, [activeTeam, effectiveSeason, todayStr]);
 
-    if (activeSeason) {
-      Promise.all([
-        api.getStandings(activeSeason.id),
-        api.getTeamCompetitionMemberships(activeTeam.id, { season_id: activeSeason.id }),
-      ]).then(async ([standings, memberships]) => {
-        const myRecord = standings.find((s) => s.team_id === activeTeam.id) || null;
-        const primary = memberships.find((membership) => membership.is_primary) ?? memberships[0] ?? null;
-        const standingsMembership =
-          memberships.find((membership) => membership.is_primary && membership.standings_enabled)
-          ?? memberships.find((membership) => membership.standings_enabled)
-          ?? null;
-
-        setRecord(myRecord);
-        setPrimaryMembership(primary);
-
-        if (!standingsMembership) {
-          setCompetitionRecord(null);
-          return;
-        }
-
-        const divisionStandings = await api.getCompetitionDivisionStandings(standingsMembership.competition_division_id);
-        setCompetitionRecord(divisionStandings.find((entry) => entry.team_id === activeTeam.id) || null);
-      });
-      return;
-    }
-
-    setCompetitionRecord(null);
-    setPrimaryMembership(null);
-    if (seasons.length === 0) {
-      setRecord(null);
-      return;
-    }
-
-    Promise.all(seasons.map((season) => api.getStandings(season.id))).then((seasonStandings) => {
-      const aggregate = seasonStandings.reduce(
-        (totals, standings) => {
-          const myRecord = standings.find((entry) => entry.team_id === activeTeam.id);
-          if (!myRecord) return totals;
-          totals.wins += myRecord.wins;
-          totals.losses += myRecord.losses;
-          totals.ties += myRecord.ties;
-          return totals;
-        },
-        { wins: 0, losses: 0, ties: 0 },
-      );
-      setRecord({
-        team_id: activeTeam.id,
-        team_name: activeTeam.name,
-        association_name: activeTeam.association_name,
-        age_group: activeTeam.age_group,
-        level: activeTeam.level,
-        wins: aggregate.wins,
-        losses: aggregate.losses,
-        ties: aggregate.ties,
-        points: 2 * aggregate.wins + aggregate.ties,
-        games_played: aggregate.wins + aggregate.losses + aggregate.ties,
-      });
-    });
-  }, [activeTeam, activeSeason, seasons]);
-
-  const seasonScopedGames = games.filter((g) => {
-    if (!activeSeason) return true;
-    return g.date >= activeSeason.start_date && g.date <= activeSeason.end_date;
-  });
-  const openDates = schedule.filter((e) => e.status === 'open');
-  const upcomingPractices = practices.filter((p) => p.slot_date && p.slot_date >= todayStr);
-  const weekEndStr = toLocalDateString(addDays(today, 7));
-  const gamesThisWeek = seasonScopedGames.filter((g) => g.date >= todayStr && g.date <= weekEndStr).length;
-  const proposalsIncoming = proposals.filter((proposal) => proposal.proposed_by_team_id !== activeTeam?.id).length;
-  const practicesThisWeek = upcomingPractices.filter((practice) => (practice.slot_date || '') <= weekEndStr).length;
-  const openDatesWithTimes = openDates.filter((entry) => !!entry.time).length;
-  const openDatesMissingTime = openDates.filter((entry) => !entry.time).length;
-  const unconfirmedGamesThisWeek = schedule.filter((entry) =>
-    !!entry.game_id
-    && entry.date >= todayStr
-    && entry.date <= weekEndStr
-    && !entry.weekly_confirmed,
+  const seasonAvailability = useMemo(
+    () =>
+      availability.filter((window) =>
+        !effectiveSeason || (window.date >= effectiveSeason.start_date && window.date <= effectiveSeason.end_date),
+      ),
+    [availability, effectiveSeason],
   );
-  const upcoming = seasonScopedGames
-    .slice()
-    .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
-    .slice(0, 5);
-  if (!activeTeam) {
-    if (teams.length > 0) {
-      return (
-        <div className="space-y-6">
-          <PageHeader title="Dashboard" subtitle="Choose an active team to view its schedule, games, proposals, and practices." />
-          <Card className="mx-auto max-w-2xl p-6">
-            <div className="font-display text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">No active team selected</div>
-            <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              Use the team dropdown in the header to choose which team you want to manage.
-            </div>
-          </Card>
-        </div>
-      );
-    }
 
+  const seasonEvents = useMemo(
+    () =>
+      events.filter((event) =>
+        !effectiveSeason || (event.date >= effectiveSeason.start_date && event.date <= effectiveSeason.end_date),
+      ),
+    [events, effectiveSeason],
+  );
+
+  const openDates = seasonAvailability.filter((window) => window.status === 'open' && !window.blocked);
+  const upcomingEventsAll = seasonEvents.filter((event) => event.date >= todayStr);
+  const gamesThisWeek = upcomingEventsAll.filter((event) => event.event_type !== 'practice' && event.date <= weekEndStr);
+  const practicesThisWeek = seasonEvents.filter(
+    (event) => event.event_type === 'practice' && event.date >= todayStr && event.date <= weekEndStr,
+  );
+  const eventsThisWeek = upcomingEventsAll.filter((event) => event.date <= weekEndStr);
+  const upcomingEvents = useMemo(
+    () =>
+      upcomingEventsAll
+        .sort((left, right) => (left.date + (left.start_time || '')).localeCompare(right.date + (right.start_time || '')))
+        .slice(0, 5),
+    [upcomingEventsAll],
+  );
+  const incomingProposals = useMemo(
+    () =>
+      [...proposals]
+        .sort((left, right) => (left.proposed_date + (left.proposed_start_time || '')).localeCompare(right.proposed_date + (right.proposed_start_time || '')))
+        .slice(0, 4),
+    [proposals],
+  );
+
+  const snapshotRecord = competitionRecord || record;
+
+  const resetDemoData = async () => {
+    const shouldReset = await confirm({
+      title: 'Reset demo data?',
+      description: 'This wipes the current demo database and reloads the seeded dataset.',
+      confirmLabel: 'Reset demo data',
+      confirmVariant: 'destructive',
+    });
+    if (!shouldReset) return;
+    setSeedError('');
+    setSeedLoading(true);
+    try {
+      await api.seed();
+      window.location.reload();
+    } catch (error) {
+      setSeedError(String(error));
+    } finally {
+      setSeedLoading(false);
+    }
+  };
+
+  if (!activeTeam) {
     return (
-      <div className="mx-auto max-w-2xl pt-12">
-        <Card className="p-6">
-          <div className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">Welcome to RinkLink</div>
+      <div className="space-y-6">
+        <PageHeader
+          title="Dashboard"
+          subtitle={teams.length > 0 ? 'Choose an active team to view schedule, proposals, and season context.' : 'Select a team or seed demo data to begin.'}
+        />
+        <Card className="mx-auto max-w-2xl p-6">
+          <div className="font-display text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            {teams.length > 0 ? 'No active team selected' : 'Welcome to RinkLink'}
+          </div>
           <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Select a team from the dropdown above, or seed demo data to get started.
+            {teams.length > 0
+              ? 'Use the team switcher in the header to load a team workspace.'
+              : 'Seed the demo dataset to restore the sample associations, teams, arenas, and events.'}
           </div>
-          <div className="mt-5">
-            <Button
-              type="button"
-              disabled={seedLoading}
-              onClick={async () => {
-                setSeedError('');
-                setSeedLoading(true);
-                try {
-                  await api.seed();
-                  window.location.reload();
-                } catch (e) {
-                  setSeedError(String(e));
-                } finally {
-                  setSeedLoading(false);
-                }
-              }}
-            >
-              {seedLoading ? 'Seeding…' : 'Seed Demo Data'}
-            </Button>
-          </div>
-          {seedError && (
+          {teams.length === 0 ? (
+            <div className="mt-5">
+              <Button type="button" disabled={seedLoading} onClick={resetDemoData}>
+                {seedLoading ? 'Seeding…' : 'Seed Demo Data'}
+              </Button>
+            </div>
+          ) : null}
+          {seedError ? (
             <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100">
               {seedError}
             </div>
-          )}
+          ) : null}
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
-        title={`${activeTeam.name} Dashboard`}
+        title={(
+          <span className="inline-flex items-center gap-3">
+            <TeamLogo name={activeTeam.name} logoUrl={activeTeam.logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+            <span>{activeTeam.name} Dashboard</span>
+          </span>
+        )}
         subtitle={
-          activeSeason
+          effectiveSeason
             ? primaryMembership
-              ? `${activeSeason.name} Season • ${primaryMembership.competition_short_name} ${primaryMembership.division_name}`
-              : `${activeSeason.name} Season`
+              ? `${effectiveSeason.name} Season • ${primaryMembership.competition_short_name} ${primaryMembership.division_name}`
+              : `${effectiveSeason.name} Season`
             : 'All Seasons'
         }
         actions={(
-          <Button
-            type="button"
-            disabled={seedLoading}
-            onClick={async () => {
-              const shouldReset = await confirm({
-                title: 'Reset demo data?',
-                description: 'This wipes the database and reloads the current demo dataset.',
-                confirmLabel: 'Reset demo data',
-                confirmVariant: 'destructive',
-              });
-              if (!shouldReset) return;
-              setSeedError('');
-              setSeedLoading(true);
-              try {
-                await api.seed();
-                window.location.reload();
-              } catch (e) {
-                setSeedError(String(e));
-              } finally {
-                setSeedLoading(false);
-              }
-            }}
-          >
+          <Button type="button" disabled={seedLoading} onClick={resetDemoData}>
             {seedLoading ? 'Seeding…' : 'Reset Demo Data'}
           </Button>
         )}
       />
 
-      {seedError && (
+      {seedError ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100">
           {seedError}
         </div>
-      )}
-
-      {(proposalsIncoming > 0 || unconfirmedGamesThisWeek.length > 0 || openDatesMissingTime > 0) ? (
-        <Card className="border-amber-200/70 bg-amber-50/85 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="mr-1 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-              <AlertTriangle className="h-4 w-4 text-amber-700 dark:text-amber-300" />
-              <span>Needs Attention</span>
-            </div>
-            {proposalsIncoming > 0 ? (
-              <Button type="button" size="sm" variant="outline" className={filterButtonClass} onClick={() => navigate('/proposals')}>
-                {proposalsIncoming} incoming proposal{proposalsIncoming === 1 ? '' : 's'}
-              </Button>
-            ) : null}
-            {unconfirmedGamesThisWeek.length > 0 ? (
-              <Button type="button" size="sm" variant="outline" className={filterButtonClass} onClick={() => navigate('/schedule')}>
-                {unconfirmedGamesThisWeek.length} game{unconfirmedGamesThisWeek.length === 1 ? '' : 's'} to confirm
-              </Button>
-            ) : null}
-            {openDatesMissingTime > 0 ? (
-              <Button type="button" size="sm" variant="outline" className={filterButtonClass} onClick={() => navigate('/schedule')}>
-                {openDatesMissingTime} open date{openDatesMissingTime === 1 ? '' : 's'} missing time
-              </Button>
-            ) : null}
-          </div>
-        </Card>
       ) : null}
 
-      <div className={cn(
-        'grid grid-cols-1 gap-3 sm:grid-cols-2',
-        record ? 'lg:grid-cols-5' : 'lg:grid-cols-4',
-      )}>
-        {(competitionRecord || record) && (
+      <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2', snapshotRecord ? 'xl:grid-cols-4' : 'xl:grid-cols-3')}>
+        {snapshotRecord ? (
           <StatCard
-            title={activeSeason && competitionRecord ? 'League Record' : activeSeason ? 'Season Record' : 'Overall Record'}
-            value={`${(competitionRecord || record)!.wins}-${(competitionRecord || record)!.losses}-${(competitionRecord || record)!.ties}`}
+            title={competitionRecord ? 'League Record' : effectiveSeason ? 'Season Record' : 'Overall Record'}
+            value={`${snapshotRecord.wins}-${snapshotRecord.losses}-${snapshotRecord.ties}`}
+            subtitle={`${snapshotRecord.points} points`}
+            onClick={competitionRecord ? () => navigate('/standings') : undefined}
             icon={<Trophy className="h-4 w-4" />}
             color="bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-400"
-            subtitle={`${(competitionRecord || record)!.points} points`}
-            ariaLabel={`${activeSeason && competitionRecord ? 'League' : activeSeason ? 'Season' : 'Overall'} record ${(competitionRecord || record)!.wins} wins, ${(competitionRecord || record)!.losses} losses, ${(competitionRecord || record)!.ties} ties`}
-            onClick={activeSeason && competitionRecord ? () => navigate('/standings') : undefined}
           />
-        )}
+        ) : null}
         <StatCard
-          title="Upcoming Games"
-          value={upcoming.length}
+          title="Upcoming Schedule"
+          value={upcomingEventsAll.length}
+          subtitle={
+            eventsThisWeek.length > 0
+              ? `${gamesThisWeek.length} game${gamesThisWeek.length === 1 ? '' : 's'} • ${practicesThisWeek.length} practice${practicesThisWeek.length === 1 ? '' : 's'} this week`
+              : 'No events this week'
+          }
+          onClick={() => navigate('/schedule')}
           icon={<CheckCircle2 className="h-4 w-4" />}
           color="bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400"
-          subtitle={gamesThisWeek > 0 ? `${gamesThisWeek} this week` : undefined}
-          ariaLabel={`${upcoming.length} upcoming games`}
-          onClick={() => navigate('/games')}
         />
         <StatCard
-          title="Open Dates"
+          title="Open Availability"
           value={openDates.length}
+          subtitle={`${openDates.filter((window) => window.date <= weekEndStr).length} this week`}
+          onClick={() => navigate('/availability')}
           icon={<Calendar className="h-4 w-4" />}
-          color="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-          subtitle={openDatesMissingTime > 0 ? `${openDatesMissingTime} missing time` : undefined}
-          ariaLabel={`${openDates.length} open dates`}
-          onClick={() => navigate('/schedule')}
+          color="bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400"
         />
         <StatCard
-          title="Pending Proposals"
+          title="Incoming Proposals"
           value={proposals.length}
-          icon={<Inbox className="h-4 w-4" />}
-          color="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
-          subtitle={proposalsIncoming > 0 ? `${proposalsIncoming} incoming` : undefined}
-          ariaLabel={`${proposals.length} pending proposals`}
           onClick={() => navigate('/proposals')}
-        />
-        <StatCard
-          title="Upcoming Practices"
-          value={upcomingPractices.length}
-          icon={<Dumbbell className="h-4 w-4" />}
-          color="bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400"
-          subtitle={practicesThisWeek > 0 ? `${practicesThisWeek} this week` : undefined}
-          ariaLabel={`${upcomingPractices.length} upcoming practices`}
-          onClick={() => navigate('/practice')}
+          icon={<Inbox className="h-4 w-4" />}
+          color="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card
-          role="button"
-          tabIndex={0}
-          aria-label="Open Games page"
-          onClick={() => navigate('/games')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') navigate('/games');
-            if (e.key === ' ') {
-              e.preventDefault();
-              navigate('/games');
-            }
-          }}
-          className={cn('p-4', clickableCard)}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400">
-                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-              </div>
-              <div className="text-sm font-medium text-slate-700 dark:text-slate-200">Upcoming Games</div>
+      <div className="grid gap-3 xl:grid-cols-[1.35fr_0.95fr]">
+        <Card className="overflow-hidden p-0">
+          <div className="border-b border-slate-200 bg-white/85 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/30">
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Upcoming Schedule</div>
+            <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Confirmed games, scrimmages, and practices for the next few dates.
             </div>
           </div>
-
-          {upcoming.length === 0 ? (
-            <EmptyState
-              className="mt-3 border-0 bg-transparent px-0 py-4 shadow-none"
-              icon={<CheckCircle2 className="h-5 w-5" />}
-              title="No upcoming scheduled games"
-              description="Open schedule dates or find an opponent to put the next game on the calendar."
-              actions={(
-                <>
-                  <Button type="button" size="sm" onClick={(e) => { e.stopPropagation(); navigate('/schedule'); }}>
-                    Open Schedule
-                  </Button>
-                  <Button type="button" size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); navigate('/search'); }}>
-                    Find Opponents
-                  </Button>
-                </>
-              )}
-            />
-          ) : (
-            <ul className="mt-3 divide-y divide-slate-200 dark:divide-slate-800">
-              {upcoming.map((g) => (
-                <li key={g.id} className="flex items-start justify-between gap-3 px-2 py-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {formatContextualDate(g.date)}{g.time ? ` • ${formatTimeHHMM(g.time) || g.time}` : ''}
-                    </div>
-                    <div className="mt-1 truncate text-sm text-slate-700 dark:text-slate-300">
-                      {g.home_team_name} vs {g.away_team_name}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {formatShortDate(g.date)}{g.time ? ` • ${formatTimeHHMM(g.time) || g.time}` : ''} • {g.rink_name || g.location_label || 'No location yet'}
+          <div className="divide-y divide-slate-200 dark:divide-slate-800">
+            {upcomingEvents.length === 0 ? (
+              <div className="px-4 py-4">
+                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
+                  <div className="font-medium text-slate-900 dark:text-slate-100">No upcoming events</div>
+                  <div className="mt-1">Schedule a practice or accept a proposal to populate the next event block.</div>
+                  <div className="mt-3">
+                    <Button type="button" size="sm" onClick={() => navigate('/schedule')}>Open Schedule</Button>
+                  </div>
+                </div>
+              </div>
+            ) : upcomingEvents.map((event) => (
+              <button
+                type="button"
+                key={event.id}
+                onClick={() => navigate(`/schedule/${event.id}`)}
+                className="group w-full px-4 py-4 text-left transition hover:bg-slate-50/70 dark:hover:bg-slate-900/40"
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-3">
+                      <div className="flex shrink-0 items-center gap-2">
+                        <TeamLogo name={event.home_team_name || 'Home'} logoUrl={event.home_team_logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+                        {event.away_team_name ? (
+                          <TeamLogo name={event.away_team_name} logoUrl={event.away_team_logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+                        ) : null}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            {eventTitle(event)}
+                          </div>
+                          {event.competition_short_name ? (
+                            <Badge variant="outline" className="shrink-0">
+                              {event.competition_short_name}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 truncate text-sm text-slate-600 dark:text-slate-400">
+                          <TeamLogo name={event.arena_name || 'Arena'} logoUrl={event.arena_logo_url} className="h-6 w-6 rounded-lg" initialsClassName="text-[9px]" />
+                          <span className="truncate">{eventVenue(event)}</span>
+                        </div>
+                        {(event.home_locker_room_name || event.away_locker_room_name) ? (
+                          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Locker rooms: {[event.home_locker_room_name, event.away_locker_room_name].filter(Boolean).join(' / ')}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
-                  <Badge variant={getGameStatusVariant(g)}>{getGameStatusLabel(g)}</Badge>
-                </li>
-              ))}
-            </ul>
-          )}
+                  <div className="flex shrink-0 flex-col gap-2 md:items-end">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      {formatShortDate(event.date)}
+                      {event.start_time ? ` • ${formatTimeHHMM(event.start_time) || event.start_time}` : ''}
+                    </div>
+                    <Badge variant={getCompetitionBadgeVariant(event.event_type)} className="w-fit">
+                      {getCompetitionLabel(event.event_type)}
+                    </Badge>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
         </Card>
 
-        <Card
-          role="button"
-          tabIndex={0}
-          aria-label="Open Proposals page"
-          onClick={() => navigate('/proposals')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') navigate('/proposals');
-            if (e.key === ' ') {
-              e.preventDefault();
-              navigate('/proposals');
-            }
-          }}
-          className={cn('p-4', clickableCard)}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
-                <Inbox className="h-4 w-4" aria-hidden="true" />
+        <Card className="overflow-hidden p-0">
+          <div className="border-b border-slate-200 bg-white/85 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/30">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Incoming Proposals</div>
+                <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  Requests waiting on your response.
+                </div>
               </div>
-              <div className="text-sm font-medium text-slate-700 dark:text-slate-200">Pending Proposals</div>
+              <Button type="button" size="sm" variant="outline" onClick={() => navigate('/proposals')}>
+                Open Proposals
+              </Button>
             </div>
           </div>
-
-          {proposals.length === 0 ? (
-            <EmptyState
-              className="mt-3 border-0 bg-transparent px-0 py-4 shadow-none"
-              icon={<Inbox className="h-5 w-5" />}
-              title="No pending proposals"
-              description="Send a new proposal from Find Opponents when you want to schedule the next game."
-              actions={(
-                <Button type="button" size="sm" onClick={(e) => { e.stopPropagation(); navigate('/search'); }}>
-                  Find Opponents
-                </Button>
-              )}
-            />
-          ) : (
-            <ul className="mt-3 divide-y divide-slate-200 dark:divide-slate-800">
-              {proposals.map((p) => (
-                <li key={p.id} className="flex items-start justify-between gap-3 px-2 py-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {formatContextualDate(p.proposed_date)} — {p.home_team_name} vs {p.away_team_name}
-                    </div>
-                    <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-                      {formatShortDate(p.proposed_date)}{p.proposed_time ? ` • ${formatTimeHHMM(p.proposed_time) || p.proposed_time}` : ''} • {p.message || 'No message'}
+          <div className="divide-y divide-slate-200 dark:divide-slate-800">
+            {incomingProposals.length === 0 ? (
+              <div className="px-4 py-4">
+                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
+                  <div className="font-medium text-slate-900 dark:text-slate-100">No incoming proposals</div>
+                  <div className="mt-1">New matchup requests will appear here when other teams send them.</div>
+                </div>
+              </div>
+            ) : incomingProposals.map((proposal) => (
+              <button
+                type="button"
+                key={proposal.id}
+                onClick={() => navigate('/proposals')}
+                className="group w-full px-4 py-3 text-left transition hover:bg-slate-50/70 dark:hover:bg-slate-900/40"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-3">
+                      <div className="flex shrink-0 items-center gap-2">
+                        <TeamLogo name={proposal.home_team_name || 'Home'} logoUrl={proposal.home_team_logo_url} className="h-9 w-9 rounded-xl" initialsClassName="text-[11px]" />
+                        <TeamLogo name={proposal.away_team_name || 'Away'} logoUrl={proposal.away_team_logo_url} className="h-9 w-9 rounded-xl" initialsClassName="text-[11px]" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-slate-900 group-hover:text-cyan-700 dark:text-slate-100 dark:group-hover:text-cyan-300">
+                          {proposal.home_team_name} vs {proposal.away_team_name}
+                        </div>
+                        <div className="mt-1 truncate text-sm text-slate-600 dark:text-slate-400">
+                          {[proposal.arena_name, proposal.arena_rink_name].filter(Boolean).join(' • ') || 'Venue TBD'}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          {formatShortDate(proposal.proposed_date)}
+                          {proposal.proposed_start_time ? ` • ${formatTimeHHMM(proposal.proposed_start_time) || proposal.proposed_start_time}` : ''}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <Badge variant={p.proposed_by_team_id === activeTeam.id ? 'info' : 'warning'}>
-                    {p.proposed_by_team_id === activeTeam.id ? 'Sent' : 'Received'}
+                  <Badge variant={getCompetitionBadgeVariant(proposal.event_type)} className="shrink-0">
+                    {getCompetitionLabel(proposal.event_type)}
                   </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
+                </div>
+              </button>
+            ))}
+          </div>
         </Card>
       </div>
     </div>

@@ -1,10 +1,11 @@
 export interface Association {
   id: string;
   name: string;
-  home_rink_address: string;
+  address: string;
   city: string;
   state: string;
   zip_code: string;
+  logo_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -69,9 +70,7 @@ export interface Team {
   manager_name: string;
   manager_email: string;
   manager_phone: string;
-  rink_city: string;
-  rink_state: string;
-  rink_zip: string;
+  logo_url: string | null;
   myhockey_ranking: number | null;
   wins: number;
   losses: number;
@@ -83,91 +82,7 @@ export interface Team {
   updated_at: string;
 }
 
-export interface ScheduleEntry {
-  id: string;
-  team_id: string;
-  season_id: string | null;
-  date: string;
-  time: string | null;
-  entry_type: 'home' | 'away';
-  status: 'open' | 'scheduled' | 'confirmed';
-  opponent_name: string | null;
-  opponent_team_id: string | null;
-  location: string | null;
-  notes: string | null;
-  weekly_confirmed: boolean;
-  blocked: boolean;
-  game_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ScheduleUploadRow {
-  date: string;
-  time: string | null;
-  entry_type: string;
-  opponent_name: string | null;
-  location: string | null;
-  notes: string | null;
-  status: string;
-}
-
-export interface ScheduleUploadPreview {
-  entries: ScheduleUploadRow[];
-  warnings: string[];
-}
-
-export interface GameProposal {
-  id: string;
-  home_team_id: string;
-  away_team_id: string;
-  home_schedule_entry_id: string;
-  away_schedule_entry_id: string;
-  proposed_date: string;
-  proposed_time: string | null;
-  status: 'proposed' | 'accepted' | 'declined' | 'cancelled';
-  proposed_by_team_id: string;
-  ice_slot_id: string | null;
-  message: string | null;
-  responded_at: string | null;
-  created_at: string;
-  updated_at: string;
-  home_team_name: string | null;
-  away_team_name: string | null;
-  home_team_association: string | null;
-  away_team_association: string | null;
-  rink_name: string | null;
-  rink_address: string | null;
-  rink_city: string | null;
-  rink_state: string | null;
-  rink_zip: string | null;
-  ice_slot_date: string | null;
-  ice_slot_start_time: string | null;
-  ice_slot_end_time: string | null;
-  ice_slot_notes: string | null;
-  location_label: string | null;
-}
-
-export interface OpponentResult {
-  team_id: string;
-  team_name: string;
-  association_name: string;
-  age_group: string;
-  level: string;
-  myhockey_ranking: number | null;
-  distance_miles: number | null;
-  schedule_entry_id: string;
-  entry_date: string;
-  entry_time: string | null;
-  entry_type: string;
-  primary_competition_short_name: string | null;
-  primary_division_name: string | null;
-  has_existing_proposal: boolean;
-  existing_proposal_id: string | null;
-  existing_proposal_status: string | null;
-}
-
-export interface Rink {
+export interface Arena {
   id: string;
   name: string;
   address: string;
@@ -176,23 +91,61 @@ export interface Rink {
   zip_code: string;
   phone: string;
   contact_email: string;
+  logo_url: string | null;
   website: string | null;
+  notes: string | null;
+  rink_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArenaRink {
+  id: string;
+  arena_id: string;
+  name: string;
+  display_order: number;
+  is_active: boolean;
+  notes: string | null;
+  arena_name: string | null;
+  locker_room_count: number;
+  ice_slot_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LockerRoom {
+  id: string;
+  arena_rink_id: string;
+  name: string;
+  display_order: number;
+  is_active: boolean;
+  notes: string | null;
+  arena_id: string | null;
+  arena_name: string | null;
+  arena_rink_name: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface IceSlot {
   id: string;
-  rink_id: string;
+  arena_rink_id: string;
   date: string;
   start_time: string;
   end_time: string | null;
   status: 'available' | 'held' | 'booked';
   booked_by_team_id: string | null;
+  booked_by_team_name: string | null;
+  booked_event_id: string | null;
+  booked_event_type: string | null;
+  booked_event_home_team_name: string | null;
+  booked_event_away_team_name: string | null;
   notes: string | null;
+  arena_id: string | null;
+  arena_name: string | null;
+  arena_rink_name: string | null;
   created_at: string;
   updated_at: string;
-  rink_name: string | null;
 }
 
 export interface IceSlotUploadRow {
@@ -207,18 +160,128 @@ export interface IceSlotUploadPreview {
   warnings: string[];
 }
 
+export interface TeamSeasonVenueAssignment {
+  id: string;
+  team_id: string;
+  season_id: string;
+  arena_id: string;
+  arena_rink_id: string;
+  default_locker_room_id: string | null;
+  team_name: string | null;
+  arena_name: string | null;
+  arena_rink_name: string | null;
+  default_locker_room_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AvailabilityWindow {
+  id: string;
+  team_id: string;
+  season_id: string | null;
+  date: string;
+  start_time: string | null;
+  end_time: string | null;
+  availability_type: 'home' | 'away';
+  status: 'open' | 'scheduled' | 'confirmed' | 'cancelled';
+  blocked: boolean;
+  opponent_team_id: string | null;
+  notes: string | null;
+  event_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AvailabilityUploadRow {
+  date: string;
+  start_time: string | null;
+  end_time: string | null;
+  availability_type: 'home' | 'away';
+  notes: string | null;
+  status: string;
+}
+
+export interface AvailabilityUploadPreview {
+  entries: AvailabilityUploadRow[];
+  warnings: string[];
+}
+
+export interface Proposal {
+  id: string;
+  home_team_id: string;
+  away_team_id: string;
+  home_availability_window_id: string;
+  away_availability_window_id: string;
+  event_type: 'league' | 'tournament' | 'practice' | 'showcase' | 'scrimmage' | 'exhibition';
+  proposed_date: string;
+  proposed_start_time: string | null;
+  proposed_end_time: string | null;
+  status: 'proposed' | 'accepted' | 'declined' | 'cancelled';
+  proposed_by_team_id: string;
+  arena_id: string;
+  arena_rink_id: string;
+  ice_slot_id: string | null;
+  home_locker_room_id: string | null;
+  away_locker_room_id: string | null;
+  message: string | null;
+  responded_at: string | null;
+  created_at: string;
+  updated_at: string;
+  home_team_name: string | null;
+  away_team_name: string | null;
+  home_team_logo_url: string | null;
+  away_team_logo_url: string | null;
+  home_team_association: string | null;
+  away_team_association: string | null;
+  arena_name: string | null;
+  arena_logo_url: string | null;
+  arena_rink_name: string | null;
+  home_locker_room_name: string | null;
+  away_locker_room_name: string | null;
+  ice_slot_date: string | null;
+  ice_slot_start_time: string | null;
+  ice_slot_end_time: string | null;
+  ice_slot_notes: string | null;
+  location_label: string | null;
+}
+
+export interface OpponentResult {
+  team_id: string;
+  team_name: string;
+  team_logo_url: string | null;
+  association_name: string;
+  age_group: string;
+  level: string;
+  myhockey_ranking: number | null;
+  distance_miles: number | null;
+  availability_window_id: string;
+  entry_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  availability_type: string;
+  primary_competition_short_name: string | null;
+  primary_division_name: string | null;
+  has_existing_proposal: boolean;
+  existing_proposal_id: string | null;
+  existing_proposal_status: string | null;
+}
+
 export interface AutoMatchResult {
   home_team_id: string;
   home_team_name: string;
+  home_team_logo_url: string | null;
   home_association_name: string;
   away_team_id: string;
   away_team_name: string;
+  away_team_logo_url: string | null;
   away_association_name: string;
   date: string;
-  home_entry_id: string;
-  away_entry_id: string;
-  home_time: string | null;
-  away_time: string | null;
+  home_availability_window_id: string;
+  away_availability_window_id: string;
+  home_start_time: string | null;
+  home_end_time: string | null;
+  away_start_time: string | null;
+  away_end_time: string | null;
   distance_miles: number | null;
   home_primary_competition_short_name: string | null;
   home_primary_division_name: string | null;
@@ -229,44 +292,26 @@ export interface AutoMatchResult {
   existing_proposal_status: string | null;
 }
 
-export interface Player {
+export interface Event {
   id: string;
-  team_id: string;
-  season_id: string;
-  first_name: string;
-  last_name: string;
-  jersey_number: number | null;
-  position: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PlayerUploadRow {
-  first_name: string;
-  last_name: string;
-  jersey_number: number | null;
-  position: string | null;
-}
-
-export interface PlayerUploadPreview {
-  entries: PlayerUploadRow[];
-  warnings: string[];
-}
-
-export interface Game {
-  id: string;
+  event_type: 'league' | 'tournament' | 'practice' | 'showcase' | 'scrimmage' | 'exhibition';
+  status: string;
   home_team_id: string;
-  away_team_id: string;
-  home_schedule_entry_id: string | null;
-  away_schedule_entry_id: string | null;
+  away_team_id: string | null;
+  home_availability_window_id: string | null;
+  away_availability_window_id: string | null;
   proposal_id: string | null;
-  ice_slot_id: string | null;
   season_id: string | null;
   competition_division_id: string | null;
+  arena_id: string;
+  arena_rink_id: string;
+  ice_slot_id: string | null;
+  home_locker_room_id: string | null;
+  away_locker_room_id: string | null;
   date: string;
-  time: string | null;
-  status: string;
-  game_type: 'league' | 'non_league' | 'showcase' | 'tournament' | 'state_tournament' | 'district' | 'scrimmage' | null;
+  start_time: string | null;
+  end_time: string | null;
+  notes: string | null;
   counts_for_standings: boolean;
   home_weekly_confirmed: boolean;
   away_weekly_confirmed: boolean;
@@ -276,13 +321,15 @@ export interface Game {
   updated_at: string;
   home_team_name: string | null;
   away_team_name: string | null;
+  home_team_logo_url: string | null;
+  away_team_logo_url: string | null;
   home_association_name: string | null;
   away_association_name: string | null;
-  rink_name: string | null;
-  rink_address: string | null;
-  rink_city: string | null;
-  rink_state: string | null;
-  rink_zip: string | null;
+  arena_name: string | null;
+  arena_logo_url: string | null;
+  arena_rink_name: string | null;
+  home_locker_room_name: string | null;
+  away_locker_room_name: string | null;
   location_label: string | null;
   competition_name: string | null;
   competition_short_name: string | null;
@@ -303,6 +350,7 @@ export interface Season {
 export interface StandingsEntry {
   team_id: string;
   team_name: string;
+  logo_url: string | null;
   association_name: string | null;
   age_group: string;
   level: string;
@@ -336,9 +384,33 @@ export interface Notification {
   updated_at: string;
 }
 
-export interface GamePlayerStat {
+export interface Player {
   id: string;
-  game_id: string;
+  team_id: string;
+  season_id: string;
+  first_name: string;
+  last_name: string;
+  jersey_number: number | null;
+  position: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlayerUploadRow {
+  first_name: string;
+  last_name: string;
+  jersey_number: number | null;
+  position: string | null;
+}
+
+export interface PlayerUploadPreview {
+  entries: PlayerUploadRow[];
+  warnings: string[];
+}
+
+export interface EventPlayerStat {
+  id: string;
+  event_id: string;
   team_id: string;
   player_id: string;
   goals: number;
@@ -348,7 +420,7 @@ export interface GamePlayerStat {
   updated_at: string;
 }
 
-export interface GamePlayerStatUpsert {
+export interface EventPlayerStatUpsert {
   team_id: string;
   player_id: string;
   goals: number;
@@ -356,9 +428,9 @@ export interface GamePlayerStatUpsert {
   shots_on_goal: number;
 }
 
-export interface GamePenalty {
+export interface EventPenalty {
   id: string;
-  game_id: string;
+  event_id: string;
   team_id: string;
   player_id: string | null;
   penalty_type: string;
@@ -367,9 +439,9 @@ export interface GamePenalty {
   updated_at: string;
 }
 
-export interface GameGoalieStat {
+export interface EventGoalieStat {
   id: string;
-  game_id: string;
+  event_id: string;
   team_id: string;
   player_id: string;
   saves: number;
@@ -379,7 +451,7 @@ export interface GameGoalieStat {
   updated_at: string;
 }
 
-export interface GameGoalieStatUpsert {
+export interface EventGoalieStatUpsert {
   team_id: string;
   player_id: string;
   saves: number;
@@ -387,9 +459,9 @@ export interface GameGoalieStatUpsert {
   shootout_saves: number;
 }
 
-export interface GameSignature {
+export interface EventSignature {
   id: string;
-  game_id: string;
+  event_id: string;
   team_id: string | null;
   role: string;
   signer_name: string;
@@ -398,29 +470,10 @@ export interface GameSignature {
   updated_at: string;
 }
 
-export interface GameScoresheet {
-  game: Game;
-  player_stats: GamePlayerStat[];
-  penalties: GamePenalty[];
-  goalie_stats: GameGoalieStat[];
-  signatures: GameSignature[];
-}
-
-export interface PracticeBooking {
-  id: string;
-  team_id: string;
-  ice_slot_id: string;
-  notes: string | null;
-  status: 'active' | 'cancelled';
-  created_at: string;
-  updated_at: string;
-  team_name: string | null;
-  slot_date: string | null;
-  slot_start_time: string | null;
-  slot_end_time: string | null;
-  slot_notes: string | null;
-  rink_id: string | null;
-  rink_name: string | null;
-  rink_city: string | null;
-  rink_state: string | null;
+export interface EventScoresheet {
+  event: Event;
+  player_stats: EventPlayerStat[];
+  penalties: EventPenalty[];
+  goalie_stats: EventGoalieStat[];
+  signatures: EventSignature[];
 }

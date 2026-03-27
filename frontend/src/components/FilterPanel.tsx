@@ -7,6 +7,7 @@ import { filterButtonClass } from '../lib/uiClasses';
 
 type FilterPanelTriggerProps = {
   count: number;
+  open?: boolean;
   onClick?: () => void;
 };
 
@@ -19,12 +20,12 @@ type FilterPanelProps = {
   description: string;
 };
 
-export function FilterPanelTrigger({ count, onClick }: FilterPanelTriggerProps) {
+export function FilterPanelTrigger({ count, open = false, onClick }: FilterPanelTriggerProps) {
   return (
     <Button type="button" variant="outline" size="sm" className={filterButtonClass} onClick={onClick}>
       <SlidersHorizontal className="h-4 w-4" />
-      Filters
-      {count > 0 ? ` (${count})` : ''}
+      {open ? 'Hide Filters' : 'Filters'}
+      {!open && count > 0 ? ` (${count})` : ''}
     </Button>
   );
 }

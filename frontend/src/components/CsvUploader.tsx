@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { UploadCloud } from 'lucide-react';
 import { api } from '../api/client';
-import { ScheduleUploadPreview, ScheduleUploadRow } from '../types';
+import { AvailabilityUploadPreview, AvailabilityUploadRow } from '../types';
 import { cn } from '../lib/cn';
 import { formatTimeHHMM } from '../lib/time';
 import { Alert } from './ui/Alert';
@@ -15,7 +15,7 @@ interface Props {
 }
 
 export default function CsvUploader({ teamId, onConfirmed }: Props) {
-  const [preview, setPreview] = useState<ScheduleUploadPreview | null>(null);
+  const [preview, setPreview] = useState<AvailabilityUploadPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
@@ -24,7 +24,7 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
     setError('');
     setLoading(true);
     try {
-      const result = await api.uploadSchedule(teamId, file);
+      const result = await api.uploadAvailability(teamId, file);
       setPreview(result);
     } catch (e) {
       setError(String(e));
@@ -37,7 +37,7 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
     if (!preview) return;
     setLoading(true);
     try {
-      await api.confirmUpload(teamId, preview.entries);
+      await api.confirmAvailabilityUpload(teamId, preview.entries);
       setPreview(null);
       onConfirmed();
     } catch (e) {
@@ -79,7 +79,7 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
               Choose File
             </Button>
             <input
-              id="schedule-csv-input"
+              id="availability-csv-input"
               type="file"
               accept=".csv"
               className="hidden"
@@ -91,7 +91,7 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
           </div>
 
           <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-            Expected columns: Date, Time, Home/Away (optional: Opponent, Location, Notes)
+            Expected columns: Date, Time, End Time, Home/Away, Notes
           </div>
         </div>
       )}
@@ -105,7 +105,7 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
               <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 Preview <span className="text-slate-500 dark:text-slate-400">({preview.entries.length} entries)</span>
               </div>
-              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Confirm to add these entries to your schedule.</div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Confirm to add these entries to team availability.</div>
             </div>
           </div>
           {preview.warnings.map((w, i) => (
@@ -125,14 +125,14 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {preview.entries.map((row: ScheduleUploadRow, i: number) => (
+                  {preview.entries.map((row: AvailabilityUploadRow, i: number) => (
                     <tr key={i} className="bg-white dark:bg-slate-950/20">
                       <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{row.date}</td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatTimeHHMM(row.time) || '-'}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatTimeHHMM(row.start_time) || '-'}</td>
                       <td className="px-4 py-3">
-                        <Badge variant={row.entry_type === 'home' ? 'success' : 'info'}>{row.entry_type}</Badge>
+                        <Badge variant={row.availability_type === 'home' ? 'success' : 'info'}>{row.availability_type}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.opponent_name || '-'}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.notes || '-'}</td>
                       <td className="px-4 py-3">
                         <Badge variant="outline">{row.status}</Badge>
                       </td>

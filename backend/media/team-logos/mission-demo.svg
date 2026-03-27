@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Mission Demo Logo</title>
+  <desc id="desc">Red and charcoal crest with stylized M and speed lines.</desc>
+  <defs>
+    <linearGradient id="mission-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7f1d1d"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 10c29 0 52 19 52 45 0 34-23 53-52 63-29-10-52-29-52-63 0-26 23-45 52-45z" fill="#111827"/>
+  <path d="M64 18c24 0 44 15 44 37 0 27-18 43-44 53-26-10-44-26-44-53 0-22 20-37 44-37z" fill="url(#mission-bg)"/>
+  <path d="M31 78h66" fill="none" stroke="#fecaca" stroke-linecap="round" stroke-width="8"/>
+  <path d="M35 43h16l13 18 13-18h16v42H77V62L64 79 51 62v23H35z" fill="#fff7ed"/>
+</svg>

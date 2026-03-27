@@ -83,19 +83,12 @@ html.dark {
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background:
-      radial-gradient(1100px circle at 12% 8%, var(--app-bg-accent-primary), transparent 55%),
-      radial-gradient(900px circle at 85% 18%, var(--app-bg-accent-secondary), transparent 50%),
-      linear-gradient(to bottom right, var(--app-bg-base-start), var(--app-bg-base-mid), var(--app-bg-base-end));
+    background: linear-gradient(to bottom, var(--app-bg-base-start), var(--app-bg-base-mid) 50%, var(--app-bg-base-end));
   }
 
   html.dark body {
     color: var(--color-slate-100);
-    background:
-      radial-gradient(1000px circle at 22% 10%, var(--app-bg-accent-primary), transparent 55%),
-      radial-gradient(900px circle at 78% 18%, var(--app-bg-accent-secondary), transparent 60%),
-      radial-gradient(800px circle at 70% 86%, var(--app-bg-accent-tertiary), transparent 60%),
-      linear-gradient(to bottom, var(--app-bg-base-start), var(--app-bg-base-mid) 45%, var(--app-bg-base-end));
+    background: linear-gradient(to bottom, var(--app-bg-base-start), var(--app-bg-base-mid) 45%, var(--app-bg-base-end));
   }
 
   thead {

@@ -1,30 +1,34 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { MapPinned, Pencil, Phone, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
-import { Team, Association } from '../types';
-import { useTeam } from '../context/TeamContext';
+import { Arena, ArenaRink, Association, LockerRoom, Team, TeamSeasonVenueAssignment } from '../types';
 import { useSeason } from '../context/SeasonContext';
+import { useTeam } from '../context/TeamContext';
 import AgeLevelSelect from '../components/AgeLevelSelect';
+import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
+import { FilterPanel, FilterPanelTrigger } from '../components/FilterPanel';
+import PageHeader from '../components/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
-import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
-import { FilterPanel, FilterPanelTrigger } from '../components/FilterPanel';
-import PageHeader from '../components/PageHeader';
-import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
-import { accentLinkClass, tableActionButtonClass } from '../lib/uiClasses';
 import { Badge } from '../components/ui/Badge';
-import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
+import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
+import { accentLinkClass, tableActionButtonClass } from '../lib/uiClasses';
+import TeamLogo from '../components/TeamLogo';
 
-const emptyForm = {
-  association_id: '', name: '', age_group: '', level: '',
-  manager_name: '', manager_email: '', manager_phone: '',
-  rink_city: '', rink_state: '', rink_zip: '',
-  myhockey_ranking: '' as string,
+const emptyTeamForm = {
+  association_id: '',
+  name: '',
+  age_group: '',
+  level: '',
+  manager_name: '',
+  manager_email: '',
+  manager_phone: '',
+  myhockey_ranking: '',
 };
 
 function ageGroupSortValue(value: string) {
@@ -36,84 +40,189 @@ function ageGroupSortValue(value: string) {
 export default function TeamListPage() {
   const { refreshTeams } = useTeam();
   const { activeSeason, seasons } = useSeason();
+  const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
+  const confirm = useConfirmDialog();
+  const pushToast = useToast();
+
   const [teams, setTeams] = useState<Team[]>([]);
   const [associations, setAssociations] = useState<Association[]>([]);
-  const [open, setOpen] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [loading, setLoading] = useState(true);
+  const [arenas, setArenas] = useState<Arena[]>([]);
+  const [arenaRinks, setArenaRinks] = useState<ArenaRink[]>([]);
+  const [lockerRooms, setLockerRooms] = useState<LockerRoom[]>([]);
+  const [assignments, setAssignments] = useState<TeamSeasonVenueAssignment[]>([]);
+
+  const [teamModalOpen, setTeamModalOpen] = useState(false);
+  const [editTeam, setEditTeam] = useState<Team | null>(null);
+  const [teamForm, setTeamForm] = useState(emptyTeamForm);
+  const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null);
+  const [removeTeamLogo, setRemoveTeamLogo] = useState(false);
+
+  const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
+  const [assignmentTeamId, setAssignmentTeamId] = useState('');
+  const [assignmentArenaId, setAssignmentArenaId] = useState('');
+  const [assignmentArenaRinkId, setAssignmentArenaRinkId] = useState('');
+  const [assignmentLockerRoomId, setAssignmentLockerRoomId] = useState('');
+
   const [selectedAssociationIds, setSelectedAssociationIds] = useState<string[]>([]);
   const [selectedCompetitionNames, setSelectedCompetitionNames] = useState<string[]>([]);
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const confirm = useConfirmDialog();
-  const pushToast = useToast();
 
-  const displaySeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
+  const assignmentByTeamId = useMemo(
+    () => Object.fromEntries(assignments.map((assignment) => [assignment.team_id, assignment])),
+    [assignments],
+  );
 
-  const load = () => {
-    let cancelled = false;
-    setLoading(true);
-    Promise.all([
-      api.getTeams(displaySeason ? { season_id: displaySeason.id } : undefined),
+  const load = async () => {
+    const [teamData, associationData, arenaData] = await Promise.all([
+      api.getTeams(effectiveSeason ? { season_id: effectiveSeason.id } : undefined),
       api.getAssociations(),
-    ]).then(([teamData, associationData]) => {
-      if (cancelled) return;
-      setTeams(teamData);
-      setAssociations(associationData);
-    }).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  };
-  useEffect(() => load(), [displaySeason?.id]);
-
-  const handleSave = async () => {
-    const data = {
-      ...form,
-      myhockey_ranking: form.myhockey_ranking ? parseInt(form.myhockey_ranking) : null,
-    };
-    if (editId) {
-      await api.updateTeam(editId, data);
+      api.getArenas(),
+    ]);
+    setTeams(teamData);
+    setAssociations(associationData);
+    setArenas(arenaData);
+    if (effectiveSeason) {
+      const assignmentLists = await Promise.all(
+        teamData.map((team) => api.getTeamVenueAssignments(team.id, { season_id: effectiveSeason.id })),
+      );
+      setAssignments(assignmentLists.map((items) => items[0]).filter(Boolean) as TeamSeasonVenueAssignment[]);
     } else {
-      await api.createTeam(data);
+      setAssignments([]);
     }
-    setOpen(false);
-    setEditId(null);
-    setForm(emptyForm);
+  };
+
+  useEffect(() => {
     load();
-    refreshTeams();
+  }, [effectiveSeason?.id]);
+
+  useEffect(() => {
+    if (!assignmentArenaId) {
+      setArenaRinks([]);
+      return;
+    }
+    api.getArenaRinks(assignmentArenaId).then(setArenaRinks);
+  }, [assignmentArenaId]);
+
+  useEffect(() => {
+    if (!assignmentArenaRinkId) {
+      setLockerRooms([]);
+      return;
+    }
+    api.getLockerRooms(assignmentArenaRinkId).then(setLockerRooms);
+  }, [assignmentArenaRinkId]);
+
+  const setTeamField = (key: keyof typeof emptyTeamForm, value: string) => {
+    setTeamForm((current) => ({ ...current, [key]: value }));
   };
 
-  const handleEdit = (t: Team) => {
-    setEditId(t.id);
-    setForm({
-      association_id: t.association_id, name: t.name, age_group: t.age_group, level: t.level,
-      manager_name: t.manager_name, manager_email: t.manager_email, manager_phone: t.manager_phone,
-      rink_city: t.rink_city, rink_state: t.rink_state, rink_zip: t.rink_zip,
-      myhockey_ranking: t.myhockey_ranking?.toString() || '',
+  const [teamLogoPreviewUrl, setTeamLogoPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!teamLogoFile) {
+      setTeamLogoPreviewUrl(removeTeamLogo ? null : (editTeam?.logo_url ?? null));
+      return;
+    }
+    const objectUrl = URL.createObjectURL(teamLogoFile);
+    setTeamLogoPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [editTeam?.logo_url, removeTeamLogo, teamLogoFile]);
+
+  const openCreateTeam = () => {
+    setEditTeam(null);
+    setTeamForm(emptyTeamForm);
+    setTeamLogoFile(null);
+    setRemoveTeamLogo(false);
+    setTeamModalOpen(true);
+  };
+
+  const openEditTeam = (team: Team) => {
+    setEditTeam(team);
+    setTeamForm({
+      association_id: team.association_id,
+      name: team.name,
+      age_group: team.age_group,
+      level: team.level,
+      manager_name: team.manager_name || '',
+      manager_email: team.manager_email || '',
+      manager_phone: team.manager_phone || '',
+      myhockey_ranking: team.myhockey_ranking != null ? String(team.myhockey_ranking) : '',
     });
-    setOpen(true);
+    setTeamLogoFile(null);
+    setRemoveTeamLogo(false);
+    setTeamModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const saveTeam = async () => {
+    const payload = {
+      ...teamForm,
+      myhockey_ranking: teamForm.myhockey_ranking ? Number(teamForm.myhockey_ranking) : null,
+    };
+    let savedTeam: Team;
+    if (editTeam) {
+      savedTeam = await api.updateTeam(editTeam.id, payload);
+      if (removeTeamLogo && editTeam.logo_url) {
+        savedTeam = await api.deleteTeamLogo(editTeam.id);
+      }
+      pushToast({ variant: 'success', title: 'Team updated' });
+    } else {
+      savedTeam = await api.createTeam(payload);
+      pushToast({ variant: 'success', title: 'Team created' });
+    }
+    if (teamLogoFile) {
+      savedTeam = await api.uploadTeamLogo(savedTeam.id, teamLogoFile);
+    }
+    setTeamModalOpen(false);
+    setEditTeam(null);
+    setTeamForm(emptyTeamForm);
+    setTeamLogoFile(null);
+    setRemoveTeamLogo(false);
+    await load();
+    await refreshTeams();
+  };
+
+  const deleteTeam = async (team: Team) => {
     const confirmed = await confirm({
       title: 'Delete team?',
-      description: 'This removes the team and its related local data.',
+      description: 'This removes the team and its local records.',
       confirmLabel: 'Delete team',
       confirmVariant: 'destructive',
     });
     if (!confirmed) return;
-    await api.deleteTeam(id);
-    load();
-    refreshTeams();
+    await api.deleteTeam(team.id);
     pushToast({ variant: 'success', title: 'Team deleted' });
+    await load();
+    await refreshTeams();
   };
 
-  const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const openAssignmentModal = (team: Team) => {
+    const current = assignmentByTeamId[team.id];
+    setAssignmentTeamId(team.id);
+    setAssignmentArenaId(current?.arena_id || '');
+    setAssignmentArenaRinkId(current?.arena_rink_id || '');
+    setAssignmentLockerRoomId(current?.default_locker_room_id || '');
+    setAssignmentModalOpen(true);
+  };
+
+  const saveAssignment = async () => {
+    if (!effectiveSeason || !assignmentTeamId || !assignmentArenaId || !assignmentArenaRinkId) return;
+    const existing = assignments.find((assignment) => assignment.team_id === assignmentTeamId);
+    const payload = {
+      season_id: effectiveSeason.id,
+      arena_id: assignmentArenaId,
+      arena_rink_id: assignmentArenaRinkId,
+      default_locker_room_id: assignmentLockerRoomId || null,
+    };
+    if (existing) {
+      await api.updateTeamVenueAssignment(existing.id, payload);
+    } else {
+      await api.createTeamVenueAssignment(assignmentTeamId, payload);
+    }
+    setAssignmentModalOpen(false);
+    pushToast({ variant: 'success', title: 'Venue assignment saved' });
+    await load();
+  };
 
   const associationOptions = useMemo<FilterOption[]>(
     () => associations
@@ -132,9 +241,7 @@ export default function TeamListPage() {
           .filter(Boolean),
       ),
     );
-    return names
-      .sort((left, right) => left.localeCompare(right))
-      .map((name) => ({ value: name, label: name }));
+    return names.sort((left, right) => left.localeCompare(right)).map((name) => ({ value: name, label: name }));
   }, [teams]);
 
   const ageGroupOptions = useMemo<FilterOption[]>(() => {
@@ -149,15 +256,18 @@ export default function TeamListPage() {
     return values.sort((left, right) => left.localeCompare(right)).map((value) => ({ value, label: value }));
   }, [teams]);
 
-  const filteredTeams = useMemo(() => teams.filter((team) => {
-    const competitionNames = team.memberships
-      .map((membership) => membership.competition_short_name || membership.competition_name || '')
-      .filter(Boolean);
-    return (selectedAssociationIds.length === 0 || selectedAssociationIds.includes(team.association_id))
-      && (selectedCompetitionNames.length === 0 || competitionNames.some((name) => selectedCompetitionNames.includes(name)))
-      && (selectedAgeGroups.length === 0 || selectedAgeGroups.includes(team.age_group))
-      && (selectedLevels.length === 0 || selectedLevels.includes(team.level));
-  }), [selectedAgeGroups, selectedAssociationIds, selectedCompetitionNames, selectedLevels, teams]);
+  const filteredTeams = useMemo(
+    () => teams.filter((team) => {
+      const competitionNames = team.memberships
+        .map((membership) => membership.competition_short_name || membership.competition_name || '')
+        .filter(Boolean);
+      return (selectedAssociationIds.length === 0 || selectedAssociationIds.includes(team.association_id))
+        && (selectedCompetitionNames.length === 0 || competitionNames.some((name) => selectedCompetitionNames.includes(name)))
+        && (selectedAgeGroups.length === 0 || selectedAgeGroups.includes(team.age_group))
+        && (selectedLevels.length === 0 || selectedLevels.includes(team.level));
+    }),
+    [selectedAgeGroups, selectedAssociationIds, selectedCompetitionNames, selectedLevels, teams],
+  );
 
   const activeFilterBadges = useMemo(() => {
     const labelsFor = (options: FilterOption[], selectedValues: string[]) =>
@@ -179,8 +289,6 @@ export default function TeamListPage() {
     selectedLevels,
   ]);
 
-  const hasActiveFilters = activeFilterBadges.length > 0;
-
   const clearFilters = () => {
     setSelectedAssociationIds([]);
     setSelectedCompetitionNames([]);
@@ -193,18 +301,14 @@ export default function TeamListPage() {
       <PageHeader
         title="Teams"
         subtitle={
-          activeSeason
-            ? `Create teams and manage contact details for the ${activeSeason.name} Season.`
-            : displaySeason
-              ? `Create teams and manage contact details. Competition assignments shown for ${displaySeason.name} Season.`
-              : 'Create teams and manage contact details.'
+          effectiveSeason
+            ? `Manage team records, competition context, managers, and venue defaults for ${effectiveSeason.name}.`
+            : 'Manage team records, competition context, managers, and venue defaults.'
         }
         actions={(
           <>
-            <FilterPanelTrigger count={activeFilterBadges.length} onClick={() => setFiltersOpen((open) => !open)} />
-            <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
-              Add Team
-            </Button>
+            <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((open) => !open)} />
+            <Button type="button" onClick={openCreateTeam}>Add Team</Button>
           </>
         )}
       />
@@ -216,306 +320,275 @@ export default function TeamListPage() {
         badges={activeFilterBadges}
         onClear={clearFilters}
       >
-        <FilterPillGroup
-          label="Association"
-          options={associationOptions}
-          values={selectedAssociationIds}
-          onChange={setSelectedAssociationIds}
-          tone="sky"
-        />
-        <FilterPillGroup
-          label="Competition"
-          options={competitionOptions}
-          values={selectedCompetitionNames}
-          onChange={setSelectedCompetitionNames}
-          tone="violet"
-        />
-        <FilterPillGroup
-          label="Age Group"
-          options={ageGroupOptions}
-          values={selectedAgeGroups}
-          onChange={setSelectedAgeGroups}
-          tone="emerald"
-        />
-        <FilterPillGroup
-          label="Level"
-          options={levelOptions}
-          values={selectedLevels}
-          onChange={setSelectedLevels}
-          tone="amber"
-        />
+        <FilterPillGroup label="Association" options={associationOptions} values={selectedAssociationIds} onChange={setSelectedAssociationIds} tone="sky" />
+        <FilterPillGroup label="Competition" options={competitionOptions} values={selectedCompetitionNames} onChange={setSelectedCompetitionNames} tone="violet" />
+        <FilterPillGroup label="Age Group" options={ageGroupOptions} values={selectedAgeGroups} onChange={setSelectedAgeGroups} tone="emerald" />
+        <FilterPillGroup label="Level" options={levelOptions} values={selectedLevels} onChange={setSelectedLevels} tone="amber" />
       </FilterPanel>
 
-      <Card className="overflow-hidden">
-        <div className="divide-y divide-slate-200 bg-white lg:hidden dark:divide-slate-800 dark:bg-slate-950/20">
-          {filteredTeams.map((t) => (
-            <div key={t.id} className="p-4">
+      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+        {filteredTeams.map((team) => {
+          const assignment = assignmentByTeamId[team.id];
+          const secondaryMemberships = team.memberships.filter((membership) => !membership.is_primary);
+
+          return (
+            <Card key={team.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{t.name}</div>
-                  <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t.association_name || '—'}</div>
-
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
-                    <span className="whitespace-nowrap">Ranking: {t.myhockey_ranking ?? '—'}</span>
-                    <span className="whitespace-nowrap font-medium text-slate-700 dark:text-slate-300">
-                      {t.wins}-{t.losses}-{t.ties}
-                    </span>
+                <div className="flex min-w-0 items-start gap-3">
+                  <TeamLogo
+                    name={team.name}
+                    logoUrl={team.logo_url}
+                    className="h-12 w-12 rounded-2xl"
+                    initialsClassName="text-sm"
+                  />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{team.name}</div>
+                      <Badge variant="outline">{team.age_group} {team.level}</Badge>
+                    </div>
+                    <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">{team.association_name || 'No association'}</div>
                   </div>
-
-                  {t.primary_membership && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Badge variant={getCompetitionBadgeVariant(t.primary_membership.competition_type)}>
-                        {t.primary_membership.competition_short_name} • {t.primary_membership.division_name}
-                      </Badge>
-                      {t.memberships.filter((membership) => !membership.is_primary).map((membership) => (
-                        <Badge key={membership.id} variant="outline">
-                          {getCompetitionLabel(membership.competition_type)}: {membership.competition_short_name}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-
-                  {(t.manager_name || t.manager_email) && (
-                    <div className="mt-2 text-sm text-slate-700 dark:text-slate-300">
-                      {t.manager_email ? (
-                        <a
-                          href={`mailto:${t.manager_email}`}
-                          className={accentLinkClass}
-                        >
-                          {t.manager_name || 'Email'}
-                        </a>
-                      ) : (
-                        <span className="text-slate-900 dark:text-slate-100">{t.manager_name}</span>
-                      )}
-                    </div>
-                  )}
                 </div>
-
                 <div className="flex items-center gap-1">
-                  <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(t)} aria-label="Edit" className={tableActionButtonClass}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={tableActionButtonClass}
+                    onClick={() => openAssignmentModal(team)}
+                    aria-label="Edit venue assignment"
+                    title="Edit venue assignment"
+                  >
+                    <MapPinned className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={tableActionButtonClass}
+                    onClick={() => openEditTeam(team)}
+                    aria-label="Edit team"
+                    title="Edit team"
+                  >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(t.id)} aria-label="Delete" className={tableActionButtonClass}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={tableActionButtonClass}
+                    onClick={() => deleteTeam(team)}
+                    aria-label="Delete team"
+                    title="Delete team"
+                  >
                     <Trash2 className="h-4 w-4 text-rose-600" />
                   </Button>
                 </div>
               </div>
-            </div>
-          ))}
 
-          {loading && (
-            <CardListSkeleton count={3} />
-          )}
-          {!loading && teams.length === 0 && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-              No teams yet. Add one or seed demo data.
-            </div>
-          )}
-          {!loading && teams.length > 0 && filteredTeams.length === 0 && (
-            <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-              No teams match the current filters.
-            </div>
-          )}
-        </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {assignment ? (
+                  <>
+                    <Badge variant="outline">{assignment.arena_name}</Badge>
+                    <Badge variant="outline">{assignment.arena_rink_name}</Badge>
+                    {assignment.default_locker_room_name ? (
+                      <Badge variant="outline">{assignment.default_locker_room_name}</Badge>
+                    ) : null}
+                  </>
+                ) : (
+                  <Badge variant="outline">No venue assignment</Badge>
+                )}
+              </div>
 
-        <div className="hidden lg:block">
-          <table className="w-full table-fixed text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-300">
-              <tr>
-                <th scope="col" className="w-[21%] px-3 py-3">Name</th>
-                <th scope="col" className="w-[15%] px-3 py-3">Association</th>
-                <th scope="col" className="w-[16%] px-3 py-3">Primary Competition</th>
-                <th scope="col" className="w-[13%] px-3 py-3 leading-tight">Other Comps</th>
-                <th scope="col" className="w-[7%] px-3 py-3 text-center">Rank</th>
-                <th scope="col" className="w-[8%] px-3 py-3">Record</th>
-                <th scope="col" className="w-[13%] px-3 py-3">Manager</th>
-                <th scope="col" className="w-[8%] px-3 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
-              {filteredTeams.map((t) => (
-                <tr key={t.id} className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
-                  <td className="px-3 py-3 font-medium text-slate-900 dark:text-slate-100">{t.name}</td>
-                  <td className="px-3 py-3 text-slate-700 dark:text-slate-300">{t.association_name}</td>
-                  <td className="px-3 py-3 text-slate-700 dark:text-slate-300">
-                    {t.primary_membership ? (
-                      <div className="min-w-0 space-y-1">
-                        <div className="font-medium text-slate-900 dark:text-slate-100">
-                          {t.primary_membership.competition_short_name}
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
-                          {t.primary_membership.division_name}
-                        </div>
-                      </div>
-                    ) : '—'}
-                  </td>
-                  <td className="px-3 py-3 text-slate-700 dark:text-slate-300">
-                    {t.memberships.filter((membership) => !membership.is_primary).length ? (
-                      <div className="min-w-0 flex flex-wrap gap-1.5">
-                        {t.memberships.filter((membership) => !membership.is_primary).map((membership) => (
-                          <Badge key={membership.id} variant="outline" className="max-w-full px-2 py-0.5 whitespace-normal break-words text-center leading-tight">
-                            {membership.competition_short_name}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : '—'}
-                  </td>
-                  <td className="px-3 py-3 text-center text-slate-700 dark:text-slate-300">{t.myhockey_ranking ?? '-'}</td>
-                  <td className="px-3 py-3 font-medium text-slate-700 dark:text-slate-300">{t.wins}-{t.losses}-{t.ties}</td>
-                  <td className="px-3 py-3 text-slate-700 dark:text-slate-300">
-                    {t.manager_name ? (
-                      t.manager_email ? (
-                        <a
-                          href={`mailto:${t.manager_email}`}
-                          className="text-slate-900 underline underline-offset-2 hover:text-slate-950 dark:text-slate-100 dark:hover:text-white"
-                        >
-                          {t.manager_name}
-                        </a>
-                      ) : (
-                        <span className="text-slate-900 dark:text-slate-100">{t.manager_name}</span>
-                      )
-                    ) : t.manager_email ? (
-                      <a
-                        href={`mailto:${t.manager_email}`}
-                        className="text-slate-900 underline underline-offset-2 hover:text-slate-950 dark:text-slate-100 dark:hover:text-white"
-                      >
-                        Email
+              <div className="mt-3 flex flex-wrap gap-2">
+                {team.primary_membership ? (
+                  <Badge variant={getCompetitionBadgeVariant(team.primary_membership.competition_type)}>
+                    {team.primary_membership.competition_short_name} • {team.primary_membership.division_name}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline">No primary competition</Badge>
+                )}
+                {secondaryMemberships.map((membership) => (
+                  <Badge key={membership.id} variant="outline">
+                    {getCompetitionLabel(membership.competition_type)} • {membership.competition_short_name}
+                  </Badge>
+                ))}
+                <div className="inline-flex min-h-8 items-center gap-2 rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1.5 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Manager</span>
+                  <span className="font-medium text-slate-900 dark:text-slate-100">
+                    {team.manager_email ? (
+                      <a href={`mailto:${team.manager_email}`} className={accentLinkClass}>
+                        {team.manager_name || team.manager_email}
                       </a>
                     ) : (
-                      '-'
+                      team.manager_name || '—'
                     )}
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex justify-end gap-0.5">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(t)} aria-label="Edit" className={tableActionButtonClass}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(t.id)} aria-label="Delete" className={tableActionButtonClass}>
-                        <Trash2 className="h-4 w-4 text-rose-600" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                  </span>
+                  {team.manager_phone ? (
+                    <a href={`tel:${team.manager_phone}`} className={accentLinkClass} aria-label={`Call ${team.manager_name || team.name} manager`}>
+                      <Phone className="h-3.5 w-3.5" />
+                    </a>
+                  ) : null}
+                </div>
+              </div>
 
-              {loading && (
-                <tr>
-                  <td colSpan={8} className="p-0">
-                    <TableSkeleton columns={8} rows={4} compact />
-                  </td>
-                </tr>
-              )}
-              {!loading && teams.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                    No teams yet. Add one or seed demo data.
-                  </td>
-                </tr>
-              )}
-              {!loading && teams.length > 0 && filteredTeams.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
-                    No teams match the current filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/35">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Rank</div>
+                  <div className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{team.myhockey_ranking ?? '—'}</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/35">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Record</div>
+                  <div className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{team.wins}-{team.losses}-{team.ties}</div>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+
+        {filteredTeams.length === 0 ? (
+          <Card className="p-6 text-sm text-slate-600 dark:text-slate-400">
+            {teams.length === 0 ? 'No teams yet. Add one to start managing seasons and venues.' : 'No teams match the current filters.'}
+          </Card>
+        ) : null}
+      </div>
 
       <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title={`${editId ? 'Edit' : 'Add'} Team`}
-        footer={
+        open={teamModalOpen}
+        onClose={() => {
+          setTeamModalOpen(false);
+          setTeamLogoFile(null);
+          setRemoveTeamLogo(false);
+        }}
+        title={editTeam ? 'Edit Team' : 'Add Team'}
+        footer={(
           <>
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={!form.name || !form.association_id || !form.age_group || !form.level}
-            >
+            <Button type="button" onClick={saveTeam} disabled={!teamForm.name || !teamForm.association_id || !teamForm.age_group || !teamForm.level}>
               Save
             </Button>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setTeamModalOpen(false)}>
               Cancel
             </Button>
           </>
-        }
+        )}
       >
         <div className="grid grid-cols-1 gap-3">
+          <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-950/35">
+            <TeamLogo
+              name={teamForm.name || editTeam?.name || ''}
+              logoUrl={teamLogoPreviewUrl}
+              className="h-16 w-16 rounded-2xl"
+              initialsClassName="text-lg"
+            />
+            <div className="min-w-0 flex-1">
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Team Logo</label>
+              <input
+                type="file"
+                accept=".png,.jpg,.jpeg,.webp,.svg"
+                className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-full file:border-0 file:bg-sky-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-sky-800 hover:file:bg-sky-200 dark:text-slate-300 dark:file:bg-sky-950/40 dark:file:text-sky-100 dark:hover:file:bg-sky-950/60"
+                onChange={(event) => {
+                  const nextFile = event.target.files?.[0] ?? null;
+                  setTeamLogoFile(nextFile);
+                  setRemoveTeamLogo(false);
+                }}
+              />
+              {editTeam?.logo_url || teamLogoFile ? (
+                <div className="mt-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setTeamLogoFile(null);
+                      setRemoveTeamLogo(true);
+                    }}
+                  >
+                    Remove Logo
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Association</label>
-            <Select
-              value={form.association_id}
-              onChange={(e) => setField('association_id', e.target.value)}
-              required
-              disabled={!!editId}
-            >
-              <option value="" disabled>
-                Select association…
-              </option>
-              {associations.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
+            <Select value={teamForm.association_id} onChange={(event) => setTeamField('association_id', event.target.value)}>
+              <option value="">Select association…</option>
+              {associations.map((association) => (
+                <option key={association.id} value={association.id}>{association.name}</option>
               ))}
             </Select>
           </div>
-
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Team Name</label>
-            <Input value={form.name} onChange={(e) => setField('name', e.target.value)} required />
+            <Input value={teamForm.name} onChange={(event) => setTeamField('name', event.target.value)} />
           </div>
-
           <AgeLevelSelect
-            ageGroup={form.age_group}
-            level={form.level}
-            onAgeGroupChange={(v) => setField('age_group', v)}
-            onLevelChange={(v) => setField('level', v)}
+            ageGroup={teamForm.age_group}
+            level={teamForm.level}
+            onAgeGroupChange={(value) => setTeamField('age_group', value)}
+            onLevelChange={(value) => setTeamField('level', value)}
           />
-
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Manager Name</label>
-            <Input value={form.manager_name} onChange={(e) => setField('manager_name', e.target.value)} />
+            <Input value={teamForm.manager_name} onChange={(event) => setTeamField('manager_name', event.target.value)} />
           </div>
-
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Email</label>
-              <Input value={form.manager_email} onChange={(e) => setField('manager_email', e.target.value)} />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Phone</label>
-              <Input value={form.manager_phone} onChange={(e) => setField('manager_phone', e.target.value)} />
-            </div>
+            <Input value={teamForm.manager_email} onChange={(event) => setTeamField('manager_email', event.target.value)} placeholder="Manager email" />
+            <Input value={teamForm.manager_phone} onChange={(event) => setTeamField('manager_phone', event.target.value)} placeholder="Manager phone" />
           </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink City</label>
-              <Input value={form.rink_city} onChange={(e) => setField('rink_city', e.target.value)} />
-            </div>
-            <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">State</label>
-              <Input value={form.rink_state} onChange={(e) => setField('rink_state', e.target.value)} />
-            </div>
-            <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Zip</label>
-              <Input value={form.rink_zip} onChange={(e) => setField('rink_zip', e.target.value)} />
-            </div>
-          </div>
-
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">MyHockey Ranking</label>
-            <Input
-              type="number"
-              inputMode="numeric"
-              value={form.myhockey_ranking}
-              onChange={(e) => setField('myhockey_ranking', e.target.value)}
-            />
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">MYHockey Ranking</label>
+            <Input type="number" value={teamForm.myhockey_ranking} onChange={(event) => setTeamField('myhockey_ranking', event.target.value)} />
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        open={assignmentModalOpen}
+        onClose={() => setAssignmentModalOpen(false)}
+        title="Team Venue Assignment"
+        footer={(
+          <>
+            <Button type="button" onClick={saveAssignment} disabled={!effectiveSeason || !assignmentTeamId || !assignmentArenaId || !assignmentArenaRinkId}>
+              Save
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setAssignmentModalOpen(false)}>Cancel</Button>
+          </>
+        )}
+      >
+        {!effectiveSeason ? (
+          <div className="text-sm text-slate-600 dark:text-slate-400">Select a season to set venue defaults.</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Arena</label>
+              <Select value={assignmentArenaId} onChange={(event) => setAssignmentArenaId(event.target.value)}>
+                <option value="">Select arena…</option>
+                {arenas.map((arena) => (
+                  <option key={arena.id} value={arena.id}>{arena.name}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Arena Rink</label>
+              <Select value={assignmentArenaRinkId} onChange={(event) => setAssignmentArenaRinkId(event.target.value)}>
+                <option value="">Select rink…</option>
+                {arenaRinks.map((arenaRink) => (
+                  <option key={arenaRink.id} value={arenaRink.id}>{arenaRink.name}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Default Locker Room</label>
+              <Select value={assignmentLockerRoomId} onChange={(event) => setAssignmentLockerRoomId(event.target.value)}>
+                <option value="">No default locker room</option>
+                {lockerRooms.map((lockerRoom) => (
+                  <option key={lockerRoom.id} value={lockerRoom.id}>{lockerRoom.name}</option>
+                ))}
+              </Select>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

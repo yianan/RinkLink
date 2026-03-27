@@ -4,15 +4,17 @@ from collections import defaultdict
 
 from sqlalchemy.orm import Session, joinedload
 
-from ..models import Competition, CompetitionDivision, Game, Team, TeamCompetitionMembership
+from ..models import Competition, CompetitionDivision, Event, Team, TeamCompetitionMembership
 from ..schemas import CompetitionDivisionOut, CompetitionOut, StandingsEntry, TeamCompetitionMembershipOut
+from .team_logos import effective_team_logo_url
 
 COMPETITION_ORDER = {
     "league": 0,
-    "state_tournament": 1,
-    "district": 2,
-    "showcase": 3,
-    "festival": 4,
+    "tournament": 1,
+    "showcase": 2,
+    "scrimmage": 3,
+    "exhibition": 4,
+    "practice": 5,
 }
 
 
@@ -185,37 +187,37 @@ def shared_divisions_for_teams(
     return shared
 
 
-def normalize_game_competition(game: Game, db: Session) -> None:
-    if not game.season_id or not game.game_type:
-        game.competition_division_id = None
-        game.counts_for_standings = False
+def normalize_event_competition(event: Event, db: Session) -> None:
+    if not event.season_id or not event.event_type or not event.away_team_id:
+        event.competition_division_id = None
+        event.counts_for_standings = False
         return
-    competition_type = game.game_type
-    if competition_type not in {"league", "district", "state_tournament", "showcase"}:
-        game.competition_division_id = None
-        game.counts_for_standings = False
+    competition_type = event.event_type
+    if competition_type not in {"league", "showcase", "tournament"}:
+        event.competition_division_id = None
+        event.counts_for_standings = False
         return
     shared = shared_divisions_for_teams(
         db,
-        game.home_team_id,
-        game.away_team_id,
-        game.season_id,
-        competition_type=competition_type,
-        standings_only=True if competition_type == "league" else None,
+        event.home_team_id,
+        event.away_team_id,
+        event.season_id,
+        competition_type="league" if competition_type == "league" else competition_type,
+        standings_only=True if competition_type == "league" else False,
     )
     if len(shared) == 1:
-        game.competition_division_id = shared[0].id
-        game.counts_for_standings = shared[0].standings_enabled
+        event.competition_division_id = shared[0].id
+        event.counts_for_standings = competition_type == "league" and shared[0].standings_enabled
         return
-    if game.competition_division_id:
-        division = db.get(CompetitionDivision, game.competition_division_id)
-        if division and division.season_id == game.season_id:
+    if event.competition_division_id:
+        division = db.get(CompetitionDivision, event.competition_division_id)
+        if division and division.season_id == event.season_id:
             competition = division.competition
-            if competition and competition.competition_type == competition_type:
-                game.counts_for_standings = division.standings_enabled
+            if competition and competition.competition_type == ("league" if competition_type == "league" else competition_type):
+                event.counts_for_standings = competition_type == "league" and division.standings_enabled
                 return
-    game.competition_division_id = None
-    game.counts_for_standings = False
+    event.competition_division_id = None
+    event.counts_for_standings = False
 
 
 def division_standings(db: Session, division_id: str) -> list[StandingsEntry]:
@@ -243,13 +245,13 @@ def division_standings(db: Session, division_id: str) -> list[StandingsEntry]:
         if teams[team_id]
     }
     games = (
-        db.query(Game)
+        db.query(Event)
         .filter(
-            Game.competition_division_id == division_id,
-            Game.counts_for_standings == True,  # noqa: E712
-            Game.status == "final",
-            Game.home_score.isnot(None),
-            Game.away_score.isnot(None),
+            Event.competition_division_id == division_id,
+            Event.counts_for_standings == True,  # noqa: E712
+            Event.status == "final",
+            Event.home_score.isnot(None),
+            Event.away_score.isnot(None),
         )
         .all()
     )
@@ -276,6 +278,7 @@ def division_standings(db: Session, division_id: str) -> list[StandingsEntry]:
             StandingsEntry(
                 team_id=team.id,
                 team_name=team.name,
+                logo_url=effective_team_logo_url(team, team.association),
                 association_name=team.association.name if team.association else None,
                 age_group=team.age_group,
                 level=team.level,

@@ -4,10 +4,10 @@ import datetime as dt
 
 from pydantic import BaseModel, Field
 
-from .game import GameOut
+from .event import EventOut
 
 
-class GamePlayerStatUpsert(BaseModel):
+class EventPlayerStatUpsert(BaseModel):
     team_id: str
     player_id: str
     goals: int = 0
@@ -15,9 +15,9 @@ class GamePlayerStatUpsert(BaseModel):
     shots_on_goal: int = 0
 
 
-class GamePlayerStatOut(BaseModel):
+class EventPlayerStatOut(BaseModel):
     id: str
-    game_id: str
+    event_id: str
     team_id: str
     player_id: str
     goals: int
@@ -30,19 +30,19 @@ class GamePlayerStatOut(BaseModel):
 
 
 class UpsertPlayerStats(BaseModel):
-    stats: list[GamePlayerStatUpsert] = Field(default_factory=list)
+    stats: list[EventPlayerStatUpsert] = Field(default_factory=list)
 
 
-class GamePenaltyCreate(BaseModel):
+class EventPenaltyCreate(BaseModel):
     team_id: str
     player_id: str | None = None
     penalty_type: str
     minutes: int = 2
 
 
-class GamePenaltyOut(BaseModel):
+class EventPenaltyOut(BaseModel):
     id: str
-    game_id: str
+    event_id: str
     team_id: str
     player_id: str | None
     penalty_type: str
@@ -53,7 +53,7 @@ class GamePenaltyOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class GameGoalieStatUpsert(BaseModel):
+class EventGoalieStatUpsert(BaseModel):
     team_id: str
     player_id: str
     saves: int = 0
@@ -61,9 +61,9 @@ class GameGoalieStatUpsert(BaseModel):
     shootout_saves: int = 0
 
 
-class GameGoalieStatOut(BaseModel):
+class EventGoalieStatOut(BaseModel):
     id: str
-    game_id: str
+    event_id: str
     team_id: str
     player_id: str
     saves: int
@@ -76,18 +76,18 @@ class GameGoalieStatOut(BaseModel):
 
 
 class UpsertGoalieStats(BaseModel):
-    stats: list[GameGoalieStatUpsert] = Field(default_factory=list)
+    stats: list[EventGoalieStatUpsert] = Field(default_factory=list)
 
 
-class GameSignatureCreate(BaseModel):
+class EventSignatureCreate(BaseModel):
     role: str
     signer_name: str
     team_id: str | None = None
 
 
-class GameSignatureOut(BaseModel):
+class EventSignatureOut(BaseModel):
     id: str
-    game_id: str
+    event_id: str
     team_id: str | None
     role: str
     signer_name: str
@@ -98,10 +98,9 @@ class GameSignatureOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class GameScoresheetOut(BaseModel):
-    game: GameOut
-    player_stats: list[GamePlayerStatOut]
-    penalties: list[GamePenaltyOut]
-    goalie_stats: list[GameGoalieStatOut]
-    signatures: list[GameSignatureOut]
-
+class EventScoresheetOut(BaseModel):
+    event: EventOut
+    player_stats: list[EventPlayerStatOut]
+    penalties: list[EventPenaltyOut]
+    goalie_stats: list[EventGoalieStatOut]
+    signatures: list[EventSignatureOut]

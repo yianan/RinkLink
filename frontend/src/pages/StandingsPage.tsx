@@ -8,6 +8,7 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import PageHeader from '../components/PageHeader';
+import TeamLogo from '../components/TeamLogo';
 import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
 
 function divisionLabel(division: CompetitionDivision) {
@@ -182,12 +183,15 @@ export default function StandingsPage() {
             {standings.map((entry, index) => (
               <Card key={entry.team_id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-bold text-slate-400 dark:text-slate-500">#{index + 1}</span>
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{entry.team_name}</span>
+                  <div className="flex items-center gap-3">
+                    <TeamLogo name={entry.team_name} logoUrl={entry.logo_url} className="h-11 w-11 rounded-xl" initialsClassName="text-sm" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-bold text-slate-400 dark:text-slate-500">#{index + 1}</span>
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{entry.team_name}</span>
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{entry.association_name || '—'}</div>
                     </div>
-                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{entry.association_name || '—'}</div>
                   </div>
                   <Badge variant="info">{entry.points} pts</Badge>
                 </div>
@@ -220,7 +224,12 @@ export default function StandingsPage() {
                   {standings.map((entry, index) => (
                     <tr key={entry.team_id} className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                       <td className="px-4 py-3 font-bold text-slate-400 dark:text-slate-500">{index + 1}</td>
-                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{entry.team_name}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <TeamLogo name={entry.team_name} logoUrl={entry.logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+                          <div className="font-medium text-slate-900 dark:text-slate-100">{entry.team_name}</div>
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{entry.association_name || '—'}</td>
                       <td className="px-4 py-3 text-center text-slate-700 dark:text-slate-300">{entry.games_played}</td>
                       <td className="px-4 py-3 text-center text-slate-700 dark:text-slate-300">{entry.wins}</td>

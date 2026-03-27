@@ -15,6 +15,7 @@ import { Select } from '../components/ui/Select';
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
 import EmptyState from '../components/EmptyState';
+import TeamLogo from '../components/TeamLogo';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { tableActionButtonClass } from '../lib/uiClasses';
@@ -116,7 +117,6 @@ export default function RosterPage() {
           </Button>
         )}
       />
-
       <SegmentedTabs
         items={[
           { label: `Players (${players.length})`, value: 0 },

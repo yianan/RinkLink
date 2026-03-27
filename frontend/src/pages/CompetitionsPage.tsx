@@ -12,6 +12,7 @@ import { Card } from '../components/ui/Card';
 import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
 import { FilterPanel, FilterPanelTrigger } from '../components/FilterPanel';
 import PageHeader from '../components/PageHeader';
+import TeamLogo from '../components/TeamLogo';
 import { CardListSkeleton } from '../components/ui/TableSkeleton';
 import { cn } from '../lib/cn';
 import { accentLinkClass } from '../lib/uiClasses';
@@ -236,7 +237,7 @@ export default function CompetitionsPage() {
         subtitle={`Leagues and other assigned competitions for the ${effectiveSeason.name} Season.`}
         actions={(
           <div className="shrink-0">
-            <FilterPanelTrigger count={activeFilterBadges.length} onClick={() => setFiltersOpen((open) => !open)} />
+            <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((open) => !open)} />
           </div>
         )}
       />
@@ -426,15 +427,18 @@ export default function CompetitionsPage() {
                                     className="rounded-xl border border-white/70 bg-white/80 px-3 py-2.5 dark:border-white/5 dark:bg-slate-950/35"
                                   >
                                     <div className="flex items-start justify-between gap-3">
-                                      <div className="min-w-0">
-                                        <button
-                                          type="button"
-                                          onClick={() => openTeamDashboard(team)}
-                                          className={`block max-w-full cursor-pointer truncate text-left text-sm font-medium text-slate-900 transition-colors hover:text-[color:var(--app-accent-link-hover)] dark:text-slate-100 ${accentLinkClass}`}
-                                        >
-                                          {team.name}
-                                        </button>
-                                        <div className="truncate text-xs text-slate-500 dark:text-slate-400">{team.association_name}</div>
+                                      <div className="flex min-w-0 items-center gap-3">
+                                        <TeamLogo name={team.name} logoUrl={team.logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+                                        <div className="min-w-0">
+                                          <button
+                                            type="button"
+                                            onClick={() => openTeamDashboard(team)}
+                                            className={`block max-w-full cursor-pointer truncate text-left text-sm font-medium text-slate-900 transition-colors hover:text-[color:var(--app-accent-link-hover)] dark:text-slate-100 ${accentLinkClass}`}
+                                          >
+                                            {team.name}
+                                          </button>
+                                          <div className="truncate text-xs text-slate-500 dark:text-slate-400">{team.association_name}</div>
+                                        </div>
                                       </div>
                                       {division.standings_enabled && standings ? (
                                         <Badge variant="info" className="shrink-0">{standings.points} pts</Badge>

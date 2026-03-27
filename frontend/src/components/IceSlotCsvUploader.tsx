@@ -9,11 +9,11 @@ import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 
 interface Props {
-  rinkId: string;
+  arenaRinkId: string;
   onConfirmed: () => void;
 }
 
-export default function IceSlotCsvUploader({ rinkId, onConfirmed }: Props) {
+export default function IceSlotCsvUploader({ arenaRinkId, onConfirmed }: Props) {
   const [preview, setPreview] = useState<IceSlotUploadPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -23,20 +23,20 @@ export default function IceSlotCsvUploader({ rinkId, onConfirmed }: Props) {
     setError('');
     setLoading(true);
     try {
-      const result = await api.uploadIceSlots(rinkId, file);
+      const result = await api.uploadIceSlots(arenaRinkId, file);
       setPreview(result);
     } catch (e) {
       setError(String(e));
     } finally {
       setLoading(false);
     }
-  }, [rinkId]);
+  }, [arenaRinkId]);
 
   const handleConfirm = async () => {
     if (!preview) return;
     setLoading(true);
     try {
-      await api.confirmIceSlotUpload(rinkId, preview.entries);
+      await api.confirmIceSlotUpload(arenaRinkId, preview.entries);
       setPreview(null);
       onConfirmed();
     } catch (e) {
@@ -83,7 +83,7 @@ export default function IceSlotCsvUploader({ rinkId, onConfirmed }: Props) {
               <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Expected columns: Date, Start Time, End Time, Notes</div>
 
               <div className="mt-5 flex items-center justify-center">
-                <Button type="button" variant="outline" onClick={() => document.getElementById('ice-slot-csv-input')?.click()}>
+              <Button type="button" variant="outline" onClick={() => document.getElementById('ice-slot-csv-input')?.click()}>
                   Browse Files
                 </Button>
                 <input

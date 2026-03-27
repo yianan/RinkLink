@@ -3,7 +3,7 @@ import io
 import re
 from datetime import date, time
 
-from ..schemas.schedule_entry import ScheduleUploadRow, ScheduleUploadPreview
+from ..schemas.availability_window import AvailabilityUploadPreview, AvailabilityUploadRow
 
 # Normalized header names -> canonical field
 HEADER_MAP = {
@@ -12,20 +12,16 @@ HEADER_MAP = {
     "time": "time",
     "game time": "time",
     "start time": "time",
-    "home/away": "entry_type",
-    "homeaway": "entry_type",
-    "home_away": "entry_type",
-    "type": "entry_type",
-    "h/a": "entry_type",
-    "opponent": "opponent_name",
-    "opponent name": "opponent_name",
-    "opp": "opponent_name",
-    "location": "location",
-    "rink": "location",
-    "venue": "location",
+    "home/away": "availability_type",
+    "homeaway": "availability_type",
+    "home_away": "availability_type",
+    "type": "availability_type",
+    "availability": "availability_type",
+    "h/a": "availability_type",
     "notes": "notes",
     "note": "notes",
     "comments": "notes",
+    "end time": "end_time",
 }
 
 
@@ -56,7 +52,7 @@ def _parse_time(val: str) -> time | None:
     return None
 
 
-def _parse_entry_type(val: str) -> str:
+def _parse_availability_type(val: str) -> str:
     v = val.strip().lower()
     if v in ("home", "h"):
         return "home"
@@ -65,14 +61,14 @@ def _parse_entry_type(val: str) -> str:
     raise ValueError(f"Unrecognized home/away value: {val}")
 
 
-def parse_csv(content: str) -> ScheduleUploadPreview:
-    """Parse CSV content into schedule entry previews."""
+def parse_csv(content: str) -> AvailabilityUploadPreview:
+    """Parse CSV content into availability upload previews."""
     warnings: list[str] = []
-    entries: list[ScheduleUploadRow] = []
+    entries: list[AvailabilityUploadRow] = []
 
     reader = csv.DictReader(io.StringIO(content))
     if not reader.fieldnames:
-        return ScheduleUploadPreview(entries=[], warnings=["Empty CSV or no headers found"])
+        return AvailabilityUploadPreview(entries=[], warnings=["Empty CSV or no headers found"])
 
     # Map headers
     field_map: dict[str, str] = {}
@@ -82,9 +78,9 @@ def parse_csv(content: str) -> ScheduleUploadPreview:
             field_map[raw_header] = HEADER_MAP[norm]
 
     if "date" not in field_map.values():
-        return ScheduleUploadPreview(entries=[], warnings=["No 'Date' column found in CSV"])
-    if "entry_type" not in field_map.values():
-        return ScheduleUploadPreview(entries=[], warnings=["No 'Home/Away' column found in CSV"])
+        return AvailabilityUploadPreview(entries=[], warnings=["No 'Date' column found in CSV"])
+    if "availability_type" not in field_map.values():
+        return AvailabilityUploadPreview(entries=[], warnings=["No 'Home/Away' column found in CSV"])
 
     for i, row in enumerate(reader, start=2):
         try:
@@ -94,17 +90,19 @@ def parse_csv(content: str) -> ScheduleUploadPreview:
 
             d = _parse_date(mapped["date"])
             t = _parse_time(mapped.get("time", ""))
-            et = _parse_entry_type(mapped["entry_type"])
-            opp = mapped.get("opponent_name") or None
-            loc = mapped.get("location") or None
+            et = _parse_availability_type(mapped["availability_type"])
             notes = mapped.get("notes") or None
-            status = "scheduled" if opp else "open"
+            end_t = _parse_time(mapped.get("end_time", ""))
 
-            entries.append(ScheduleUploadRow(
-                date=d, time=t, entry_type=et,
-                opponent_name=opp, location=loc, notes=notes, status=status,
+            entries.append(AvailabilityUploadRow(
+                date=d,
+                start_time=t,
+                end_time=end_t,
+                availability_type=et,
+                notes=notes,
+                status="open",
             ))
         except (ValueError, KeyError) as e:
             warnings.append(f"Row {i}: {e}")
 
-    return ScheduleUploadPreview(entries=entries, warnings=warnings)
+    return AvailabilityUploadPreview(entries=entries, warnings=warnings)

@@ -4,207 +4,137 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import GameProposal, ScheduleEntry, Team, Association, Game, ProposalRinkPreference
-from ..models.rink import IceSlot, Rink
-from ..schemas import ProposalCreate, ProposalOut, ProposalRescheduleCreate
+from ..models import Arena, ArenaRink, AvailabilityWindow, Event, IceSlot, LockerRoom, Proposal, Team
+from ..schemas import EventCreate, ProposalCreate, ProposalOut, ProposalRescheduleCreate
+from ..services.competitions import normalize_event_competition
+from ..services.event_view import enrich_event
 from ..services.season_utils import resolve_season_id
+from ..services.arena_logos import arena_logo_url
+from ..services.team_logos import effective_team_logo_url
 
 router = APIRouter(tags=["proposals"])
 
-def _location_label_from_rink(rink: Rink) -> str:
-    city_state = ", ".join([p for p in [rink.city, rink.state] if p])
-    return f"{rink.name} — {city_state}" if city_state else rink.name
+
+def _validate_venue(db: Session, *, arena_id: str, arena_rink_id: str, ice_slot_id: str | None, locker_room_ids: tuple[str | None, str | None], proposal_date):
+    arena = db.get(Arena, arena_id)
+    if not arena:
+        raise HTTPException(404, "Arena not found")
+    arena_rink = db.get(ArenaRink, arena_rink_id)
+    if not arena_rink or arena_rink.arena_id != arena.id:
+        raise HTTPException(400, "Arena rink does not belong to arena")
+    if not ice_slot_id:
+        raise HTTPException(400, "An ice slot is required to send a proposal")
+    slot = db.get(IceSlot, ice_slot_id)
+    if not slot or slot.arena_rink_id != arena_rink.id:
+        raise HTTPException(400, "Ice slot does not belong to arena rink")
+    if slot.date != proposal_date:
+        raise HTTPException(400, "Ice slot date must match proposal date")
+    if slot.status != "available":
+        raise HTTPException(400, "Ice slot is not available")
+    for locker_room_id in locker_room_ids:
+        if not locker_room_id:
+            continue
+        locker_room = db.get(LockerRoom, locker_room_id)
+        if not locker_room or locker_room.arena_rink_id != arena_rink.id:
+            raise HTTPException(400, "Locker room does not belong to arena rink")
+    return arena, arena_rink, slot
 
 
-def _location_label_from_association(a: Association) -> str | None:
-    parts: list[str] = []
-    if a.home_rink_address:
-        parts.append(a.home_rink_address)
-    city_state = ", ".join([p for p in [a.city, a.state] if p])
-    if city_state and a.zip_code:
-        city_state = f"{city_state} {a.zip_code}"
-    if city_state:
-        parts.append(city_state)
-    elif a.zip_code:
-        parts.append(a.zip_code)
-
-    if not parts:
-        return None
-    return f"{a.name} Home Rink — {', '.join(parts)}" if a.name else ", ".join(parts)
-
-
-def _validate_rink_selection(
-    db: Session,
-    *,
-    rink_id: str,
-    ice_slot_id: str | None,
-    proposed_date,
-):
-    rink = db.get(Rink, rink_id)
-    if not rink:
-        raise HTTPException(404, "Rink not found")
-
-    slot = None
-    if ice_slot_id:
-        slot = db.get(IceSlot, ice_slot_id)
-        if not slot:
-            raise HTTPException(404, "Ice slot not found")
-        if slot.rink_id != rink.id:
-            raise HTTPException(400, "Selected ice slot does not belong to the chosen rink")
-        if slot.date != proposed_date:
-            raise HTTPException(400, "Selected ice slot does not match the proposed date")
-        if slot.status != "available":
-            raise HTTPException(400, "Selected ice slot is no longer available")
-
-    return rink, slot
-
-def _enrich(p: GameProposal, db: Session) -> ProposalOut:
-    home = db.get(Team, p.home_team_id)
-    away = db.get(Team, p.away_team_id)
-    home_assoc = db.get(Association, home.association_id) if home else None
-    away_assoc = db.get(Association, away.association_id) if away else None
-
-    home_entry = db.get(ScheduleEntry, p.home_schedule_entry_id)
-    away_entry = db.get(ScheduleEntry, p.away_schedule_entry_id)
-
-    slot = db.get(IceSlot, p.ice_slot_id) if p.ice_slot_id else None
-    rink = db.get(Rink, slot.rink_id) if slot else None
-    if not rink:
-        pref = db.get(ProposalRinkPreference, p.id)
-        if pref:
-            rink = db.get(Rink, pref.rink_id)
-
-    out = ProposalOut.model_validate(p)
-    if out.proposed_time is None:
-        out.proposed_time = home_entry.time if home_entry and home_entry.time is not None else (away_entry.time if away_entry else None)
-    out.home_team_name = home.name if home else None
-    out.away_team_name = away.name if away else None
-    out.home_team_association = home_assoc.name if home_assoc else None
-    out.away_team_association = away_assoc.name if away_assoc else None
-
-    if rink:
-        out.rink_name = rink.name
-        out.rink_address = rink.address
-        out.rink_city = rink.city
-        out.rink_state = rink.state
-        out.rink_zip = rink.zip_code
-
-    if slot:
-        out.ice_slot_date = slot.date
-        out.ice_slot_start_time = slot.start_time
-        out.ice_slot_end_time = slot.end_time
-        out.ice_slot_notes = slot.notes
-
-    if rink:
-        out.location_label = _location_label_from_rink(rink)
-    elif home_entry and home_entry.location:
-        out.location_label = home_entry.location
-    elif away_entry and away_entry.location:
-        out.location_label = away_entry.location
-    elif home_assoc:
-        out.location_label = _location_label_from_association(home_assoc)
-
+def _proposal_out(proposal: Proposal, db: Session) -> ProposalOut:
+    out = ProposalOut.model_validate(proposal)
+    out.home_team_name = proposal.home_team.name if proposal.home_team else None
+    out.away_team_name = proposal.away_team.name if proposal.away_team else None
+    out.home_team_logo_url = effective_team_logo_url(proposal.home_team, proposal.home_team.association if proposal.home_team else None)
+    out.away_team_logo_url = effective_team_logo_url(proposal.away_team, proposal.away_team.association if proposal.away_team else None)
+    out.home_team_association = proposal.home_team.association.name if proposal.home_team and proposal.home_team.association else None
+    out.away_team_association = proposal.away_team.association.name if proposal.away_team and proposal.away_team.association else None
+    out.arena_name = proposal.arena.name if proposal.arena else None
+    out.arena_logo_url = arena_logo_url(proposal.arena.logo_path if proposal.arena else None)
+    out.arena_rink_name = proposal.arena_rink.name if proposal.arena_rink else None
+    out.home_locker_room_name = proposal.home_locker_room.name if proposal.home_locker_room else None
+    out.away_locker_room_name = proposal.away_locker_room.name if proposal.away_locker_room else None
+    if proposal.ice_slot:
+        out.ice_slot_date = proposal.ice_slot.date
+        out.ice_slot_start_time = proposal.ice_slot.start_time
+        out.ice_slot_end_time = proposal.ice_slot.end_time
+        out.ice_slot_notes = proposal.ice_slot.notes
+    if proposal.arena and proposal.arena_rink:
+        out.location_label = f"{proposal.arena.name} > {proposal.arena_rink.name}"
     return out
+
+
+def _validate_windows(db: Session, home_window_id: str, away_window_id: str):
+    home_window = db.get(AvailabilityWindow, home_window_id)
+    away_window = db.get(AvailabilityWindow, away_window_id)
+    if not home_window or not away_window:
+        raise HTTPException(400, "Availability windows not found")
+    if home_window.status != "open" or away_window.status != "open":
+        raise HTTPException(400, "One or both availability windows are no longer open")
+    return home_window, away_window
 
 
 @router.post("/proposals", response_model=ProposalOut, status_code=201)
 def create_proposal(body: ProposalCreate, db: Session = Depends(get_db)):
-    # Validate entries exist and are open
-    home_entry = db.get(ScheduleEntry, body.home_schedule_entry_id)
-    away_entry = db.get(ScheduleEntry, body.away_schedule_entry_id)
-    if not home_entry or not away_entry:
-        raise HTTPException(400, "Schedule entries not found")
-    if home_entry.status != "open" or away_entry.status != "open":
-        raise HTTPException(400, "One or both schedule entries are no longer open")
-
+    _validate_windows(db, body.home_availability_window_id, body.away_availability_window_id)
+    _validate_venue(
+        db,
+        arena_id=body.arena_id,
+        arena_rink_id=body.arena_rink_id,
+        ice_slot_id=body.ice_slot_id,
+        locker_room_ids=(body.home_locker_room_id, body.away_locker_room_id),
+        proposal_date=body.proposed_date,
+    )
     existing = (
-        db.query(GameProposal)
+        db.query(Proposal)
         .filter(
             (
-                (GameProposal.home_schedule_entry_id == body.home_schedule_entry_id)
-                & (GameProposal.away_schedule_entry_id == body.away_schedule_entry_id)
+                (Proposal.home_availability_window_id == body.home_availability_window_id)
+                & (Proposal.away_availability_window_id == body.away_availability_window_id)
             )
             | (
-                (GameProposal.home_schedule_entry_id == body.away_schedule_entry_id)
-                & (GameProposal.away_schedule_entry_id == body.home_schedule_entry_id)
+                (Proposal.home_availability_window_id == body.away_availability_window_id)
+                & (Proposal.away_availability_window_id == body.home_availability_window_id)
             )
         )
-        .filter(GameProposal.status.in_(("proposed", "accepted")))
+        .filter(Proposal.status.in_(("proposed", "accepted")))
         .first()
     )
     if existing:
-        raise HTTPException(409, "A proposal already exists for these schedule entries")
-
-    rink, slot = _validate_rink_selection(
-        db,
-        rink_id=body.rink_id,
-        ice_slot_id=body.ice_slot_id,
-        proposed_date=body.proposed_date,
-    )
-
-    data = body.model_dump(exclude={"rink_id"})
-    if slot:
-        data["proposed_time"] = slot.start_time
-
-    proposal = GameProposal(**data)
+        raise HTTPException(409, "A proposal already exists for these availability windows")
+    proposal = Proposal(**body.model_dump())
     db.add(proposal)
-    db.flush()
-    db.add(ProposalRinkPreference(proposal_id=proposal.id, rink_id=rink.id))
-
     db.commit()
     db.refresh(proposal)
-    return _enrich(proposal, db)
+    return _proposal_out(proposal, db)
 
 
-@router.post("/proposals/{id}/reschedule", response_model=ProposalOut, status_code=201)
-def request_reschedule(id: str, body: ProposalRescheduleCreate, db: Session = Depends(get_db)):
-    base = db.get(GameProposal, id)
+@router.post("/proposals/{proposal_id}/reschedule", response_model=ProposalOut, status_code=201)
+def request_reschedule(proposal_id: str, body: ProposalRescheduleCreate, db: Session = Depends(get_db)):
+    base = db.get(Proposal, proposal_id)
     if not base:
         raise HTTPException(404, "Proposal not found")
     if base.status != "accepted":
         raise HTTPException(400, f"Cannot reschedule proposal with status '{base.status}'")
-    if body.proposed_by_team_id not in (base.home_team_id, base.away_team_id):
-        raise HTTPException(400, "Team is not part of this proposal")
-
-    existing = (
-        db.query(GameProposal)
-        .filter(
-            GameProposal.home_schedule_entry_id == base.home_schedule_entry_id,
-            GameProposal.away_schedule_entry_id == base.away_schedule_entry_id,
-            GameProposal.status == "proposed",
-        )
-        .first()
-    )
-    if existing:
-        raise HTTPException(400, "A reschedule request is already pending for this game")
-
-    rink, slot = _validate_rink_selection(
+    _validate_venue(
         db,
-        rink_id=body.rink_id,
+        arena_id=body.arena_id,
+        arena_rink_id=body.arena_rink_id,
         ice_slot_id=body.ice_slot_id,
-        proposed_date=body.proposed_date,
+        locker_room_ids=(body.home_locker_room_id, body.away_locker_room_id),
+        proposal_date=body.proposed_date,
     )
-
-    # Create a new proposal that reuses the same schedule entries and teams.
-    proposal = GameProposal(
+    proposal = Proposal(
         home_team_id=base.home_team_id,
         away_team_id=base.away_team_id,
-        home_schedule_entry_id=base.home_schedule_entry_id,
-        away_schedule_entry_id=base.away_schedule_entry_id,
-        proposed_date=body.proposed_date,
-        proposed_time=slot.start_time if slot else body.proposed_time,
+        home_availability_window_id=base.home_availability_window_id,
+        away_availability_window_id=base.away_availability_window_id,
         status="proposed",
-        proposed_by_team_id=body.proposed_by_team_id,
-        ice_slot_id=body.ice_slot_id,
-        message=body.message,
+        **body.model_dump(),
     )
     db.add(proposal)
-    db.flush()
-    db.add(ProposalRinkPreference(proposal_id=proposal.id, rink_id=rink.id))
-
     db.commit()
     db.refresh(proposal)
-    return _enrich(proposal, db)
+    return _proposal_out(proposal, db)
 
 
 @router.get("/teams/{team_id}/proposals", response_model=list[ProposalOut])
@@ -216,158 +146,101 @@ def list_proposals(
 ):
     if not db.get(Team, team_id):
         raise HTTPException(404, "Team not found")
-
-    q = db.query(GameProposal)
+    query = db.query(Proposal)
     if direction == "incoming":
-        # Proposals where this team needs to respond (they didn't propose it)
-        q = q.filter(
-            ((GameProposal.home_team_id == team_id) | (GameProposal.away_team_id == team_id)),
-            GameProposal.proposed_by_team_id != team_id,
+        query = query.filter(
+            ((Proposal.home_team_id == team_id) | (Proposal.away_team_id == team_id)),
+            Proposal.proposed_by_team_id != team_id,
         )
     elif direction == "outgoing":
-        q = q.filter(GameProposal.proposed_by_team_id == team_id)
+        query = query.filter(Proposal.proposed_by_team_id == team_id)
     else:
-        q = q.filter(
-            (GameProposal.home_team_id == team_id) | (GameProposal.away_team_id == team_id)
-        )
-
+        query = query.filter((Proposal.home_team_id == team_id) | (Proposal.away_team_id == team_id))
     if status:
-        q = q.filter(GameProposal.status == status)
+        query = query.filter(Proposal.status == status)
+    proposals = query.order_by(Proposal.proposed_date.asc(), Proposal.proposed_start_time.asc()).all()
+    return [_proposal_out(proposal, db) for proposal in proposals]
 
-    proposals = q.order_by(GameProposal.proposed_date.asc()).all()
-    return [_enrich(p, db) for p in proposals]
 
-
-@router.patch("/proposals/{id}/accept", response_model=ProposalOut)
-def accept_proposal(id: str, db: Session = Depends(get_db)):
-    proposal = db.get(GameProposal, id)
+@router.patch("/proposals/{proposal_id}/accept", response_model=ProposalOut)
+def accept_proposal(proposal_id: str, db: Session = Depends(get_db)):
+    proposal = db.get(Proposal, proposal_id)
     if not proposal:
         raise HTTPException(404, "Proposal not found")
     if proposal.status != "proposed":
         raise HTTPException(400, f"Cannot accept proposal with status '{proposal.status}'")
-
     proposal.status = "accepted"
     proposal.responded_at = datetime.now(timezone.utc)
 
-    # Update schedule entries
-    home_entry = db.get(ScheduleEntry, proposal.home_schedule_entry_id)
-    away_entry = db.get(ScheduleEntry, proposal.away_schedule_entry_id)
-
-    home_team = db.get(Team, proposal.home_team_id)
-    away_team = db.get(Team, proposal.away_team_id)
-
-    if home_entry:
-        home_entry.status = "scheduled"
-        home_entry.opponent_team_id = proposal.away_team_id
-        home_entry.opponent_name = away_team.name if away_team else None
-    if away_entry:
-        away_entry.status = "scheduled"
-        away_entry.opponent_team_id = proposal.home_team_id
-        away_entry.opponent_name = home_team.name if home_team else None
-
-    if proposal.proposed_time:
-        if home_entry:
-            home_entry.time = proposal.proposed_time
-        if away_entry:
-            away_entry.time = proposal.proposed_time
-    if home_entry:
-        home_entry.date = proposal.proposed_date
-    if away_entry:
-        away_entry.date = proposal.proposed_date
-
-    # Keep schedule entries' location in sync with the chosen rink/slot.
-    label = None
-    if proposal.ice_slot_id:
-        slot = db.get(IceSlot, proposal.ice_slot_id)
-        rink = db.get(Rink, slot.rink_id) if slot else None
-        if rink:
-            label = _location_label_from_rink(rink)
-    else:
-        pref = db.get(ProposalRinkPreference, proposal.id)
-        if pref:
-            rink = db.get(Rink, pref.rink_id)
-            if rink:
-                label = _location_label_from_rink(rink)
-
-    if label is None:
-        home_assoc = db.get(Association, home_team.association_id) if home_team else None
-        if home_assoc:
-            label = _location_label_from_association(home_assoc)
-
-    if label:
-        if home_entry:
-            home_entry.location = label
-        if away_entry:
-            away_entry.location = label
-
-    # Mark ice slot as booked if one was attached
-    # If we are rescheduling to a new slot, free the old one (best-effort).
-    existing_game = (
-        db.query(Game)
-        .filter((Game.proposal_id == proposal.id) | (
-            (Game.home_schedule_entry_id == proposal.home_schedule_entry_id)
-            & (Game.away_schedule_entry_id == proposal.away_schedule_entry_id)
-        ))
+    event = (
+        db.query(Event)
+        .filter(
+            (Event.proposal_id == proposal.id)
+            | (
+                (Event.home_availability_window_id == proposal.home_availability_window_id)
+                & (Event.away_availability_window_id == proposal.away_availability_window_id)
+            )
+        )
         .first()
     )
-    if existing_game and existing_game.ice_slot_id and existing_game.ice_slot_id != proposal.ice_slot_id:
-        old_slot = db.get(IceSlot, existing_game.ice_slot_id)
-        if old_slot and old_slot.status == "booked":
-            old_slot.status = "available"
-            old_slot.booked_by_team_id = None
-
-    if proposal.ice_slot_id:
-        ice_slot = db.get(IceSlot, proposal.ice_slot_id)
-        if ice_slot and ice_slot.status == "available":
-            ice_slot.status = "booked"
-            ice_slot.booked_by_team_id = proposal.home_team_id
-
-    # Create a game record for scoresheet + weekly confirmation
-    if existing_game:
-        game_time = proposal.proposed_time
-        if game_time is None and home_entry and home_entry.time is not None:
-            game_time = home_entry.time
-        if game_time is None and away_entry and away_entry.time is not None:
-            game_time = away_entry.time
-
-        existing_game.date = proposal.proposed_date
-        existing_game.time = game_time
-        existing_game.status = "scheduled"
-        existing_game.ice_slot_id = proposal.ice_slot_id
-        existing_game.proposal_id = proposal.id
-        existing_game.home_weekly_confirmed = False
-        existing_game.away_weekly_confirmed = False
+    payload = EventCreate(
+        event_type=proposal.event_type,
+        away_team_id=proposal.away_team_id,
+        home_availability_window_id=proposal.home_availability_window_id,
+        away_availability_window_id=proposal.away_availability_window_id,
+        season_id=resolve_season_id(db, proposal.proposed_date),
+        arena_id=proposal.arena_id,
+        arena_rink_id=proposal.arena_rink_id,
+        ice_slot_id=proposal.ice_slot_id,
+        home_locker_room_id=proposal.home_locker_room_id,
+        away_locker_room_id=proposal.away_locker_room_id,
+        date=proposal.proposed_date,
+        start_time=proposal.proposed_start_time,
+        end_time=proposal.proposed_end_time,
+        notes=proposal.message,
+    )
+    if event:
+        event.away_team_id = payload.away_team_id
+        event.home_availability_window_id = payload.home_availability_window_id
+        event.away_availability_window_id = payload.away_availability_window_id
+        event.season_id = payload.season_id
+        event.arena_id = payload.arena_id
+        event.arena_rink_id = payload.arena_rink_id
+        event.ice_slot_id = payload.ice_slot_id
+        event.home_locker_room_id = payload.home_locker_room_id
+        event.away_locker_room_id = payload.away_locker_room_id
+        event.date = payload.date
+        event.start_time = payload.start_time
+        event.end_time = payload.end_time
+        event.notes = payload.notes
+        event.status = "scheduled"
+        event.proposal_id = proposal.id
     else:
-        game_time = proposal.proposed_time
-        if game_time is None and home_entry and home_entry.time is not None:
-            game_time = home_entry.time
-        if game_time is None and away_entry and away_entry.time is not None:
-            game_time = away_entry.time
-        # Resolve the global season from the proposed date
-        game_season_id = None
-        if proposal.proposed_date:
-            game_season_id = resolve_season_id(db, proposal.proposed_date)
-        db.add(Game(
-            home_team_id=proposal.home_team_id,
-            away_team_id=proposal.away_team_id,
-            home_schedule_entry_id=proposal.home_schedule_entry_id,
-            away_schedule_entry_id=proposal.away_schedule_entry_id,
-            proposal_id=proposal.id,
-            ice_slot_id=proposal.ice_slot_id,
-            date=proposal.proposed_date,
-            time=game_time,
-            status="scheduled",
-            season_id=game_season_id,
-        ))
-
+        event = Event(home_team_id=proposal.home_team_id, proposal_id=proposal.id, status="scheduled", **payload.model_dump())
+        db.add(event)
+        db.flush()
+    normalize_event_competition(event, db)
+    if proposal.ice_slot_id:
+        slot = db.get(IceSlot, proposal.ice_slot_id)
+        if slot:
+            slot.status = "booked"
+            slot.booked_by_team_id = proposal.home_team_id
+    for window_id, opponent_team_id in (
+        (proposal.home_availability_window_id, proposal.away_team_id),
+        (proposal.away_availability_window_id, proposal.home_team_id),
+    ):
+        window = db.get(AvailabilityWindow, window_id)
+        if window:
+            window.status = "scheduled"
+            window.opponent_team_id = opponent_team_id
     db.commit()
     db.refresh(proposal)
-    return _enrich(proposal, db)
+    return _proposal_out(proposal, db)
 
 
-@router.patch("/proposals/{id}/decline", response_model=ProposalOut)
-def decline_proposal(id: str, db: Session = Depends(get_db)):
-    proposal = db.get(GameProposal, id)
+@router.patch("/proposals/{proposal_id}/decline", response_model=ProposalOut)
+def decline_proposal(proposal_id: str, db: Session = Depends(get_db)):
+    proposal = db.get(Proposal, proposal_id)
     if not proposal:
         raise HTTPException(404, "Proposal not found")
     if proposal.status != "proposed":
@@ -376,54 +249,29 @@ def decline_proposal(id: str, db: Session = Depends(get_db)):
     proposal.responded_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(proposal)
-    return _enrich(proposal, db)
+    return _proposal_out(proposal, db)
 
 
-@router.patch("/proposals/{id}/cancel", response_model=ProposalOut)
-def cancel_proposal(id: str, db: Session = Depends(get_db)):
-    proposal = db.get(GameProposal, id)
+@router.patch("/proposals/{proposal_id}/cancel", response_model=ProposalOut)
+def cancel_proposal(proposal_id: str, db: Session = Depends(get_db)):
+    proposal = db.get(Proposal, proposal_id)
     if not proposal:
         raise HTTPException(404, "Proposal not found")
-    if proposal.status not in ("proposed", "accepted"):
-        raise HTTPException(400, f"Cannot cancel proposal with status '{proposal.status}'")
     proposal.status = "cancelled"
     proposal.responded_at = datetime.now(timezone.utc)
-
-    # If it was already accepted, cancel the game + reopen schedule entries (best-effort).
-    if proposal.status == "cancelled":
-        home_entry = db.get(ScheduleEntry, proposal.home_schedule_entry_id)
-        away_entry = db.get(ScheduleEntry, proposal.away_schedule_entry_id)
-        for se in (home_entry, away_entry):
-            if not se:
-                continue
-            se.status = "open"
-            se.opponent_team_id = None
-            se.opponent_name = None
-            se.weekly_confirmed = False
-
-        g = (
-            db.query(Game)
-            .filter(
-                (Game.proposal_id == proposal.id)
-                | (
-                    (Game.home_schedule_entry_id == proposal.home_schedule_entry_id)
-                    & (Game.away_schedule_entry_id == proposal.away_schedule_entry_id)
-                )
-            )
-            .first()
-        )
-        if g:
-            g.status = "cancelled"
-            g.home_weekly_confirmed = False
-            g.away_weekly_confirmed = False
-
-        slot_id = g.ice_slot_id if g and g.ice_slot_id else proposal.ice_slot_id
-        if slot_id:
-            slot = db.get(IceSlot, slot_id)
-            if slot and slot.status == "booked":
+    event = db.query(Event).filter(Event.proposal_id == proposal.id).first()
+    if event:
+        event.status = "cancelled"
+        if event.ice_slot_id:
+            slot = db.get(IceSlot, event.ice_slot_id)
+            if slot:
                 slot.status = "available"
                 slot.booked_by_team_id = None
-
+    for window_id in (proposal.home_availability_window_id, proposal.away_availability_window_id):
+        window = db.get(AvailabilityWindow, window_id)
+        if window:
+            window.status = "open"
+            window.opponent_team_id = None
     db.commit()
     db.refresh(proposal)
-    return _enrich(proposal, db)
+    return _proposal_out(proposal, db)

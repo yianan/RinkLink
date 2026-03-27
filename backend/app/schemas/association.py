@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 class AssociationCreate(BaseModel):
     name: str
-    home_rink_address: str = ""
+    address: str = ""
     city: str = ""
     state: str = ""
     zip_code: str = ""
@@ -14,7 +14,7 @@ class AssociationCreate(BaseModel):
 
 class AssociationUpdate(BaseModel):
     name: str | None = None
-    home_rink_address: str | None = None
+    address: str | None = None
     city: str | None = None
     state: str | None = None
     zip_code: str | None = None
@@ -23,10 +23,11 @@ class AssociationUpdate(BaseModel):
 class AssociationOut(BaseModel):
     id: str
     name: str
-    home_rink_address: str
+    address: str
     city: str
     state: str
     zip_code: str
+    logo_url: str | None = None
     created_at: datetime
     updated_at: datetime
 

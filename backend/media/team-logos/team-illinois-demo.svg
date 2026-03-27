@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Team Illinois Demo Logo</title>
+  <desc id="desc">Navy and gold roundel with TI initials.</desc>
+  <defs>
+    <linearGradient id="ti-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="56" fill="#f8fafc"/>
+  <circle cx="64" cy="64" r="50" fill="url(#ti-bg)"/>
+  <circle cx="64" cy="64" r="41" fill="none" stroke="#fbbf24" stroke-width="6"/>
+  <path d="M33 42h62" fill="none" stroke="#fde68a" stroke-linecap="round" stroke-width="8"/>
+  <path d="M41 43h46v13H71v31H57V56H41z" fill="#f8fafc"/>
+  <path d="M92 43v44H78V43z" fill="#fbbf24"/>
+</svg>

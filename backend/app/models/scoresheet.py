@@ -16,15 +16,15 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..database import Base
 
 
-class GamePlayerStat(Base):
-    __tablename__ = "game_player_stats"
+class EventPlayerStat(Base):
+    __tablename__ = "event_player_stats"
     __table_args__ = (
-        UniqueConstraint("game_id", "player_id", name="uq_game_player_stats_game_player"),
-        Index("ix_game_player_stats_game_team", "game_id", "team_id"),
+        UniqueConstraint("event_id", "player_id", name="uq_event_player_stats_event_player"),
+        Index("ix_event_player_stats_event_team", "event_id", "team_id"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    game_id: Mapped[str] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    event_id: Mapped[str] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
     team_id: Mapped[str] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), nullable=False)
 
@@ -39,19 +39,19 @@ class GamePlayerStat(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
-    game = relationship("Game", foreign_keys=[game_id])
+    event = relationship("Event", foreign_keys=[event_id])
     team = relationship("Team", foreign_keys=[team_id])
     player = relationship("Player", foreign_keys=[player_id])
 
 
-class GamePenalty(Base):
-    __tablename__ = "game_penalties"
+class EventPenalty(Base):
+    __tablename__ = "event_penalties"
     __table_args__ = (
-        Index("ix_game_penalties_game_team", "game_id", "team_id"),
+        Index("ix_event_penalties_event_team", "event_id", "team_id"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    game_id: Mapped[str] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    event_id: Mapped[str] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
     team_id: Mapped[str] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
     player_id: Mapped[str | None] = mapped_column(ForeignKey("players.id", ondelete="SET NULL"), nullable=True)
 
@@ -65,20 +65,20 @@ class GamePenalty(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
-    game = relationship("Game", foreign_keys=[game_id])
+    event = relationship("Event", foreign_keys=[event_id])
     team = relationship("Team", foreign_keys=[team_id])
     player = relationship("Player", foreign_keys=[player_id])
 
 
-class GameGoalieStat(Base):
-    __tablename__ = "game_goalie_stats"
+class EventGoalieStat(Base):
+    __tablename__ = "event_goalie_stats"
     __table_args__ = (
-        UniqueConstraint("game_id", "player_id", name="uq_game_goalie_stats_game_player"),
-        Index("ix_game_goalie_stats_game_team", "game_id", "team_id"),
+        UniqueConstraint("event_id", "player_id", name="uq_event_goalie_stats_event_player"),
+        Index("ix_event_goalie_stats_event_team", "event_id", "team_id"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    game_id: Mapped[str] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    event_id: Mapped[str] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
     team_id: Mapped[str] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), nullable=False)
 
@@ -93,20 +93,20 @@ class GameGoalieStat(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
-    game = relationship("Game", foreign_keys=[game_id])
+    event = relationship("Event", foreign_keys=[event_id])
     team = relationship("Team", foreign_keys=[team_id])
     player = relationship("Player", foreign_keys=[player_id])
 
 
-class GameSignature(Base):
-    __tablename__ = "game_signatures"
+class EventSignature(Base):
+    __tablename__ = "event_signatures"
     __table_args__ = (
-        UniqueConstraint("game_id", "role", name="uq_game_signatures_game_role"),
-        Index("ix_game_signatures_game", "game_id"),
+        UniqueConstraint("event_id", "role", name="uq_event_signatures_event_role"),
+        Index("ix_event_signatures_event", "event_id"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    game_id: Mapped[str] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    event_id: Mapped[str] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
     team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
 
     role: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -120,6 +120,5 @@ class GameSignature(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
-    game = relationship("Game", foreign_keys=[game_id])
+    event = relationship("Event", foreign_keys=[event_id])
     team = relationship("Team", foreign_keys=[team_id])
-

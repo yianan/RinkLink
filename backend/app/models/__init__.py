@@ -1,38 +1,38 @@
 from .association import Association
 from .team import Team
-from .schedule_entry import ScheduleEntry
-from .game_proposal import GameProposal
-from .game import Game
+from .availability_window import AvailabilityWindow
+from .proposal import Proposal
+from .event import Event
 from .notification import Notification
 from .player import Player
-from .scoresheet import GamePlayerStat, GamePenalty, GameGoalieStat, GameSignature
+from .scoresheet import EventPlayerStat, EventPenalty, EventGoalieStat, EventSignature
 from .zip_code import ZipCode
-from .rink import Rink, IceSlot
-from .proposal_rink_preference import ProposalRinkPreference
-from .practice_booking import PracticeBooking
+from .arena import Arena, ArenaRink, LockerRoom, IceSlot
 from .season import Season, TeamSeasonRecord
 from .competition import Competition, CompetitionDivision, TeamCompetitionMembership
+from .team_season_venue_assignment import TeamSeasonVenueAssignment
 
 __all__ = [
     "Association",
     "Team",
-    "ScheduleEntry",
-    "GameProposal",
-    "Game",
-    "ProposalRinkPreference",
+    "AvailabilityWindow",
+    "Proposal",
+    "Event",
     "Notification",
     "Player",
-    "GamePlayerStat",
-    "GamePenalty",
-    "GameGoalieStat",
-    "GameSignature",
+    "EventPlayerStat",
+    "EventPenalty",
+    "EventGoalieStat",
+    "EventSignature",
     "ZipCode",
-    "Rink",
+    "Arena",
+    "ArenaRink",
+    "LockerRoom",
     "IceSlot",
-    "PracticeBooking",
     "Season",
     "TeamSeasonRecord",
     "Competition",
     "CompetitionDivision",
     "TeamCompetitionMembership",
+    "TeamSeasonVenueAssignment",
 ]

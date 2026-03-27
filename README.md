@@ -1,34 +1,47 @@
 # RinkLink
 
-Youth hockey scheduling app for finding opponents, managing games, and booking practice ice time.
+RinkLink is a youth hockey scheduling application built around five core concepts:
 
-## Tech Stack
+- `Availability` for open home/away scheduling windows
+- `Schedule` for actual games, practices, and scrimmages
+- `Arenas` for venue administration
+- `Proposals` for opponent matching and scheduling offers
+- `Scoresheets` for in-game scoring, penalties, goalie stats, and signatures
 
-- **Backend**: FastAPI + SQLAlchemy + SQLite (local) / PostgreSQL (production)
-- **Frontend**: React + TypeScript + Vite + Tailwind CSS
-- **Migrations**: Alembic
-- **Deployment**: Render (backend + frontend served together via Docker)
+## Stack
 
----
+- Backend: FastAPI + SQLAlchemy
+- Database: SQLite locally, PostgreSQL in cloud
+- Frontend: React + TypeScript + Vite + Tailwind
+- Schema management: Alembic
+- Frontend hosting: Render
+- Cloud database: Neon PostgreSQL
 
 ## Local Development
 
-### 1. Backend
+### Backend
 
 ```bash
 cd backend
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-
-# Apply any pending migrations (creates the DB on first run)
 alembic upgrade head
-
-# Start the API server
 uvicorn app.main:app --reload --port 8000
 ```
 
-The backend reads `DATABASE_URL` from the environment. If not set it defaults to `sqlite:///./rinklink.db` in the `backend/` directory.
+Defaults:
 
-### 2. Frontend
+- `DATABASE_URL`: `sqlite:///backend/rinklink.db`
+- `MEDIA_ROOT`: `backend/media`
+- `CORS_ORIGINS`: `http://localhost:5173,http://localhost:5174`
+
+Important:
+
+- The app no longer creates or alters tables on startup.
+- If you have an older local SQLite file from a pre-redesign build, delete it and rerun `alembic upgrade head`.
+
+### Frontend
 
 ```bash
 cd frontend
@@ -36,197 +49,162 @@ npm install
 npm run dev
 ```
 
-Vite starts on `http://localhost:5173` and proxies all `/api` requests to `http://localhost:8000`, so you never need to touch CORS or hardcoded URLs locally.
+The Vite dev server runs on `http://localhost:5173` and proxies `/api` to `http://localhost:8000`.
 
-### 3. Seed demo data
-
-Once both servers are running:
+### Seed Demo Data
 
 ```bash
 curl -X POST http://localhost:8000/api/seed
 ```
 
-Or click **Seed Demo Data** on the homepage when no teams exist.
+Or use `Reset Demo Data` from the dashboard.
 
-### 4. Test flow
+## Current Migration Lineage
 
-1. Select a team via the team switcher dropdown
-2. View the schedule — open dates show **Find Opponents** and **Block/Unblock** buttons
-3. Search for opponents (**Find Opponents** page, or click directly from an open date)
-4. Propose a game from search results
-5. Switch to the opponent team and accept the proposal (**Proposals** page)
-6. View the accepted game on the **Games** page; set its type (League / Non-League / Tournament)
-7. Confirm the game is happening this week on the **Weekly Confirm** page
-8. Fill in the scoresheet on the **Game** detail page (stats, penalties, goalie stats, signatures)
-9. Book practice ice on the **Practice** page (browse rinks → available ice slots → Book)
+The original Alembic history is preserved.
 
----
+- Previous head before the redesign: `7f2b6c8a91d3`
+- Current head: `092fd6e43b19`
+- Forward redesign migration: `backend/alembic/versions/092fd6e43b19_arena_availability_events_redesign.py`
 
-## Database Migrations (Alembic)
+Important:
 
-Alembic manages all schema changes. **Never modify the database schema manually** — always go through a migration file so that both local SQLite and production Postgres stay in sync.
+- The redesign migration is intentionally destructive.
+- It preserves Alembic continuity for deployed databases, but it resets legacy application tables to the new arena / availability / events schema.
+- That matches the current product decision: move forward to the new model without preserving old schedule / games / rinks data.
 
-### How it works
+## Migration Workflow
 
-- Every schema change is captured in a versioned Python file under `backend/alembic/versions/`.
-- Each file has an `upgrade()` function (apply the change) and a `downgrade()` function (reverse it).
-- Both local SQLite and Railway Postgres run the exact same migration files, in order.
-- The `alembic_version` table in each database records which migrations have been applied, so Alembic never runs the same migration twice.
+All schema changes must go through Alembic. Do not rely on startup code to create tables or add columns.
 
-### Workflow for every model change
+### Standard workflow
 
-```
-┌─────────────────────────────────┐
-│  1. Edit the SQLAlchemy model   │
-│     in backend/app/models/      │
-└────────────────┬────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────┐
-│  2. Generate the migration      │
-│                                 │
-│  cd backend                     │
-│  alembic revision \             │
-│    --autogenerate \             │
-│    -m "describe the change"     │
-│                                 │
-│  Alembic diffs your models      │
-│  against the live DB and writes │
-│  the SQL into a new file in     │
-│  alembic/versions/              │
-└────────────────┬────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────┐
-│  3. Review the generated file   │
-│                                 │
-│  Open the new file in           │
-│  alembic/versions/ and confirm  │
-│  the upgrade() / downgrade()    │
-│  SQL looks correct.             │
-│  Autogenerate is good but not   │
-│  perfect — always check.        │
-└────────────────┬────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────┐
-│  4. Apply locally               │
-│                                 │
-│  alembic upgrade head           │
-│                                 │
-│  Your local SQLite DB is now    │
-│  up to date.                    │
-└────────────────┬────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────┐
-│  5. Commit and push             │
-│                                 │
-│  git add alembic/versions/...   │
-│  git commit -m "..."            │
-│  git push                       │
-│                                 │
-│  Railway detects the push,      │
-│  rebuilds the Docker image, and │
-│  runs `alembic upgrade head`    │
-│  before starting uvicorn.       │
-│  Railway Postgres is now in     │
-│  sync with your local DB.       │
-└─────────────────────────────────┘
-```
-
-### Useful Alembic commands
-
-| Command | What it does |
-|---|---|
-| `alembic upgrade head` | Apply all pending migrations |
-| `alembic downgrade -1` | Roll back the last migration |
-| `alembic current` | Show which revision the DB is at |
-| `alembic history` | List all migrations in order |
-| `alembic check` | Verify models and DB are in sync (no pending changes) |
-| `alembic revision --autogenerate -m "..."` | Generate a new migration from model changes |
-| `alembic stamp head` | Mark the DB as being at head **without running migrations** (used once when adopting Alembic on an existing DB) |
-
-### What Alembic does NOT sync
-
-Alembic syncs **schema** (tables, columns, indexes, constraints) — not **data**. Local SQLite and Railway Postgres are expected to have different data: local is throwaway test/seed data, Railway is production data.
-
----
-
-## Deployment (Render)
-
-The app is deployed as a single Render Web Service (FastAPI serves the built React app as static files) backed by a Render-managed Postgres database.
-
-### Architecture
-
-```
-Browser
-  └── Render service URL
-        ├── GET /api/*   → FastAPI handles the request
-        └── GET /*       → FastAPI serves the built React SPA (index.html)
-
-FastAPI
-  └── Render Postgres (DATABASE_URL set in environment)
-```
-
-### First-time Render setup
-
-1. **Push to GitHub** (the remote is already configured).
-
-2. **Create a Web Service on Render**
-   - Go to [render.com](https://render.com) → **New** → **Web Service** → connect this repo.
-   - Set **Runtime** to **Docker** — Render will use the `Dockerfile` automatically.
-
-3. **Add Postgres**
-   - Create a **Render PostgreSQL** database and copy its **Internal Database URL**.
-   - Add it as an environment variable `DATABASE_URL` on the Web Service.
-
-4. **First deploy**
-   - Render builds the Docker image (Node stage builds React, Python stage installs deps and copies `dist/`).
-   - On container start, `alembic upgrade head` runs to create all tables in the fresh Postgres DB.
-   - The health check hits `/api/health`.
-
-### Every subsequent deploy
+1. Update the SQLAlchemy models in `backend/app/models/`.
+2. Generate a migration:
 
 ```bash
-git push origin main
+cd backend
+alembic revision --autogenerate -m "describe the change"
 ```
 
-Render rebuilds and redeploys automatically. If the push includes new migration files, `alembic upgrade head` applies them before uvicorn starts.
+3. Review the generated file in `backend/alembic/versions/`.
+4. Apply it locally:
 
-### Environment variables
+```bash
+alembic upgrade head
+```
 
-| Variable | Default | Purpose |
+5. Confirm there is no schema drift:
+
+```bash
+alembic check
+```
+
+6. Commit both the model changes and the migration file together.
+
+### Useful commands
+
+| Command | Purpose |
+|---|---|
+| `alembic upgrade head` | Apply all pending migrations |
+| `alembic downgrade -1` | Roll back one migration |
+| `alembic current` | Show the DB's current revision |
+| `alembic heads` | Show the latest revision(s) |
+| `alembic history` | Show migration history |
+| `alembic check` | Verify the database matches the models |
+
+### Deployment rule
+
+The backend deployment must always start from:
+
+```bash
+alembic upgrade head
+```
+
+If you containerize the backend, the start command should continue to do this before launching Uvicorn.
+
+## Cloud Deployment
+
+Current cloud shape:
+
+1. Frontend on Render
+2. PostgreSQL on Neon
+3. Backend deployed from this repo and pointed at Neon via `DATABASE_URL`
+4. Persistent media storage for uploaded logos via `MEDIA_ROOT`
+
+### Required environment
+
+| Variable | Example | Purpose |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///./rinklink.db` | Postgres URL from Render; falls back to SQLite locally |
-| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:5174` | Comma-separated allowed origins; not needed when frontend and backend share the same Render URL |
+| `DATABASE_URL` | Neon Postgres connection URL | Primary application database |
+| `MEDIA_ROOT` | `/var/data/rinklink-media` | Persistent storage for uploaded logos |
+| `CORS_ORIGINS` | `https://your-frontend.onrender.com` | Browser origins allowed to call the API |
 
----
+### Why `MEDIA_ROOT` matters
+
+Bundled demo logos ship in the repository, but uploaded team / arena / association logos must not live on the container filesystem. Containers are replaceable; persistent disks are not.
+
+Use a Render disk mount and point `MEDIA_ROOT` at that mount path.
+
+### First cloud deploy
+
+1. Create a Neon Postgres database.
+2. Provision persistent filesystem storage for uploaded media wherever the backend runs.
+3. Set:
+   - `DATABASE_URL` to the Neon connection URL
+   - `MEDIA_ROOT` to the mounted media path
+   - `CORS_ORIGINS` to the Render frontend URL
+4. Deploy the backend service.
+
+```bash
+alembic upgrade head
+```
+
+If your backend is running on Render, the existing Docker start command already does this automatically during boot:
+
+```bash
+alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+```
+
+That is the same core mechanism as before:
+
+- Render rebuilds on push
+- the backend container starts
+- startup runs `alembic upgrade head`
+- Alembic reads `DATABASE_URL`
+- `DATABASE_URL` is normalized to a psycopg-backed Postgres URL when needed
+- migrations apply to Neon instead of local SQLite
+
+### Existing local SQLite does not migrate to cloud automatically
+
+The local SQLite database is only for development. Cloud should use Neon Postgres and the Alembic migration chain.
+
+If you ever want to move real data from local SQLite into Postgres, that is a separate data migration/export task, not something Alembic handles.
 
 ## Project Structure
 
-```
+```text
 RinkLink/
-├── Dockerfile              # Multi-stage build: Node (React) → Python (FastAPI)
-├── railway.toml            # Railway build + deploy config
+├── Dockerfile
 ├── .dockerignore
+├── README.md
 ├── backend/
-│   ├── alembic.ini         # Alembic config (DB URL is set from env, not here)
+│   ├── alembic.ini
 │   ├── alembic/
-│   │   ├── env.py          # Wires Alembic to settings.database_url + all models
-│   │   └── versions/       # One file per migration — commit every file
-│   ├── requirements.txt
-│   └── app/
-│       ├── config.py       # Reads DATABASE_URL + CORS_ORIGINS from environment
-│       ├── database.py     # SQLAlchemy engine (SQLite pragma applied only locally)
-│       ├── main.py         # FastAPI app + SPA catch-all for production static files
-│       ├── models/         # SQLAlchemy models — source of truth for the schema
-│       ├── routers/        # One file per resource
-│       └── schemas/        # Pydantic request/response models
+│   │   ├── env.py
+│   │   └── versions/
+│   ├── app/
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── main.py
+│   │   ├── models/
+│   │   ├── routers/
+│   │   ├── schemas/
+│   │   └── services/
+│   ├── media/
+│   └── requirements.txt
 └── frontend/
-    ├── vite.config.ts      # Proxies /api → localhost:8000 in dev
+    ├── package.json
+    ├── vite.config.ts
     └── src/
-        ├── api/client.ts   # All API calls — uses relative /api URL
-        ├── types/index.ts  # TypeScript interfaces mirroring backend schemas
-        └── pages/          # One file per page/route
 ```

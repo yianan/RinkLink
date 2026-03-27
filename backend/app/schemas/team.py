@@ -13,9 +13,6 @@ class TeamCreate(BaseModel):
     manager_name: str = ""
     manager_email: str = ""
     manager_phone: str = ""
-    rink_city: str = ""
-    rink_state: str = ""
-    rink_zip: str = ""
     myhockey_ranking: int | None = None
 
 
@@ -26,9 +23,6 @@ class TeamUpdate(BaseModel):
     manager_name: str | None = None
     manager_email: str | None = None
     manager_phone: str | None = None
-    rink_city: str | None = None
-    rink_state: str | None = None
-    rink_zip: str | None = None
     myhockey_ranking: int | None = None
 
 
@@ -41,9 +35,7 @@ class TeamOut(BaseModel):
     manager_name: str
     manager_email: str
     manager_phone: str
-    rink_city: str
-    rink_state: str
-    rink_zip: str
+    logo_url: str | None = None
     myhockey_ranking: int | None
     wins: int
     losses: int

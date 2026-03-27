@@ -34,6 +34,7 @@ class TeamSeasonRecordOut(BaseModel):
 class StandingsEntry(BaseModel):
     team_id: str
     team_name: str
+    logo_url: str | None = None
     association_name: str | None = None
     age_group: str
     level: str

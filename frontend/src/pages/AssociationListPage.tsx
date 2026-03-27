@@ -17,8 +17,9 @@ import { cn } from '../lib/cn';
 import { accentLinkClass, tableActionButtonClass } from '../lib/uiClasses';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
+import TeamLogo from '../components/TeamLogo';
 
-const emptyForm = { name: '', home_rink_address: '', city: '', state: '', zip_code: '' };
+const emptyForm = { name: '', address: '', city: '', state: '', zip_code: '' };
 
 function ageGroupSortValue(value: string) {
   const match = value.match(/(\d+)/);
@@ -35,6 +36,9 @@ export default function AssociationListPage() {
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [associationLogoFile, setAssociationLogoFile] = useState<File | null>(null);
+  const [removeAssociationLogo, setRemoveAssociationLogo] = useState(false);
+  const [associationLogoPreviewUrl, setAssociationLogoPreviewUrl] = useState<string | null>(null);
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
@@ -60,6 +64,21 @@ export default function AssociationListPage() {
     };
   };
   useEffect(() => load(), []);
+
+  const editAssociation = useMemo(
+    () => associations.find((association) => association.id === editId) ?? null,
+    [associations, editId],
+  );
+
+  useEffect(() => {
+    if (!associationLogoFile) {
+      setAssociationLogoPreviewUrl(removeAssociationLogo ? null : (editAssociation?.logo_url ?? null));
+      return;
+    }
+    const objectUrl = URL.createObjectURL(associationLogoFile);
+    setAssociationLogoPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [associationLogoFile, editAssociation?.logo_url, removeAssociationLogo]);
 
   const teamsByAssociation = useMemo(() => {
     const by: Record<string, Team[]> = {};
@@ -148,20 +167,32 @@ export default function AssociationListPage() {
   };
 
   const handleSave = async () => {
+    let savedAssociation: Association;
     if (editId) {
-      await api.updateAssociation(editId, form);
+      savedAssociation = await api.updateAssociation(editId, form);
+      if (removeAssociationLogo && editAssociation?.logo_url) {
+        savedAssociation = await api.deleteAssociationLogo(editId);
+      }
     } else {
-      await api.createAssociation(form);
+      savedAssociation = await api.createAssociation(form);
+    }
+    if (associationLogoFile) {
+      savedAssociation = await api.uploadAssociationLogo(savedAssociation.id, associationLogoFile);
     }
     setOpen(false);
     setEditId(null);
     setForm(emptyForm);
+    setAssociationLogoFile(null);
+    setRemoveAssociationLogo(false);
+    setAssociationLogoPreviewUrl(null);
     load();
   };
 
   const handleEdit = (a: Association) => {
     setEditId(a.id);
-    setForm({ name: a.name, home_rink_address: a.home_rink_address, city: a.city, state: a.state, zip_code: a.zip_code });
+    setForm({ name: a.name, address: a.address, city: a.city, state: a.state, zip_code: a.zip_code });
+    setAssociationLogoFile(null);
+    setRemoveAssociationLogo(false);
     setOpen(true);
   };
 
@@ -191,8 +222,8 @@ export default function AssociationListPage() {
         subtitle="Organizations that manage teams."
         actions={(
           <>
-            <FilterPanelTrigger count={activeFilterBadges.length} onClick={() => setFiltersOpen((open) => !open)} />
-            <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setOpen(true); }}>
+            <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((open) => !open)} />
+            <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setAssociationLogoFile(null); setRemoveAssociationLogo(false); setAssociationLogoPreviewUrl(null); setOpen(true); }}>
               Add Association
             </Button>
           </>
@@ -253,29 +284,32 @@ export default function AssociationListPage() {
             return (
               <div key={a.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{a.name}</div>
-                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {a.city}, {a.state} {a.zip_code}
-                    </div>
-                    <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">Teams: {assocTeams.length}</div>
-                    {assocTeams.length ? (
-                      <div className="mt-1 space-y-1">
-                        {assocTeams.slice(0, 3).map((t) => (
-                          <button
-                            key={t.id}
-                            type="button"
-                            onClick={() => openTeamDashboard(t)}
-                            className={cn('block cursor-pointer truncate text-left text-xs font-medium', accentLinkClass)}
-                          >
-                            {t.name}
-                          </button>
-                        ))}
-                        {extraTeams ? (
-                          <div className="text-xs text-slate-500 dark:text-slate-400">+ {extraTeams} more</div>
-                        ) : null}
+                  <div className="flex min-w-0 items-start gap-3">
+                    <TeamLogo name={a.name} logoUrl={a.logo_url} className="h-12 w-12 rounded-2xl" initialsClassName="text-sm" />
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{a.name}</div>
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {a.city}, {a.state} {a.zip_code}
                       </div>
-                    ) : null}
+                      <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">Teams: {assocTeams.length}</div>
+                      {assocTeams.length ? (
+                        <div className="mt-1 space-y-1">
+                          {assocTeams.slice(0, 3).map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => openTeamDashboard(t)}
+                              className={cn('block cursor-pointer truncate text-left text-xs font-medium', accentLinkClass)}
+                            >
+                              {t.name}
+                            </button>
+                          ))}
+                          {extraTeams ? (
+                            <div className="text-xs text-slate-500 dark:text-slate-400">+ {extraTeams} more</div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-1">
@@ -321,7 +355,12 @@ export default function AssociationListPage() {
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
               {filteredAssociations.map((a) => (
                 <tr key={a.id} className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
-                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{a.name}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <TeamLogo name={a.name} logoUrl={a.logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+                      <div className="font-medium text-slate-900 dark:text-slate-100">{a.name}</div>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{a.city}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{a.state}</td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{a.zip_code}</td>
@@ -384,7 +423,12 @@ export default function AssociationListPage() {
 
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false);
+          setAssociationLogoFile(null);
+          setRemoveAssociationLogo(false);
+          setAssociationLogoPreviewUrl(null);
+        }}
         title={`${editId ? 'Edit' : 'Add'} Association`}
         footer={
           <>
@@ -398,13 +442,49 @@ export default function AssociationListPage() {
         }
       >
         <div className="grid grid-cols-1 gap-3">
+          <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-950/35">
+            <TeamLogo
+              name={form.name}
+              logoUrl={associationLogoPreviewUrl}
+              className="h-16 w-16 rounded-2xl"
+              initialsClassName="text-lg"
+            />
+            <div className="min-w-0 flex-1">
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Association Logo</label>
+              <input
+                type="file"
+                accept=".png,.jpg,.jpeg,.webp,.svg"
+                className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-full file:border-0 file:bg-sky-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-sky-800 hover:file:bg-sky-200 dark:text-slate-300 dark:file:bg-sky-950/40 dark:file:text-sky-100 dark:hover:file:bg-sky-950/60"
+                onChange={(event) => {
+                  const nextFile = event.target.files?.[0] ?? null;
+                  setAssociationLogoFile(nextFile);
+                  setRemoveAssociationLogo(false);
+                }}
+              />
+              {editAssociation?.logo_url || associationLogoFile ? (
+                <div className="mt-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setAssociationLogoFile(null);
+                      setRemoveAssociationLogo(true);
+                    }}
+                  >
+                    Remove Logo
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Name</label>
             <Input value={form.name} onChange={(e) => setField('name', e.target.value)} required />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Home Rink Address</label>
-            <Input value={form.home_rink_address} onChange={(e) => setField('home_rink_address', e.target.value)} />
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Primary Address</label>
+            <Input value={form.address} onChange={(e) => setField('address', e.target.value)} />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

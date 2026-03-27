@@ -20,9 +20,7 @@ class Team(Base):
     manager_name: Mapped[str] = mapped_column(String(200), default="")
     manager_email: Mapped[str] = mapped_column(String(200), default="")
     manager_phone: Mapped[str] = mapped_column(String(30), default="")
-    rink_city: Mapped[str] = mapped_column(String(100), default="")
-    rink_state: Mapped[str] = mapped_column(String(2), default="")
-    rink_zip: Mapped[str] = mapped_column(String(10), default="")
+    logo_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     myhockey_ranking: Mapped[int | None] = mapped_column(Integer, nullable=True)
     wins: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
     losses: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
@@ -31,5 +29,4 @@ class Team(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     association = relationship("Association", back_populates="teams")
-    schedule_entries = relationship("ScheduleEntry", back_populates="team", cascade="all, delete-orphan", foreign_keys="[ScheduleEntry.team_id]")
     competition_memberships = relationship("TeamCompetitionMembership", back_populates="team", cascade="all, delete-orphan", foreign_keys="[TeamCompetitionMembership.team_id]")

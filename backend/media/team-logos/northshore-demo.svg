@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Northshore Demo Logo</title>
+  <desc id="desc">Blue shield with NS initials and a hockey stripe.</desc>
+  <defs>
+    <linearGradient id="northshore-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f3c78"/>
+      <stop offset="100%" stop-color="#15a3d7"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 8 110 26v34c0 30-19 50-46 60C37 110 18 90 18 60V26z" fill="url(#northshore-bg)"/>
+  <path d="M26 70c18-10 40-14 76-12" fill="none" stroke="#e0f2fe" stroke-linecap="round" stroke-width="8"/>
+  <path d="M37 39h18l14 19V39h18v48H69L55 68v19H37z" fill="#ffffff"/>
+  <path d="M85 38 61 87" fill="none" stroke="#dbeafe" stroke-linecap="round" stroke-width="6"/>
+</svg>

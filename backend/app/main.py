@@ -7,11 +7,19 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 from .config import settings
 from .database import engine  # noqa: F401 — imported to ensure engine is initialised
+from .services.arena_logos import ensure_arena_logo_dir
+from .services.association_logos import ensure_association_logo_dir
+from .services.team_logos import ensure_team_logo_dir
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield  # schema managed by Alembic migrations, not create_all
+    from . import models  # noqa: F401
+
+    ensure_team_logo_dir()
+    ensure_arena_logo_dir()
+    ensure_association_logo_dir()
+    yield
 
 
 app = FastAPI(title="RinkLink", version="0.1.0", lifespan=lifespan)
@@ -33,33 +41,31 @@ def health():
 
 # Routers imported after app creation to avoid circular imports
 from .routers import (  # noqa: E402
+    arenas,
     associations,
+    availability,
+    events,
     teams,
-    schedules,
     search,
     proposals,
-    rinks,
-    games,
     notifications,
     players,
     scoresheet,
-    practice_bookings,
     seasons,
     competitions,
     seed as seed_router,
 )
 
+app.include_router(arenas.router, prefix="/api")
 app.include_router(associations.router, prefix="/api")
+app.include_router(availability.router, prefix="/api")
+app.include_router(events.router, prefix="/api")
 app.include_router(teams.router, prefix="/api")
-app.include_router(schedules.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
 app.include_router(proposals.router, prefix="/api")
-app.include_router(rinks.router, prefix="/api")
-app.include_router(games.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(players.router, prefix="/api")
 app.include_router(scoresheet.router, prefix="/api")
-app.include_router(practice_bookings.router, prefix="/api")
 app.include_router(seasons.router, prefix="/api")
 app.include_router(competitions.router, prefix="/api")
 app.include_router(seed_router.router, prefix="/api")
