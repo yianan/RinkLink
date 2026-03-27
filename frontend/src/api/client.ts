@@ -218,6 +218,8 @@ export const api = {
     }),
   getAvailableIceSlots: (arenaRinkId: string, date: string) =>
     request<import('../types').IceSlot[]>(`/arena-rinks/${arenaRinkId}/available-ice-slots?date=${date}`),
+  getOpenIceSlots: (params: Record<string, string>) =>
+    request<import('../types').IceSlot[]>(`/ice-slots/open?${new URLSearchParams(params).toString()}`),
   updateIceSlot: (id: string, data: Partial<import('../types').IceSlot>) =>
     request<import('../types').IceSlot>(`/ice-slots/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteIceSlot: (id: string) => request<void>(`/ice-slots/${id}`, { method: 'DELETE' }),

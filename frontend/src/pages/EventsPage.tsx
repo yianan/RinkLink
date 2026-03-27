@@ -61,7 +61,7 @@ export default function EventsPage() {
   const [arenas, setArenas] = useState<Arena[]>([]);
   const [arenaRinks, setArenaRinks] = useState<ArenaRink[]>([]);
   const [lockerRooms, setLockerRooms] = useState<LockerRoom[]>([]);
-  const [slots, setSlots] = useState<IceSlot[]>([]);
+  const [openIceSlots, setOpenIceSlots] = useState<IceSlot[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [scoreEdits, setScoreEdits] = useState<Record<string, Partial<{ home: string; away: string }>>>({});
@@ -97,20 +97,37 @@ export default function EventsPage() {
   useEffect(() => {
     if (!form.arena_rink_id) {
       setLockerRooms([]);
-      setSlots([]);
       return;
     }
     api.getLockerRooms(form.arena_rink_id).then(setLockerRooms);
-    if (form.date) {
-      api.getAvailableIceSlots(form.arena_rink_id, form.date).then(setSlots);
-    } else {
-      setSlots([]);
+  }, [form.arena_rink_id]);
+
+  useEffect(() => {
+    if (!open || !form.date) {
+      setOpenIceSlots([]);
+      return;
     }
-  }, [form.arena_rink_id, form.date]);
+    const params: Record<string, string> = { date_from: form.date };
+    if (form.arena_id) params.arena_id = form.arena_id;
+    if (form.arena_rink_id) params.arena_rink_id = form.arena_rink_id;
+    api.getOpenIceSlots(params).then((slots) => {
+      setOpenIceSlots(slots);
+      if (form.ice_slot_id && !slots.some((slot) => slot.id === form.ice_slot_id)) {
+        setForm((current) => ({
+          ...current,
+          ice_slot_id: '',
+          start_time: '',
+          end_time: '',
+          home_locker_room_id: '',
+          away_locker_room_id: '',
+        }));
+      }
+    });
+  }, [open, form.date, form.arena_id, form.arena_rink_id, form.ice_slot_id]);
 
   const selectedSlot = useMemo(
-    () => slots.find((slot) => slot.id === form.ice_slot_id) ?? null,
-    [form.ice_slot_id, slots],
+    () => openIceSlots.find((slot) => slot.id === form.ice_slot_id) ?? null,
+    [form.ice_slot_id, openIceSlots],
   );
 
   const eventTypeOptions = useMemo<FilterOption[]>(
@@ -355,7 +372,7 @@ export default function EventsPage() {
         title="Create Event"
         footer={(
           <>
-            <Button type="button" onClick={saveEvent} disabled={!form.date || !form.arena_id || !form.arena_rink_id || !form.ice_slot_id}>
+            <Button type="button" onClick={saveEvent} disabled={!form.date || !form.ice_slot_id}>
               Save
             </Button>
             <Button type="button" variant="outline" onClick={() => { setOpen(false); setForm(emptyForm); }}>
@@ -397,7 +414,15 @@ export default function EventsPage() {
               <Input
                 type="date"
                 value={form.date}
-                onChange={(e) => setForm((current) => ({ ...current, date: e.target.value, ice_slot_id: '', start_time: '', end_time: '' }))}
+                onChange={(e) => setForm((current) => ({
+                  ...current,
+                  date: e.target.value,
+                  ice_slot_id: '',
+                  start_time: '',
+                  end_time: '',
+                  home_locker_room_id: '',
+                  away_locker_room_id: '',
+                }))}
               />
             </div>
             <div>
@@ -412,7 +437,7 @@ export default function EventsPage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Arena</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Arena Filter</label>
               <Select
                 value={form.arena_id}
                 onChange={(e) => setForm((current) => ({
@@ -420,28 +445,32 @@ export default function EventsPage() {
                   arena_id: e.target.value,
                   arena_rink_id: '',
                   ice_slot_id: '',
+                  start_time: '',
+                  end_time: '',
                   home_locker_room_id: '',
                   away_locker_room_id: '',
                 }))}
               >
-                <option value="">Select arena…</option>
+                <option value="">All arenas</option>
                 {arenas.map((arena) => <option key={arena.id} value={arena.id}>{arena.name}</option>)}
               </Select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Arena Rink</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Rink Filter</label>
               <Select
                 value={form.arena_rink_id}
                 onChange={(e) => setForm((current) => ({
                   ...current,
                   arena_rink_id: e.target.value,
                   ice_slot_id: '',
+                  start_time: '',
+                  end_time: '',
                   home_locker_room_id: '',
                   away_locker_room_id: '',
                 }))}
                 disabled={!form.arena_id}
               >
-                <option value="">{!form.arena_id ? 'Select arena first' : 'Select rink…'}</option>
+                <option value="">{!form.arena_id ? 'Select arena first' : 'All rinks'}</option>
                 {arenaRinks.map((arenaRink) => <option key={arenaRink.id} value={arenaRink.id}>{arenaRink.name}</option>)}
               </Select>
             </div>
@@ -449,30 +478,57 @@ export default function EventsPage() {
 
           <div className="grid grid-cols-1 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Ice Slot</label>
-              <Select
-                value={form.ice_slot_id}
-                onChange={(e) => {
-                  const nextSlot = slots.find((slot) => slot.id === e.target.value);
-                  setForm((current) => ({
-                    ...current,
-                    ice_slot_id: e.target.value,
-                    start_time: nextSlot?.start_time || current.start_time,
-                    end_time: nextSlot?.end_time || current.end_time,
-                  }));
-                }}
-                disabled={!form.arena_rink_id || !form.date}
-              >
-                <option value="">
-                  {!form.arena_rink_id ? 'Select rink first' : !form.date ? 'Select date first' : slots.length === 0 ? 'No available slots' : 'Select slot…'}
-                </option>
-                {slots.map((slot) => (
-                  <option key={slot.id} value={slot.id}>
-                    {formatTimeHHMM(slot.start_time) || slot.start_time}
-                    {slot.end_time ? `-${formatTimeHHMM(slot.end_time) || slot.end_time}` : ''}
-                  </option>
-                ))}
-              </Select>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Open Ice</label>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-900/30">
+                {!form.date ? (
+                  <div className="px-3 py-3 text-sm text-slate-600 dark:text-slate-400">Choose a date to browse open ice across all arenas.</div>
+                ) : openIceSlots.length === 0 ? (
+                  <div className="px-3 py-3 text-sm text-slate-600 dark:text-slate-400">
+                    No open ice matches this date and filter. Add slots in Arenas or widen the filter.
+                  </div>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto divide-y divide-slate-200 dark:divide-slate-800">
+                    {openIceSlots.map((slot) => {
+                      const selected = slot.id === form.ice_slot_id;
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          onClick={() => setForm((current) => ({
+                            ...current,
+                            ice_slot_id: slot.id,
+                            arena_id: slot.arena_id || current.arena_id,
+                            arena_rink_id: slot.arena_rink_id,
+                            start_time: slot.start_time,
+                            end_time: slot.end_time || '',
+                            home_locker_room_id: '',
+                            away_locker_room_id: '',
+                          }))}
+                          className={`flex w-full items-start justify-between gap-3 px-3 py-3 text-left transition-colors ${
+                            selected
+                              ? 'bg-sky-50 text-sky-950 dark:bg-sky-950/40 dark:text-sky-100'
+                              : 'hover:bg-slate-100/80 dark:hover:bg-slate-800/70'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                              {slot.arena_name || 'Arena TBD'}{slot.arena_rink_name ? ` · ${slot.arena_rink_name}` : ''}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                              {formatShortDate(slot.date)} · {formatTimeHHMM(slot.start_time) || slot.start_time}
+                              {slot.end_time ? `-${formatTimeHHMM(slot.end_time) || slot.end_time}` : ''}
+                            </div>
+                            {slot.notes ? (
+                              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{slot.notes}</div>
+                            ) : null}
+                          </div>
+                          {selected ? <Badge variant="info">Selected</Badge> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className={`grid grid-cols-1 gap-3 ${form.event_type !== 'practice' && form.event_type !== 'scrimmage' ? 'sm:grid-cols-2' : ''}`}>
@@ -481,9 +537,9 @@ export default function EventsPage() {
                 <Select
                   value={form.home_locker_room_id}
                   onChange={(e) => setForm((current) => ({ ...current, home_locker_room_id: e.target.value }))}
-                  disabled={!form.arena_rink_id}
+                  disabled={!form.ice_slot_id || !form.arena_rink_id}
                 >
-                  <option value="">{!form.arena_rink_id ? 'Select rink first' : lockerRooms.length === 0 ? 'No locker rooms configured' : 'Select room…'}</option>
+                  <option value="">{!form.ice_slot_id ? 'Select open ice first' : lockerRooms.length === 0 ? 'No locker rooms configured' : 'Select room…'}</option>
                   {lockerRooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
                 </Select>
               </div>
@@ -494,9 +550,9 @@ export default function EventsPage() {
                   <Select
                     value={form.away_locker_room_id}
                     onChange={(e) => setForm((current) => ({ ...current, away_locker_room_id: e.target.value }))}
-                    disabled={!form.arena_rink_id}
+                    disabled={!form.ice_slot_id || !form.arena_rink_id}
                   >
-                    <option value="">{!form.arena_rink_id ? 'Select rink first' : lockerRooms.length === 0 ? 'No locker rooms configured' : 'Select room…'}</option>
+                    <option value="">{!form.ice_slot_id ? 'Select open ice first' : lockerRooms.length === 0 ? 'No locker rooms configured' : 'Select room…'}</option>
                     {lockerRooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
                   </Select>
                 </div>

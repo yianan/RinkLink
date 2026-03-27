@@ -348,6 +348,36 @@ def get_available_ice_slots(arena_rink_id: str, date: date = Query(...), db: Ses
     return [_slot_out(slot, db) for slot in slots]
 
 
+@router.get("/ice-slots/open", response_model=list[IceSlotOut])
+def list_open_ice_slots(
+    date_from: date = Query(...),
+    date_to: date | None = Query(None),
+    arena_id: str | None = Query(None),
+    arena_rink_id: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    query = (
+        db.query(IceSlot)
+        .join(ArenaRink, ArenaRink.id == IceSlot.arena_rink_id)
+        .filter(IceSlot.status == "available", IceSlot.date >= date_from)
+    )
+    if date_to:
+        query = query.filter(IceSlot.date <= date_to)
+    else:
+        query = query.filter(IceSlot.date == date_from)
+    if arena_id:
+        if not db.get(Arena, arena_id):
+            raise HTTPException(404, "Arena not found")
+        query = query.filter(ArenaRink.arena_id == arena_id)
+    if arena_rink_id:
+        arena_rink = db.get(ArenaRink, arena_rink_id)
+        if not arena_rink:
+            raise HTTPException(404, "Arena rink not found")
+        query = query.filter(IceSlot.arena_rink_id == arena_rink_id)
+    slots = query.order_by(IceSlot.date, IceSlot.start_time, IceSlot.created_at).all()
+    return [_slot_out(slot, db) for slot in slots]
+
+
 @router.put("/ice-slots/{ice_slot_id}", response_model=IceSlotOut)
 def update_ice_slot(ice_slot_id: str, body: IceSlotUpdate, db: Session = Depends(get_db)):
     slot = db.get(IceSlot, ice_slot_id)
