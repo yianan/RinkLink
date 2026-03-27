@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
-import { Arena, ArenaRink, IceSlot, LockerRoom, Team, TeamSeasonVenueAssignment } from '../types';
+import { Arena, ArenaRink, IceSlot, LockerRoom } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import PageHeader from '../components/PageHeader';
 import { Alert } from '../components/ui/Alert';
@@ -10,7 +10,6 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
-import { Select } from '../components/ui/Select';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { formatShortDate, formatTimeHHMM } from '../lib/time';
@@ -34,9 +33,6 @@ export default function ArenaDetailPage() {
   const [selectedRinkId, setSelectedRinkId] = useState('');
   const [lockerRooms, setLockerRooms] = useState<LockerRoom[]>([]);
   const [iceSlots, setIceSlots] = useState<IceSlot[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [assignments, setAssignments] = useState<TeamSeasonVenueAssignment[]>([]);
-  const [assignmentLockerRooms, setAssignmentLockerRooms] = useState<LockerRoom[]>([]);
 
   const [arenaEditOpen, setArenaEditOpen] = useState(false);
   const [arenaForm, setArenaForm] = useState({
@@ -60,18 +56,9 @@ export default function ArenaDetailPage() {
 
   const [slotModalOpen, setSlotModalOpen] = useState(false);
   const [slotForm, setSlotForm] = useState(emptySlotForm);
-
-  const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
-  const [assignmentTeamId, setAssignmentTeamId] = useState('');
-  const [assignmentRinkId, setAssignmentRinkId] = useState('');
-  const [assignmentLockerRoomId, setAssignmentLockerRoomId] = useState('');
   const initialRinkSyncDone = useRef(false);
 
   const selectedRink = rinks.find((rink) => rink.id === selectedRinkId) ?? null;
-  const assignmentByTeamId = useMemo(
-    () => Object.fromEntries(assignments.map((assignment) => [assignment.team_id, assignment])),
-    [assignments],
-  );
 
   const loadArena = () => {
     api.getArena(arenaId).then((data) => {
@@ -97,22 +84,12 @@ export default function ArenaDetailPage() {
     });
   };
 
-  const loadAssignments = () => {
-    if (!effectiveSeason) {
-      setAssignments([]);
-      return;
-    }
-    api.getArenaVenueAssignments(arenaId, { season_id: effectiveSeason.id }).then(setAssignments);
-  };
-
   useEffect(() => {
     if (!arenaId) return;
     initialRinkSyncDone.current = false;
     loadArena();
     loadRinks();
-    loadAssignments();
-    api.getTeams(effectiveSeason ? { season_id: effectiveSeason.id } : undefined).then(setTeams);
-  }, [arenaId, effectiveSeason?.id]);
+  }, [arenaId]);
 
   useEffect(() => {
     if (rinks.length === 0 || initialRinkSyncDone.current) {
@@ -147,14 +124,6 @@ export default function ArenaDetailPage() {
         setIceSlots(slots);
       });
   }, [selectedRinkId]);
-
-  useEffect(() => {
-    if (!assignmentRinkId) {
-      setAssignmentLockerRooms([]);
-      return;
-    }
-    api.getLockerRooms(assignmentRinkId).then(setAssignmentLockerRooms);
-  }, [assignmentRinkId]);
 
   const selectRink = (rinkId: string) => {
     if (rinkId === selectedRinkId) return;
@@ -275,30 +244,6 @@ export default function ArenaDetailPage() {
     pushToast({ variant: 'success', title: 'Ice slot deleted' });
     api.getIceSlots(selectedRinkId).then(setIceSlots);
     loadRinks();
-  };
-
-  const openAssignmentModal = (team?: Team) => {
-    const currentAssignment = team ? assignmentByTeamId[team.id] : undefined;
-    setAssignmentTeamId(team?.id || '');
-    setAssignmentRinkId(currentAssignment?.arena_rink_id || selectedRinkId || rinks[0]?.id || '');
-    setAssignmentLockerRoomId(currentAssignment?.default_locker_room_id || '');
-    setAssignmentModalOpen(true);
-  };
-
-  const saveAssignment = async () => {
-    if (!effectiveSeason || !assignmentTeamId || !assignmentRinkId) return;
-    await api.createTeamVenueAssignment(assignmentTeamId, {
-      season_id: effectiveSeason.id,
-      arena_id: arenaId,
-      arena_rink_id: assignmentRinkId,
-      default_locker_room_id: assignmentLockerRoomId || null,
-    });
-    setAssignmentModalOpen(false);
-    setAssignmentTeamId('');
-    setAssignmentRinkId('');
-    setAssignmentLockerRoomId('');
-    pushToast({ variant: 'success', title: 'Venue assignment saved' });
-    loadAssignments();
   };
 
   if (!arena) {
@@ -483,45 +428,6 @@ export default function ArenaDetailPage() {
         </div>
       ) : null}
 
-      <Card className="p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Team Venue Assignments</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">
-              {effectiveSeason ? `Defaults for ${effectiveSeason.name}.` : 'Select a season to manage team defaults.'}
-            </div>
-          </div>
-          {effectiveSeason ? (
-            <Button type="button" size="sm" onClick={() => openAssignmentModal()}>
-              <Plus className="h-3.5 w-3.5" />
-              Assign Team
-            </Button>
-          ) : null}
-        </div>
-        <div className="mt-4 space-y-2">
-          {teams.map((team) => {
-            const assignment = assignmentByTeamId[team.id];
-            return (
-              <div key={team.id} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-3 text-sm dark:border-slate-800">
-                <div>
-                  <div className="font-medium text-slate-900 dark:text-slate-100">{team.name}</div>
-                  <div className="text-slate-600 dark:text-slate-400">
-                    {assignment
-                      ? `${assignment.arena_rink_name}${assignment.default_locker_room_name ? ` • ${assignment.default_locker_room_name}` : ''}`
-                      : 'No venue assignment'}
-                  </div>
-                </div>
-                {effectiveSeason ? (
-                  <Button type="button" size="sm" variant="outline" onClick={() => openAssignmentModal(team)}>
-                    {assignment ? 'Edit Venue' : 'Assign Venue'}
-                  </Button>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
       <Modal
         open={arenaEditOpen}
         onClose={() => setArenaEditOpen(false)}
@@ -605,51 +511,6 @@ export default function ArenaDetailPage() {
         </div>
       </Modal>
 
-      <Modal
-        open={assignmentModalOpen}
-        onClose={() => setAssignmentModalOpen(false)}
-        title="Team Venue Assignment"
-        footer={(
-          <>
-            <Button type="button" onClick={saveAssignment} disabled={!assignmentTeamId || !assignmentRinkId || !effectiveSeason}>Save</Button>
-            <Button type="button" variant="outline" onClick={() => setAssignmentModalOpen(false)}>Cancel</Button>
-          </>
-        )}
-      >
-        {!effectiveSeason ? (
-          <Alert variant="info">Select a season to create venue assignments.</Alert>
-        ) : (
-          <div className="grid grid-cols-1 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Team</label>
-              <Select value={assignmentTeamId} onChange={(event) => setAssignmentTeamId(event.target.value)}>
-                <option value="">Select team…</option>
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>{team.name}</option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Arena Rink</label>
-              <Select value={assignmentRinkId} onChange={(event) => setAssignmentRinkId(event.target.value)}>
-                <option value="">Select rink…</option>
-                {rinks.map((rink) => (
-                  <option key={rink.id} value={rink.id}>{rink.name}</option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Default Locker Room</label>
-              <Select value={assignmentLockerRoomId} onChange={(event) => setAssignmentLockerRoomId(event.target.value)}>
-                <option value="">No default locker room</option>
-                {assignmentLockerRooms.map((lockerRoom) => (
-                  <option key={lockerRoom.id} value={lockerRoom.id}>{lockerRoom.name}</option>
-                ))}
-              </Select>
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }

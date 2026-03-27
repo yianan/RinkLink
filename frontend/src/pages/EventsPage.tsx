@@ -38,7 +38,7 @@ function attendanceSummaryLabel(event: Event) {
 }
 
 const emptyForm = {
-  event_type: 'practice' as Event['event_type'],
+  event_type: 'league' as Event['event_type'],
   away_team_id: '',
   arena_id: '',
   arena_rink_id: '',
@@ -484,7 +484,7 @@ export default function EventsPage() {
                   <div className="px-3 py-3 text-sm text-slate-600 dark:text-slate-400">Choose a date to browse open ice across all arenas.</div>
                 ) : openIceSlots.length === 0 ? (
                   <div className="px-3 py-3 text-sm text-slate-600 dark:text-slate-400">
-                    No open ice matches this date and filter. Add slots in Arenas or widen the filter.
+                    No open ice slots found.
                   </div>
                 ) : (
                   <div className="max-h-64 overflow-y-auto divide-y divide-slate-200 dark:divide-slate-800">

@@ -171,9 +171,14 @@ def seed_demo_data(db: Session):
     slot_specs = [
         (arenas[0], "Rink A", confirmed_game_date, time(17, 0), time(18, 15)),
         (arenas[0], "Rink B", proposal_date, time(18, 0), time(19, 15)),
+        (arenas[0], "Rink A", open_date, time(15, 45), time(17, 0)),
+        (arenas[0], "Rink B", open_date, time(18, 15), time(19, 30)),
         (arenas[1], "Rink B", open_date, time(16, 30), time(17, 45)),
+        (arenas[1], "Rink A", open_date, time(19, 0), time(20, 15)),
         (arenas[1], "Rink A", search_demo_date, time(18, 30), time(19, 45)),
         (arenas[2], "Rink A", practice_date, time(19, 0), time(20, 15)),
+        (arenas[2], "Rink A", open_date, time(17, 30), time(18, 45)),
+        (arenas[2], "Rink B", open_date, time(20, 0), time(21, 15)),
         (arenas[2], "Rink B", showcase_date, time(17, 30), time(18, 45)),
         (arenas[1], "Rink A", live_game_date, time(18, 0), time(19, 15)),
     ]
@@ -219,15 +224,6 @@ def seed_demo_data(db: Session):
     db.add_all(memberships)
     db.flush()
 
-    assignments = [
-        TeamSeasonVenueAssignment(team_id=teams[0].id, season_id=season_id, arena_id=arenas[0].id, arena_rink_id=arena_rinks[0].id, default_locker_room_id=locker_rooms[0].id),
-        TeamSeasonVenueAssignment(team_id=teams[1].id, season_id=season_id, arena_id=arenas[0].id, arena_rink_id=arena_rinks[1].id, default_locker_room_id=locker_rooms[3].id),
-        TeamSeasonVenueAssignment(team_id=teams[2].id, season_id=season_id, arena_id=arenas[1].id, arena_rink_id=arena_rinks[2].id, default_locker_room_id=locker_rooms[6].id),
-        TeamSeasonVenueAssignment(team_id=teams[3].id, season_id=season_id, arena_id=arenas[1].id, arena_rink_id=arena_rinks[3].id, default_locker_room_id=locker_rooms[9].id),
-        TeamSeasonVenueAssignment(team_id=teams[4].id, season_id=season_id, arena_id=arenas[2].id, arena_rink_id=arena_rinks[4].id, default_locker_room_id=locker_rooms[12].id),
-        TeamSeasonVenueAssignment(team_id=teams[5].id, season_id=season_id, arena_id=arenas[2].id, arena_rink_id=arena_rinks[5].id, default_locker_room_id=locker_rooms[15].id),
-    ]
-    db.add_all(assignments)
     db.flush()
 
     availability = [

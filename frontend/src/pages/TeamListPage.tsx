@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { MapPinned, Pencil, Phone, Trash2 } from 'lucide-react';
+import { Pencil, Phone, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
-import { Arena, ArenaRink, Association, LockerRoom, Team, TeamSeasonVenueAssignment } from '../types';
+import { Association, Team } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
 import AgeLevelSelect from '../components/AgeLevelSelect';
@@ -46,10 +46,6 @@ export default function TeamListPage() {
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [associations, setAssociations] = useState<Association[]>([]);
-  const [arenas, setArenas] = useState<Arena[]>([]);
-  const [arenaRinks, setArenaRinks] = useState<ArenaRink[]>([]);
-  const [lockerRooms, setLockerRooms] = useState<LockerRoom[]>([]);
-  const [assignments, setAssignments] = useState<TeamSeasonVenueAssignment[]>([]);
 
   const [teamModalOpen, setTeamModalOpen] = useState(false);
   const [editTeam, setEditTeam] = useState<Team | null>(null);
@@ -57,61 +53,24 @@ export default function TeamListPage() {
   const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null);
   const [removeTeamLogo, setRemoveTeamLogo] = useState(false);
 
-  const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
-  const [assignmentTeamId, setAssignmentTeamId] = useState('');
-  const [assignmentArenaId, setAssignmentArenaId] = useState('');
-  const [assignmentArenaRinkId, setAssignmentArenaRinkId] = useState('');
-  const [assignmentLockerRoomId, setAssignmentLockerRoomId] = useState('');
-
   const [selectedAssociationIds, setSelectedAssociationIds] = useState<string[]>([]);
   const [selectedCompetitionNames, setSelectedCompetitionNames] = useState<string[]>([]);
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const assignmentByTeamId = useMemo(
-    () => Object.fromEntries(assignments.map((assignment) => [assignment.team_id, assignment])),
-    [assignments],
-  );
-
   const load = async () => {
-    const [teamData, associationData, arenaData] = await Promise.all([
+    const [teamData, associationData] = await Promise.all([
       api.getTeams(effectiveSeason ? { season_id: effectiveSeason.id } : undefined),
       api.getAssociations(),
-      api.getArenas(),
     ]);
     setTeams(teamData);
     setAssociations(associationData);
-    setArenas(arenaData);
-    if (effectiveSeason) {
-      const assignmentLists = await Promise.all(
-        teamData.map((team) => api.getTeamVenueAssignments(team.id, { season_id: effectiveSeason.id })),
-      );
-      setAssignments(assignmentLists.map((items) => items[0]).filter(Boolean) as TeamSeasonVenueAssignment[]);
-    } else {
-      setAssignments([]);
-    }
   };
 
   useEffect(() => {
     load();
   }, [effectiveSeason?.id]);
-
-  useEffect(() => {
-    if (!assignmentArenaId) {
-      setArenaRinks([]);
-      return;
-    }
-    api.getArenaRinks(assignmentArenaId).then(setArenaRinks);
-  }, [assignmentArenaId]);
-
-  useEffect(() => {
-    if (!assignmentArenaRinkId) {
-      setLockerRooms([]);
-      return;
-    }
-    api.getLockerRooms(assignmentArenaRinkId).then(setLockerRooms);
-  }, [assignmentArenaRinkId]);
 
   const setTeamField = (key: keyof typeof emptyTeamForm, value: string) => {
     setTeamForm((current) => ({ ...current, [key]: value }));
@@ -196,34 +155,6 @@ export default function TeamListPage() {
     await refreshTeams();
   };
 
-  const openAssignmentModal = (team: Team) => {
-    const current = assignmentByTeamId[team.id];
-    setAssignmentTeamId(team.id);
-    setAssignmentArenaId(current?.arena_id || '');
-    setAssignmentArenaRinkId(current?.arena_rink_id || '');
-    setAssignmentLockerRoomId(current?.default_locker_room_id || '');
-    setAssignmentModalOpen(true);
-  };
-
-  const saveAssignment = async () => {
-    if (!effectiveSeason || !assignmentTeamId || !assignmentArenaId || !assignmentArenaRinkId) return;
-    const existing = assignments.find((assignment) => assignment.team_id === assignmentTeamId);
-    const payload = {
-      season_id: effectiveSeason.id,
-      arena_id: assignmentArenaId,
-      arena_rink_id: assignmentArenaRinkId,
-      default_locker_room_id: assignmentLockerRoomId || null,
-    };
-    if (existing) {
-      await api.updateTeamVenueAssignment(existing.id, payload);
-    } else {
-      await api.createTeamVenueAssignment(assignmentTeamId, payload);
-    }
-    setAssignmentModalOpen(false);
-    pushToast({ variant: 'success', title: 'Venue assignment saved' });
-    await load();
-  };
-
   const associationOptions = useMemo<FilterOption[]>(
     () => associations
       .slice()
@@ -236,8 +167,7 @@ export default function TeamListPage() {
     const names = Array.from(
       new Set(
         teams
-          .flatMap((team) => team.memberships)
-          .map((membership) => membership.competition_short_name || membership.competition_name || '')
+          .map((team) => team.primary_membership?.competition_short_name || team.primary_membership?.competition_name || '')
           .filter(Boolean),
       ),
     );
@@ -258,11 +188,9 @@ export default function TeamListPage() {
 
   const filteredTeams = useMemo(
     () => teams.filter((team) => {
-      const competitionNames = team.memberships
-        .map((membership) => membership.competition_short_name || membership.competition_name || '')
-        .filter(Boolean);
+      const primaryCompetitionName = team.primary_membership?.competition_short_name || team.primary_membership?.competition_name || '';
       return (selectedAssociationIds.length === 0 || selectedAssociationIds.includes(team.association_id))
-        && (selectedCompetitionNames.length === 0 || competitionNames.some((name) => selectedCompetitionNames.includes(name)))
+        && (selectedCompetitionNames.length === 0 || (primaryCompetitionName && selectedCompetitionNames.includes(primaryCompetitionName)))
         && (selectedAgeGroups.length === 0 || selectedAgeGroups.includes(team.age_group))
         && (selectedLevels.length === 0 || selectedLevels.includes(team.level));
     }),
@@ -302,8 +230,8 @@ export default function TeamListPage() {
         title="Teams"
         subtitle={
           effectiveSeason
-            ? `Manage team records, competition context, managers, and venue defaults for ${effectiveSeason.name}.`
-            : 'Manage team records, competition context, managers, and venue defaults.'
+            ? `Manage team records, competition context, and managers for ${effectiveSeason.name}.`
+            : 'Manage team records, competition context, and managers.'
         }
         actions={(
           <>
@@ -315,7 +243,7 @@ export default function TeamListPage() {
 
       <FilterPanel
         title="Filter teams"
-        description="Narrow the list by association, competition, age group, and level."
+        description="Narrow the list by association, primary league, age group, and level."
         open={filtersOpen}
         badges={activeFilterBadges}
         onClear={clearFilters}
@@ -328,9 +256,6 @@ export default function TeamListPage() {
 
       <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {filteredTeams.map((team) => {
-          const assignment = assignmentByTeamId[team.id];
-          const secondaryMemberships = team.memberships.filter((membership) => !membership.is_primary);
-
           return (
             <Card key={team.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
@@ -350,17 +275,6 @@ export default function TeamListPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className={tableActionButtonClass}
-                    onClick={() => openAssignmentModal(team)}
-                    aria-label="Edit venue assignment"
-                    title="Edit venue assignment"
-                  >
-                    <MapPinned className="h-4 w-4" />
-                  </Button>
                   <Button
                     type="button"
                     variant="ghost"
@@ -387,20 +301,6 @@ export default function TeamListPage() {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
-                {assignment ? (
-                  <>
-                    <Badge variant="outline">{assignment.arena_name}</Badge>
-                    <Badge variant="outline">{assignment.arena_rink_name}</Badge>
-                    {assignment.default_locker_room_name ? (
-                      <Badge variant="outline">{assignment.default_locker_room_name}</Badge>
-                    ) : null}
-                  </>
-                ) : (
-                  <Badge variant="outline">No venue assignment</Badge>
-                )}
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
                 {team.primary_membership ? (
                   <Badge variant={getCompetitionBadgeVariant(team.primary_membership.competition_type)}>
                     {team.primary_membership.competition_short_name} • {team.primary_membership.division_name}
@@ -408,11 +308,6 @@ export default function TeamListPage() {
                 ) : (
                   <Badge variant="outline">No primary competition</Badge>
                 )}
-                {secondaryMemberships.map((membership) => (
-                  <Badge key={membership.id} variant="outline">
-                    {getCompetitionLabel(membership.competition_type)} • {membership.competition_short_name}
-                  </Badge>
-                ))}
                 <div className="inline-flex min-h-8 items-center gap-2 rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1.5 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Manager</span>
                   <span className="font-medium text-slate-900 dark:text-slate-100">
@@ -448,7 +343,7 @@ export default function TeamListPage() {
 
         {filteredTeams.length === 0 ? (
           <Card className="p-6 text-sm text-slate-600 dark:text-slate-400">
-            {teams.length === 0 ? 'No teams yet. Add one to start managing seasons and venues.' : 'No teams match the current filters.'}
+            {teams.length === 0 ? 'No teams yet. Add one to start managing seasons.' : 'No teams match the current filters.'}
           </Card>
         ) : null}
       </div>
@@ -543,53 +438,6 @@ export default function TeamListPage() {
         </div>
       </Modal>
 
-      <Modal
-        open={assignmentModalOpen}
-        onClose={() => setAssignmentModalOpen(false)}
-        title="Team Venue Assignment"
-        footer={(
-          <>
-            <Button type="button" onClick={saveAssignment} disabled={!effectiveSeason || !assignmentTeamId || !assignmentArenaId || !assignmentArenaRinkId}>
-              Save
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setAssignmentModalOpen(false)}>Cancel</Button>
-          </>
-        )}
-      >
-        {!effectiveSeason ? (
-          <div className="text-sm text-slate-600 dark:text-slate-400">Select a season to set venue defaults.</div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Arena</label>
-              <Select value={assignmentArenaId} onChange={(event) => setAssignmentArenaId(event.target.value)}>
-                <option value="">Select arena…</option>
-                {arenas.map((arena) => (
-                  <option key={arena.id} value={arena.id}>{arena.name}</option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Arena Rink</label>
-              <Select value={assignmentArenaRinkId} onChange={(event) => setAssignmentArenaRinkId(event.target.value)}>
-                <option value="">Select rink…</option>
-                {arenaRinks.map((arenaRink) => (
-                  <option key={arenaRink.id} value={arenaRink.id}>{arenaRink.name}</option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Default Locker Room</label>
-              <Select value={assignmentLockerRoomId} onChange={(event) => setAssignmentLockerRoomId(event.target.value)}>
-                <option value="">No default locker room</option>
-                {lockerRooms.map((lockerRoom) => (
-                  <option key={lockerRoom.id} value={lockerRoom.id}>{lockerRoom.name}</option>
-                ))}
-              </Select>
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }
