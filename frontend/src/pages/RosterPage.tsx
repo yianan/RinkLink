@@ -44,6 +44,8 @@ function positionLabel(position: string | null | undefined) {
 function playerSeasonTotalItems(player: Player) {
   if (player.position === 'G') {
     return [
+      { label: 'G', value: String(player.season_totals.goals) },
+      { label: 'A', value: String(player.season_totals.assists) },
       { label: 'SV', value: String(player.season_totals.saves) },
       { label: 'Shootout', value: `${player.season_totals.shootout_saves}/${player.season_totals.shootout_shots}` },
     ];
@@ -57,11 +59,11 @@ function playerSeasonTotalItems(player: Player) {
 
 function SeasonTotalsChips({ player }: { player: Player }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex gap-1 whitespace-nowrap">
       {playerSeasonTotalItems(player).map((item) => (
         <span
           key={item.label}
-          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
         >
           <span className="font-semibold text-slate-900 dark:text-slate-100">{item.value}</span>
           <span className="uppercase tracking-wide text-slate-500 dark:text-slate-400">{item.label}</span>
@@ -238,26 +240,26 @@ export default function RosterPage() {
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
                 {players.map((p) => (
-                  <tr key={p.id} className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                  <tr key={p.id} className="align-middle hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                     <td className="px-4 py-3">
                       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/80 dark:bg-slate-900/70 dark:text-slate-100 dark:ring-slate-800/80">
                         {p.jersey_number ?? '—'}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                    <td className="px-4 py-3 align-middle text-slate-700 dark:text-slate-300">
                       <div className="font-medium text-slate-900 dark:text-slate-100">
                         {p.first_name} {p.last_name}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                    <td className="px-4 py-3 align-middle text-slate-700 dark:text-slate-300">
                       <SeasonTotalsChips player={p} />
                     </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                    <td className="px-4 py-3 align-middle text-slate-700 dark:text-slate-300">
                       <Badge variant={positionBadgeVariant(p.position)}>
                         {positionLabel(p.position)}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-middle">
                       <div className="flex justify-end gap-1">
                         <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit" className={tableActionButtonClass}>
                           <Pencil className="h-4 w-4" />
