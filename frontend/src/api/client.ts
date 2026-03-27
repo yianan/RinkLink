@@ -131,6 +131,13 @@ export const api = {
   createEvent: (teamId: string, data: Partial<import('../types').Event>) =>
     request<import('../types').Event>(`/teams/${teamId}/events`, { method: 'POST', body: JSON.stringify(data) }),
   getEvent: (id: string) => request<import('../types').Event>(`/events/${id}`),
+  getEventAttendance: (teamId: string, eventId: string) =>
+    request<import('../types').EventAttendancePlayer[]>(`/teams/${teamId}/events/${eventId}/attendance`),
+  updateEventAttendance: (teamId: string, eventId: string, updates: { player_id: string; status: import('../types').AttendanceStatus }[]) =>
+    request<import('../types').EventAttendancePlayer[]>(`/teams/${teamId}/events/${eventId}/attendance`, {
+      method: 'PUT',
+      body: JSON.stringify({ updates }),
+    }),
   updateEvent: (id: string, data: Partial<import('../types').Event>) =>
     request<import('../types').Event>(`/events/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   confirmEvent: (id: string, teamId: string, confirmed: boolean) =>

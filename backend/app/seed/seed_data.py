@@ -16,6 +16,7 @@ from ..models import (
     Competition,
     CompetitionDivision,
     Event,
+    EventAttendance,
     IceSlot,
     LockerRoom,
     Notification,
@@ -460,6 +461,30 @@ def seed_demo_data(db: Session):
     add_roster(teams[4].id, "TI14-")
     add_roster(teams[5].id, "TI12-")
 
+    db.flush()
+
+    roster_by_team: dict[str, list[Player]] = {}
+    players = db.query(Player).filter(Player.season_id == season_id).order_by(Player.team_id, Player.jersey_number).all()
+    for player in players:
+        roster_by_team.setdefault(player.team_id, []).append(player)
+
+    def mark_attendance(event_id: str, team_id: str, attending: int, tentative: int = 0, absent: int = 0):
+        roster = roster_by_team.get(team_id, [])
+        statuses = (
+            ["attending"] * min(attending, len(roster))
+            + ["tentative"] * min(tentative, max(len(roster) - attending, 0))
+            + ["absent"] * min(absent, max(len(roster) - attending - tentative, 0))
+        )
+        for player, status in zip(roster, statuses):
+            db.add(EventAttendance(event_id=event_id, player_id=player.id, status=status))
+
+    mark_attendance(events[0].id, teams[0].id, attending=9, tentative=1, absent=1)
+    mark_attendance(events[0].id, teams[2].id, attending=8, tentative=2, absent=1)
+    mark_attendance(events[1].id, teams[3].id, attending=11, tentative=0, absent=1)
+    mark_attendance(events[2].id, teams[0].id, attending=8, tentative=2, absent=1)
+    mark_attendance(events[3].id, teams[3].id, attending=10, tentative=1, absent=1)
+    mark_attendance(events[3].id, teams[1].id, attending=9, tentative=2, absent=0)
+
     db.commit()
 
     for team in teams:
@@ -475,5 +500,6 @@ def seed_demo_data(db: Session):
         "ice_slots": len(slots),
         "availability_windows": len(availability),
         "events": len(events),
+        "event_attendance": db.query(EventAttendance).count(),
         "proposals": 1,
     }

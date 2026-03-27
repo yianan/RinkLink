@@ -1,3 +1,8 @@
+from .attendance import (
+    BulkEventAttendanceUpdate,
+    EventAttendancePlayer,
+    EventAttendanceSummary,
+)
 from .association import AssociationCreate, AssociationUpdate, AssociationOut
 from .team import TeamCreate, TeamUpdate, TeamOut
 from .availability_window import (
@@ -46,6 +51,7 @@ from .competition import CompetitionOut, CompetitionDivisionOut, TeamCompetition
 
 __all__ = [
     "AssociationCreate", "AssociationUpdate", "AssociationOut",
+    "BulkEventAttendanceUpdate", "EventAttendancePlayer", "EventAttendanceSummary",
     "TeamCreate", "TeamUpdate", "TeamOut",
     "AvailabilityWindowCreate", "AvailabilityWindowUpdate", "AvailabilityWindowOut",
     "AvailabilityUploadPreview", "AvailabilityConfirmUpload",

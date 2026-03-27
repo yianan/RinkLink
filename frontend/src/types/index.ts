@@ -334,6 +334,7 @@ export interface Event {
   competition_name: string | null;
   competition_short_name: string | null;
   division_name: string | null;
+  attendance_summary: EventAttendanceSummary | null;
 }
 
 export interface Season {
@@ -394,6 +395,26 @@ export interface Player {
   position: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type AttendanceStatus = 'unknown' | 'attending' | 'tentative' | 'absent';
+
+export interface EventAttendanceSummary {
+  attending_count: number;
+  tentative_count: number;
+  absent_count: number;
+  unknown_count: number;
+  total_players: number;
+}
+
+export interface EventAttendancePlayer {
+  player_id: string;
+  first_name: string;
+  last_name: string;
+  jersey_number: number | null;
+  position: string | null;
+  status: AttendanceStatus;
+  responded_at: string | null;
 }
 
 export interface PlayerUploadRow {

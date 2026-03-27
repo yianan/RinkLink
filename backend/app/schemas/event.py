@@ -4,6 +4,8 @@ import datetime as dt
 
 from pydantic import BaseModel
 
+from .attendance import EventAttendanceSummary
+
 
 class EventCreate(BaseModel):
     event_type: str
@@ -91,5 +93,6 @@ class EventOut(BaseModel):
     competition_name: str | None = None
     competition_short_name: str | None = None
     division_name: str | None = None
+    attendance_summary: EventAttendanceSummary | None = None
 
     model_config = {"from_attributes": True}

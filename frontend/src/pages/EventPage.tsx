@@ -3,7 +3,10 @@ import { ArrowLeft, MapPin, Navigation, Plus, Save, ShieldCheck, Trash2, Utensil
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import {
+  AttendanceStatus,
   Event,
+  EventAttendancePlayer,
+  EventAttendanceSummary,
   EventGoalieStatUpsert,
   EventPenalty,
   EventPlayerStatUpsert,
@@ -85,6 +88,41 @@ const emptyPenaltyForm: PenaltyForm = {
   minutes: '',
 };
 
+function buildAttendanceSummary(players: EventAttendancePlayer[]): EventAttendanceSummary {
+  const attending_count = players.filter((player) => player.status === 'attending').length;
+  const tentative_count = players.filter((player) => player.status === 'tentative').length;
+  const absent_count = players.filter((player) => player.status === 'absent').length;
+  return {
+    attending_count,
+    tentative_count,
+    absent_count,
+    unknown_count: players.length - attending_count - tentative_count - absent_count,
+    total_players: players.length,
+  };
+}
+
+function attendanceStatusLabel(status: AttendanceStatus) {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function attendanceStatusClasses(status: AttendanceStatus, active: boolean) {
+  const palette: Record<AttendanceStatus, string> = {
+    attending: active
+      ? 'border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-100'
+      : 'border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-950/25 dark:text-slate-300',
+    tentative: active
+      ? 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-100'
+      : 'border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-950/25 dark:text-slate-300',
+    absent: active
+      ? 'border-rose-300 bg-rose-100 text-rose-900 dark:border-rose-700 dark:bg-rose-950/60 dark:text-rose-100'
+      : 'border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-950/25 dark:text-slate-300',
+    unknown: active
+      ? 'border-slate-300 bg-slate-200 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100'
+      : 'border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-950/25 dark:text-slate-300',
+  };
+  return palette[status];
+}
+
 function buildPlayerStatSnapshot(
   players: Player[],
   teamId: string,
@@ -109,6 +147,9 @@ export default function EventPage() {
   const [error, setError] = useState('');
   const [homePlayers, setHomePlayers] = useState<Player[]>([]);
   const [awayPlayers, setAwayPlayers] = useState<Player[]>([]);
+  const [attendancePlayers, setAttendancePlayers] = useState<EventAttendancePlayer[]>([]);
+  const [attendanceDraft, setAttendanceDraft] = useState<Record<string, AttendanceStatus>>({});
+  const [attendanceFilter, setAttendanceFilter] = useState<'all' | AttendanceStatus>('all');
   const [scoreDraft, setScoreDraft] = useState({ home: '', away: '' });
   const [statDraft, setStatDraft] = useState<Record<string, { goals: number; assists: number; shots: number; team_id: string }>>({});
   const [penaltyForm, setPenaltyForm] = useState<PenaltyForm>(emptyPenaltyForm);
@@ -127,15 +168,20 @@ export default function EventPage() {
       ]);
 
       const playerParams = eventData.season_id ? { season_id: eventData.season_id } : undefined;
-      const [homeRoster, awayRoster] = await Promise.all([
+      const [homeRoster, awayRoster, attendanceData] = await Promise.all([
         api.getPlayers(eventData.home_team_id, playerParams),
         eventData.away_team_id ? api.getPlayers(eventData.away_team_id, playerParams) : Promise.resolve([]),
+        activeTeam && (activeTeam.id === eventData.home_team_id || activeTeam.id === eventData.away_team_id)
+          ? api.getEventAttendance(activeTeam.id, eventId)
+          : Promise.resolve([]),
       ]);
 
       setEvent(eventData);
       setScoresheet(scoresheetData);
       setHomePlayers(homeRoster);
       setAwayPlayers(awayRoster);
+      setAttendancePlayers(attendanceData);
+      setAttendanceDraft(Object.fromEntries(attendanceData.map((player) => [player.player_id, player.status])));
       setScoreDraft({
         home: eventData.home_score != null ? String(eventData.home_score) : '',
         away: eventData.away_score != null ? String(eventData.away_score) : '',
@@ -166,6 +212,8 @@ export default function EventPage() {
     } catch (loadError) {
       setEvent(null);
       setScoresheet(null);
+      setAttendancePlayers([]);
+      setAttendanceDraft({});
       setError(loadError instanceof Error ? loadError.message.replace(/^\d+:\s*/, '') : 'Unable to load event');
     } finally {
       setLoading(false);
@@ -175,7 +223,7 @@ export default function EventPage() {
   useEffect(() => {
     if (!eventId) return;
     load();
-  }, [eventId]);
+  }, [eventId, activeTeam?.id]);
 
   const teamRole = useMemo(() => {
     if (!event || !activeTeam) return null;
@@ -227,7 +275,18 @@ export default function EventPage() {
 
   const canScore = !!event.away_team_id && event.status !== 'cancelled' && event.date <= todayStr;
   const canConfirm = !!activeTeam && !!teamRole && !!event.away_team_id && event.status !== 'cancelled';
+  const canEditAttendance = !!activeTeam && !!teamRole && event.status !== 'cancelled' && event.date >= todayStr;
   const alreadyConfirmed = teamRole === 'home' ? event.home_weekly_confirmed : event.away_weekly_confirmed;
+  const persistedAttendanceMap = Object.fromEntries(attendancePlayers.map((player) => [player.player_id, player.status]));
+  const effectiveAttendancePlayers = attendancePlayers.map((player) => ({
+    ...player,
+    status: attendanceDraft[player.player_id] ?? player.status,
+  }));
+  const filteredAttendancePlayers = effectiveAttendancePlayers.filter((player) => (
+    attendanceFilter === 'all' ? true : player.status === attendanceFilter
+  ));
+  const attendanceSummary = buildAttendanceSummary(effectiveAttendancePlayers);
+  const attendanceDirty = effectiveAttendancePlayers.some((player) => player.status !== persistedAttendanceMap[player.player_id]);
   const hasSavedScore = event.home_score != null || event.away_score != null;
   const effectiveScoreDraft = {
     home: scoreDraft.home !== '' ? scoreDraft.home : (event.home_score != null ? String(event.home_score) : '0'),
@@ -258,6 +317,7 @@ export default function EventPage() {
     );
   });
   const dirtySections = [
+    attendanceDirty ? 'attendance' : null,
     scoreDirty ? 'score' : null,
     playerStatsDirty ? 'player stats' : null,
     goalieStatsDirty ? 'goalie stats' : null,
@@ -298,6 +358,18 @@ export default function EventPage() {
     setScoreDraft({ home: String(updated.home_score ?? ''), away: String(updated.away_score ?? '') });
     setScoresheet((current) => (current ? { ...current, event: updated } : current));
     pushToast({ variant: 'success', title: hasSavedScore ? 'Score updated' : 'Score saved' });
+  };
+
+  const saveAttendance = async () => {
+    if (!activeTeam) return;
+    const updates = effectiveAttendancePlayers
+      .filter((player) => player.status !== persistedAttendanceMap[player.player_id])
+      .map((player) => ({ player_id: player.player_id, status: player.status }));
+    if (updates.length === 0) return;
+    const updated = await api.updateEventAttendance(activeTeam.id, event.id, updates);
+    setAttendancePlayers(updated);
+    setAttendanceDraft(Object.fromEntries(updated.map((player) => [player.player_id, player.status])));
+    pushToast({ variant: 'success', title: 'Attendance saved' });
   };
 
   const toggleConfirm = async (confirmed: boolean) => {
@@ -404,6 +476,9 @@ export default function EventPage() {
   };
 
   const handleSaveAll = async () => {
+    if (attendanceDirty) {
+      await saveAttendance();
+    }
     if (scoreDirty) {
       await saveScore();
     }
@@ -468,7 +543,9 @@ export default function EventPage() {
             <div className="flex flex-wrap items-center gap-2 pt-1">
               {event.away_team_id ? <Badge variant={event.home_weekly_confirmed ? 'success' : 'outline'}>{event.home_team_name} confirmed</Badge> : null}
               {event.away_team_id ? <Badge variant={event.away_weekly_confirmed ? 'success' : 'outline'}>{event.away_team_name} confirmed</Badge> : null}
-              <Badge variant="outline">{getGameStatusLabel(event)}</Badge>
+              {!event.away_team_id || (!event.home_weekly_confirmed || !event.away_weekly_confirmed) ? (
+                <Badge variant="outline">{getGameStatusLabel(event)}</Badge>
+              ) : null}
             </div>
             {rinkLabel ? (
               <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
@@ -500,7 +577,9 @@ export default function EventPage() {
 
       <div className="flex flex-wrap gap-2">
         <Badge variant={getCompetitionBadgeVariant(event.event_type)}>{getCompetitionLabel(event.event_type)}</Badge>
-        <Badge variant={getGameStatusVariant(event)}>{getGameStatusLabel(event)}</Badge>
+        {!event.away_team_id || (!event.home_weekly_confirmed || !event.away_weekly_confirmed) ? (
+          <Badge variant={getGameStatusVariant(event)}>{getGameStatusLabel(event)}</Badge>
+        ) : null}
         {event.competition_short_name ? (
           <Badge variant="outline">{event.competition_short_name}{event.division_name ? ` • ${event.division_name}` : ''}</Badge>
         ) : null}
@@ -573,6 +652,88 @@ export default function EventPage() {
           </div>
         </Card>
       </div>
+
+      {activeTeam && teamRole ? (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                <span>Attendance</span>
+                {attendanceDirty ? <Badge variant="warning">Unsaved</Badge> : null}
+              </div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                {canEditAttendance
+                  ? 'Record attendance for the active team roster.'
+                  : event.status === 'cancelled'
+                    ? 'Attendance is read-only for cancelled events.'
+                    : 'Attendance is read-only for past events.'}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {attendanceSummary.attending_count > 0 ? <Badge variant="success">{attendanceSummary.attending_count} Attending</Badge> : null}
+              {attendanceSummary.tentative_count > 0 ? <Badge variant="warning">{attendanceSummary.tentative_count} Tentative</Badge> : null}
+              {attendanceSummary.absent_count > 0 ? <Badge variant="danger">{attendanceSummary.absent_count} Absent</Badge> : null}
+              {attendanceSummary.unknown_count > 0 ? <Badge variant="outline">{attendanceSummary.unknown_count} Unknown</Badge> : null}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(['all', 'attending', 'tentative', 'absent', 'unknown'] as const).map((status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setAttendanceFilter(status)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                  attendanceFilter === status
+                    ? 'border-cyan-300 bg-cyan-100 text-cyan-900 dark:border-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-100'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/25 dark:text-slate-300 dark:hover:bg-slate-900/45'
+                }`}
+              >
+                {status === 'all' ? 'All' : attendanceStatusLabel(status)}
+              </button>
+            ))}
+          </div>
+
+      <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+            <div className="grid grid-cols-[minmax(0,1fr)_10rem] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:border-slate-800 dark:bg-slate-900/35 dark:text-slate-400">
+              <div>{activeTeam.name} Roster</div>
+              <div>Status</div>
+            </div>
+            <div className="divide-y divide-slate-200 dark:divide-slate-800">
+              {filteredAttendancePlayers.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-slate-600 dark:text-slate-400">No roster players found for this event.</div>
+              ) : filteredAttendancePlayers.map((player) => (
+                <div key={player.player_id} className="grid grid-cols-[minmax(0,1fr)_10rem] items-center gap-3 px-4 py-2.5 hover:bg-slate-50/70 dark:hover:bg-slate-900/20">
+                  <div className="min-w-0 text-sm text-slate-900 dark:text-slate-100">
+                    <span className="font-medium">
+                      {player.jersey_number != null ? `#${player.jersey_number} ` : ''}{player.first_name} {player.last_name}
+                    </span>
+                    <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                      {player.position || 'Skater'}
+                    </span>
+                  </div>
+                  <Select
+                    value={player.status}
+                    disabled={!canEditAttendance}
+                    onChange={(inputEvent) =>
+                      setAttendanceDraft((current) => ({
+                        ...current,
+                        [player.player_id]: inputEvent.target.value as AttendanceStatus,
+                      }))
+                    }
+                    className={`h-9 min-h-9 text-xs font-medium ${attendanceStatusClasses(player.status, true)} ${canEditAttendance ? 'cursor-pointer' : ''}`}
+                  >
+                    <option value="unknown">Unknown</option>
+                    <option value="attending">Attending</option>
+                    <option value="tentative">Tentative</option>
+                    <option value="absent">Absent</option>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      ) : null}
 
       {canScore ? (
         <>
@@ -995,11 +1156,11 @@ export default function EventPage() {
         </Card>
       ) : null}
 
-      {canScore ? (
+      {(canEditAttendance || canScore) ? (
         <div className="sticky bottom-4 z-20 flex justify-end">
           <Card className="max-w-lg border-cyan-200/70 bg-white/95 p-3 shadow-xl backdrop-blur dark:border-cyan-900/40 dark:bg-slate-950/92" role="status" aria-live="polite">
             <div className="flex flex-wrap items-center justify-end gap-3">
-              <Button type="button" onClick={handleSaveAll} aria-label="Save all scoresheet changes" disabled={!hasUnsavedChanges}>
+              <Button type="button" onClick={handleSaveAll} aria-label="Save all event changes" disabled={!hasUnsavedChanges}>
                 Save All Changes
               </Button>
             </div>

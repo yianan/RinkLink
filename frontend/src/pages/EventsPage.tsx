@@ -25,6 +25,18 @@ import { useToast } from '../context/ToastContext';
 
 const EVENT_TYPES: Event['event_type'][] = ['league', 'tournament', 'practice', 'showcase', 'scrimmage', 'exhibition'];
 
+function attendanceSummaryLabel(event: Event) {
+  const summary = event.attendance_summary;
+  if (!summary || summary.total_players === 0) return null;
+  const parts = [
+    summary.attending_count > 0 ? `${summary.attending_count} Attending` : null,
+    summary.tentative_count > 0 ? `${summary.tentative_count} Tentative` : null,
+    summary.absent_count > 0 ? `${summary.absent_count} Absent` : null,
+    summary.unknown_count > 0 ? `${summary.unknown_count} Unknown` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 const emptyForm = {
   event_type: 'practice' as Event['event_type'],
   away_team_id: '',
@@ -276,6 +288,11 @@ export default function EventsPage() {
                       {event.home_locker_room_name || event.away_locker_room_name ? (
                         <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                           Locker Rooms: {[event.home_locker_room_name, event.away_locker_room_name].filter(Boolean).join(' / ')}
+                        </div>
+                      ) : null}
+                      {attendanceSummaryLabel(event) ? (
+                        <div className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                          {attendanceSummaryLabel(event)}
                         </div>
                       ) : null}
                     </div>

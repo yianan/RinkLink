@@ -3,6 +3,7 @@ from .team import Team
 from .availability_window import AvailabilityWindow
 from .proposal import Proposal
 from .event import Event
+from .event_attendance import EventAttendance
 from .notification import Notification
 from .player import Player
 from .scoresheet import EventPlayerStat, EventPenalty, EventGoalieStat, EventSignature
@@ -18,6 +19,7 @@ __all__ = [
     "AvailabilityWindow",
     "Proposal",
     "Event",
+    "EventAttendance",
     "Notification",
     "Player",
     "EventPlayerStat",

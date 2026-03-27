@@ -5,7 +5,20 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Arena, ArenaRink, AvailabilityWindow, Event, IceSlot, LockerRoom, Team
-from ..schemas import EventCreate, EventOut, EventUpdate, WeeklyConfirmUpdate
+from ..schemas import (
+    BulkEventAttendanceUpdate,
+    EventAttendancePlayer,
+    EventCreate,
+    EventOut,
+    EventUpdate,
+    WeeklyConfirmUpdate,
+)
+from ..services.attendance import (
+    attach_attendance_summary,
+    build_attendance_players,
+    upsert_attendance_updates,
+    validate_attendance_team,
+)
 from ..services.competitions import normalize_event_competition
 from ..services.event_view import enrich_event
 from ..services.records import is_recordable_event, recompute_team_records
@@ -101,7 +114,12 @@ def list_events(
         query = query.filter(Event.date <= date_to)
     if season_id:
         query = query.filter(Event.season_id == season_id)
-    return [enrich_event(event, db) for event in query.order_by(Event.date, Event.start_time).all()]
+    enriched_events: list[EventOut] = []
+    for event in query.order_by(Event.date, Event.start_time).all():
+        out = enrich_event(event, db)
+        attach_attendance_summary(db, event, team_id, out)
+        enriched_events.append(out)
+    return enriched_events
 
 
 @router.post("/teams/{team_id}/events", response_model=EventOut, status_code=201)
@@ -128,6 +146,32 @@ def get_event(event_id: str, db: Session = Depends(get_db)):
     if not event:
         raise HTTPException(404, "Event not found")
     return enrich_event(event, db)
+
+
+@router.get("/teams/{team_id}/events/{event_id}/attendance", response_model=list[EventAttendancePlayer])
+def get_event_attendance(team_id: str, event_id: str, db: Session = Depends(get_db)):
+    event = db.get(Event, event_id)
+    if not event:
+        raise HTTPException(404, "Event not found")
+    validate_attendance_team(event, team_id)
+    return build_attendance_players(db, event, team_id)
+
+
+@router.put("/teams/{team_id}/events/{event_id}/attendance", response_model=list[EventAttendancePlayer])
+def update_event_attendance(
+    team_id: str,
+    event_id: str,
+    body: BulkEventAttendanceUpdate,
+    db: Session = Depends(get_db),
+):
+    event = db.get(Event, event_id)
+    if not event:
+        raise HTTPException(404, "Event not found")
+    validate_attendance_team(event, team_id)
+    updates = {item.player_id: item.status for item in body.updates}
+    players = upsert_attendance_updates(db, event, team_id, updates)
+    db.commit()
+    return players
 
 
 @router.patch("/events/{event_id}", response_model=EventOut)
