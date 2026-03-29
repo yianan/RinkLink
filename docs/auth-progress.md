@@ -34,6 +34,18 @@
   - backend auth models compile via `./.venv/bin/python -m compileall app`
   - `./.venv/bin/alembic upgrade head` succeeded
   - `./.venv/bin/alembic check` reports no schema drift
+- Added backend auth runtime foundation:
+  - Better Auth JWT validation support dependencies
+  - runtime auth safety checks
+  - JWKS fetch and cache utility
+  - JWT decode utility
+  - capability mapping module
+  - `current_user` and `require_active_user` dependencies
+  - `/api/me` router and auth schemas
+- Validation:
+  - backend dependencies installed successfully in `.venv`
+  - `./.venv/bin/python -m compileall app` succeeded with auth modules
+  - `./.venv/bin/python -c "from app.main import app; print('ok')"` succeeded
 
 ## Planned Commit Sequence
 

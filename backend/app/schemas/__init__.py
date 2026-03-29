@@ -49,6 +49,15 @@ from .team_season_venue_assignment import (
 )
 from .season import SeasonOut, TeamSeasonRecordOut, StandingsEntry
 from .competition import CompetitionOut, CompetitionDivisionOut, TeamCompetitionMembershipOut
+from .auth import (
+    AppUserOut,
+    AssociationMembershipOut,
+    TeamMembershipOut,
+    ArenaMembershipOut,
+    LinkedPlayerOut,
+    AccessibleTeamOut,
+    MeOut,
+)
 
 __all__ = [
     "AssociationCreate", "AssociationUpdate", "AssociationOut",
@@ -74,4 +83,6 @@ __all__ = [
     "TeamSeasonVenueAssignmentCreate", "TeamSeasonVenueAssignmentUpdate", "TeamSeasonVenueAssignmentOut",
     "SeasonOut", "TeamSeasonRecordOut", "StandingsEntry",
     "CompetitionOut", "CompetitionDivisionOut", "TeamCompetitionMembershipOut",
+    "AppUserOut", "AssociationMembershipOut", "TeamMembershipOut", "ArenaMembershipOut",
+    "LinkedPlayerOut", "AccessibleTeamOut", "MeOut",
 ]

@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 from .config import settings
 from .database import engine  # noqa: F401 — imported to ensure engine is initialised
+from .auth.runtime import assert_auth_runtime_safe
 from .services.arena_logos import ensure_arena_logo_dir
 from .services.association_logos import ensure_association_logo_dir
 from .services.team_logos import ensure_team_logo_dir
@@ -16,6 +17,7 @@ from .services.team_logos import ensure_team_logo_dir
 async def lifespan(app: FastAPI):
     from . import models  # noqa: F401
 
+    assert_auth_runtime_safe()
     ensure_team_logo_dir()
     ensure_arena_logo_dir()
     ensure_association_logo_dir()
@@ -54,6 +56,7 @@ from .routers import (  # noqa: E402
     scoresheet,
     seasons,
     competitions,
+    me,
     seed as seed_router,
 )
 
@@ -70,6 +73,7 @@ app.include_router(players.router, prefix="/api")
 app.include_router(scoresheet.router, prefix="/api")
 app.include_router(seasons.router, prefix="/api")
 app.include_router(competitions.router, prefix="/api")
+app.include_router(me.router, prefix="/api")
 app.include_router(seed_router.router, prefix="/api")
 
 # Serve the React SPA for all non-API routes (production only — only present in Docker image)

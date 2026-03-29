@@ -7,3 +7,6 @@ python-multipart==0.0.22
 # psycopg (v3) provides a binary distribution that works cleanly on 3.14+.
 psycopg[binary]==3.3.3
 alembic==1.18.4
+PyJWT==2.10.1
+cryptography==46.0.3
+httpx==0.28.1
