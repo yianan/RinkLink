@@ -12,13 +12,45 @@ RinkLink is a youth hockey scheduling application built around five core concept
 ## Stack
 
 - Backend: FastAPI + SQLAlchemy
-- Database: SQLite locally, PostgreSQL in cloud
+- Database: PostgreSQL locally and in cloud for auth-enabled development; SQLite remains available only as a fallback for isolated backend work
 - Frontend: React + TypeScript + Vite + Tailwind
 - Schema management: Alembic
 - Frontend hosting: Render
 - Cloud database: Neon PostgreSQL
 
 ## Local Development
+
+### Preferred local stack
+
+Auth implementation work uses a shared local Postgres instance and a dedicated auth service so local behavior matches Neon-backed production more closely.
+
+Start the shared services from the repo root:
+
+```bash
+docker compose up postgres auth-service backend
+```
+
+This starts:
+
+- Postgres on `localhost:5432`
+- Better Auth service on `http://localhost:3000`
+- FastAPI backend on `http://localhost:8000`
+
+Then run the frontend separately:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend runs on `http://localhost:5173`.
+
+Local env examples:
+
+- `backend/.env.example`
+- `auth-service/.env.example`
+- `frontend/.env.example`
 
 ### Backend
 
@@ -33,14 +65,14 @@ uvicorn app.main:app --reload --port 8000
 
 Defaults:
 
-- `DATABASE_URL`: `sqlite:///backend/rinklink.db`
+- `DATABASE_URL`: `postgresql://postgres:postgres@localhost:5432/rinklink`
 - `MEDIA_ROOT`: `backend/media`
 - `CORS_ORIGINS`: `http://localhost:5173,http://localhost:5174`
 
 Important:
 
 - The app no longer creates or alters tables on startup.
-- If you have an older local SQLite file from a pre-redesign build, delete it and rerun `alembic upgrade head`.
+- SQLite is still supported as a fallback for isolated backend development, but auth implementation work should use the shared local Postgres setup above.
 
 ### Frontend
 
@@ -51,6 +83,20 @@ npm run dev
 ```
 
 The Vite dev server runs on `http://localhost:5173` and proxies `/api` to `http://localhost:8000`.
+
+### Auth Service
+
+```bash
+cd auth-service
+npm install
+npm run dev
+```
+
+Important local URLs:
+
+- Better Auth base URL: `http://localhost:3000`
+- Better Auth routes: `http://localhost:3000/api/auth/*`
+- JWKS URL: `http://localhost:3000/.well-known/jwks.json`
 
 ### Seed Demo Data
 
