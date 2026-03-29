@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Arena, ArenaRink, Event, IceSlot, LockerRoom, Proposal, TeamSeasonVenueAssignment
+from ..models import Arena, ArenaRink, Event, IceBookingRequest, IceSlot, LockerRoom, Proposal, TeamSeasonVenueAssignment
 from ..schemas import (
     ArenaCreate,
     ArenaOut,
@@ -32,6 +32,11 @@ from ..services.arena_logos import (
 from ..services.ice_slot_csv_parser import parse_ice_slot_csv
 
 router = APIRouter(tags=["arenas"])
+
+
+def _validate_slot_pricing(pricing_mode: str, price_amount_cents: int | None) -> None:
+    if pricing_mode == "fixed_price" and price_amount_cents is None:
+        raise HTTPException(400, "Fixed-price slots require a price")
 
 
 def _arena_out(arena: Arena, db: Session) -> ArenaOut:
@@ -74,6 +79,12 @@ def _slot_out(slot: IceSlot, db: Session) -> IceSlotOut:
         .order_by(Event.updated_at.desc())
         .first()
     )
+    active_request = (
+        db.query(IceBookingRequest)
+        .filter(IceBookingRequest.ice_slot_id == slot.id, IceBookingRequest.status.in_(("requested", "accepted")))
+        .order_by(IceBookingRequest.updated_at.desc())
+        .first()
+    )
     out = IceSlotOut.model_validate(slot)
     out.arena_rink_name = arena_rink.name if arena_rink else None
     out.arena_id = arena.id if arena else None
@@ -83,6 +94,10 @@ def _slot_out(slot: IceSlot, db: Session) -> IceSlotOut:
     out.booked_event_type = booked_event.event_type if booked_event else None
     out.booked_event_home_team_name = booked_event.home_team.name if booked_event and booked_event.home_team else None
     out.booked_event_away_team_name = booked_event.away_team.name if booked_event and booked_event.away_team else None
+    out.active_booking_request_id = active_request.id if active_request else None
+    out.active_booking_request_status = active_request.status if active_request else None
+    out.active_booking_request_team_name = active_request.requester_team.name if active_request and active_request.requester_team else None
+    out.active_booking_request_event_type = active_request.event_type if active_request else None
     return out
 
 
@@ -164,8 +179,9 @@ def delete_arena(arena_id: str, db: Session = Depends(get_db)):
     future_event_count = db.query(Event).filter(Event.arena_id == arena_id, Event.date >= today).count()
     historical_event_count = db.query(Event).filter(Event.arena_id == arena_id, Event.date < today).count()
     proposal_count = db.query(Proposal).filter(Proposal.arena_id == arena_id).count()
+    booking_request_count = db.query(IceBookingRequest).filter(IceBookingRequest.arena_id == arena_id).count()
     assignment_count = db.query(TeamSeasonVenueAssignment).filter(TeamSeasonVenueAssignment.arena_id == arena_id).count()
-    if future_event_count or historical_event_count or proposal_count or assignment_count:
+    if future_event_count or historical_event_count or proposal_count or booking_request_count or assignment_count:
         parts: list[str] = []
         if future_event_count:
             parts.append(f"{future_event_count} upcoming event{'s' if future_event_count != 1 else ''}")
@@ -173,6 +189,8 @@ def delete_arena(arena_id: str, db: Session = Depends(get_db)):
             parts.append(f"{historical_event_count} past event{'s' if historical_event_count != 1 else ''}")
         if proposal_count:
             parts.append(f"{proposal_count} proposal{'s' if proposal_count != 1 else ''}")
+        if booking_request_count:
+            parts.append(f"{booking_request_count} ice booking request{'s' if booking_request_count != 1 else ''}")
         if assignment_count:
             parts.append(f"{assignment_count} team venue assignment{'s' if assignment_count != 1 else ''}")
         raise HTTPException(
@@ -305,7 +323,11 @@ def list_ice_slots(
 def create_ice_slot(arena_rink_id: str, body: IceSlotCreate, db: Session = Depends(get_db)):
     if not db.get(ArenaRink, arena_rink_id):
         raise HTTPException(404, "Arena rink not found")
-    slot = IceSlot(arena_rink_id=arena_rink_id, **body.model_dump())
+    _validate_slot_pricing(body.pricing_mode, body.price_amount_cents)
+    payload = body.model_dump()
+    if payload["pricing_mode"] == "call_for_pricing":
+        payload["price_amount_cents"] = None
+    slot = IceSlot(arena_rink_id=arena_rink_id, **payload)
     db.add(slot)
     db.commit()
     db.refresh(slot)
@@ -383,7 +405,15 @@ def update_ice_slot(ice_slot_id: str, body: IceSlotUpdate, db: Session = Depends
     slot = db.get(IceSlot, ice_slot_id)
     if not slot:
         raise HTTPException(404, "Ice slot not found")
-    for key, value in body.model_dump(exclude_unset=True).items():
+    if slot.status != "available":
+        raise HTTPException(409, "Only open ice slots can be edited")
+    payload = body.model_dump(exclude_unset=True)
+    next_pricing_mode = payload.get("pricing_mode", slot.pricing_mode)
+    next_price_amount_cents = payload.get("price_amount_cents", slot.price_amount_cents)
+    _validate_slot_pricing(next_pricing_mode, next_price_amount_cents)
+    if next_pricing_mode == "call_for_pricing":
+        payload["price_amount_cents"] = None
+    for key, value in payload.items():
         setattr(slot, key, value)
     db.commit()
     db.refresh(slot)
@@ -395,6 +425,9 @@ def delete_ice_slot(ice_slot_id: str, db: Session = Depends(get_db)):
     slot = db.get(IceSlot, ice_slot_id)
     if not slot:
         raise HTTPException(404, "Ice slot not found")
+    active_request_count = db.query(IceBookingRequest).filter(IceBookingRequest.ice_slot_id == ice_slot_id, IceBookingRequest.status.in_(("requested", "accepted"))).count()
+    if slot.status != "available" or active_request_count:
+        raise HTTPException(409, "Only open ice slots without booking requests can be deleted")
     db.delete(slot)
     db.commit()
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, MapPin, Navigation, Plus, Save, ShieldCheck, Trash2, UtensilsCrossed } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import {
   AttendanceStatus,
@@ -11,6 +11,7 @@ import {
   EventPenalty,
   EventPlayerStatUpsert,
   EventScoresheet,
+  LockerRoom,
   Player,
 } from '../types';
 import { useTeam } from '../context/TeamContext';
@@ -19,6 +20,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import TeamLogo from '../components/TeamLogo';
 import { Textarea } from '../components/ui/Textarea';
@@ -72,6 +74,16 @@ function blockNonIntegerNumberKeys(event: React.KeyboardEvent<HTMLInputElement>)
   }
 }
 
+function eventHasStarted(eventDate: string, startTime: string | null, todayStr: string) {
+  if (eventDate < todayStr) return true;
+  if (eventDate > todayStr) return false;
+  if (!startTime) return false;
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const [hours, minutes] = startTime.split(':').map(Number);
+  return currentMinutes >= (hours * 60 + minutes);
+}
+
 type PenaltyForm = {
   team_id: string;
   player_id: string;
@@ -86,6 +98,12 @@ const emptyPenaltyForm: PenaltyForm = {
   penalty_type: '',
   custom_penalty_type: '',
   minutes: '',
+};
+
+const emptyLockerRoomForm = {
+  home_locker_room_id: '',
+  away_locker_room_id: '',
+  response_message: '',
 };
 
 function buildAttendanceSummary(players: EventAttendancePlayer[]): EventAttendanceSummary {
@@ -137,6 +155,7 @@ function buildPlayerStatSnapshot(
 
 export default function EventPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { eventId = '' } = useParams();
   const { activeTeam } = useTeam();
   const confirm = useConfirmDialog();
@@ -156,6 +175,24 @@ export default function EventPage() {
   const [penaltyForm, setPenaltyForm] = useState<PenaltyForm>(emptyPenaltyForm);
   const [goalieDraft, setGoalieDraft] = useState<Record<string, { player_id: string; saves: string; shootout_shots: string; shootout_saves: string }>>({});
   const [signatureDraft, setSignatureDraft] = useState<Record<string, string>>({});
+  const [lockerRooms, setLockerRooms] = useState<LockerRoom[]>([]);
+  const [lockerRoomModalOpen, setLockerRoomModalOpen] = useState(false);
+  const [lockerRoomForm, setLockerRoomForm] = useState(emptyLockerRoomForm);
+  const backTo = (location.state as { backTo?: string; backLabel?: string } | null)?.backTo || '/schedule';
+  const backLabel = (location.state as { backTo?: string; backLabel?: string } | null)?.backLabel
+    || ((window.history.state?.idx ?? 0) > 0 ? 'Back' : 'Back to Schedule');
+  const handleBack = () => {
+    const state = location.state as { backTo?: string } | null;
+    if (state?.backTo) {
+      navigate(state.backTo);
+      return;
+    }
+    if ((window.history.state?.idx ?? 0) > 0) {
+      navigate(-1);
+      return;
+    }
+    navigate('/schedule');
+  };
 
   const todayStr = toLocalDateString(new Date());
 
@@ -210,11 +247,20 @@ export default function EventPage() {
       });
       setGoalieDraft(nextGoalieDraft);
       setPenaltyForm(emptyPenaltyForm);
+      api.getLockerRooms(eventData.arena_rink_id).then((rooms) => {
+        setLockerRooms(rooms);
+        setLockerRoomForm({
+          home_locker_room_id: eventData.home_locker_room_id || '',
+          away_locker_room_id: eventData.away_locker_room_id || '',
+          response_message: '',
+        });
+      });
     } catch (loadError) {
       setEvent(null);
       setScoresheet(null);
       setAttendancePlayers([]);
       setAttendanceDraft({});
+      setLockerRooms([]);
       setError(loadError instanceof Error ? loadError.message.replace(/^\d+:\s*/, '') : 'Unable to load event');
     } finally {
       setLoading(false);
@@ -256,8 +302,8 @@ export default function EventPage() {
     return (
       <div className="space-y-4">
         <Alert variant="error">{error}</Alert>
-        <Button type="button" variant="outline" onClick={() => navigate('/schedule')}>
-          Back to Schedule
+        <Button type="button" variant="outline" onClick={handleBack}>
+          {backLabel}
         </Button>
       </div>
     );
@@ -267,8 +313,8 @@ export default function EventPage() {
     return (
       <div className="space-y-4">
         <Alert variant="error">Event not found.</Alert>
-        <Button type="button" variant="outline" onClick={() => navigate('/schedule')}>
-          Back to Schedule
+        <Button type="button" variant="outline" onClick={handleBack}>
+          {backLabel}
         </Button>
       </div>
     );
@@ -277,6 +323,7 @@ export default function EventPage() {
   const canScore = !!event.away_team_id && event.status !== 'cancelled' && event.date <= todayStr;
   const canConfirm = !!activeTeam && !!teamRole && !!event.away_team_id && event.status !== 'cancelled';
   const canEditAttendance = !!activeTeam && !!teamRole && event.status !== 'cancelled' && event.date >= todayStr;
+  const canEditLockerRooms = event.status !== 'cancelled' && !eventHasStarted(event.date, event.start_time, todayStr);
   const alreadyConfirmed = teamRole === 'home' ? event.home_weekly_confirmed : event.away_weekly_confirmed;
   const persistedAttendanceMap = Object.fromEntries(attendancePlayers.map((player) => [player.player_id, player.status]));
   const effectiveAttendancePlayers = attendancePlayers.map((player) => ({
@@ -395,6 +442,23 @@ export default function EventPage() {
     pushToast({ variant: 'success', title: 'Event cancelled' });
   };
 
+  const saveLockerRooms = async () => {
+    const updated = await api.updateEventLockerRooms(event.id, {
+      home_locker_room_id: lockerRoomForm.home_locker_room_id || null,
+      away_locker_room_id: event.away_team_id ? (lockerRoomForm.away_locker_room_id || null) : null,
+      response_message: lockerRoomForm.response_message || null,
+    });
+    setEvent(updated);
+    setScoresheet((current) => (current ? { ...current, event: updated } : current));
+    setLockerRoomForm({
+      home_locker_room_id: updated.home_locker_room_id || '',
+      away_locker_room_id: updated.away_locker_room_id || '',
+      response_message: '',
+    });
+    setLockerRoomModalOpen(false);
+    pushToast({ variant: 'success', title: 'Locker rooms updated' });
+  };
+
   const savePlayerStats = async () => {
     const stats: EventPlayerStatUpsert[] = [];
     const teamGroups = [
@@ -502,9 +566,9 @@ export default function EventPage() {
         subtitle={`${formatShortDate(event.date)}${event.start_time ? ` • ${formatTimeHHMM(event.start_time) || event.start_time}` : ''}`}
         actions={(
           <>
-            <Button type="button" variant="outline" onClick={() => navigate('/schedule')}>
+            <Button type="button" variant="outline" onClick={handleBack}>
               <ArrowLeft className="h-4 w-4" />
-              Back to Schedule
+              {backLabel}
             </Button>
             {canConfirm ? (
               <Button type="button" variant="outline" onClick={() => toggleConfirm(!alreadyConfirmed)}>
@@ -588,7 +652,31 @@ export default function EventPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">
         <Card className="p-4">
-          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Venue Logistics</div>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Venue Logistics</div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                {canEditLockerRooms ? 'Locker rooms can be updated until event start.' : 'Locker rooms are read-only once the event starts.'}
+              </div>
+            </div>
+            {canEditLockerRooms ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setLockerRoomForm({
+                    home_locker_room_id: event.home_locker_room_id || '',
+                    away_locker_room_id: event.away_locker_room_id || '',
+                    response_message: '',
+                  });
+                  setLockerRoomModalOpen(true);
+                }}
+              >
+                Edit Locker Rooms
+              </Button>
+            ) : null}
+          </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/35 sm:col-span-2">
               <TeamLogo name={event.arena_name || 'Arena'} logoUrl={event.arena_logo_url} className="h-12 w-12 rounded-xl" initialsClassName="text-xs" />
@@ -653,6 +741,43 @@ export default function EventPage() {
           </div>
         </Card>
       </div>
+
+      <Modal
+        open={lockerRoomModalOpen}
+        onClose={() => setLockerRoomModalOpen(false)}
+        title="Edit Locker Rooms"
+        footer={(
+          <>
+            <Button type="button" onClick={saveLockerRooms}>Save</Button>
+            <Button type="button" variant="outline" onClick={() => setLockerRoomModalOpen(false)}>Cancel</Button>
+          </>
+        )}
+      >
+        <div className="grid grid-cols-1 gap-3">
+          <Select
+            value={lockerRoomForm.home_locker_room_id}
+            onChange={(event) => setLockerRoomForm((current) => ({ ...current, home_locker_room_id: event.target.value }))}
+          >
+            <option value="">Home locker room</option>
+            {lockerRooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
+          </Select>
+          {event.away_team_id ? (
+            <Select
+              value={lockerRoomForm.away_locker_room_id}
+              onChange={(event) => setLockerRoomForm((current) => ({ ...current, away_locker_room_id: event.target.value }))}
+            >
+              <option value="">Away locker room</option>
+              {lockerRooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
+            </Select>
+          ) : null}
+          <Textarea
+            value={lockerRoomForm.response_message}
+            onChange={(event) => setLockerRoomForm((current) => ({ ...current, response_message: event.target.value }))}
+            placeholder="Note to organizer and opponent"
+            rows={3}
+          />
+        </div>
+      </Modal>
 
       {activeTeam && teamRole ? (
         <Card className="p-4">

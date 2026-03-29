@@ -124,6 +124,47 @@ export const api = {
   rescheduleProposal: (id: string, data: Partial<import('../types').Proposal>) =>
     request<import('../types').Proposal>(`/proposals/${id}/reschedule`, { method: 'POST', body: JSON.stringify(data) }),
 
+  getTeamIceBookingRequests: (teamId: string, params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return request<import('../types').IceBookingRequest[]>(`/teams/${teamId}/ice-booking-requests${qs}`);
+  },
+  createTeamIceBookingRequest: (teamId: string, data: Partial<import('../types').IceBookingRequest>) =>
+    request<import('../types').IceBookingRequest>(`/teams/${teamId}/ice-booking-requests`, { method: 'POST', body: JSON.stringify(data) }),
+  cancelTeamIceBookingRequest: (teamId: string, requestId: string, responseMessage?: string) =>
+    request<import('../types').IceBookingRequest>(`/teams/${teamId}/ice-booking-requests/${requestId}/cancel`, {
+      method: 'PATCH',
+      body: JSON.stringify({ response_message: responseMessage || null }),
+    }),
+  getArenaIceBookingRequests: (arenaId: string, params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return request<import('../types').IceBookingRequest[]>(`/arenas/${arenaId}/ice-booking-requests${qs}`);
+  },
+  acceptArenaIceBookingRequest: (
+    arenaId: string,
+    requestId: string,
+    data: {
+      home_locker_room_id?: string | null;
+      away_locker_room_id?: string | null;
+      final_price_amount_cents?: number | null;
+      final_currency?: string | null;
+      response_message?: string | null;
+    },
+  ) =>
+    request<import('../types').IceBookingRequest>(`/arenas/${arenaId}/ice-booking-requests/${requestId}/accept`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  rejectArenaIceBookingRequest: (arenaId: string, requestId: string, responseMessage?: string) =>
+    request<import('../types').IceBookingRequest>(`/arenas/${arenaId}/ice-booking-requests/${requestId}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ response_message: responseMessage || null }),
+    }),
+  cancelArenaIceBookingRequest: (arenaId: string, requestId: string, responseMessage?: string) =>
+    request<import('../types').IceBookingRequest>(`/arenas/${arenaId}/ice-booking-requests/${requestId}/cancel`, {
+      method: 'PATCH',
+      body: JSON.stringify({ response_message: responseMessage || null }),
+    }),
+
   getEvents: (teamId: string, params?: Record<string, string>) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').Event[]>(`/teams/${teamId}/events${qs}`);
@@ -140,6 +181,14 @@ export const api = {
     }),
   updateEvent: (id: string, data: Partial<import('../types').Event>) =>
     request<import('../types').Event>(`/events/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  updateEventLockerRooms: (
+    id: string,
+    data: {
+      home_locker_room_id?: string | null;
+      away_locker_room_id?: string | null;
+      response_message?: string | null;
+    },
+  ) => request<import('../types').Event>(`/events/${id}/locker-rooms`, { method: 'PATCH', body: JSON.stringify(data) }),
   confirmEvent: (id: string, teamId: string, confirmed: boolean) =>
     request<import('../types').Event>(`/events/${id}/weekly-confirm`, { method: 'PATCH', body: JSON.stringify({ team_id: teamId, confirmed }) }),
   cancelEvent: (id: string) => request<import('../types').Event>(`/events/${id}/cancel`, { method: 'PATCH' }),

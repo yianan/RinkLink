@@ -19,6 +19,7 @@ from ..models import (
     EventAttendance,
     EventGoalieStat,
     EventPlayerStat,
+    IceBookingRequest,
     IceSlot,
     LockerRoom,
     Notification,
@@ -142,6 +143,11 @@ def seed_demo_data(db: Session):
     open_date = anchor_date + timedelta(days=5)
     search_demo_date = anchor_date + timedelta(days=6)
     showcase_date = anchor_date + timedelta(days=10)
+    request_pending_date = anchor_date + timedelta(days=7)
+    request_accepted_date = anchor_date + timedelta(days=8)
+    request_pending_opponent_date = anchor_date + timedelta(days=9)
+    request_practice_accepted_date = anchor_date + timedelta(days=11)
+    request_cancelled_date = anchor_date + timedelta(days=12)
     live_game_date = today
     completed_game_date = anchor_date - timedelta(days=14)
     completed_aa_game_date = anchor_date - timedelta(days=10)
@@ -169,22 +175,36 @@ def seed_demo_data(db: Session):
 
     slots: list[IceSlot] = []
     slot_specs = [
-        (arenas[0], "Rink A", confirmed_game_date, time(17, 0), time(18, 15)),
-        (arenas[0], "Rink B", proposal_date, time(18, 0), time(19, 15)),
-        (arenas[0], "Rink A", open_date, time(15, 45), time(17, 0)),
-        (arenas[0], "Rink B", open_date, time(18, 15), time(19, 30)),
-        (arenas[1], "Rink B", open_date, time(16, 30), time(17, 45)),
-        (arenas[1], "Rink A", open_date, time(19, 0), time(20, 15)),
-        (arenas[1], "Rink A", search_demo_date, time(18, 30), time(19, 45)),
-        (arenas[2], "Rink A", practice_date, time(19, 0), time(20, 15)),
-        (arenas[2], "Rink A", open_date, time(17, 30), time(18, 45)),
-        (arenas[2], "Rink B", open_date, time(20, 0), time(21, 15)),
-        (arenas[2], "Rink B", showcase_date, time(17, 30), time(18, 45)),
-        (arenas[1], "Rink A", live_game_date, time(18, 0), time(19, 15)),
+        (arenas[0], "Rink A", confirmed_game_date, time(17, 0), time(18, 15), "fixed_price", 46500),
+        (arenas[0], "Rink B", proposal_date, time(18, 0), time(19, 15), "fixed_price", 45000),
+        (arenas[0], "Rink A", open_date, time(15, 45), time(17, 0), "fixed_price", 42500),
+        (arenas[0], "Rink B", open_date, time(18, 15), time(19, 30), "call_for_pricing", None),
+        (arenas[1], "Rink B", open_date, time(16, 30), time(17, 45), "fixed_price", 47500),
+        (arenas[1], "Rink A", open_date, time(19, 0), time(20, 15), "fixed_price", 51000),
+        (arenas[1], "Rink A", search_demo_date, time(18, 30), time(19, 45), "fixed_price", 49500),
+        (arenas[2], "Rink A", practice_date, time(19, 0), time(20, 15), "fixed_price", 44000),
+        (arenas[2], "Rink A", open_date, time(17, 30), time(18, 45), "fixed_price", 45500),
+        (arenas[2], "Rink B", open_date, time(20, 0), time(21, 15), "call_for_pricing", None),
+        (arenas[2], "Rink B", showcase_date, time(17, 30), time(18, 45), "fixed_price", 52000),
+        (arenas[1], "Rink A", live_game_date, time(18, 0), time(19, 15), "fixed_price", 50000),
+        (arenas[0], "Rink B", request_pending_date, time(20, 0), time(21, 15), "fixed_price", 48500),
+        (arenas[1], "Rink B", request_accepted_date, time(17, 15), time(18, 30), "call_for_pricing", None),
+        (arenas[2], "Rink A", request_pending_opponent_date, time(18, 0), time(19, 15), "fixed_price", 51500),
+        (arenas[0], "Rink A", request_practice_accepted_date, time(20, 15), time(21, 30), "fixed_price", 43500),
+        (arenas[2], "Rink B", request_cancelled_date, time(19, 15), time(20, 30), "fixed_price", 56000),
     ]
-    for arena, rink_name, slot_date, start_time, end_time in slot_specs:
+    for arena, rink_name, slot_date, start_time, end_time, pricing_mode, price_amount_cents in slot_specs:
         arena_rink = next(rink for rink in arena_rinks if rink.arena_id == arena.id and rink.name == rink_name)
-        slot = IceSlot(id=_id(), arena_rink_id=arena_rink.id, date=slot_date, start_time=start_time, end_time=end_time)
+        slot = IceSlot(
+            id=_id(),
+            arena_rink_id=arena_rink.id,
+            date=slot_date,
+            start_time=start_time,
+            end_time=end_time,
+            pricing_mode=pricing_mode,
+            price_amount_cents=price_amount_cents,
+            currency="USD",
+        )
         slots.append(slot)
         db.add(slot)
     db.flush()
@@ -396,20 +416,180 @@ def seed_demo_data(db: Session):
             event_type="scrimmage",
             status="final",
             home_team_id=teams[4].id,
-            away_team_id=teams[0].id,
+            away_team_id=None,
             season_id=season_id,
             arena_id=arenas[2].id,
             arena_rink_id=arena_rinks[5].id,
             home_locker_room_id=locker_rooms[15].id,
-            away_locker_room_id=locker_rooms[16].id,
+            away_locker_room_id=None,
             date=completed_team_il_14u_date,
             start_time=time(17, 45),
             end_time=time(19, 0),
             home_score=2,
-            away_score=2,
+            away_score=None,
         ),
     ]
     db.add_all(events)
+    db.flush()
+
+    accepted_request_event = Event(
+        id=_id(),
+        event_type="league",
+        status="scheduled",
+        home_team_id=teams[0].id,
+        away_team_id=teams[4].id,
+        season_id=season_id,
+        competition_division_id=divisions[0].id,
+        arena_id=arenas[1].id,
+        arena_rink_id=arena_rinks[3].id,
+        ice_slot_id=slots[13].id,
+        home_locker_room_id=locker_rooms[9].id,
+        away_locker_room_id=locker_rooms[10].id,
+        date=request_accepted_date,
+        start_time=time(17, 15),
+        end_time=time(18, 30),
+        counts_for_standings=True,
+    )
+    db.add(accepted_request_event)
+    db.flush()
+
+    accepted_practice_request_event = Event(
+        id=_id(),
+        event_type="practice",
+        status="scheduled",
+        home_team_id=teams[5].id,
+        away_team_id=None,
+        season_id=season_id,
+        arena_id=arenas[0].id,
+        arena_rink_id=arena_rinks[0].id,
+        ice_slot_id=slots[15].id,
+        home_locker_room_id=locker_rooms[2].id,
+        away_locker_room_id=None,
+        date=request_practice_accepted_date,
+        start_time=time(20, 15),
+        end_time=time(21, 30),
+        notes="Accepted ice rental for extra team training.",
+    )
+    db.add(accepted_practice_request_event)
+    db.flush()
+
+    cancelled_request_event = Event(
+        id=_id(),
+        event_type="tournament",
+        status="cancelled",
+        home_team_id=teams[2].id,
+        away_team_id=teams[0].id,
+        season_id=season_id,
+        competition_division_id=divisions[2].id,
+        arena_id=arenas[2].id,
+        arena_rink_id=arena_rinks[5].id,
+        ice_slot_id=slots[16].id,
+        home_locker_room_id=locker_rooms[15].id,
+        away_locker_room_id=locker_rooms[16].id,
+        date=request_cancelled_date,
+        start_time=time(19, 15),
+        end_time=time(20, 30),
+        notes="Cancelled after bracket change.",
+    )
+    db.add(cancelled_request_event)
+    db.flush()
+
+    booking_requests = [
+        IceBookingRequest(
+            id=_id(),
+            requester_team_id=teams[3].id,
+            away_team_id=None,
+            season_id=season_id,
+            event_type="practice",
+            status="requested",
+            arena_id=arenas[0].id,
+            arena_rink_id=arena_rinks[1].id,
+            ice_slot_id=slots[12].id,
+            pricing_mode=slots[12].pricing_mode,
+            price_amount_cents=slots[12].price_amount_cents,
+            currency=slots[12].currency,
+            message="Looking for a late-week skills slot.",
+        ),
+        IceBookingRequest(
+            id=_id(),
+            requester_team_id=teams[1].id,
+            away_team_id=teams[5].id,
+            season_id=season_id,
+            event_type="league",
+            status="requested",
+            arena_id=arenas[2].id,
+            arena_rink_id=arena_rinks[4].id,
+            ice_slot_id=slots[14].id,
+            pricing_mode=slots[14].pricing_mode,
+            price_amount_cents=slots[14].price_amount_cents,
+            currency=slots[14].currency,
+            message="Need a reschedule option if possible. Opponent prefers after 6 PM.",
+        ),
+        IceBookingRequest(
+            id=_id(),
+            requester_team_id=teams[0].id,
+            away_team_id=teams[4].id,
+            season_id=season_id,
+            event_type="league",
+            status="accepted",
+            arena_id=arenas[1].id,
+            arena_rink_id=arena_rinks[3].id,
+            ice_slot_id=slots[13].id,
+            event_id=accepted_request_event.id,
+            pricing_mode=slots[13].pricing_mode,
+            price_amount_cents=slots[13].price_amount_cents,
+            currency=slots[13].currency,
+            final_price_amount_cents=53500,
+            final_currency="USD",
+            home_locker_room_id=locker_rooms[9].id,
+            away_locker_room_id=locker_rooms[10].id,
+            message="Need a full game slot for a league makeup.",
+            response_message="Accepted. Home in Home Rink B, away in Away Rink B.",
+        ),
+        IceBookingRequest(
+            id=_id(),
+            requester_team_id=teams[5].id,
+            away_team_id=None,
+            season_id=season_id,
+            event_type="practice",
+            status="accepted",
+            arena_id=arenas[0].id,
+            arena_rink_id=arena_rinks[0].id,
+            ice_slot_id=slots[15].id,
+            event_id=accepted_practice_request_event.id,
+            pricing_mode=slots[15].pricing_mode,
+            price_amount_cents=slots[15].price_amount_cents,
+            currency=slots[15].currency,
+            final_price_amount_cents=43500,
+            final_currency="USD",
+            home_locker_room_id=locker_rooms[2].id,
+            away_locker_room_id=None,
+            message="Looking for an extra late practice.",
+            response_message="Accepted. Practice Rink A is assigned.",
+        ),
+        IceBookingRequest(
+            id=_id(),
+            requester_team_id=teams[2].id,
+            away_team_id=teams[0].id,
+            season_id=season_id,
+            event_type="tournament",
+            status="cancelled",
+            arena_id=arenas[2].id,
+            arena_rink_id=arena_rinks[5].id,
+            ice_slot_id=slots[16].id,
+            event_id=cancelled_request_event.id,
+            pricing_mode=slots[16].pricing_mode,
+            price_amount_cents=slots[16].price_amount_cents,
+            currency=slots[16].currency,
+            final_price_amount_cents=56000,
+            final_currency="USD",
+            home_locker_room_id=locker_rooms[15].id,
+            away_locker_room_id=locker_rooms[16].id,
+            message="Tournament overflow game request.",
+            response_message="Cancelled after the event was moved to another sheet.",
+        ),
+    ]
+    db.add_all(booking_requests)
     db.flush()
 
     slots[0].status = "booked"
@@ -418,6 +598,16 @@ def seed_demo_data(db: Session):
     slots[3].booked_by_team_id = teams[3].id
     slots[6].status = "booked"
     slots[6].booked_by_team_id = teams[3].id
+    slots[12].status = "held"
+    slots[12].booked_by_team_id = teams[3].id
+    slots[13].status = "booked"
+    slots[13].booked_by_team_id = teams[0].id
+    slots[14].status = "held"
+    slots[14].booked_by_team_id = teams[1].id
+    slots[15].status = "booked"
+    slots[15].booked_by_team_id = teams[5].id
+    slots[16].status = "available"
+    slots[16].booked_by_team_id = None
 
     availability[0].status = "scheduled"
     availability[0].opponent_team_id = teams[2].id
@@ -529,6 +719,43 @@ def seed_demo_data(db: Session):
     mark_attendance(events[2].id, teams[0].id, attending=8, tentative=2, absent=1)
     mark_attendance(events[3].id, teams[3].id, attending=10, tentative=1, absent=1)
     mark_attendance(events[3].id, teams[1].id, attending=9, tentative=2, absent=0)
+    mark_attendance(accepted_request_event.id, teams[0].id, attending=10, tentative=1, absent=1)
+    mark_attendance(accepted_request_event.id, teams[4].id, attending=9, tentative=2, absent=1)
+    mark_attendance(accepted_practice_request_event.id, teams[5].id, attending=11, tentative=0, absent=1)
+
+    notifications = [
+        Notification(
+            team_id=teams[0].id,
+            notif_type="locker_room_update",
+            title="Locker rooms assigned",
+            message=f"{teams[0].name} vs {teams[4].name}\n{request_accepted_date.isoformat()} 17:15\n{arenas[1].name} • Rink B\nHome: Home Rink B | Away: Away Rink B\nNote: Accepted. Home in Home Rink B, away in Away Rink B.",
+        ),
+        Notification(
+            team_id=teams[4].id,
+            notif_type="locker_room_update",
+            title="Locker rooms assigned",
+            message=f"{teams[0].name} vs {teams[4].name}\n{request_accepted_date.isoformat()} 17:15\n{arenas[1].name} • Rink B\nHome: Home Rink B | Away: Away Rink B\nNote: Accepted. Home in Home Rink B, away in Away Rink B.",
+        ),
+        Notification(
+            team_id=teams[5].id,
+            notif_type="locker_room_update",
+            title="Locker rooms assigned",
+            message=f"{teams[5].name} Practice\n{request_practice_accepted_date.isoformat()} 20:15\n{arenas[0].name} • Rink A\nHome: Practice Rink A\nNote: Accepted. Practice Rink A is assigned.",
+        ),
+        Notification(
+            team_id=teams[2].id,
+            notif_type="locker_room_update",
+            title="Locker rooms updated",
+            message=f"{teams[2].name} vs {teams[0].name}\n{request_cancelled_date.isoformat()} 19:15\n{arenas[2].name} • Rink B\nHome: Home Rink B | Away: Away Rink B\nNote: Cancelled after the event was moved to another sheet.",
+        ),
+        Notification(
+            team_id=teams[0].id,
+            notif_type="locker_room_update",
+            title="Locker rooms updated",
+            message=f"{teams[2].name} vs {teams[0].name}\n{request_cancelled_date.isoformat()} 19:15\n{arenas[2].name} • Rink B\nHome: Home Rink B | Away: Away Rink B\nNote: Cancelled after the event was moved to another sheet.",
+        ),
+    ]
+    db.add_all(notifications)
 
     db.commit()
 
@@ -544,7 +771,9 @@ def seed_demo_data(db: Session):
         "locker_rooms": len(locker_rooms),
         "ice_slots": len(slots),
         "availability_windows": len(availability),
-        "events": len(events),
+        "events": len(events) + 2,
         "event_attendance": db.query(EventAttendance).count(),
         "proposals": 1,
+        "booking_requests": len(booking_requests),
+        "notifications": len(notifications),
     }

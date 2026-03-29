@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, time, timezone
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -91,6 +91,9 @@ class IceSlot(Base):
     start_time: Mapped[time] = mapped_column(nullable=False)
     end_time: Mapped[time | None] = mapped_column(nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="available")
+    pricing_mode: Mapped[str] = mapped_column(String(30), default="call_for_pricing", server_default="call_for_pricing")
+    price_amount_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    currency: Mapped[str] = mapped_column(String(3), default="USD", server_default="USD")
     booked_by_team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))

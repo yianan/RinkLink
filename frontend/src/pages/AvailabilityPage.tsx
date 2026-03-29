@@ -438,7 +438,18 @@ export default function AvailabilityPage() {
                         </>
                       ) : null}
                       {window.event_id ? (
-                        <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/schedule/${window.event_id}`)} className="justify-center">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate(`/schedule/${window.event_id}`, {
+                            state: {
+                              backTo: `/availability?tab=${tab}&month=${monthKeyForDate(window.date)}&date=${window.date}`,
+                              backLabel: 'Back to Availability',
+                            },
+                          })}
+                          className="justify-center"
+                        >
                           <Eye className="h-3.5 w-3.5" />
                           View Event
                         </Button>
@@ -539,7 +550,12 @@ export default function AvailabilityPage() {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              onClick={() => navigate(`/schedule/${window.event_id}`)}
+                              onClick={() => navigate(`/schedule/${window.event_id}`, {
+                                state: {
+                                  backTo: `/availability?tab=${tab}&month=${monthKeyForDate(window.date)}&date=${window.date}`,
+                                  backLabel: 'Back to Availability',
+                                },
+                              })}
                               aria-label="View event"
                               title="View Event"
                             >
@@ -671,7 +687,12 @@ export default function AvailabilityPage() {
                                     type="button"
                                     onClick={(event) => {
                                       event.stopPropagation();
-                                      navigate(`/schedule/${window.event_id}`);
+                                      navigate(`/schedule/${window.event_id}`, {
+                                        state: {
+                                          backTo: `/availability?tab=${tab}&month=${month.key}&date=${day.date}`,
+                                          backLabel: 'Back to Availability',
+                                        },
+                                      });
                                     }}
                                     className="rounded-full border border-current/30 bg-white/90 px-1.5 py-0.5 text-[9px] leading-none text-current transition hover:bg-white hover:shadow-sm dark:border-white/30 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                                   >

@@ -5,6 +5,7 @@ RinkLink is a youth hockey scheduling application built around five core concept
 - `Availability` for open home/away scheduling windows
 - `Schedule` for actual games, practices, and scrimmages
 - `Arenas` for venue administration
+- `Ice Booking Requests` for team requests against priced open ice
 - `Proposals` for opponent matching and scheduling offers
 - `Scoresheets` for in-game scoring, penalties, goalie stats, and signatures
 
@@ -64,8 +65,10 @@ Or use `Reset Demo Data` from the dashboard.
 The original Alembic history is preserved.
 
 - Previous head before the redesign: `7f2b6c8a91d3`
-- Current head: `092fd6e43b19`
+- Current head: `c4b9a5930f12`
 - Forward redesign migration: `backend/alembic/versions/092fd6e43b19_arena_availability_events_redesign.py`
+- Attendance migration: `backend/alembic/versions/7b6a6c0f4d21_add_event_attendance.py`
+- Open-ice pricing and booking-request migration: `backend/alembic/versions/c4b9a5930f12_add_ice_booking_requests_and_slot_pricing.py`
 
 Important:
 
@@ -101,6 +104,11 @@ alembic check
 ```
 
 6. Commit both the model changes and the migration file together.
+
+Current examples of post-redesign migrations in this repo:
+- attendance tracking on events
+- priced ice slots
+- arena-side ice booking requests with accept / reject / cancel flow
 
 ### Useful commands
 

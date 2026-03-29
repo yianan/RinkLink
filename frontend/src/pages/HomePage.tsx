@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, CheckCircle2, Inbox, Trophy } from 'lucide-react';
 import { api } from '../api/client';
-import { Event, Proposal, StandingsEntry, TeamCompetitionMembership, AvailabilityWindow } from '../types';
+import { Event, IceBookingRequest, Proposal, StandingsEntry, TeamCompetitionMembership, AvailabilityWindow } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
 import { addDays, formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time';
@@ -97,6 +97,7 @@ export default function HomePage() {
   const [availability, setAvailability] = useState<AvailabilityWindow[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [bookingRequests, setBookingRequests] = useState<IceBookingRequest[]>([]);
   const [record, setRecord] = useState<StandingsEntry | null>(null);
   const [competitionRecord, setCompetitionRecord] = useState<StandingsEntry | null>(null);
   const [primaryMembership, setPrimaryMembership] = useState<TeamCompetitionMembership | null>(null);
@@ -115,12 +116,14 @@ export default function HomePage() {
       api.getAvailability(activeTeam.id),
       api.getEvents(activeTeam.id, { date_from: todayStr }),
       api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }),
+      api.getTeamIceBookingRequests(activeTeam.id, { status: 'requested' }),
       effectiveSeason ? api.getStandings(effectiveSeason.id) : Promise.resolve([]),
       effectiveSeason ? api.getTeamCompetitionMemberships(activeTeam.id, { season_id: effectiveSeason.id }) : Promise.resolve([]),
-    ]).then(async ([availabilityData, eventData, proposalData, standings, memberships]) => {
+    ]).then(async ([availabilityData, eventData, proposalData, requestData, standings, memberships]) => {
       setAvailability(availabilityData);
       setEvents(eventData);
       setProposals(proposalData);
+      setBookingRequests(requestData);
       setRecord(standings.find((entry) => entry.team_id === activeTeam.id) || null);
 
       const primary = memberships.find((membership) => membership.is_primary) ?? memberships[0] ?? null;
@@ -263,7 +266,7 @@ export default function HomePage() {
         </div>
       ) : null}
 
-      <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2', snapshotRecord ? 'xl:grid-cols-4' : 'xl:grid-cols-3')}>
+      <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2', snapshotRecord ? 'xl:grid-cols-5' : 'xl:grid-cols-4')}>
         {snapshotRecord ? (
           <StatCard
             title={competitionRecord ? 'League Record' : effectiveSeason ? 'Season Record' : 'Overall Record'}
@@ -301,6 +304,14 @@ export default function HomePage() {
           icon={<Inbox className="h-4 w-4" />}
           color="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
         />
+        <StatCard
+          title="Pending Ice Requests"
+          value={bookingRequests.length}
+          subtitle={bookingRequests.length > 0 ? 'Awaiting arena response' : 'No pending requests'}
+          onClick={bookingRequests.length > 0 ? () => navigate('/schedule?tab=requests') : undefined}
+          icon={<Inbox className="h-4 w-4" />}
+          color="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+        />
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[1.35fr_0.95fr]">
@@ -326,7 +337,12 @@ export default function HomePage() {
               <button
                 type="button"
                 key={event.id}
-                onClick={() => navigate(`/schedule/${event.id}`)}
+                onClick={() => navigate(`/schedule/${event.id}`, {
+                  state: {
+                    backTo: '/',
+                    backLabel: 'Back to Dashboard',
+                  },
+                })}
                 className="group w-full px-4 py-4 text-left transition hover:bg-slate-50/70 dark:hover:bg-slate-900/40"
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">

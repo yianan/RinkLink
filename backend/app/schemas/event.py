@@ -50,6 +50,12 @@ class WeeklyConfirmUpdate(BaseModel):
     confirmed: bool
 
 
+class EventLockerRoomUpdate(BaseModel):
+    home_locker_room_id: str | None = None
+    away_locker_room_id: str | None = None
+    response_message: str | None = None
+
+
 class EventOut(BaseModel):
     id: str
     event_type: str

@@ -113,6 +113,9 @@ class IceSlotCreate(BaseModel):
     start_time: dt.time
     end_time: dt.time | None = None
     status: str = "available"
+    pricing_mode: str = "call_for_pricing"
+    price_amount_cents: int | None = None
+    currency: str = "USD"
     notes: str | None = None
 
 
@@ -121,6 +124,9 @@ class IceSlotUpdate(BaseModel):
     start_time: dt.time | None = None
     end_time: dt.time | None = None
     status: str | None = None
+    pricing_mode: str | None = None
+    price_amount_cents: int | None = None
+    currency: str | None = None
     notes: str | None = None
 
 
@@ -131,12 +137,19 @@ class IceSlotOut(BaseModel):
     start_time: dt.time
     end_time: dt.time | None
     status: str
+    pricing_mode: str
+    price_amount_cents: int | None
+    currency: str
     booked_by_team_id: str | None
     booked_by_team_name: str | None = None
     booked_event_id: str | None = None
     booked_event_type: str | None = None
     booked_event_home_team_name: str | None = None
     booked_event_away_team_name: str | None = None
+    active_booking_request_id: str | None = None
+    active_booking_request_status: str | None = None
+    active_booking_request_team_name: str | None = None
+    active_booking_request_event_type: str | None = None
     notes: str | None
     arena_id: str | None = None
     arena_name: str | None = None

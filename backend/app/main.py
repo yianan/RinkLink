@@ -45,6 +45,7 @@ from .routers import (  # noqa: E402
     associations,
     availability,
     events,
+    ice_booking_requests,
     teams,
     search,
     proposals,
@@ -60,6 +61,7 @@ app.include_router(arenas.router, prefix="/api")
 app.include_router(associations.router, prefix="/api")
 app.include_router(availability.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
+app.include_router(ice_booking_requests.router, prefix="/api")
 app.include_router(teams.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
 app.include_router(proposals.router, prefix="/api")

@@ -4,6 +4,7 @@ from .availability_window import AvailabilityWindow
 from .proposal import Proposal
 from .event import Event
 from .event_attendance import EventAttendance
+from .ice_booking_request import IceBookingRequest
 from .notification import Notification
 from .player import Player
 from .scoresheet import EventPlayerStat, EventPenalty, EventGoalieStat, EventSignature
@@ -20,6 +21,7 @@ __all__ = [
     "Proposal",
     "Event",
     "EventAttendance",
+    "IceBookingRequest",
     "Notification",
     "Player",
     "EventPlayerStat",

@@ -134,12 +134,19 @@ export interface IceSlot {
   start_time: string;
   end_time: string | null;
   status: 'available' | 'held' | 'booked';
+  pricing_mode: 'fixed_price' | 'call_for_pricing' | string;
+  price_amount_cents: number | null;
+  currency: string;
   booked_by_team_id: string | null;
   booked_by_team_name: string | null;
   booked_event_id: string | null;
   booked_event_type: string | null;
   booked_event_home_team_name: string | null;
   booked_event_away_team_name: string | null;
+  active_booking_request_id: string | null;
+  active_booking_request_status: string | null;
+  active_booking_request_team_name: string | null;
+  active_booking_request_event_type: string | null;
   notes: string | null;
   arena_id: string | null;
   arena_name: string | null;
@@ -242,6 +249,48 @@ export interface Proposal {
   ice_slot_start_time: string | null;
   ice_slot_end_time: string | null;
   ice_slot_notes: string | null;
+  location_label: string | null;
+}
+
+export interface IceBookingRequest {
+  id: string;
+  requester_team_id: string;
+  away_team_id: string | null;
+  season_id: string | null;
+  event_type: 'league' | 'tournament' | 'practice' | 'showcase' | 'scrimmage' | 'exhibition';
+  status: 'requested' | 'accepted' | 'rejected' | 'cancelled';
+  arena_id: string;
+  arena_rink_id: string;
+  ice_slot_id: string;
+  event_id: string | null;
+  pricing_mode: 'fixed_price' | 'call_for_pricing' | string;
+  price_amount_cents: number | null;
+  currency: string;
+  final_price_amount_cents: number | null;
+  final_currency: string | null;
+  home_locker_room_id: string | null;
+  away_locker_room_id: string | null;
+  message: string | null;
+  response_message: string | null;
+  responded_at: string | null;
+  created_at: string;
+  updated_at: string;
+  requester_team_name: string | null;
+  requester_team_logo_url: string | null;
+  requester_association_name: string | null;
+  away_team_name: string | null;
+  away_team_logo_url: string | null;
+  away_association_name: string | null;
+  arena_name: string | null;
+  arena_logo_url: string | null;
+  arena_rink_name: string | null;
+  home_locker_room_name: string | null;
+  away_locker_room_name: string | null;
+  ice_slot_date: string | null;
+  ice_slot_start_time: string | null;
+  ice_slot_end_time: string | null;
+  ice_slot_notes: string | null;
+  event_status: string | null;
   location_label: string | null;
 }
 

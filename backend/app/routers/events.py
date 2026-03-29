@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Arena, ArenaRink, AvailabilityWindow, Event, IceSlot, LockerRoom, Team
+from ..models import Arena, ArenaRink, AvailabilityWindow, Event, IceBookingRequest, IceSlot, LockerRoom, Team
 from ..schemas import (
     BulkEventAttendanceUpdate,
     EventAttendancePlayer,
     EventCreate,
+    EventLockerRoomUpdate,
     EventOut,
     EventUpdate,
     WeeklyConfirmUpdate,
@@ -21,9 +22,30 @@ from ..services.attendance import (
 )
 from ..services.competitions import normalize_event_competition
 from ..services.event_view import enrich_event
+from ..services.locker_rooms import assign_locker_rooms, event_has_started, notify_locker_room_update
 from ..services.records import is_recordable_event, recompute_team_records
 
 router = APIRouter(tags=["events"])
+
+
+def _compose_booking_response_message(
+    *,
+    arena_rink_name: str | None,
+    home_locker_room_name: str | None,
+    away_locker_room_name: str | None,
+    custom_note: str | None,
+) -> str | None:
+    details: list[str] = []
+    if arena_rink_name:
+        details.append(f"Rink: {arena_rink_name}")
+    if home_locker_room_name or away_locker_room_name:
+        if away_locker_room_name:
+            details.append(f"Locker rooms: {home_locker_room_name or 'TBD'} / {away_locker_room_name}")
+        else:
+            details.append(f"Locker room: {home_locker_room_name or 'TBD'}")
+    if custom_note:
+        details.append(custom_note)
+    return "\n".join(details) if details else None
 
 
 def _validate_event_links(db: Session, event: Event) -> None:
@@ -134,6 +156,12 @@ def create_event(team_id: str, body: EventCreate, db: Session = Depends(get_db))
     _book_slot(db, event)
     db.add(event)
     db.flush()
+    assign_locker_rooms(
+        db,
+        event=event,
+        home_locker_room_id=event.home_locker_room_id,
+        away_locker_room_id=event.away_locker_room_id,
+    )
     _sync_availability_on_schedule(db, event)
     db.commit()
     db.refresh(event)
@@ -216,10 +244,52 @@ def cancel_event(event_id: str, db: Session = Depends(get_db)):
     event.away_weekly_confirmed = False
     _release_slot(db, event)
     _sync_availability_on_schedule(db, event)
+    booking_request = db.query(IceBookingRequest).filter(IceBookingRequest.event_id == event.id).first()
+    if booking_request and booking_request.status == "accepted":
+        booking_request.status = "cancelled"
     if was_recordable:
         recompute_team_records(db, event.home_team_id)
         if event.away_team_id:
             recompute_team_records(db, event.away_team_id)
+    db.commit()
+    db.refresh(event)
+    return enrich_event(event, db)
+
+
+@router.patch("/events/{event_id}/locker-rooms", response_model=EventOut)
+def update_event_locker_rooms(event_id: str, body: EventLockerRoomUpdate, db: Session = Depends(get_db)):
+    event = db.get(Event, event_id)
+    if not event:
+        raise HTTPException(404, "Event not found")
+    if event.status == "cancelled":
+        raise HTTPException(400, "Locker rooms cannot be changed for cancelled events")
+    if event_has_started(event):
+        raise HTTPException(400, "Locker rooms can only be changed before the event starts")
+    assign_locker_rooms(
+        db,
+        event=event,
+        home_locker_room_id=body.home_locker_room_id,
+        away_locker_room_id=body.away_locker_room_id,
+    )
+    booking_request = db.query(IceBookingRequest).filter(IceBookingRequest.event_id == event.id).first()
+    if booking_request:
+        booking_request.home_locker_room_id = event.home_locker_room_id
+        booking_request.away_locker_room_id = event.away_locker_room_id
+        booking_request.response_message = _compose_booking_response_message(
+            arena_rink_name=event.arena_rink.name if event.arena_rink else None,
+            home_locker_room_name=event.home_locker_room.name if event.home_locker_room else None,
+            away_locker_room_name=event.away_locker_room.name if event.away_locker_room else None,
+            custom_note=body.response_message,
+        )
+    notify_locker_room_update(
+        db,
+        event=event,
+        arena_name=event.arena.name if event.arena else None,
+        arena_rink_name=event.arena_rink.name if event.arena_rink else None,
+        home_locker_room_name=event.home_locker_room.name if event.home_locker_room else None,
+        away_locker_room_name=event.away_locker_room.name if event.away_locker_room else None,
+        note=body.response_message,
+    )
     db.commit()
     db.refresh(event)
     return enrich_event(event, db)

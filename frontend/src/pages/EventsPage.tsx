@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Save } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Save, XCircle } from 'lucide-react';
 import { api } from '../api/client';
-import { Arena, ArenaRink, Event, IceSlot, LockerRoom, Team } from '../types';
+import { Arena, ArenaRink, Event, IceBookingRequest, IceSlot, Team } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
 import { Alert } from '../components/ui/Alert';
@@ -25,6 +25,27 @@ import { useToast } from '../context/ToastContext';
 
 const EVENT_TYPES: Event['event_type'][] = ['league', 'tournament', 'practice', 'showcase', 'scrimmage', 'exhibition'];
 
+function formatPriceLabel(pricingMode: string, priceAmountCents: number | null, currency = 'USD') {
+  if (pricingMode === 'call_for_pricing') {
+    return 'Call for pricing';
+  }
+  if (priceAmountCents == null) {
+    return 'Pricing TBD';
+  }
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency || 'USD',
+    maximumFractionDigits: 0,
+  }).format(priceAmountCents / 100);
+}
+
+function bookingRequestTitle(request: IceBookingRequest) {
+  if (!request.away_team_name || request.event_type === 'practice' || request.event_type === 'scrimmage') {
+    return `${request.requester_team_name} ${getCompetitionLabel(request.event_type)}`;
+  }
+  return `${request.requester_team_name} vs ${request.away_team_name}`;
+}
+
 function attendanceSummaryLabel(event: Event) {
   const summary = event.attendance_summary;
   if (!summary || summary.total_players === 0) return null;
@@ -43,24 +64,27 @@ const emptyForm = {
   arena_id: '',
   arena_rink_id: '',
   ice_slot_id: '',
-  home_locker_room_id: '',
-  away_locker_room_id: '',
   date: '',
   start_time: '',
   end_time: '',
   notes: '',
+  opponent_message: '',
 };
 
 export default function EventsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { activeTeam, teams } = useTeam();
   const { activeSeason, seasons } = useSeason();
   const pushToast = useToast();
-  const [tab, setTab] = useState<'upcoming' | 'past' | 'all'>('upcoming');
+  const [tab, setTab] = useState<'upcoming' | 'past' | 'all' | 'requests'>(() => {
+    const requestedTab = searchParams.get('tab');
+    return requestedTab === 'past' || requestedTab === 'all' || requestedTab === 'requests' ? requestedTab : 'upcoming';
+  });
   const [events, setEvents] = useState<Event[]>([]);
+  const [bookingRequests, setBookingRequests] = useState<IceBookingRequest[]>([]);
   const [arenas, setArenas] = useState<Arena[]>([]);
   const [arenaRinks, setArenaRinks] = useState<ArenaRink[]>([]);
-  const [lockerRooms, setLockerRooms] = useState<LockerRoom[]>([]);
   const [openIceSlots, setOpenIceSlots] = useState<IceSlot[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -74,9 +98,30 @@ export default function EventsPage() {
   const todayStr = toLocalDateString(new Date());
 
   useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    const normalizedTab = requestedTab === 'past' || requestedTab === 'all' || requestedTab === 'requests' ? requestedTab : 'upcoming';
+    if (normalizedTab !== tab) setTab(normalizedTab);
+  }, [searchParams, tab]);
+
+  const handleTabChange = (nextTab: 'upcoming' | 'past' | 'all' | 'requests') => {
+    setTab(nextTab);
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextTab === 'upcoming') {
+      nextParams.delete('tab');
+    } else {
+      nextParams.set('tab', nextTab);
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  useEffect(() => {
     if (!activeTeam) return;
-    api.getEvents(activeTeam.id).then((data) => {
-      setEvents(data);
+    Promise.all([
+      api.getEvents(activeTeam.id),
+      api.getTeamIceBookingRequests(activeTeam.id),
+    ]).then(([eventData, requestData]) => {
+      setEvents(eventData);
+      setBookingRequests(requestData);
       setScoreEdits({});
     });
   }, [activeTeam?.id]);
@@ -95,14 +140,6 @@ export default function EventsPage() {
   }, [form.arena_id]);
 
   useEffect(() => {
-    if (!form.arena_rink_id) {
-      setLockerRooms([]);
-      return;
-    }
-    api.getLockerRooms(form.arena_rink_id).then(setLockerRooms);
-  }, [form.arena_rink_id]);
-
-  useEffect(() => {
     if (!open || !form.date) {
       setOpenIceSlots([]);
       return;
@@ -118,8 +155,6 @@ export default function EventsPage() {
           ice_slot_id: '',
           start_time: '',
           end_time: '',
-          home_locker_room_id: '',
-          away_locker_room_id: '',
         }));
       }
     });
@@ -155,12 +190,17 @@ export default function EventsPage() {
   const filtered = seasonEvents.filter((event) => {
     if (tab === 'upcoming') return event.date >= todayStr;
     if (tab === 'past') return event.date < todayStr;
+    if (tab === 'requests') return false;
     return true;
   }).filter((event) => (
     (selectedEventTypes.length === 0 || selectedEventTypes.includes(event.event_type))
     && (selectedStatuses.length === 0 || selectedStatuses.includes(event.status))
     && (selectedArenaNames.length === 0 || (event.arena_name && selectedArenaNames.includes(event.arena_name)))
   ));
+  const filteredRequests = bookingRequests.filter((request) => {
+    if (tab !== 'requests') return false;
+    return true;
+  });
 
   const activeFilterBadges = useMemo(() => {
     const labelsFor = (options: FilterOption[], selectedValues: string[]) =>
@@ -183,26 +223,25 @@ export default function EventsPage() {
     away: scoreEdits[event.id]?.away ?? (event.away_score != null ? String(event.away_score) : '0'),
   });
 
-  const saveEvent = async () => {
-    await api.createEvent(activeTeam.id, {
+  const saveBookingRequest = async () => {
+    const requestMessage = [
+      form.notes.trim(),
+      form.event_type !== 'practice' && form.event_type !== 'scrimmage' && form.opponent_message.trim()
+        ? `Message for opponent: ${form.opponent_message.trim()}`
+        : '',
+    ].filter(Boolean).join('\n\n');
+    await api.createTeamIceBookingRequest(activeTeam.id, {
       event_type: form.event_type,
-      away_team_id: form.event_type === 'practice' ? null : (form.away_team_id || null),
+      away_team_id: form.event_type === 'practice' || form.event_type === 'scrimmage' ? null : (form.away_team_id || null),
       season_id: effectiveSeason?.id || null,
-      arena_id: form.arena_id,
-      arena_rink_id: form.arena_rink_id,
-      ice_slot_id: form.ice_slot_id || null,
-      home_locker_room_id: form.home_locker_room_id || null,
-      away_locker_room_id: form.event_type === 'practice' ? null : (form.away_locker_room_id || null),
-      date: form.date,
-      start_time: form.start_time || null,
-      end_time: form.end_time || null,
-      notes: form.notes || null,
+      ice_slot_id: form.ice_slot_id || undefined,
+      message: requestMessage || null,
     });
     setOpen(false);
     setForm(emptyForm);
-    const data = await api.getEvents(activeTeam.id);
-    setEvents(data);
-    pushToast({ variant: 'success', title: 'Event created' });
+    const requests = await api.getTeamIceBookingRequests(activeTeam.id);
+    setBookingRequests(requests);
+    pushToast({ variant: 'success', title: 'Booking request sent' });
   };
 
   const saveScore = async (event: Event) => {
@@ -226,10 +265,12 @@ export default function EventsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Schedule"
-        subtitle="Practices and scheduled matchups share one schedule."
+        subtitle="Scheduled events and open-ice requests live together here."
         actions={(
           <>
-            <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((current) => !current)} />
+            {tab !== 'requests' ? (
+              <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((current) => !current)} />
+            ) : null}
             <Button type="button" onClick={() => setOpen(true)}>Schedule Event</Button>
           </>
         )}
@@ -240,24 +281,116 @@ export default function EventsPage() {
           { label: 'Upcoming', value: 'upcoming' as const },
           { label: 'Past', value: 'past' as const },
           { label: 'All', value: 'all' as const },
+          { label: 'Ice Requests', value: 'requests' as const },
         ]}
         value={tab}
-        onChange={setTab}
+        onChange={handleTabChange}
       />
 
-      <FilterPanel
-        title="Filter events"
-        description="Narrow the list by event type, status, and arena."
-        open={filtersOpen}
-        badges={activeFilterBadges}
-        onClear={clearFilters}
-      >
-        <FilterPillGroup label="Type" options={eventTypeOptions} values={selectedEventTypes} onChange={setSelectedEventTypes} tone="sky" />
-        <FilterPillGroup label="Status" options={statusOptions} values={selectedStatuses} onChange={setSelectedStatuses} tone="violet" />
-        <FilterPillGroup label="Arena" options={arenaOptions} values={selectedArenaNames} onChange={setSelectedArenaNames} tone="emerald" />
-      </FilterPanel>
+      {tab !== 'requests' ? (
+        <FilterPanel
+          title="Filter events"
+          description="Narrow the list by event type, status, and arena."
+          open={filtersOpen}
+          badges={activeFilterBadges}
+          onClear={clearFilters}
+        >
+          <FilterPillGroup label="Type" options={eventTypeOptions} values={selectedEventTypes} onChange={setSelectedEventTypes} tone="sky" />
+          <FilterPillGroup label="Status" options={statusOptions} values={selectedStatuses} onChange={setSelectedStatuses} tone="violet" />
+          <FilterPillGroup label="Arena" options={arenaOptions} values={selectedArenaNames} onChange={setSelectedArenaNames} tone="emerald" />
+        </FilterPanel>
+      ) : null}
 
-      <Card className="overflow-hidden">
+      {tab === 'requests' ? (
+        <Card className="overflow-hidden">
+          <div className="divide-y divide-slate-200 dark:divide-slate-800">
+            {filteredRequests.length === 0 ? (
+              <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">No ice booking requests yet.</div>
+            ) : filteredRequests.map((request) => (
+              <div key={request.id} className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_14rem]">
+                <div className="min-w-0">
+                  <div className="flex items-start gap-3">
+                    <div className="flex shrink-0 items-center gap-2">
+                      <TeamLogo name={request.requester_team_name || activeTeam.name} logoUrl={request.requester_team_logo_url || activeTeam.logo_url} className="h-11 w-11 rounded-xl" initialsClassName="text-xs" />
+                      {request.away_team_name ? (
+                        <TeamLogo name={request.away_team_name} logoUrl={request.away_team_logo_url} className="h-11 w-11 rounded-xl" initialsClassName="text-xs" />
+                      ) : null}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {request.event_id ? (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/schedule/${request.event_id}`, {
+                              state: {
+                                backTo: '/schedule?tab=requests',
+                                backLabel: 'Back to Ice Requests',
+                              },
+                            })}
+                            className="truncate text-left text-sm font-semibold text-sky-700 underline decoration-sky-300 underline-offset-2 transition-colors hover:text-sky-800 dark:text-sky-300 dark:decoration-sky-700 dark:hover:text-sky-200"
+                            title="Open event"
+                          >
+                            {bookingRequestTitle(request)}
+                          </button>
+                        ) : (
+                          <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{bookingRequestTitle(request)}</div>
+                        )}
+                        <Badge variant={request.final_price_amount_cents != null || request.pricing_mode === 'fixed_price' ? 'outline' : 'warning'}>
+                          {formatPriceLabel(request.final_price_amount_cents != null ? 'fixed_price' : request.pricing_mode, request.final_price_amount_cents ?? request.price_amount_cents, request.final_currency || request.currency)}
+                        </Badge>
+                        <Badge variant={getCompetitionBadgeVariant(request.event_type)}>{getCompetitionLabel(request.event_type)}</Badge>
+                        <Badge variant={request.status === 'accepted' ? 'success' : request.status === 'requested' ? 'warning' : request.status === 'rejected' ? 'danger' : 'neutral'}>
+                          {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                        <TeamLogo name={request.arena_name || 'Arena'} logoUrl={request.arena_logo_url} className="h-6 w-6 rounded-lg" initialsClassName="text-[9px]" />
+                        <span className="truncate">
+                          {request.ice_slot_date ? formatShortDate(request.ice_slot_date) : 'Date TBD'}
+                          {request.ice_slot_start_time ? ` • ${formatTimeHHMM(request.ice_slot_start_time) || request.ice_slot_start_time}` : ''}
+                          {request.location_label ? ` • ${request.location_label}` : ''}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {request.home_locker_room_name || request.away_locker_room_name
+                          ? `Locker rooms: ${[request.home_locker_room_name, request.away_locker_room_name].filter(Boolean).join(' / ')}`
+                          : ''}
+                      </div>
+                      {request.message ? (
+                        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                          <span className="font-semibold">Booker note:</span> {request.message}
+                        </div>
+                      ) : null}
+                      {request.response_message ? (
+                        <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-100">
+                          <span className="font-semibold">Arena note:</span> {request.response_message}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col items-start justify-center gap-2 lg:items-end">
+                  {(request.status === 'requested' || request.status === 'accepted') ? (
+                    <Button type="button" size="sm" variant="ghost" onClick={async () => {
+                      const updated = await api.cancelTeamIceBookingRequest(activeTeam.id, request.id);
+                      setBookingRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+                      if (request.event_id) {
+                        const updatedEvents = await api.getEvents(activeTeam.id);
+                        setEvents(updatedEvents);
+                      }
+                      pushToast({ variant: 'success', title: 'Booking request cancelled' });
+                    }}>
+                      <XCircle className="h-3.5 w-3.5" />
+                      Cancel
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : (
+        <Card className="overflow-hidden">
         <div className="divide-y divide-slate-200 dark:divide-slate-800">
           {filtered.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">No scheduled items in this view.</div>
@@ -272,7 +405,12 @@ export default function EventsPage() {
               <div key={event.id} className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
                 <button
                   type="button"
-                  onClick={() => navigate(`/schedule/${event.id}`)}
+                  onClick={() => navigate(`/schedule/${event.id}`, {
+                    state: {
+                      backTo: '/schedule',
+                      backLabel: 'Back to Schedule',
+                    },
+                  })}
                   className="cursor-pointer text-left"
                   title="Open schedule details"
                 >
@@ -365,15 +503,20 @@ export default function EventsPage() {
           })}
         </div>
       </Card>
+      )}
 
       <Modal
         open={open}
         onClose={() => { setOpen(false); setForm(emptyForm); }}
-        title="Create Event"
+        title="Schedule Event"
         footer={(
           <>
-            <Button type="button" onClick={saveEvent} disabled={!form.date || !form.ice_slot_id}>
-              Save
+            <Button
+              type="button"
+              onClick={saveBookingRequest}
+              disabled={!form.date || !form.ice_slot_id || ((form.event_type !== 'practice' && form.event_type !== 'scrimmage') && !form.away_team_id)}
+            >
+              Send Booking Request
             </Button>
             <Button type="button" variant="outline" onClick={() => { setOpen(false); setForm(emptyForm); }}>
               Cancel
@@ -390,8 +533,7 @@ export default function EventsPage() {
                 onChange={(e) => setForm((current) => ({
                   ...current,
                   event_type: e.target.value as Event['event_type'],
-                  away_team_id: e.target.value === 'practice' ? '' : current.away_team_id,
-                  away_locker_room_id: e.target.value === 'practice' ? '' : current.away_locker_room_id,
+                  away_team_id: e.target.value === 'practice' || e.target.value === 'scrimmage' ? '' : current.away_team_id,
                 }))}
               >
                 {EVENT_TYPES.map((eventType) => <option key={eventType} value={eventType}>{getCompetitionLabel(eventType)}</option>)}
@@ -420,8 +562,6 @@ export default function EventsPage() {
                   ice_slot_id: '',
                   start_time: '',
                   end_time: '',
-                  home_locker_room_id: '',
-                  away_locker_room_id: '',
                 }))}
               />
             </div>
@@ -447,8 +587,6 @@ export default function EventsPage() {
                   ice_slot_id: '',
                   start_time: '',
                   end_time: '',
-                  home_locker_room_id: '',
-                  away_locker_room_id: '',
                 }))}
               >
                 <option value="">All arenas</option>
@@ -465,8 +603,6 @@ export default function EventsPage() {
                   ice_slot_id: '',
                   start_time: '',
                   end_time: '',
-                  home_locker_room_id: '',
-                  away_locker_room_id: '',
                 }))}
                 disabled={!form.arena_id}
               >
@@ -501,8 +637,6 @@ export default function EventsPage() {
                             arena_rink_id: slot.arena_rink_id,
                             start_time: slot.start_time,
                             end_time: slot.end_time || '',
-                            home_locker_room_id: '',
-                            away_locker_room_id: '',
                           }))}
                           className={`flex w-full items-start justify-between gap-3 px-3 py-3 text-left transition-colors ${
                             selected
@@ -522,7 +656,12 @@ export default function EventsPage() {
                               <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{slot.notes}</div>
                             ) : null}
                           </div>
-                          {selected ? <Badge variant="info">Selected</Badge> : null}
+                          <div className="shrink-0 text-right">
+                            <div className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-sm font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-100">
+                              {formatPriceLabel(slot.pricing_mode, slot.price_amount_cents, slot.currency)}
+                            </div>
+                            {selected ? <Badge variant="info" className="mt-2">Selected</Badge> : null}
+                          </div>
                         </button>
                       );
                     })}
@@ -530,37 +669,16 @@ export default function EventsPage() {
                 )}
               </div>
             </div>
-
-            <div className={`grid grid-cols-1 gap-3 ${form.event_type !== 'practice' && form.event_type !== 'scrimmage' ? 'sm:grid-cols-2' : ''}`}>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Home Locker Room</label>
-                <Select
-                  value={form.home_locker_room_id}
-                  onChange={(e) => setForm((current) => ({ ...current, home_locker_room_id: e.target.value }))}
-                  disabled={!form.ice_slot_id || !form.arena_rink_id}
-                >
-                  <option value="">{!form.ice_slot_id ? 'Select open ice first' : lockerRooms.length === 0 ? 'No locker rooms configured' : 'Select room…'}</option>
-                  {lockerRooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
-                </Select>
-              </div>
-
-              {form.event_type !== 'practice' && form.event_type !== 'scrimmage' ? (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Away Locker Room</label>
-                  <Select
-                    value={form.away_locker_room_id}
-                    onChange={(e) => setForm((current) => ({ ...current, away_locker_room_id: e.target.value }))}
-                    disabled={!form.ice_slot_id || !form.arena_rink_id}
-                  >
-                    <option value="">{!form.ice_slot_id ? 'Select open ice first' : lockerRooms.length === 0 ? 'No locker rooms configured' : 'Select room…'}</option>
-                    {lockerRooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
-                  </Select>
-                </div>
-              ) : null}
-            </div>
           </div>
 
-          <Input placeholder="Notes" value={form.notes} onChange={(e) => setForm((current) => ({ ...current, notes: e.target.value }))} />
+          <Input placeholder="Message for arena" value={form.notes} onChange={(e) => setForm((current) => ({ ...current, notes: e.target.value }))} />
+          {form.event_type !== 'practice' && form.event_type !== 'scrimmage' ? (
+            <Input
+              placeholder="Message for opponent"
+              value={form.opponent_message}
+              onChange={(e) => setForm((current) => ({ ...current, opponent_message: e.target.value }))}
+            />
+          ) : null}
         </div>
       </Modal>
     </div>

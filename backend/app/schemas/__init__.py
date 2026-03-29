@@ -13,7 +13,8 @@ from .availability_window import (
     AvailabilityConfirmUpload,
 )
 from .proposal import ProposalCreate, ProposalOut, ProposalRescheduleCreate
-from .event import EventCreate, EventOut, EventUpdate, WeeklyConfirmUpdate
+from .ice_booking_request import IceBookingRequestAccept, IceBookingRequestAction, IceBookingRequestCreate, IceBookingRequestOut
+from .event import EventCreate, EventLockerRoomUpdate, EventOut, EventUpdate, WeeklyConfirmUpdate
 from .notification import NotificationOut
 from .player import (
     PlayerCreate,
@@ -56,7 +57,8 @@ __all__ = [
     "AvailabilityWindowCreate", "AvailabilityWindowUpdate", "AvailabilityWindowOut",
     "AvailabilityUploadPreview", "AvailabilityConfirmUpload",
     "ProposalCreate", "ProposalOut", "ProposalRescheduleCreate",
-    "EventCreate", "EventOut", "EventUpdate", "WeeklyConfirmUpdate",
+    "IceBookingRequestCreate", "IceBookingRequestAccept", "IceBookingRequestAction", "IceBookingRequestOut",
+    "EventCreate", "EventLockerRoomUpdate", "EventOut", "EventUpdate", "WeeklyConfirmUpdate",
     "NotificationOut",
     "PlayerCreate", "PlayerUpdate", "PlayerOut",
     "PlayerUploadPreview", "PlayerConfirmUpload",
