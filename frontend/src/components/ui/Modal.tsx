@@ -3,6 +3,7 @@ import { useEffect, useId, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/cn';
+import { chromeIconButtonClass } from '../../lib/uiClasses';
 import { Button } from './Button';
 
 export type ModalProps = {
@@ -73,7 +74,7 @@ export function Modal({
                 variant="ghost"
                 size="icon"
                 data-dialog-close="true"
-                className="h-9 w-9 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+                className={chromeIconButtonClass}
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />

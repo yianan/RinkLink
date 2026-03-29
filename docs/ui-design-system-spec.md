@@ -184,6 +184,12 @@ The app is strongly context-driven. Two global selectors determine much of what 
 
 The active team selector appears only on pages where team context matters.
 
+Selector behavior:
+
+- the selected team should display its logo alongside the team name
+- dropdown options should include the team logo and enough supporting metadata to disambiguate similarly named teams
+- trigger text and hover states must remain legible in both light and dark mode
+
 It is intentionally hidden on:
 
 - `Associations`
@@ -224,7 +230,6 @@ This rule is important. Season selection is not merely decorative; it must match
 Button variants:
 
 - `primary`
-- `secondary`
 - `outline`
 - `ghost`
 - `destructive`
@@ -233,9 +238,9 @@ Button variants:
 Rules:
 
 - primary buttons use a cyan → sky → violet gradient
-- outline buttons are used for secondary actions that still need prominence
-- ghost buttons are used for low-emphasis actions, especially icon actions
-- destructive buttons are reserved for delete/cancel flows
+- outline buttons are used for explicit secondary actions that still need prominence
+- ghost buttons are used for low-emphasis actions, utility actions, and established icon actions
+- destructive buttons are reserved for delete/cancel flows and should read as risky, not merely secondary
 - disabled buttons must be unmistakably inactive
 
 Usage guidance:
@@ -243,6 +248,33 @@ Usage guidance:
 - use one clear primary action per local workflow
 - keep “Cancel” after the primary action
 - use icon buttons only when paired with tooltip/title and the meaning is established
+- do not introduce an additional filled “secondary” action style; the live hierarchy should stay intentionally tight
+
+Action hierarchy:
+
+- `primary`: the main forward action on the current surface
+- `outline`: explicit secondary actions such as `Edit`, `Manage`, `Review`, `Open`, or neutral alternatives to the main action
+- `ghost`: low-emphasis actions such as `Back`, `Clear all`, local utilities, and established tertiary actions
+- `destructive`: destructive actions such as `Delete`, `Cancel Booking`, `Cancel Event`, `Reject`, or similar irreversible/negative operations
+
+Hierarchy rules:
+
+- a page header should normally contain at most one primary action
+- a card/section should normally contain at most one primary action
+- back/navigation actions should not visually compete with create/save/confirm actions
+- actions with very different risk levels should not share the same visual tier
+- destructive actions should not be presented as neutral outline actions unless they are intentionally de-emphasized and clearly supported by surrounding context
+
+Labeling rules:
+
+- use `Open` for navigation to another page, detail view, or workspace such as `Open Event`, `Open Schedule`, or `Open Proposals`
+- avoid `View` as the default navigation verb; reserve it only for truly read-only previews
+- use `Review` for pending items that need a decision and `Manage` for existing items that need follow-up work
+- use `Cancel` to dismiss or abandon an in-progress form/modal, and use qualified destructive labels such as `Cancel Event` or `Cancel Booking` when voiding something real
+- use `Back` for return navigation
+- reserve `Close` for passive informational surfaces with no in-progress work
+- prefer labeled destructive buttons over icon-only destructive buttons when the action is high-stakes and there is room
+- use icon-only destructive actions mainly in dense row/table contexts where the action pattern is already well established
 
 ### 5.2 Cards
 
@@ -279,6 +311,9 @@ Rules:
 - fields should be compact, not oversized
 - numeric fields should use steppers where editing counts or stats
 - required fields should not use “optional” copy
+- time fields should be labeled by meaning, not just by raw type
+- paired time fields should use explicit start/end language such as `Available From` / `Available Until` or `Slot Starts` / `Slot Ends`
+- when two time fields define a range, the end time must not be earlier than the start time
 
 ### 5.4 Badges
 
@@ -340,6 +375,20 @@ Every major screen starts with a `PageHeader` pattern:
 - right: actions
 
 This keeps screen entry consistent and prevents each page from inventing its own heading structure.
+
+PageHeader action taxonomy:
+
+- first: optional navigation action such as `Back`, rendered quieter than task actions
+- second: optional secondary management action such as `Edit`, `Review`, or `Open`
+- last: optional primary creation/commit action such as `Add Rink`, `Schedule Event`, or `Add Team`
+
+PageHeader rules:
+
+- if a back action is present, it should normally use the quiet/ghost tier rather than outline or primary
+- avoid making navigation and task actions look equivalent
+- avoid more than three header actions unless the screen is exceptionally action-rich
+- if two non-navigation actions are present, they should usually be one outline and one primary
+- destructive page-level actions should be rare; prefer locating them closer to the object they affect unless the whole screen is about that destructive decision
 
 ### 6.2 Segmented Tabs
 
@@ -410,6 +459,8 @@ Card rules:
 - preserve the most important hierarchy from the desktop table
 - keep action buttons accessible
 - collapse secondary metadata into smaller supporting lines
+- dense card rows may use icon-only actions only when the action vocabulary is already learned elsewhere on the page
+- if a card action is consequential and there is room, prefer a labeled button over an icon-only action
 
 ---
 
@@ -424,6 +475,12 @@ Use the following patterns consistently:
 - team names are clickable where they are intended to switch active team / navigate
 - league names link externally if the competition has a website
 - manager names and emails use `mailto:` where that is the intended behavior
+
+Action density guidance:
+
+- dense row actions may use ghost icon buttons with tooltips
+- section-level operations should usually use labeled buttons
+- destructive row actions can be icon-only, but destructive section-level actions should normally be labeled
 
 ### 7.2 Tooltips
 
@@ -460,6 +517,8 @@ When a user edits operational data:
 - scores should not allow negative numbers
 - penalty minutes should require valid positive values
 - final scores may remain editable when the workflow requires post-game correction
+- time-entry forms should communicate what each time represents before the user interacts with the control
+- invalid time ranges should be blocked in the UI and rejected in the API so partial edits cannot create impossible schedules
 
 ---
 
@@ -680,7 +739,12 @@ Rules:
 ### Actions
 
 - use explicit verbs
-- prefer `Add`, `Edit`, `Delete`, `Confirm`, `Cancel`, `Propose`, `Save`
+- prefer `Add`, `Edit`, `Open`, `Review`, `Manage`, `Confirm`, `Cancel`, `Propose`, `Save`
+- use `Open` for cross-screen navigation and avoid mixing `Open` and `View` for the same action family
+- use `Review` for pending requests and `Manage` for accepted or already-created operational objects
+- use `Back` for return navigation
+- use `Cancel` for dismissing in-progress UI or cancelling a real booking/proposal/event when qualified
+- reserve `Close` for passive informational dismissal only
 
 ### Empty States
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Ban, CalendarPlus2, Eye, Pencil, Search, Trash2 } from 'lucide-react';
+import { ArrowLeft, Ban, CalendarPlus2, Eye, Pencil, Save, Search, Trash2, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import CsvUploader from '../components/CsvUploader';
@@ -19,17 +19,20 @@ import SegmentedTabs from '../components/SegmentedTabs';
 import EmptyState from '../components/EmptyState';
 import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
 import TeamLogo from '../components/TeamLogo';
+import { Select } from '../components/ui/Select';
 import {
   addDays,
   formatMonthYear,
   formatShortDate,
   formatTimeHHMM,
+  hasInvalidTimeRange,
   parseLocalDate,
   toLocalDateString,
 } from '../lib/time';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { cn } from '../lib/cn';
+import { compactChipButtonClass, destructiveIconButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 
 const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
   Open: 'success',
@@ -122,6 +125,9 @@ export default function AvailabilityPage() {
     availability_type: 'home' as 'home' | 'away',
     notes: '',
   });
+  const availabilityTimeError = hasInvalidTimeRange(form.start_time, form.end_time)
+    ? 'Available until must be the same as or later than available from.'
+    : '';
 
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const todayStr = toLocalDateString(new Date());
@@ -271,6 +277,10 @@ export default function AvailabilityPage() {
   }, [effectiveSeason]);
 
   const saveAvailability = async () => {
+    if (availabilityTimeError) {
+      pushToast({ variant: 'error', title: 'Check the time range', description: availabilityTimeError });
+      return;
+    }
     if (editingWindowId) {
       await api.updateAvailability(editingWindowId, {
         date: form.date,
@@ -344,7 +354,7 @@ export default function AvailabilityPage() {
         subtitle="Manage open home and away windows for matchup planning."
         actions={(
           <>
-            <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+            <Button type="button" variant="ghost" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
@@ -355,6 +365,7 @@ export default function AvailabilityPage() {
               setOpen(true);
             }}
             >
+              <CalendarPlus2 className="h-4 w-4" />
               Add Availability
             </Button>
           </>
@@ -451,11 +462,11 @@ export default function AvailabilityPage() {
                           className="justify-center"
                         >
                           <Eye className="h-3.5 w-3.5" />
-                          View Event
+                          Open Event
                         </Button>
                       ) : null}
                       <div className="col-span-2 flex justify-center">
-                        <Button type="button" size="sm" variant="outline" onClick={() => removeAvailability(window.id)} className="w-full max-w-[10.75rem] justify-center">
+                        <Button type="button" size="sm" variant="destructive" onClick={() => removeAvailability(window.id)} className="w-full max-w-[10.75rem] justify-center">
                           <Trash2 className="h-3.5 w-3.5" />
                           Delete
                         </Button>
@@ -513,10 +524,11 @@ export default function AvailabilityPage() {
                             <Button
                               type="button"
                               variant="ghost"
-                              size="sm"
+                              size="icon"
                               onClick={() => navigate(`/search?availability=${window.id}&from=availability&tab=${tab}&month=${monthKeyForDate(window.date)}&date=${window.date}`)}
                               aria-label="Find opponents"
                               title="Find Opponents"
+                              className={tableActionButtonClass}
                             >
                               <Search className="h-4 w-4" />
                             </Button>
@@ -529,8 +541,9 @@ export default function AvailabilityPage() {
                               onClick={() => openEditAvailability(window)}
                               aria-label="Edit availability"
                               title="Edit availability"
+                              className={tableActionButtonClass}
                             >
-                              <Pencil className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+                              <Pencil className="h-4 w-4" />
                             </Button>
                           ) : null}
                           {window.status === 'open' || window.blocked ? (
@@ -541,8 +554,9 @@ export default function AvailabilityPage() {
                               onClick={() => toggleBlocked(window)}
                               aria-label={window.blocked ? 'Unblock' : 'Block'}
                               title={window.blocked ? 'Unblock' : 'Block'}
+                              className={tableActionButtonClass}
                             >
-                              <Ban className="h-4 w-4 text-slate-500" />
+                              <Ban className="h-4 w-4" />
                             </Button>
                           ) : null}
                           {window.event_id ? (
@@ -556,14 +570,15 @@ export default function AvailabilityPage() {
                                   backLabel: 'Back to Availability',
                                 },
                               })}
-                              aria-label="View event"
-                              title="View Event"
+                              aria-label="Open event"
+                              title="Open Event"
+                              className={tableActionButtonClass}
                             >
-                              <Eye className="h-4 w-4 text-sky-600" />
+                              <Eye className="h-4 w-4" />
                             </Button>
                           ) : null}
-                          <Button type="button" variant="ghost" size="icon" onClick={() => removeAvailability(window.id)} aria-label="Delete window" title="Delete window">
-                            <Trash2 className="h-4 w-4 text-rose-600" />
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeAvailability(window.id)} aria-label="Delete window" title="Delete window" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>
@@ -653,7 +668,7 @@ export default function AvailabilityPage() {
                                       event.stopPropagation();
                                       navigate(`/search?availability=${window.id}&from=availability&tab=${tab}&month=${month.key}&date=${day.date}`);
                                     }}
-                                    className="rounded-full border border-current/30 bg-white/90 px-1.5 py-0.5 text-[9px] leading-none text-current transition hover:bg-white hover:shadow-sm dark:border-white/30 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+                                    className={`${compactChipButtonClass} px-1.5 py-0.5 text-[9px]`}
                                   >
                                     Find
                                   </button>
@@ -665,7 +680,7 @@ export default function AvailabilityPage() {
                                       event.stopPropagation();
                                       openEditAvailability(window);
                                     }}
-                                    className="rounded-full border border-current/30 bg-white/90 px-1.5 py-0.5 text-[9px] leading-none text-current transition hover:bg-white hover:shadow-sm dark:border-white/30 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+                                    className={`${compactChipButtonClass} px-1.5 py-0.5 text-[9px]`}
                                   >
                                     Edit
                                   </button>
@@ -677,7 +692,7 @@ export default function AvailabilityPage() {
                                       event.stopPropagation();
                                       toggleBlocked(window);
                                     }}
-                                    className="rounded-full border border-current/30 bg-white/90 px-1.5 py-0.5 text-[9px] leading-none text-current transition hover:bg-white hover:shadow-sm dark:border-white/30 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+                                    className={`${compactChipButtonClass} px-1.5 py-0.5 text-[9px]`}
                                   >
                                     {window.blocked ? 'Unblock' : 'Block'}
                                   </button>
@@ -694,9 +709,9 @@ export default function AvailabilityPage() {
                                         },
                                       });
                                     }}
-                                    className="rounded-full border border-current/30 bg-white/90 px-1.5 py-0.5 text-[9px] leading-none text-current transition hover:bg-white hover:shadow-sm dark:border-white/30 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+                                    className={`${compactChipButtonClass} px-1.5 py-0.5 text-[9px]`}
                                   >
-                                    View
+                                    Open
                                   </button>
                                 ) : null}
                               </div>
@@ -722,6 +737,7 @@ export default function AvailabilityPage() {
               description={activeFilterBadges.length > 0 ? 'Clear or change filters to see the season calendar again.' : 'Add your first home or away window to start planning matchups.'}
               actions={activeFilterBadges.length === 0 ? (
                 <Button type="button" size="sm" onClick={() => setOpen(true)}>
+                  <CalendarPlus2 className="h-4 w-4" />
                   Add Availability
                 </Button>
               ) : undefined}
@@ -741,10 +757,12 @@ export default function AvailabilityPage() {
         title={editingWindowId ? 'Edit Availability' : 'Add Availability'}
         footer={(
           <>
-            <Button type="button" onClick={saveAvailability} disabled={!form.date}>
+            <Button type="button" onClick={saveAvailability} disabled={!form.date || !!availabilityTimeError}>
+              <Save className="h-4 w-4" />
               {editingWindowId ? 'Save Changes' : 'Save'}
             </Button>
             <Button type="button" variant="outline" onClick={() => { setOpen(false); setEditingWindowId(null); }}>
+              <X className="h-4 w-4" />
               Cancel
             </Button>
           </>
@@ -757,25 +775,27 @@ export default function AvailabilityPage() {
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Start Time</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Available From</label>
               <Input type="time" value={form.start_time} onChange={(event) => setForm((current) => ({ ...current, start_time: event.target.value }))} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">End Time</label>
-              <Input type="time" value={form.end_time} onChange={(event) => setForm((current) => ({ ...current, end_time: event.target.value }))} />
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Available Until</label>
+              <Input type="time" min={form.start_time || undefined} value={form.end_time} onChange={(event) => setForm((current) => ({ ...current, end_time: event.target.value }))} />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Type</label>
-              <select
-                className="min-h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950/20"
+              <Select
                 value={form.availability_type}
                 onChange={(event) => setForm((current) => ({ ...current, availability_type: event.target.value as 'home' | 'away' }))}
               >
                 <option value="home">Home</option>
                 <option value="away">Away</option>
-              </select>
+              </Select>
             </div>
           </div>
+          {availabilityTimeError ? (
+            <div className="text-xs font-medium text-rose-600 dark:text-rose-300">{availabilityTimeError}</div>
+          ) : null}
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Notes</label>
             <Input value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />

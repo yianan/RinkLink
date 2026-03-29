@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, Phone, Trash2 } from 'lucide-react';
+import { Pencil, Phone, Save, Trash2, Users, X } from 'lucide-react';
 import { api } from '../api/client';
 import { Association, Team } from '../types';
 import { useSeason } from '../context/SeasonContext';
@@ -17,7 +17,7 @@ import { Badge } from '../components/ui/Badge';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
-import { accentLinkClass, tableActionButtonClass } from '../lib/uiClasses';
+import { accentLinkClass, destructiveIconButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 import TeamLogo from '../components/TeamLogo';
 
 const emptyTeamForm = {
@@ -236,7 +236,10 @@ export default function TeamListPage() {
         actions={(
           <>
             <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((open) => !open)} />
-            <Button type="button" onClick={openCreateTeam}>Add Team</Button>
+            <Button type="button" onClick={openCreateTeam}>
+              <Users className="h-4 w-4" />
+              Add Team
+            </Button>
           </>
         )}
       />
@@ -290,12 +293,12 @@ export default function TeamListPage() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className={tableActionButtonClass}
+                    className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
                     onClick={() => deleteTeam(team)}
                     aria-label="Delete team"
                     title="Delete team"
                   >
-                    <Trash2 className="h-4 w-4 text-rose-600" />
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -359,9 +362,11 @@ export default function TeamListPage() {
         footer={(
           <>
             <Button type="button" onClick={saveTeam} disabled={!teamForm.name || !teamForm.association_id || !teamForm.age_group || !teamForm.level}>
+              <Save className="h-4 w-4" />
               Save
             </Button>
             <Button type="button" variant="outline" onClick={() => setTeamModalOpen(false)}>
+              <X className="h-4 w-4" />
               Cancel
             </Button>
           </>
@@ -398,6 +403,7 @@ export default function TeamListPage() {
                       setRemoveTeamLogo(true);
                     }}
                   >
+                    <Trash2 className="h-4 w-4" />
                     Remove Logo
                   </Button>
                 </div>

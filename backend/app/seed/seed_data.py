@@ -88,6 +88,67 @@ def seed_zip_codes(db: Session):
     db.commit()
 
 
+def _assert_seed_event_links(db: Session, events: list[Event]) -> None:
+    for event in events:
+        if not event.ice_slot_id:
+            continue
+        slot = db.get(IceSlot, event.ice_slot_id)
+        if not slot:
+            raise RuntimeError(f"Seed event {event.id} references a missing ice slot")
+        arena_rink = db.get(ArenaRink, slot.arena_rink_id)
+        if not arena_rink:
+            raise RuntimeError(f"Seed slot {slot.id} references a missing rink")
+        if arena_rink.id != event.arena_rink_id or arena_rink.arena_id != event.arena_id:
+            raise RuntimeError(f"Seed event {event.id} does not match its slot arena/rink")
+        if slot.date != event.date or slot.start_time != event.start_time or slot.end_time != event.end_time:
+            raise RuntimeError(f"Seed event {event.id} does not match its slot date/time")
+        linked_request = db.query(IceBookingRequest).filter(IceBookingRequest.event_id == event.id).first()
+        if event.proposal_id and linked_request:
+            raise RuntimeError(f"Seed event {event.id} should not be linked to both a proposal and a booking request")
+        if not event.proposal_id and not linked_request:
+            raise RuntimeError(f"Seed event {event.id} must be linked to a proposal or booking request")
+
+
+def _assert_seed_proposal_links(db: Session, proposals: list[Proposal]) -> None:
+    for proposal in proposals:
+        if not proposal.ice_slot_id:
+            continue
+        slot = db.get(IceSlot, proposal.ice_slot_id)
+        if not slot:
+            raise RuntimeError(f"Seed proposal {proposal.id} references a missing ice slot")
+        arena_rink = db.get(ArenaRink, slot.arena_rink_id)
+        if not arena_rink:
+            raise RuntimeError(f"Seed slot {slot.id} references a missing rink")
+        if arena_rink.id != proposal.arena_rink_id or arena_rink.arena_id != proposal.arena_id:
+            raise RuntimeError(f"Seed proposal {proposal.id} does not match its slot arena/rink")
+        if slot.date != proposal.proposed_date or slot.start_time != proposal.proposed_start_time or slot.end_time != proposal.proposed_end_time:
+            raise RuntimeError(f"Seed proposal {proposal.id} does not match its slot date/time")
+        if proposal.status == "proposed" and slot.status != "held":
+            raise RuntimeError(f"Seed proposal {proposal.id} should hold its slot")
+        if proposal.status == "accepted":
+            event = db.query(Event).filter(Event.proposal_id == proposal.id).first()
+            if not event:
+                raise RuntimeError(f"Seed proposal {proposal.id} should have an accepted event")
+
+
+def _assert_seed_booking_request_links(db: Session, booking_requests: list[IceBookingRequest]) -> None:
+    for request in booking_requests:
+        slot = db.get(IceSlot, request.ice_slot_id)
+        if not slot:
+            raise RuntimeError(f"Seed booking request {request.id} references a missing ice slot")
+        arena_rink = db.get(ArenaRink, slot.arena_rink_id)
+        if not arena_rink:
+            raise RuntimeError(f"Seed slot {slot.id} references a missing rink")
+        if arena_rink.id != request.arena_rink_id or arena_rink.arena_id != request.arena_id:
+            raise RuntimeError(f"Seed booking request {request.id} does not match its slot arena/rink")
+        if request.event_id:
+            event = db.get(Event, request.event_id)
+            if not event:
+                raise RuntimeError(f"Seed booking request {request.id} references a missing event")
+            if event.ice_slot_id != request.ice_slot_id:
+                raise RuntimeError(f"Seed booking request {request.id} does not match its accepted event slot")
+
+
 def seed_demo_data(db: Session):
     db.rollback()
     _drop_all_tables(db)
@@ -156,10 +217,13 @@ def seed_demo_data(db: Session):
 
     arena_rinks: list[ArenaRink] = []
     locker_rooms: list[LockerRoom] = []
+    arena_rink_by_key: dict[tuple[str, str], ArenaRink] = {}
+    locker_room_by_key: dict[tuple[str, str, str], LockerRoom] = {}
     for arena in arenas:
         for idx, rink_name in enumerate(("Rink A", "Rink B"), start=1):
             arena_rink = ArenaRink(id=_id(), arena_id=arena.id, name=rink_name, display_order=idx)
             arena_rinks.append(arena_rink)
+            arena_rink_by_key[(arena.name, rink_name)] = arena_rink
             db.add(arena_rink)
             db.flush()
             for locker_idx, room_name in enumerate(("Home", "Away", "Practice"), start=1):
@@ -170,31 +234,33 @@ def seed_demo_data(db: Session):
                     display_order=locker_idx,
                 )
                 locker_rooms.append(locker_room)
+                locker_room_by_key[(arena.name, rink_name, room_name)] = locker_room
                 db.add(locker_room)
     db.flush()
 
     slots: list[IceSlot] = []
-    slot_specs = [
-        (arenas[0], "Rink A", confirmed_game_date, time(17, 0), time(18, 15), "fixed_price", 46500),
-        (arenas[0], "Rink B", proposal_date, time(18, 0), time(19, 15), "fixed_price", 45000),
-        (arenas[0], "Rink A", open_date, time(15, 45), time(17, 0), "fixed_price", 42500),
-        (arenas[0], "Rink B", open_date, time(18, 15), time(19, 30), "call_for_pricing", None),
-        (arenas[1], "Rink B", open_date, time(16, 30), time(17, 45), "fixed_price", 47500),
-        (arenas[1], "Rink A", open_date, time(19, 0), time(20, 15), "fixed_price", 51000),
-        (arenas[1], "Rink A", search_demo_date, time(18, 30), time(19, 45), "fixed_price", 49500),
-        (arenas[2], "Rink A", practice_date, time(19, 0), time(20, 15), "fixed_price", 44000),
-        (arenas[2], "Rink A", open_date, time(17, 30), time(18, 45), "fixed_price", 45500),
-        (arenas[2], "Rink B", open_date, time(20, 0), time(21, 15), "call_for_pricing", None),
-        (arenas[2], "Rink B", showcase_date, time(17, 30), time(18, 45), "fixed_price", 52000),
-        (arenas[1], "Rink A", live_game_date, time(18, 0), time(19, 15), "fixed_price", 50000),
-        (arenas[0], "Rink B", request_pending_date, time(20, 0), time(21, 15), "fixed_price", 48500),
-        (arenas[1], "Rink B", request_accepted_date, time(17, 15), time(18, 30), "call_for_pricing", None),
-        (arenas[2], "Rink A", request_pending_opponent_date, time(18, 0), time(19, 15), "fixed_price", 51500),
-        (arenas[0], "Rink A", request_practice_accepted_date, time(20, 15), time(21, 30), "fixed_price", 43500),
-        (arenas[2], "Rink B", request_cancelled_date, time(19, 15), time(20, 30), "fixed_price", 56000),
-    ]
-    for arena, rink_name, slot_date, start_time, end_time, pricing_mode, price_amount_cents in slot_specs:
-        arena_rink = next(rink for rink in arena_rinks if rink.arena_id == arena.id and rink.name == rink_name)
+    slot_by_key: dict[str, IceSlot] = {}
+    slot_specs = {
+        "centennial_confirmed_game": ("Centennial Ice Arena", "Rink A", confirmed_game_date, time(17, 0), time(18, 15), "fixed_price", 46500),
+        "centennial_proposal": ("Centennial Ice Arena", "Rink B", proposal_date, time(18, 0), time(19, 15), "fixed_price", 45000),
+        "centennial_open_afternoon": ("Centennial Ice Arena", "Rink A", open_date, time(15, 45), time(17, 0), "fixed_price", 42500),
+        "centennial_direct_practice": ("Centennial Ice Arena", "Rink B", open_date, time(18, 15), time(19, 30), "call_for_pricing", None),
+        "edge_open_early": ("Edge Ice Center", "Rink B", open_date, time(16, 30), time(17, 45), "fixed_price", 47500),
+        "edge_open_late": ("Edge Ice Center", "Rink A", open_date, time(19, 0), time(20, 15), "fixed_price", 51000),
+        "edge_live_game": ("Edge Ice Center", "Rink A", live_game_date, time(18, 0), time(19, 15), "fixed_price", 50000),
+        "fox_practice": ("Fox Valley Ice House", "Rink A", practice_date, time(19, 0), time(20, 15), "fixed_price", 44000),
+        "fox_open_afternoon": ("Fox Valley Ice House", "Rink A", open_date, time(17, 30), time(18, 45), "fixed_price", 45500),
+        "fox_open_evening": ("Fox Valley Ice House", "Rink B", open_date, time(20, 0), time(21, 15), "call_for_pricing", None),
+        "fox_showcase": ("Fox Valley Ice House", "Rink B", showcase_date, time(17, 30), time(18, 45), "fixed_price", 52000),
+        "edge_search_demo": ("Edge Ice Center", "Rink A", search_demo_date, time(18, 30), time(19, 45), "fixed_price", 49500),
+        "centennial_request_pending": ("Centennial Ice Arena", "Rink B", request_pending_date, time(20, 0), time(21, 15), "fixed_price", 48500),
+        "edge_request_accepted": ("Edge Ice Center", "Rink B", request_accepted_date, time(17, 15), time(18, 30), "call_for_pricing", None),
+        "fox_request_pending": ("Fox Valley Ice House", "Rink A", request_pending_opponent_date, time(18, 0), time(19, 15), "fixed_price", 51500),
+        "centennial_request_practice_accepted": ("Centennial Ice Arena", "Rink A", request_practice_accepted_date, time(20, 15), time(21, 30), "fixed_price", 43500),
+        "fox_request_cancelled": ("Fox Valley Ice House", "Rink B", request_cancelled_date, time(19, 15), time(20, 30), "fixed_price", 56000),
+    }
+    for slot_key, (arena_name, rink_name, slot_date, start_time, end_time, pricing_mode, price_amount_cents) in slot_specs.items():
+        arena_rink = arena_rink_by_key[(arena_name, rink_name)]
         slot = IceSlot(
             id=_id(),
             arena_rink_id=arena_rink.id,
@@ -206,6 +272,7 @@ def seed_demo_data(db: Session):
             currency="USD",
         )
         slots.append(slot)
+        slot_by_key[slot_key] = slot
         db.add(slot)
     db.flush()
 
@@ -272,11 +339,33 @@ def seed_demo_data(db: Session):
         status="proposed",
         proposed_by_team_id=teams[1].id,
         arena_id=arenas[0].id,
-        arena_rink_id=arena_rinks[1].id,
-        ice_slot_id=slots[1].id,
+        arena_rink_id=arena_rink_by_key[("Centennial Ice Arena", "Rink B")].id,
+        ice_slot_id=slot_by_key["centennial_proposal"].id,
         message="Can you do Sunday evening at Centennial?",
     )
     db.add(proposal)
+    db.flush()
+
+    accepted_confirmed_proposal = Proposal(
+        id=_id(),
+        home_team_id=teams[0].id,
+        away_team_id=teams[2].id,
+        home_availability_window_id=availability[0].id,
+        away_availability_window_id=availability[1].id,
+        event_type="league",
+        proposed_date=confirmed_game_date,
+        proposed_start_time=time(17, 0),
+        proposed_end_time=time(18, 15),
+        status="accepted",
+        proposed_by_team_id=teams[0].id,
+        arena_id=arenas[0].id,
+        arena_rink_id=arena_rink_by_key[("Centennial Ice Arena", "Rink A")].id,
+        ice_slot_id=slot_by_key["centennial_confirmed_game"].id,
+        home_locker_room_id=locker_room_by_key[("Centennial Ice Arena", "Rink A", "Home")].id,
+        away_locker_room_id=locker_room_by_key[("Centennial Ice Arena", "Rink A", "Away")].id,
+        message="Confirmed for Saturday evening at Centennial.",
+    )
+    db.add(accepted_confirmed_proposal)
     db.flush()
 
     events = [
@@ -288,13 +377,14 @@ def seed_demo_data(db: Session):
             away_team_id=teams[2].id,
             home_availability_window_id=availability[0].id,
             away_availability_window_id=availability[1].id,
+            proposal_id=accepted_confirmed_proposal.id,
             season_id=season_id,
             competition_division_id=divisions[0].id,
             arena_id=arenas[0].id,
-            arena_rink_id=arena_rinks[0].id,
-            ice_slot_id=slots[0].id,
-            home_locker_room_id=locker_rooms[0].id,
-            away_locker_room_id=locker_rooms[1].id,
+            arena_rink_id=arena_rink_by_key[("Centennial Ice Arena", "Rink A")].id,
+            ice_slot_id=slot_by_key["centennial_confirmed_game"].id,
+            home_locker_room_id=locker_room_by_key[("Centennial Ice Arena", "Rink A", "Home")].id,
+            away_locker_room_id=locker_room_by_key[("Centennial Ice Arena", "Rink A", "Away")].id,
             date=confirmed_game_date,
             start_time=time(17, 0),
             end_time=time(18, 15),
@@ -309,14 +399,14 @@ def seed_demo_data(db: Session):
             home_team_id=teams[3].id,
             away_team_id=None,
             season_id=season_id,
-            arena_id=arenas[1].id,
-            arena_rink_id=arena_rinks[3].id,
-            ice_slot_id=slots[3].id,
-            home_locker_room_id=locker_rooms[11].id,
+            arena_id=arenas[0].id,
+            arena_rink_id=arena_rink_by_key[("Centennial Ice Arena", "Rink B")].id,
+            ice_slot_id=slot_by_key["centennial_direct_practice"].id,
+            home_locker_room_id=locker_room_by_key[("Centennial Ice Arena", "Rink B", "Practice")].id,
             away_locker_room_id=None,
-            date=practice_date,
-            start_time=time(19, 0),
-            end_time=time(20, 15),
+            date=open_date,
+            start_time=time(18, 15),
+            end_time=time(19, 30),
             notes="Skills session",
         ),
         Event(
@@ -328,10 +418,10 @@ def seed_demo_data(db: Session):
             season_id=season_id,
             competition_division_id=divisions[2].id,
             arena_id=arenas[2].id,
-            arena_rink_id=arena_rinks[5].id,
-            ice_slot_id=slots[4].id,
-            home_locker_room_id=locker_rooms[15].id,
-            away_locker_room_id=locker_rooms[16].id,
+            arena_rink_id=arena_rink_by_key[("Fox Valley Ice House", "Rink B")].id,
+            ice_slot_id=slot_by_key["fox_showcase"].id,
+            home_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Home")].id,
+            away_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Away")].id,
             date=showcase_date,
             start_time=time(17, 30),
             end_time=time(18, 45),
@@ -345,10 +435,10 @@ def seed_demo_data(db: Session):
             season_id=season_id,
             competition_division_id=divisions[1].id,
             arena_id=arenas[1].id,
-            arena_rink_id=arena_rinks[2].id,
-            ice_slot_id=slots[6].id,
-            home_locker_room_id=locker_rooms[6].id,
-            away_locker_room_id=locker_rooms[7].id,
+            arena_rink_id=arena_rink_by_key[("Edge Ice Center", "Rink A")].id,
+            ice_slot_id=slot_by_key["edge_live_game"].id,
+            home_locker_room_id=locker_room_by_key[("Edge Ice Center", "Rink A", "Home")].id,
+            away_locker_room_id=locker_room_by_key[("Edge Ice Center", "Rink A", "Away")].id,
             date=live_game_date,
             start_time=time(18, 0),
             end_time=time(19, 15),
@@ -365,9 +455,9 @@ def seed_demo_data(db: Session):
             season_id=season_id,
             competition_division_id=divisions[1].id,
             arena_id=arenas[1].id,
-            arena_rink_id=arena_rinks[3].id,
-            home_locker_room_id=locker_rooms[9].id,
-            away_locker_room_id=locker_rooms[10].id,
+            arena_rink_id=arena_rink_by_key[("Edge Ice Center", "Rink B")].id,
+            home_locker_room_id=locker_room_by_key[("Edge Ice Center", "Rink B", "Home")].id,
+            away_locker_room_id=locker_room_by_key[("Edge Ice Center", "Rink B", "Away")].id,
             date=completed_game_date,
             start_time=time(18, 0),
             end_time=time(19, 15),
@@ -384,9 +474,9 @@ def seed_demo_data(db: Session):
             season_id=season_id,
             competition_division_id=divisions[0].id,
             arena_id=arenas[0].id,
-            arena_rink_id=arena_rinks[0].id,
-            home_locker_room_id=locker_rooms[0].id,
-            away_locker_room_id=locker_rooms[1].id,
+            arena_rink_id=arena_rink_by_key[("Centennial Ice Arena", "Rink A")].id,
+            home_locker_room_id=locker_room_by_key[("Centennial Ice Arena", "Rink A", "Home")].id,
+            away_locker_room_id=locker_room_by_key[("Centennial Ice Arena", "Rink A", "Away")].id,
             date=completed_aa_game_date,
             start_time=time(17, 15),
             end_time=time(18, 30),
@@ -402,9 +492,9 @@ def seed_demo_data(db: Session):
             away_team_id=teams[1].id,
             season_id=season_id,
             arena_id=arenas[2].id,
-            arena_rink_id=arena_rinks[4].id,
-            home_locker_room_id=locker_rooms[12].id,
-            away_locker_room_id=locker_rooms[13].id,
+            arena_rink_id=arena_rink_by_key[("Fox Valley Ice House", "Rink A")].id,
+            home_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink A", "Home")].id,
+            away_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink A", "Away")].id,
             date=completed_team_il_12u_date,
             start_time=time(18, 15),
             end_time=time(19, 30),
@@ -419,8 +509,8 @@ def seed_demo_data(db: Session):
             away_team_id=None,
             season_id=season_id,
             arena_id=arenas[2].id,
-            arena_rink_id=arena_rinks[5].id,
-            home_locker_room_id=locker_rooms[15].id,
+            arena_rink_id=arena_rink_by_key[("Fox Valley Ice House", "Rink B")].id,
+            home_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Home")].id,
             away_locker_room_id=None,
             date=completed_team_il_14u_date,
             start_time=time(17, 45),
@@ -441,10 +531,10 @@ def seed_demo_data(db: Session):
         season_id=season_id,
         competition_division_id=divisions[0].id,
         arena_id=arenas[1].id,
-        arena_rink_id=arena_rinks[3].id,
-        ice_slot_id=slots[13].id,
-        home_locker_room_id=locker_rooms[9].id,
-        away_locker_room_id=locker_rooms[10].id,
+        arena_rink_id=arena_rink_by_key[("Edge Ice Center", "Rink B")].id,
+        ice_slot_id=slot_by_key["edge_request_accepted"].id,
+        home_locker_room_id=locker_room_by_key[("Edge Ice Center", "Rink B", "Home")].id,
+        away_locker_room_id=locker_room_by_key[("Edge Ice Center", "Rink B", "Away")].id,
         date=request_accepted_date,
         start_time=time(17, 15),
         end_time=time(18, 30),
@@ -461,9 +551,9 @@ def seed_demo_data(db: Session):
         away_team_id=None,
         season_id=season_id,
         arena_id=arenas[0].id,
-        arena_rink_id=arena_rinks[0].id,
-        ice_slot_id=slots[15].id,
-        home_locker_room_id=locker_rooms[2].id,
+        arena_rink_id=arena_rink_by_key[("Centennial Ice Arena", "Rink A")].id,
+        ice_slot_id=slot_by_key["centennial_request_practice_accepted"].id,
+        home_locker_room_id=locker_room_by_key[("Centennial Ice Arena", "Rink A", "Practice")].id,
         away_locker_room_id=None,
         date=request_practice_accepted_date,
         start_time=time(20, 15),
@@ -482,10 +572,10 @@ def seed_demo_data(db: Session):
         season_id=season_id,
         competition_division_id=divisions[2].id,
         arena_id=arenas[2].id,
-        arena_rink_id=arena_rinks[5].id,
-        ice_slot_id=slots[16].id,
-        home_locker_room_id=locker_rooms[15].id,
-        away_locker_room_id=locker_rooms[16].id,
+        arena_rink_id=arena_rink_by_key[("Fox Valley Ice House", "Rink B")].id,
+        ice_slot_id=slot_by_key["fox_request_cancelled"].id,
+        home_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Home")].id,
+        away_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Away")].id,
         date=request_cancelled_date,
         start_time=time(19, 15),
         end_time=time(20, 30),
@@ -503,12 +593,75 @@ def seed_demo_data(db: Session):
             event_type="practice",
             status="requested",
             arena_id=arenas[0].id,
-            arena_rink_id=arena_rinks[1].id,
-            ice_slot_id=slots[12].id,
-            pricing_mode=slots[12].pricing_mode,
-            price_amount_cents=slots[12].price_amount_cents,
-            currency=slots[12].currency,
+            arena_rink_id=arena_rink_by_key[("Centennial Ice Arena", "Rink B")].id,
+            ice_slot_id=slot_by_key["centennial_request_pending"].id,
+            pricing_mode=slot_by_key["centennial_request_pending"].pricing_mode,
+            price_amount_cents=slot_by_key["centennial_request_pending"].price_amount_cents,
+            currency=slot_by_key["centennial_request_pending"].currency,
             message="Looking for a late-week skills slot.",
+        ),
+        IceBookingRequest(
+            id=_id(),
+            requester_team_id=teams[3].id,
+            away_team_id=None,
+            season_id=season_id,
+            event_type="practice",
+            status="accepted",
+            arena_id=arenas[0].id,
+            arena_rink_id=arena_rink_by_key[("Centennial Ice Arena", "Rink B")].id,
+            ice_slot_id=slot_by_key["centennial_direct_practice"].id,
+            event_id=events[1].id,
+            pricing_mode=slot_by_key["centennial_direct_practice"].pricing_mode,
+            price_amount_cents=slot_by_key["centennial_direct_practice"].price_amount_cents,
+            currency=slot_by_key["centennial_direct_practice"].currency,
+            final_price_amount_cents=None,
+            final_currency=None,
+            home_locker_room_id=locker_room_by_key[("Centennial Ice Arena", "Rink B", "Practice")].id,
+            away_locker_room_id=None,
+            message="Looking for a weekday skills session.",
+            response_message="Accepted. Practice Rink B is assigned.",
+        ),
+        IceBookingRequest(
+            id=_id(),
+            requester_team_id=teams[0].id,
+            away_team_id=teams[4].id,
+            season_id=season_id,
+            event_type="showcase",
+            status="accepted",
+            arena_id=arenas[2].id,
+            arena_rink_id=arena_rink_by_key[("Fox Valley Ice House", "Rink B")].id,
+            ice_slot_id=slot_by_key["fox_showcase"].id,
+            event_id=events[2].id,
+            pricing_mode=slot_by_key["fox_showcase"].pricing_mode,
+            price_amount_cents=slot_by_key["fox_showcase"].price_amount_cents,
+            currency=slot_by_key["fox_showcase"].currency,
+            final_price_amount_cents=slot_by_key["fox_showcase"].price_amount_cents,
+            final_currency=slot_by_key["fox_showcase"].currency,
+            home_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Home")].id,
+            away_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Away")].id,
+            message="Need the showcase slot locked in for both teams.",
+            response_message="Accepted. Home in Home Rink B, away in Away Rink B.",
+        ),
+        IceBookingRequest(
+            id=_id(),
+            requester_team_id=teams[3].id,
+            away_team_id=teams[1].id,
+            season_id=season_id,
+            event_type="league",
+            status="accepted",
+            arena_id=arenas[1].id,
+            arena_rink_id=arena_rink_by_key[("Edge Ice Center", "Rink A")].id,
+            ice_slot_id=slot_by_key["edge_live_game"].id,
+            event_id=events[3].id,
+            pricing_mode=slot_by_key["edge_live_game"].pricing_mode,
+            price_amount_cents=slot_by_key["edge_live_game"].price_amount_cents,
+            currency=slot_by_key["edge_live_game"].currency,
+            final_price_amount_cents=slot_by_key["edge_live_game"].price_amount_cents,
+            final_currency=slot_by_key["edge_live_game"].currency,
+            home_locker_room_id=locker_room_by_key[("Edge Ice Center", "Rink A", "Home")].id,
+            away_locker_room_id=locker_room_by_key[("Edge Ice Center", "Rink A", "Away")].id,
+            message="Same-day league booking.",
+            response_message="Accepted. Home in Home Rink A, away in Away Rink A.",
         ),
         IceBookingRequest(
             id=_id(),
@@ -518,11 +671,11 @@ def seed_demo_data(db: Session):
             event_type="league",
             status="requested",
             arena_id=arenas[2].id,
-            arena_rink_id=arena_rinks[4].id,
-            ice_slot_id=slots[14].id,
-            pricing_mode=slots[14].pricing_mode,
-            price_amount_cents=slots[14].price_amount_cents,
-            currency=slots[14].currency,
+            arena_rink_id=arena_rink_by_key[("Fox Valley Ice House", "Rink A")].id,
+            ice_slot_id=slot_by_key["fox_request_pending"].id,
+            pricing_mode=slot_by_key["fox_request_pending"].pricing_mode,
+            price_amount_cents=slot_by_key["fox_request_pending"].price_amount_cents,
+            currency=slot_by_key["fox_request_pending"].currency,
             message="Need a reschedule option if possible. Opponent prefers after 6 PM.",
         ),
         IceBookingRequest(
@@ -533,16 +686,16 @@ def seed_demo_data(db: Session):
             event_type="league",
             status="accepted",
             arena_id=arenas[1].id,
-            arena_rink_id=arena_rinks[3].id,
-            ice_slot_id=slots[13].id,
+            arena_rink_id=arena_rink_by_key[("Edge Ice Center", "Rink B")].id,
+            ice_slot_id=slot_by_key["edge_request_accepted"].id,
             event_id=accepted_request_event.id,
-            pricing_mode=slots[13].pricing_mode,
-            price_amount_cents=slots[13].price_amount_cents,
-            currency=slots[13].currency,
+            pricing_mode=slot_by_key["edge_request_accepted"].pricing_mode,
+            price_amount_cents=slot_by_key["edge_request_accepted"].price_amount_cents,
+            currency=slot_by_key["edge_request_accepted"].currency,
             final_price_amount_cents=53500,
             final_currency="USD",
-            home_locker_room_id=locker_rooms[9].id,
-            away_locker_room_id=locker_rooms[10].id,
+            home_locker_room_id=locker_room_by_key[("Edge Ice Center", "Rink B", "Home")].id,
+            away_locker_room_id=locker_room_by_key[("Edge Ice Center", "Rink B", "Away")].id,
             message="Need a full game slot for a league makeup.",
             response_message="Accepted. Home in Home Rink B, away in Away Rink B.",
         ),
@@ -554,15 +707,15 @@ def seed_demo_data(db: Session):
             event_type="practice",
             status="accepted",
             arena_id=arenas[0].id,
-            arena_rink_id=arena_rinks[0].id,
-            ice_slot_id=slots[15].id,
+            arena_rink_id=arena_rink_by_key[("Centennial Ice Arena", "Rink A")].id,
+            ice_slot_id=slot_by_key["centennial_request_practice_accepted"].id,
             event_id=accepted_practice_request_event.id,
-            pricing_mode=slots[15].pricing_mode,
-            price_amount_cents=slots[15].price_amount_cents,
-            currency=slots[15].currency,
+            pricing_mode=slot_by_key["centennial_request_practice_accepted"].pricing_mode,
+            price_amount_cents=slot_by_key["centennial_request_practice_accepted"].price_amount_cents,
+            currency=slot_by_key["centennial_request_practice_accepted"].currency,
             final_price_amount_cents=43500,
             final_currency="USD",
-            home_locker_room_id=locker_rooms[2].id,
+            home_locker_room_id=locker_room_by_key[("Centennial Ice Arena", "Rink A", "Practice")].id,
             away_locker_room_id=None,
             message="Looking for an extra late practice.",
             response_message="Accepted. Practice Rink A is assigned.",
@@ -575,16 +728,16 @@ def seed_demo_data(db: Session):
             event_type="tournament",
             status="cancelled",
             arena_id=arenas[2].id,
-            arena_rink_id=arena_rinks[5].id,
-            ice_slot_id=slots[16].id,
+            arena_rink_id=arena_rink_by_key[("Fox Valley Ice House", "Rink B")].id,
+            ice_slot_id=slot_by_key["fox_request_cancelled"].id,
             event_id=cancelled_request_event.id,
-            pricing_mode=slots[16].pricing_mode,
-            price_amount_cents=slots[16].price_amount_cents,
-            currency=slots[16].currency,
+            pricing_mode=slot_by_key["fox_request_cancelled"].pricing_mode,
+            price_amount_cents=slot_by_key["fox_request_cancelled"].price_amount_cents,
+            currency=slot_by_key["fox_request_cancelled"].currency,
             final_price_amount_cents=56000,
             final_currency="USD",
-            home_locker_room_id=locker_rooms[15].id,
-            away_locker_room_id=locker_rooms[16].id,
+            home_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Home")].id,
+            away_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Away")].id,
             message="Tournament overflow game request.",
             response_message="Cancelled after the event was moved to another sheet.",
         ),
@@ -592,27 +745,36 @@ def seed_demo_data(db: Session):
     db.add_all(booking_requests)
     db.flush()
 
-    slots[0].status = "booked"
-    slots[0].booked_by_team_id = teams[0].id
-    slots[3].status = "booked"
-    slots[3].booked_by_team_id = teams[3].id
-    slots[6].status = "booked"
-    slots[6].booked_by_team_id = teams[3].id
-    slots[12].status = "held"
-    slots[12].booked_by_team_id = teams[3].id
-    slots[13].status = "booked"
-    slots[13].booked_by_team_id = teams[0].id
-    slots[14].status = "held"
-    slots[14].booked_by_team_id = teams[1].id
-    slots[15].status = "booked"
-    slots[15].booked_by_team_id = teams[5].id
-    slots[16].status = "available"
-    slots[16].booked_by_team_id = None
+    slot_by_key["centennial_confirmed_game"].status = "booked"
+    slot_by_key["centennial_confirmed_game"].booked_by_team_id = teams[0].id
+    slot_by_key["centennial_proposal"].status = "held"
+    slot_by_key["centennial_proposal"].booked_by_team_id = teams[1].id
+    slot_by_key["centennial_direct_practice"].status = "booked"
+    slot_by_key["centennial_direct_practice"].booked_by_team_id = teams[3].id
+    slot_by_key["edge_live_game"].status = "booked"
+    slot_by_key["edge_live_game"].booked_by_team_id = teams[3].id
+    slot_by_key["fox_showcase"].status = "booked"
+    slot_by_key["fox_showcase"].booked_by_team_id = teams[0].id
+    slot_by_key["centennial_request_pending"].status = "held"
+    slot_by_key["centennial_request_pending"].booked_by_team_id = teams[3].id
+    slot_by_key["edge_request_accepted"].status = "booked"
+    slot_by_key["edge_request_accepted"].booked_by_team_id = teams[0].id
+    slot_by_key["fox_request_pending"].status = "held"
+    slot_by_key["fox_request_pending"].booked_by_team_id = teams[1].id
+    slot_by_key["centennial_request_practice_accepted"].status = "booked"
+    slot_by_key["centennial_request_practice_accepted"].booked_by_team_id = teams[5].id
+    slot_by_key["fox_request_cancelled"].status = "available"
+    slot_by_key["fox_request_cancelled"].booked_by_team_id = None
 
     availability[0].status = "scheduled"
     availability[0].opponent_team_id = teams[2].id
     availability[1].status = "scheduled"
     availability[1].opponent_team_id = teams[0].id
+
+    seeded_events = [*events, accepted_request_event, accepted_practice_request_event, cancelled_request_event]
+    _assert_seed_event_links(db, seeded_events)
+    _assert_seed_proposal_links(db, [proposal, accepted_confirmed_proposal])
+    _assert_seed_booking_request_links(db, booking_requests)
 
     def add_roster(team_id: str, last_name_prefix: str):
         roster = [
@@ -771,9 +933,9 @@ def seed_demo_data(db: Session):
         "locker_rooms": len(locker_rooms),
         "ice_slots": len(slots),
         "availability_windows": len(availability),
-        "events": len(events) + 2,
+        "events": len(seeded_events),
         "event_attendance": db.query(EventAttendance).count(),
-        "proposals": 1,
+        "proposals": 2,
         "booking_requests": len(booking_requests),
         "notifications": len(notifications),
     }

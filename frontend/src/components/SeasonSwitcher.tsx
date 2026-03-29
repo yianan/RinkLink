@@ -2,6 +2,7 @@ import { useSeason } from '../context/SeasonContext';
 import { Select } from './ui/Select';
 import { useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
+import { toolbarSelectClass } from '../lib/uiClasses';
 
 const HIDE_SEASON_SWITCHER_PATHS = ['/associations', '/arenas'];
 const REQUIRE_SPECIFIC_SEASON_PATHS = ['/standings', '/availability', '/search', '/schedule', '/events', '/proposals', '/roster', '/competitions'];
@@ -36,7 +37,7 @@ export default function SeasonSwitcher() {
             }
             if (!requireSpecificSeason) setActiveSeason(null);
           }}
-          className="min-h-11 w-full bg-white/80 text-slate-900 shadow-sm ring-1 ring-slate-200/80 focus:border-cyan-400 focus:ring-cyan-400 sm:min-h-10 dark:bg-slate-950/40 dark:text-slate-100 dark:ring-slate-700/60 dark:focus:border-cyan-400 dark:focus:ring-cyan-400"
+          className={toolbarSelectClass}
         >
           {!requireSpecificSeason && <option value="">{loading ? 'Loading seasons…' : 'All Seasons'}</option>}
           {seasons.map((s) => (

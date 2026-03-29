@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Building2, Pencil, Save, Trash2, X } from 'lucide-react';
 import { api } from '../api/client';
 import { Association, Team } from '../types';
 import { Badge } from '../components/ui/Badge';
@@ -14,7 +14,7 @@ import { useTeam } from '../context/TeamContext';
 import PageHeader from '../components/PageHeader';
 import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
 import { cn } from '../lib/cn';
-import { accentLinkClass, tableActionButtonClass } from '../lib/uiClasses';
+import { accentLinkClass, destructiveIconButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import TeamLogo from '../components/TeamLogo';
@@ -224,6 +224,7 @@ export default function AssociationListPage() {
           <>
             <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((open) => !open)} />
             <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setAssociationLogoFile(null); setRemoveAssociationLogo(false); setAssociationLogoPreviewUrl(null); setOpen(true); }}>
+              <Building2 className="h-4 w-4" />
               Add Association
             </Button>
           </>
@@ -316,8 +317,8 @@ export default function AssociationListPage() {
                     <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(a)} aria-label="Edit" className={tableActionButtonClass}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete" className={tableActionButtonClass}>
-                      <Trash2 className="h-4 w-4 text-rose-600" />
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -387,8 +388,8 @@ export default function AssociationListPage() {
                       <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(a)} aria-label="Edit" className={tableActionButtonClass}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete" className={tableActionButtonClass}>
-                        <Trash2 className="h-4 w-4 text-rose-600" />
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </td>
@@ -433,9 +434,11 @@ export default function AssociationListPage() {
         footer={
           <>
             <Button type="button" onClick={handleSave} disabled={!form.name}>
+              <Save className="h-4 w-4" />
               Save
             </Button>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <X className="h-4 w-4" />
               Cancel
             </Button>
           </>
@@ -472,6 +475,7 @@ export default function AssociationListPage() {
                       setRemoveAssociationLogo(true);
                     }}
                   >
+                    <Trash2 className="h-4 w-4" />
                     Remove Logo
                   </Button>
                 </div>

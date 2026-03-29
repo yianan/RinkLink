@@ -9,6 +9,11 @@ export function formatTimeHHMM(value: string | null | undefined): string | null 
   return `${hour12}:${minutes} ${period}`;
 }
 
+export function hasInvalidTimeRange(start: string | null | undefined, end: string | null | undefined): boolean {
+  if (!start || !end) return false;
+  return end < start;
+}
+
 export function parseLocalDate(value: string | null | undefined): Date | null {
   if (!value) return null;
   const match = value.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Save, XCircle } from 'lucide-react';
+import { CalendarPlus2, Save, SendHorizontal, X, XCircle } from 'lucide-react';
 import { api } from '../api/client';
 import { Arena, ArenaRink, Event, IceBookingRequest, IceSlot, Team } from '../types';
 import { useSeason } from '../context/SeasonContext';
@@ -20,6 +20,7 @@ import SegmentedTabs from '../components/SegmentedTabs';
 import TeamLogo from '../components/TeamLogo';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
 import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
+import { accentActionClass, interactiveTitleClass, listRowButtonClass, selectableRowButtonActiveClass, selectableRowButtonClass } from '../lib/uiClasses';
 import { formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time';
 import { useToast } from '../context/ToastContext';
 
@@ -271,7 +272,10 @@ export default function EventsPage() {
             {tab !== 'requests' ? (
               <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((current) => !current)} />
             ) : null}
-            <Button type="button" onClick={() => setOpen(true)}>Schedule Event</Button>
+            <Button type="button" onClick={() => setOpen(true)}>
+              <CalendarPlus2 className="h-4 w-4" />
+              Schedule Event
+            </Button>
           </>
         )}
       />
@@ -327,10 +331,10 @@ export default function EventsPage() {
                                 backLabel: 'Back to Ice Requests',
                               },
                             })}
-                            className="truncate text-left text-sm font-semibold text-sky-700 underline decoration-sky-300 underline-offset-2 transition-colors hover:text-sky-800 dark:text-sky-300 dark:decoration-sky-700 dark:hover:text-sky-200"
-                            title="Open event"
+                            className={`truncate text-left text-sm font-semibold ${accentActionClass}`}
+                            title="Open Event"
                           >
-                            {bookingRequestTitle(request)}
+                            <span className={interactiveTitleClass}>{bookingRequestTitle(request)}</span>
                           </button>
                         ) : (
                           <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{bookingRequestTitle(request)}</div>
@@ -371,7 +375,7 @@ export default function EventsPage() {
                 </div>
                 <div className="flex flex-col items-start justify-center gap-2 lg:items-end">
                   {(request.status === 'requested' || request.status === 'accepted') ? (
-                    <Button type="button" size="sm" variant="ghost" onClick={async () => {
+                    <Button type="button" size="sm" variant="destructive" onClick={async () => {
                       const updated = await api.cancelTeamIceBookingRequest(activeTeam.id, request.id);
                       setBookingRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
                       if (request.event_id) {
@@ -381,7 +385,7 @@ export default function EventsPage() {
                       pushToast({ variant: 'success', title: 'Booking request cancelled' });
                     }}>
                       <XCircle className="h-3.5 w-3.5" />
-                      Cancel
+                      Cancel Request
                     </Button>
                   ) : null}
                 </div>
@@ -411,8 +415,8 @@ export default function EventsPage() {
                       backLabel: 'Back to Schedule',
                     },
                   })}
-                  className="cursor-pointer text-left"
-                  title="Open schedule details"
+                  className={listRowButtonClass}
+                  title="Open Event"
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex shrink-0 items-center gap-2">
@@ -423,7 +427,7 @@ export default function EventsPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm font-medium text-sky-700 underline decoration-sky-300 underline-offset-2 transition-colors hover:text-sky-800 dark:text-sky-300 dark:decoration-sky-700 dark:hover:text-sky-200">
+                        <div className={`text-sm font-medium text-[color:var(--app-accent-link)] dark:text-[color:var(--app-accent-link)] ${interactiveTitleClass}`}>
                           {event.away_team_name ? `${event.home_team_name} vs ${event.away_team_name}` : `${event.home_team_name} ${getCompetitionLabel(event.event_type)}`}
                         </div>
                         <Badge variant={getCompetitionBadgeVariant(event.event_type)}>{getCompetitionLabel(event.event_type)}</Badge>
@@ -516,9 +520,11 @@ export default function EventsPage() {
               onClick={saveBookingRequest}
               disabled={!form.date || !form.ice_slot_id || ((form.event_type !== 'practice' && form.event_type !== 'scrimmage') && !form.away_team_id)}
             >
+              <SendHorizontal className="h-4 w-4" />
               Send Booking Request
             </Button>
             <Button type="button" variant="outline" onClick={() => { setOpen(false); setForm(emptyForm); }}>
+              <X className="h-4 w-4" />
               Cancel
             </Button>
           </>
@@ -638,11 +644,7 @@ export default function EventsPage() {
                             start_time: slot.start_time,
                             end_time: slot.end_time || '',
                           }))}
-                          className={`flex w-full items-start justify-between gap-3 px-3 py-3 text-left transition-colors ${
-                            selected
-                              ? 'bg-sky-50 text-sky-950 dark:bg-sky-950/40 dark:text-sky-100'
-                              : 'hover:bg-slate-100/80 dark:hover:bg-slate-800/70'
-                          }`}
+                          className={`flex items-start justify-between gap-3 ${selectableRowButtonClass} ${selected ? selectableRowButtonActiveClass : ''}`}
                         >
                           <div className="min-w-0">
                             <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">

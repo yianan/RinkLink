@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CalendarPlus2, Search as SearchIcon, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, CalendarPlus2, Eye, Search as SearchIcon, SendHorizontal, SlidersHorizontal, X } from 'lucide-react';
 import { api } from '../api/client';
 import { Arena, ArenaRink, AutoMatchResult, AvailabilityWindow, IceSlot, OpponentResult, Proposal } from '../types';
 import { useSeason } from '../context/SeasonContext';
@@ -342,7 +342,7 @@ export default function SearchPage() {
         actions={(
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             onClick={() => navigate(
               cameFromAvailability
                 ? `/availability?tab=${availabilityReturnTab}${availabilityReturnMonth ? `&month=${availabilityReturnMonth}` : ''}${availabilityReturnDate ? `&date=${availabilityReturnDate}` : ''}`
@@ -524,12 +524,14 @@ export default function SearchPage() {
                             <Badge variant={proposalBadgeVariant(result.existing_proposal_status)}>
                               {proposalStatusLabel(result.existing_proposal_status)}
                             </Badge>
-                            <Button type="button" size="sm" onClick={() => navigate('/proposals')}>
-                              View
+                            <Button type="button" size="sm" variant="outline" onClick={() => navigate('/proposals')}>
+                              <Eye className="h-4 w-4" />
+                              Open Proposal
                             </Button>
                           </>
                         ) : (
                           <Button type="button" size="sm" onClick={() => openProposal({ open: true, mode: 'search', opponent: result })}>
+                            <CalendarPlus2 className="h-4 w-4" />
                             Propose
                           </Button>
                         )}
@@ -586,12 +588,14 @@ export default function SearchPage() {
                                 <Badge variant={proposalBadgeVariant(result.existing_proposal_status)}>
                                   {proposalStatusLabel(result.existing_proposal_status)}
                                 </Badge>
-                                <Button type="button" size="sm" onClick={() => navigate('/proposals')}>
-                                  View
+                                <Button type="button" size="sm" variant="outline" onClick={() => navigate('/proposals')}>
+                                  <Eye className="h-4 w-4" />
+                                  Open Proposal
                                 </Button>
                               </div>
                             ) : (
                               <Button type="button" size="sm" onClick={() => openProposal({ open: true, mode: 'search', opponent: result })}>
+                                <CalendarPlus2 className="h-4 w-4" />
                                 Propose
                               </Button>
                             )}
@@ -630,7 +634,8 @@ export default function SearchPage() {
                 title="No auto-matches found"
                 description="Add more open availability windows to widen the matching pool."
                 actions={(
-                  <Button type="button" size="sm" onClick={() => navigate('/availability')}>
+                  <Button type="button" size="sm" variant="outline" onClick={() => navigate('/availability')}>
+                    <CalendarPlus2 className="h-4 w-4" />
                     Open Availability
                   </Button>
                 )}
@@ -708,12 +713,14 @@ export default function SearchPage() {
                                 <Badge variant={proposalBadgeVariant(match.existing_proposal_status)}>
                                   {proposalStatusLabel(match.existing_proposal_status)}
                                 </Badge>
-                                <Button type="button" size="sm" onClick={() => navigate('/proposals')}>
-                                  View
+                                <Button type="button" size="sm" variant="outline" onClick={() => navigate('/proposals')}>
+                                  <Eye className="h-4 w-4" />
+                                  Open Proposal
                                 </Button>
                               </>
                             ) : (
                               <Button type="button" size="sm" onClick={() => openProposal({ open: true, mode: 'auto', autoMatch: match })}>
+                                <CalendarPlus2 className="h-4 w-4" />
                                 Propose
                               </Button>
                             )}
@@ -794,12 +801,14 @@ export default function SearchPage() {
                                     <Badge variant={proposalBadgeVariant(match.existing_proposal_status)}>
                                       {proposalStatusLabel(match.existing_proposal_status)}
                                     </Badge>
-                                    <Button type="button" size="sm" onClick={() => navigate('/proposals')}>
-                                      View
+                                    <Button type="button" size="sm" variant="outline" onClick={() => navigate('/proposals')}>
+                                      <Eye className="h-4 w-4" />
+                                      Open Proposal
                                     </Button>
                                   </div>
                                 ) : (
                                   <Button type="button" size="sm" onClick={() => openProposal({ open: true, mode: 'auto', autoMatch: match })}>
+                                    <CalendarPlus2 className="h-4 w-4" />
                                     Propose
                                   </Button>
                                 )}
@@ -824,9 +833,11 @@ export default function SearchPage() {
         footer={(
           <>
             <Button type="button" onClick={saveProposal} disabled={proposalLoading || !proposalForm.arena_id || !proposalForm.arena_rink_id || !proposalForm.ice_slot_id}>
+              <SendHorizontal className="h-4 w-4" />
               {proposalLoading ? 'Sending…' : 'Send Proposal'}
             </Button>
             <Button type="button" variant="outline" onClick={closeProposal} disabled={proposalLoading}>
+              <X className="h-4 w-4" />
               Cancel
             </Button>
           </>

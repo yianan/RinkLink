@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { Button } from './ui/Button';
+import { chromeIconButtonClass } from '../lib/uiClasses';
 
 type Theme = 'light' | 'dark';
 
@@ -44,7 +45,7 @@ export default function ThemeToggle() {
         }
         setTheme(next);
       }}
-      className="bg-slate-900/5 text-slate-700 ring-1 ring-slate-200/70 hover:bg-slate-900/10 hover:text-slate-900 dark:bg-white/10 dark:text-white dark:ring-white/15 dark:hover:bg-white/15 dark:hover:text-white"
+      className={chromeIconButtonClass}
       title={label}
     >
       {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

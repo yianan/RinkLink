@@ -7,24 +7,6 @@ from pydantic import BaseModel
 from .attendance import EventAttendanceSummary
 
 
-class EventCreate(BaseModel):
-    event_type: str
-    away_team_id: str | None = None
-    home_availability_window_id: str | None = None
-    away_availability_window_id: str | None = None
-    season_id: str | None = None
-    competition_division_id: str | None = None
-    arena_id: str
-    arena_rink_id: str
-    ice_slot_id: str | None = None
-    home_locker_room_id: str | None = None
-    away_locker_room_id: str | None = None
-    date: dt.date
-    start_time: dt.time | None = None
-    end_time: dt.time | None = None
-    notes: str | None = None
-
-
 class EventUpdate(BaseModel):
     event_type: str | None = None
     status: str | None = None
@@ -81,6 +63,9 @@ class EventOut(BaseModel):
     away_weekly_confirmed: bool
     home_score: int | None
     away_score: int | None
+    response_message: str | None = None
+    response_source: str | None = None
+    responded_at: dt.datetime | None = None
     created_at: dt.datetime
     updated_at: dt.datetime
 

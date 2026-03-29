@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Save, Trash2, Warehouse, X } from 'lucide-react';
 import { api } from '../api/client';
 import { Arena } from '../types';
 import PageHeader from '../components/PageHeader';
@@ -10,7 +10,7 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
-import { tableActionButtonClass } from '../lib/uiClasses';
+import { accentLinkClass, destructiveIconButtonClass, focusRingClass, interactiveTitleClass, tableActionButtonClass } from '../lib/uiClasses';
 import TeamLogo from '../components/TeamLogo';
 
 const emptyForm = {
@@ -141,7 +141,7 @@ export default function ArenaListPage() {
         subtitle="Manage arena records, then drill into each rink for locker rooms and ice slots."
         actions={(
           <Button type="button" onClick={openCreate}>
-            <Plus className="h-4 w-4" />
+            <Warehouse className="h-4 w-4" />
             Add Arena
           </Button>
         )}
@@ -155,10 +155,10 @@ export default function ArenaListPage() {
                 <TeamLogo name={arena.name} logoUrl={arena.logo_url} className="h-12 w-12 rounded-2xl" initialsClassName="text-sm" />
                 <button
                   type="button"
-                  className="min-w-0 cursor-pointer text-left"
+                  className={`group min-w-0 rounded-lg text-left ${focusRingClass}`}
                   onClick={() => navigate(`/arenas/${arena.id}`)}
                 >
-                  <div className="text-base font-semibold text-slate-900 transition-colors hover:text-sky-700 dark:text-slate-100 dark:hover:text-sky-300">
+                  <div className={`text-base font-semibold text-slate-900 dark:text-slate-100 ${interactiveTitleClass}`}>
                     {arena.name}
                   </div>
                   <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
@@ -182,12 +182,12 @@ export default function ArenaListPage() {
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className={tableActionButtonClass}
+                  className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
                   onClick={() => deleteArena(arena)}
                   aria-label="Delete arena"
                   title="Delete arena"
                 >
-                  <Trash2 className="h-4 w-4 text-rose-600" />
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -199,7 +199,7 @@ export default function ArenaListPage() {
                 <div className="truncate">
                   <a
                     href={`mailto:${arena.contact_email}`}
-                    className="text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+                    className={accentLinkClass}
                   >
                     {arena.contact_email}
                   </a>
@@ -227,9 +227,11 @@ export default function ArenaListPage() {
         footer={(
           <>
             <Button type="button" onClick={saveArena} disabled={!form.name || !form.city || !form.state || !form.zip_code}>
+              <Save className="h-4 w-4" />
               Save
             </Button>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <X className="h-4 w-4" />
               Cancel
             </Button>
           </>
@@ -266,6 +268,7 @@ export default function ArenaListPage() {
                       setRemoveArenaLogo(true);
                     }}
                   >
+                    <Trash2 className="h-4 w-4" />
                     Remove Logo
                   </Button>
                 </div>

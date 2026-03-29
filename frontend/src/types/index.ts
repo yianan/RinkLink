@@ -133,7 +133,7 @@ export interface IceSlot {
   date: string;
   start_time: string;
   end_time: string | null;
-  status: 'available' | 'held' | 'booked';
+  status: 'available' | 'held' | 'booked' | 'cancelled';
   pricing_mode: 'fixed_price' | 'call_for_pricing' | string;
   price_amount_cents: number | null;
   currency: string;
@@ -147,6 +147,10 @@ export interface IceSlot {
   active_booking_request_status: string | null;
   active_booking_request_team_name: string | null;
   active_booking_request_event_type: string | null;
+  active_proposal_id: string | null;
+  active_proposal_status: string | null;
+  active_proposal_home_team_name: string | null;
+  active_proposal_away_team_name: string | null;
   notes: string | null;
   arena_id: string | null;
   arena_name: string | null;
@@ -159,6 +163,9 @@ export interface IceSlotUploadRow {
   date: string;
   start_time: string;
   end_time: string | null;
+  pricing_mode: 'fixed_price' | 'call_for_pricing' | string;
+  price_amount_cents: number | null;
+  currency: string;
   notes: string | null;
 }
 
@@ -231,6 +238,8 @@ export interface Proposal {
   home_locker_room_id: string | null;
   away_locker_room_id: string | null;
   message: string | null;
+  response_message: string | null;
+  response_source: string | null;
   responded_at: string | null;
   created_at: string;
   updated_at: string;
@@ -366,6 +375,9 @@ export interface Event {
   away_weekly_confirmed: boolean;
   home_score: number | null;
   away_score: number | null;
+  response_message: string | null;
+  response_source: string | null;
+  responded_at: string | null;
   created_at: string;
   updated_at: string;
   home_team_name: string | null;

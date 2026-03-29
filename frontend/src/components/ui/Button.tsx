@@ -2,7 +2,7 @@ import type React from 'react';
 import { cn } from '../../lib/cn';
 import { Tooltip } from './Tooltip';
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
+type ButtonVariant = 'primary' | 'outline' | 'ghost' | 'destructive';
 type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -16,14 +16,12 @@ const base =
 const variants: Record<ButtonVariant, string> = {
   primary:
     'bg-gradient-to-r from-cyan-600 via-sky-600 to-violet-600 text-white shadow-soft hover:from-cyan-500 hover:via-sky-500 hover:to-violet-500 hover:shadow-md disabled:border disabled:border-[color:var(--app-border-subtle)] disabled:from-[var(--app-disabled-surface)] disabled:via-[var(--app-disabled-surface)] disabled:to-[var(--app-disabled-surface)] disabled:text-[color:var(--app-disabled-text)] dark:from-cyan-400 dark:via-sky-400 dark:to-violet-400 dark:text-slate-950 dark:shadow-[0_0_0_1px_rgba(34,211,238,0.22),0_12px_30px_rgba(34,211,238,0.15)] dark:hover:from-cyan-300 dark:hover:via-sky-300 dark:hover:to-violet-300 dark:hover:shadow-[0_0_0_1px_rgba(34,211,238,0.3),0_12px_30px_rgba(34,211,238,0.2)]',
-  secondary:
-    'bg-slate-900 text-white shadow-soft hover:bg-slate-800 hover:shadow-md disabled:border disabled:border-[color:var(--app-border-subtle)] disabled:bg-[var(--app-disabled-surface)] disabled:text-[color:var(--app-disabled-text)] dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white',
   outline:
-    'border border-slate-300/90 bg-white/95 text-slate-800 shadow-sm backdrop-blur-[1px] hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-1 hover:ring-sky-400/20 disabled:border-[color:var(--app-border-subtle)] disabled:bg-[var(--app-disabled-surface)] disabled:text-[color:var(--app-disabled-text)] dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25',
+    'border border-slate-300/90 bg-white/95 text-slate-800 shadow-sm backdrop-blur-[1px] hover:border-[color:var(--app-accent-link)]/35 hover:bg-[color:color-mix(in_srgb,var(--app-accent-link)_8%,white)] hover:text-[color:var(--app-accent-link-hover)] hover:ring-1 hover:ring-[color:var(--app-accent-link)]/15 disabled:border-[color:var(--app-border-subtle)] disabled:bg-[var(--app-disabled-surface)] disabled:text-[color:var(--app-disabled-text)] dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-[color:var(--app-accent-link)]/45 dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-link)_14%,transparent)] dark:hover:text-[color:var(--app-accent-link)] dark:hover:ring-[color:var(--app-accent-link)]/20',
   ghost:
-    'text-slate-800 hover:bg-[var(--app-surface)] disabled:text-[color:var(--app-disabled-text)] dark:text-slate-200 dark:hover:bg-[var(--app-surface)]',
+    'text-slate-700 hover:bg-[color:color-mix(in_srgb,var(--app-accent-link)_6%,white)] hover:text-[color:var(--app-accent-link-hover)] disabled:text-[color:var(--app-disabled-text)] dark:text-slate-200 dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-link)_10%,transparent)] dark:hover:text-[color:var(--app-accent-link)]',
   destructive:
-    'bg-rose-600 text-white shadow-soft hover:bg-rose-500 hover:shadow-md disabled:border disabled:border-rose-200/70 disabled:bg-[color:color-mix(in_srgb,var(--app-disabled-surface)_84%,rgb(251_191_191))] disabled:text-rose-700 dark:disabled:text-rose-200',
+    'bg-rose-600 text-white shadow-soft hover:bg-rose-700 hover:shadow-md disabled:border disabled:border-rose-200/70 disabled:bg-[color:color-mix(in_srgb,var(--app-disabled-surface)_84%,rgb(251_191_191))] disabled:text-rose-700 dark:bg-rose-500 dark:hover:bg-rose-400 dark:disabled:text-rose-200',
 };
 
 const sizes: Record<ButtonSize, string> = {

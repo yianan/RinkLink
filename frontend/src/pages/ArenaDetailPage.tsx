@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Eye, Pencil, Plus, Trash2 } from 'lucide-react';
+import { CalendarPlus2, Check, ChevronLeft, DoorOpen, FileUp, Pencil, Plus, Save, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../api/client';
-import { Arena, ArenaRink, IceBookingRequest, IceSlot, LockerRoom } from '../types';
+import { Arena, ArenaRink, Event, IceBookingRequest, IceSlot, LockerRoom } from '../types';
 import PageHeader from '../components/PageHeader';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
@@ -13,10 +13,12 @@ import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import SegmentedTabs from '../components/SegmentedTabs';
+import IceSlotCsvUploader from '../components/IceSlotCsvUploader';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
-import { formatShortDate, formatTimeHHMM } from '../lib/time';
-import { tableActionButtonClass } from '../lib/uiClasses';
+import { formatShortDate, formatTimeHHMM, hasInvalidTimeRange } from '../lib/time';
+import { cn } from '../lib/cn';
+import { accentSelectorPillActiveClass, destructiveIconButtonClass, selectorPillClass, selectorPillIdleClass, tableActionButtonClass } from '../lib/uiClasses';
 import TeamLogo from '../components/TeamLogo';
 import { getCompetitionLabel } from '../lib/competition';
 
@@ -54,12 +56,63 @@ function centsToDollars(value: number | null) {
 }
 
 function isRequestActive(request: IceBookingRequest, todayIso: string) {
-  if (request.status === 'requested') return true;
   if (request.status !== 'accepted') return false;
   if (!request.ice_slot_date) return true;
   if (request.event_status === 'cancelled') return false;
   return request.ice_slot_date >= todayIso;
 }
+
+function requestDateTimeKey(request: IceBookingRequest) {
+  return `${request.ice_slot_date || '9999-12-31'}:${request.ice_slot_start_time || '99:99:99'}`;
+}
+
+function eventDateTimeKey(event: Event) {
+  return `${event.date}:${event.start_time || '99:99:99'}`;
+}
+
+function slotDateTimeKey(slot: IceSlot) {
+  return `${slot.date}:${slot.start_time || '99:99:99'}`;
+}
+
+function getErrorDescription(error: unknown) {
+  if (error instanceof Error) {
+    const [, ...rest] = error.message.split(': ');
+    const rawMessage = (rest.length > 0 ? rest.join(': ') : error.message).trim();
+    if (!rawMessage) return 'Something went wrong.';
+    try {
+      const parsed = JSON.parse(rawMessage) as { detail?: string };
+      if (typeof parsed.detail === 'string' && parsed.detail.trim()) {
+        return parsed.detail;
+      }
+    } catch {
+      // Fall back to the raw message when the backend response is plain text.
+    }
+    return rawMessage;
+  }
+  return 'Something went wrong.';
+}
+
+type BookedSlotActionTarget = {
+  ice_slot_id: string;
+  arena_rink_id: string;
+  title: string;
+  arena_rink_name: string | null;
+  date: string | null;
+  start_time: string | null;
+  event_type: Event['event_type'];
+  away_team_id: string | null;
+  home_locker_room_id: string;
+  away_locker_room_id: string;
+};
+
+type CancelSlotTarget = {
+  ice_slot_id: string;
+  title: string;
+  arena_rink_name: string | null;
+  date: string | null;
+  start_time: string | null;
+  description: string;
+};
 
 export default function ArenaDetailPage() {
   const navigate = useNavigate();
@@ -72,6 +125,8 @@ export default function ArenaDetailPage() {
   const [selectedRinkId, setSelectedRinkId] = useState('');
   const [lockerRooms, setLockerRooms] = useState<LockerRoom[]>([]);
   const [iceSlots, setIceSlots] = useState<IceSlot[]>([]);
+  const [arenaIceSlots, setArenaIceSlots] = useState<IceSlot[]>([]);
+  const [arenaEvents, setArenaEvents] = useState<Event[]>([]);
   const [bookingRequests, setBookingRequests] = useState<IceBookingRequest[]>([]);
   const [requestTab, setRequestTab] = useState<'active' | 'pending' | 'history'>('active');
 
@@ -92,31 +147,64 @@ export default function ArenaDetailPage() {
   const [editRink, setEditRink] = useState<ArenaRink | null>(null);
   const [rinkForm, setRinkForm] = useState(emptyRinkForm);
 
+  const [lockerManagerOpen, setLockerManagerOpen] = useState(false);
   const [lockerModalOpen, setLockerModalOpen] = useState(false);
   const [lockerForm, setLockerForm] = useState(emptyLockerForm);
 
   const [slotModalOpen, setSlotModalOpen] = useState(false);
+  const [slotUploadOpen, setSlotUploadOpen] = useState(false);
   const [slotForm, setSlotForm] = useState(emptySlotForm);
   const [editSlot, setEditSlot] = useState<IceSlot | null>(null);
+  const [bookedSlotTarget, setBookedSlotTarget] = useState<BookedSlotActionTarget | null>(null);
+  const [cancelSlotTarget, setCancelSlotTarget] = useState<CancelSlotTarget | null>(null);
+  const [cancelSlotForm, setCancelSlotForm] = useState(emptyActionForm);
   const [acceptRequest, setAcceptRequest] = useState<IceBookingRequest | null>(null);
   const [acceptForm, setAcceptForm] = useState(emptyAcceptForm);
   const [acceptLockerRooms, setAcceptLockerRooms] = useState<LockerRoom[]>([]);
-  const [editLockerRequest, setEditLockerRequest] = useState<IceBookingRequest | null>(null);
   const [editLockerRooms, setEditLockerRooms] = useState<LockerRoom[]>([]);
   const [lockerAssignForm, setLockerAssignForm] = useState(emptyLockerAssignForm);
   const [actionRequest, setActionRequest] = useState<IceBookingRequest | null>(null);
-  const [actionMode, setActionMode] = useState<'reject' | 'cancel' | null>(null);
+  const [actionMode, setActionMode] = useState<'reject' | null>(null);
   const [actionForm, setActionForm] = useState(emptyActionForm);
+  const [highlightedRequestId, setHighlightedRequestId] = useState<string | null>(null);
   const initialRinkSyncDone = useRef(false);
   const iceSlotsSectionRef = useRef<HTMLDivElement | null>(null);
   const bookingRequestsSectionRef = useRef<HTMLDivElement | null>(null);
 
   const selectedRink = rinks.find((rink) => rink.id === selectedRinkId) ?? null;
   const todayIso = new Date().toISOString().slice(0, 10);
-  const pendingRequests = bookingRequests.filter((request) => request.status === 'requested');
-  const activeRequests = bookingRequests.filter((request) => isRequestActive(request, todayIso));
+  const pendingRequests = [...bookingRequests.filter((request) => request.status === 'requested')]
+    .sort((left, right) => requestDateTimeKey(left).localeCompare(requestDateTimeKey(right)));
+  const activeRequests = [...bookingRequests.filter((request) => isRequestActive(request, todayIso))]
+    .sort((left, right) => requestDateTimeKey(left).localeCompare(requestDateTimeKey(right)));
   const activeAcceptedRequests = activeRequests.filter((request) => request.status === 'accepted');
-  const historyRequests = bookingRequests.filter((request) => !isRequestActive(request, todayIso));
+  const historyRequests = [...bookingRequests.filter((request) => request.status !== 'requested' && !isRequestActive(request, todayIso))]
+    .sort((left, right) => requestDateTimeKey(right).localeCompare(requestDateTimeKey(left)));
+  const bookingRequestsById = new Map(bookingRequests.map((request) => [request.id, request]));
+  const arenaEventsById = new Map(arenaEvents.map((event) => [event.id, event]));
+  const requestEventIds = new Set(bookingRequests.map((request) => request.event_id).filter(Boolean));
+  const activeRequestSlotIds = new Set(activeAcceptedRequests.map((request) => request.ice_slot_id).filter(Boolean));
+  const directUpcomingEvents = [...arenaEvents.filter((event) => (
+    event.status !== 'cancelled'
+    && event.date >= todayIso
+    && !requestEventIds.has(event.id)
+  ))].sort((left, right) => eventDateTimeKey(left).localeCompare(eventDateTimeKey(right)));
+  const directUpcomingEventIds = new Set(directUpcomingEvents.map((event) => event.id));
+  const slotTimeError = hasInvalidTimeRange(slotForm.start_time, slotForm.end_time)
+    ? 'Slot end time must be the same as or later than slot start time.'
+    : '';
+  const orphanBookedSlots = [...arenaIceSlots.filter((slot) => (
+    slot.status === 'booked'
+    && slot.date >= todayIso
+    && !slot.active_booking_request_id
+    && !activeRequestSlotIds.has(slot.id)
+    && (!slot.booked_event_id || !directUpcomingEventIds.has(slot.booked_event_id))
+  ))].sort((left, right) => slotDateTimeKey(left).localeCompare(slotDateTimeKey(right)));
+  const upcomingItems = [
+    ...activeAcceptedRequests.map((request) => ({ kind: 'request' as const, sortKey: requestDateTimeKey(request), request })),
+    ...directUpcomingEvents.map((event) => ({ kind: 'event' as const, sortKey: eventDateTimeKey(event), event })),
+    ...orphanBookedSlots.map((slot) => ({ kind: 'slot' as const, sortKey: slotDateTimeKey(slot), slot })),
+  ].sort((left, right) => left.sortKey.localeCompare(right.sortKey));
 
   const loadArena = () => {
     api.getArena(arenaId).then((data) => {
@@ -146,12 +234,29 @@ export default function ArenaDetailPage() {
     api.getArenaIceBookingRequests(arenaId).then(setBookingRequests);
   };
 
+  const loadArenaEvents = () => {
+    api.getArenaEvents(arenaId, { date_from: todayIso }).then(setArenaEvents);
+  };
+
+  const loadArenaIceSlots = () => {
+    api.getArenaIceSlots(arenaId, { date_from: todayIso }).then(setArenaIceSlots);
+  };
+
+  const refreshIceSlots = () => {
+    if (!selectedRinkId) return;
+    api.getIceSlots(selectedRinkId).then(setIceSlots);
+    loadArenaIceSlots();
+    loadRinks();
+  };
+
   useEffect(() => {
     if (!arenaId) return;
     initialRinkSyncDone.current = false;
     loadArena();
     loadRinks();
     loadBookingRequests();
+    loadArenaEvents();
+    loadArenaIceSlots();
   }, [arenaId]);
 
   useEffect(() => {
@@ -179,6 +284,7 @@ export default function ArenaDetailPage() {
     if (!selectedRinkId) {
       setLockerRooms([]);
       setIceSlots([]);
+      setSlotUploadOpen(false);
       return;
     }
     Promise.all([api.getLockerRooms(selectedRinkId), api.getIceSlots(selectedRinkId)])
@@ -187,6 +293,33 @@ export default function ArenaDetailPage() {
         setIceSlots(slots);
       });
   }, [selectedRinkId]);
+
+  useEffect(() => {
+    if (!arenaId) return;
+
+    const refreshArenaDetail = () => {
+      if (document.visibilityState === 'hidden') return;
+      loadArena();
+      loadRinks();
+      loadBookingRequests();
+      loadArenaEvents();
+      loadArenaIceSlots();
+      if (selectedRinkId) {
+        Promise.all([api.getLockerRooms(selectedRinkId), api.getIceSlots(selectedRinkId)])
+          .then(([rooms, slots]) => {
+            setLockerRooms(rooms);
+            setIceSlots(slots);
+          });
+      }
+    };
+
+    window.addEventListener('focus', refreshArenaDetail);
+    document.addEventListener('visibilitychange', refreshArenaDetail);
+    return () => {
+      window.removeEventListener('focus', refreshArenaDetail);
+      document.removeEventListener('visibilitychange', refreshArenaDetail);
+    };
+  }, [arenaId, selectedRinkId]);
 
   useEffect(() => {
     if (!acceptRequest) {
@@ -202,18 +335,18 @@ export default function ArenaDetailPage() {
   }, [acceptRequest]);
 
   useEffect(() => {
-    if (!editLockerRequest) {
+    if (!bookedSlotTarget) {
       setEditLockerRooms([]);
       setLockerAssignForm(emptyLockerAssignForm);
       return;
     }
-    api.getLockerRooms(editLockerRequest.arena_rink_id).then(setEditLockerRooms);
+    api.getLockerRooms(bookedSlotTarget.arena_rink_id).then(setEditLockerRooms);
     setLockerAssignForm({
-      home_locker_room_id: editLockerRequest.home_locker_room_id || '',
-      away_locker_room_id: editLockerRequest.away_locker_room_id || '',
+      home_locker_room_id: bookedSlotTarget.home_locker_room_id || '',
+      away_locker_room_id: bookedSlotTarget.away_locker_room_id || '',
       response_message: '',
     });
-  }, [editLockerRequest]);
+  }, [bookedSlotTarget]);
 
   useEffect(() => {
     if (!actionRequest || !actionMode) {
@@ -222,7 +355,13 @@ export default function ArenaDetailPage() {
   }, [actionMode, actionRequest]);
 
   useEffect(() => {
-    if (requestTab === 'active' && activeRequests.length === 0) {
+    if (!cancelSlotTarget) {
+      setCancelSlotForm(emptyActionForm);
+    }
+  }, [cancelSlotTarget]);
+
+  useEffect(() => {
+    if (requestTab === 'active' && upcomingItems.length === 0) {
       if (pendingRequests.length > 0) {
         setRequestTab('pending');
       } else if (historyRequests.length > 0) {
@@ -231,7 +370,7 @@ export default function ArenaDetailPage() {
       return;
     }
     if (requestTab === 'pending' && pendingRequests.length === 0) {
-      if (activeRequests.length > 0) {
+      if (upcomingItems.length > 0) {
         setRequestTab('active');
       } else if (historyRequests.length > 0) {
         setRequestTab('history');
@@ -239,13 +378,13 @@ export default function ArenaDetailPage() {
       return;
     }
     if (requestTab === 'history' && historyRequests.length === 0) {
-      if (activeRequests.length > 0) {
+      if (upcomingItems.length > 0) {
         setRequestTab('active');
       } else if (pendingRequests.length > 0) {
         setRequestTab('pending');
       }
     }
-  }, [activeRequests.length, historyRequests.length, pendingRequests.length, requestTab]);
+  }, [historyRequests.length, pendingRequests.length, requestTab, upcomingItems.length]);
 
   const selectRink = (rinkId: string) => {
     if (rinkId === selectedRinkId) return;
@@ -341,6 +480,10 @@ export default function ArenaDetailPage() {
 
   const saveIceSlot = async () => {
     if (!selectedRinkId) return;
+    if (slotTimeError) {
+      pushToast({ variant: 'error', title: 'Check the slot time range', description: slotTimeError });
+      return;
+    }
     const payload = {
       date: slotForm.date,
       start_time: slotForm.start_time,
@@ -354,18 +497,26 @@ export default function ArenaDetailPage() {
       pushToast({ variant: 'error', title: 'Enter a slot price' });
       return;
     }
-    if (editSlot) {
-      await api.updateIceSlot(editSlot.id, payload);
-      pushToast({ variant: 'success', title: 'Ice slot updated' });
-    } else {
-      await api.createIceSlot(selectedRinkId, payload);
-      pushToast({ variant: 'success', title: 'Ice slot added' });
+    try {
+      if (editSlot) {
+        await api.updateIceSlot(editSlot.id, payload);
+        pushToast({ variant: 'success', title: 'Ice slot updated' });
+      } else {
+        await api.createIceSlot(selectedRinkId, payload);
+        pushToast({ variant: 'success', title: 'Ice slot added' });
+      }
+    } catch (error) {
+      pushToast({
+        variant: 'error',
+        title: editSlot ? 'Unable to update ice slot' : 'Unable to add ice slot',
+        description: getErrorDescription(error),
+      });
+      return;
     }
     setSlotModalOpen(false);
     setEditSlot(null);
     setSlotForm(emptySlotForm);
-    api.getIceSlots(selectedRinkId).then(setIceSlots);
-    loadRinks();
+    refreshIceSlots();
   };
 
   const openEditSlot = (slot: IceSlot) => {
@@ -398,10 +549,17 @@ export default function ArenaDetailPage() {
       confirmVariant: 'destructive',
     });
     if (!confirmed) return;
-    await api.deleteIceSlot(slot.id);
-    pushToast({ variant: 'success', title: 'Ice slot deleted' });
-    api.getIceSlots(selectedRinkId).then(setIceSlots);
-    loadRinks();
+    try {
+      await api.deleteIceSlot(slot.id);
+      pushToast({ variant: 'success', title: 'Ice slot deleted' });
+      refreshIceSlots();
+    } catch (error) {
+      pushToast({
+        variant: 'error',
+        title: 'Unable to delete ice slot',
+        description: getErrorDescription(error),
+      });
+    }
   };
 
   const acceptBookingRequest = async () => {
@@ -414,46 +572,65 @@ export default function ArenaDetailPage() {
     setAcceptRequest(null);
     setRequestTab('active');
     loadBookingRequests();
-    if (selectedRinkId) {
-      api.getIceSlots(selectedRinkId).then(setIceSlots);
-    }
+    loadArenaEvents();
+    loadArenaIceSlots();
+    refreshIceSlots();
     pushToast({ variant: 'success', title: 'Booking request accepted' });
   };
 
   const rejectBookingRequest = async (request: IceBookingRequest) => {
     await api.rejectArenaIceBookingRequest(arenaId, request.id, actionForm.response_message || undefined);
     loadBookingRequests();
+    loadArenaEvents();
+    loadArenaIceSlots();
     setActionRequest(null);
     setActionMode(null);
     setActionForm(emptyActionForm);
-    if (selectedRinkId) {
-      api.getIceSlots(selectedRinkId).then(setIceSlots);
-    }
+    refreshIceSlots();
     pushToast({ variant: 'success', title: 'Booking request rejected' });
   };
 
-  const cancelBookingRequest = async (request: IceBookingRequest) => {
-    await api.cancelArenaIceBookingRequest(arenaId, request.id, actionForm.response_message || undefined);
-    loadBookingRequests();
-    setActionRequest(null);
-    setActionMode(null);
-    setActionForm(emptyActionForm);
-    if (selectedRinkId) {
-      api.getIceSlots(selectedRinkId).then(setIceSlots);
+  const saveEditedLockerRooms = async () => {
+    if (!bookedSlotTarget) return;
+    try {
+      await api.updateArenaIceSlotLockerRooms(arenaId, bookedSlotTarget.ice_slot_id, {
+        home_locker_room_id: lockerAssignForm.home_locker_room_id || null,
+        away_locker_room_id: bookedSlotTarget.away_team_id ? (lockerAssignForm.away_locker_room_id || null) : null,
+        response_message: lockerAssignForm.response_message || null,
+      });
+      setBookedSlotTarget(null);
+      loadBookingRequests();
+      loadArenaEvents();
+      loadArenaIceSlots();
+      refreshIceSlots();
+      pushToast({ variant: 'success', title: 'Locker rooms updated' });
+    } catch (error) {
+      pushToast({
+        variant: 'error',
+        title: 'Unable to update locker rooms',
+        description: getErrorDescription(error),
+      });
     }
-    pushToast({ variant: 'success', title: 'Booking request cancelled' });
   };
 
-  const saveEditedLockerRooms = async () => {
-    if (!editLockerRequest?.event_id) return;
-    await api.updateEventLockerRooms(editLockerRequest.event_id, {
-      home_locker_room_id: lockerAssignForm.home_locker_room_id || null,
-      away_locker_room_id: editLockerRequest.away_team_id ? (lockerAssignForm.away_locker_room_id || null) : null,
-      response_message: lockerAssignForm.response_message || null,
-    });
-    setEditLockerRequest(null);
-    loadBookingRequests();
-    pushToast({ variant: 'success', title: 'Locker rooms updated' });
+  const cancelSlot = async () => {
+    if (!cancelSlotTarget) return;
+    try {
+      await api.cancelArenaIceSlot(arenaId, cancelSlotTarget.ice_slot_id, cancelSlotForm.response_message || undefined);
+      setCancelSlotTarget(null);
+      setCancelSlotForm(emptyActionForm);
+      loadBookingRequests();
+      loadArenaEvents();
+      loadArenaIceSlots();
+      refreshIceSlots();
+      pushToast({ variant: 'success', title: 'Slot cancelled' });
+    } catch (error) {
+      pushToast({
+        variant: 'error',
+        title: 'Unable to cancel slot',
+        description: getErrorDescription(error),
+      });
+    }
   };
 
   if (!arena) {
@@ -470,9 +647,25 @@ export default function ArenaDetailPage() {
     return slot.booked_by_team_name;
   };
 
-  const formatSlotStatus = (status: IceSlot['status']) => status.charAt(0).toUpperCase() + status.slice(1);
+  const formatSlotStatus = (status: IceSlot['status']) => {
+    if (status === 'available') return 'Open';
+    if (status === 'held') return 'Pending';
+    if (status === 'cancelled') return 'Cancelled';
+    return 'Booked';
+  };
+  const slotStatusVariant = (status: IceSlot['status']): 'success' | 'warning' | 'info' | 'neutral' => {
+    if (status === 'available') return 'success';
+    if (status === 'held') return 'warning';
+    if (status === 'cancelled') return 'neutral';
+    return 'info';
+  };
+  const getHeldSlotLabel = (slot: IceSlot) => {
+    if (slot.active_booking_request_id) return 'Pending request';
+    if (slot.active_proposal_id) return 'Pending proposal';
+    return 'Pending';
+  };
   const openSlotCount = iceSlots.filter((slot) => slot.status === 'available').length;
-  const visibleRequests = requestTab === 'active' ? activeRequests : requestTab === 'pending' ? pendingRequests : historyRequests;
+  const visibleRequests = requestTab === 'pending' ? pendingRequests : historyRequests;
 
   const focusIceSlots = () => {
     iceSlotsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -484,6 +677,280 @@ export default function ArenaDetailPage() {
       bookingRequestsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   };
+
+  const focusSlotManagement = (slot: IceSlot) => {
+    const requestId = slot.active_booking_request_id;
+    if (!requestId) return;
+    const nextTab = pendingRequests.some((request) => request.id === requestId)
+      ? 'pending'
+      : activeRequests.some((request) => request.id === requestId)
+        ? 'active'
+        : 'history';
+    setHighlightedRequestId(requestId);
+    focusRequests(nextTab);
+    window.setTimeout(() => {
+      setHighlightedRequestId((current) => (current === requestId ? null : current));
+    }, 2400);
+  };
+
+  const openBookedSlotLockerRooms = (target: BookedSlotActionTarget) => {
+    setBookedSlotTarget(target);
+  };
+
+  const openCancelSlot = (target: CancelSlotTarget) => {
+    setCancelSlotTarget(target);
+  };
+
+  const bookedSlotTitleFromRequest = (request: IceBookingRequest) => (
+    request.away_team_name
+      ? `${request.requester_team_name} vs ${request.away_team_name}`
+      : `${request.requester_team_name} ${getCompetitionLabel(request.event_type as Event['event_type'])}`
+  );
+
+  const bookedSlotTitleFromEvent = (event: Event) => (
+    event.away_team_name
+      ? `${event.home_team_name} vs ${event.away_team_name}`
+      : `${event.home_team_name} ${getCompetitionLabel(event.event_type)}`
+  );
+
+  const renderOrphanSlotCard = (slot: IceSlot) => (
+    <div key={slot.id} className="rounded-xl border border-slate-200 px-4 py-4 transition dark:border-slate-800">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {slot.booked_event_away_team_name
+                    ? `${slot.booked_event_home_team_name} vs ${slot.booked_event_away_team_name}`
+                    : `${slot.booked_event_home_team_name || 'Booked Slot'} Practice`}
+                </div>
+                <Badge variant={slot.pricing_mode === 'call_for_pricing' ? 'warning' : 'outline'}>
+                  {formatPriceLabel(slot.pricing_mode, slot.price_amount_cents, slot.currency)}
+                </Badge>
+                <Badge variant="success">Booked</Badge>
+              </div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                {[slot.arena_rink_name, formatShortDate(slot.date), formatTimeHHMM(slot.start_time) || slot.start_time].filter(Boolean).join(' • ')}
+              </div>
+              {slot.notes ? (
+                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200">
+                  <span className="font-semibold">Slot note:</span> {slot.notes}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            onClick={() => openCancelSlot({
+              ice_slot_id: slot.id,
+              title: slot.booked_event_away_team_name
+                ? `${slot.booked_event_home_team_name} vs ${slot.booked_event_away_team_name}`
+                : `${slot.booked_event_home_team_name || 'Booked Slot'} Practice`,
+              arena_rink_name: slot.arena_rink_name,
+              date: slot.date,
+              start_time: slot.start_time,
+              description: 'This cancels the booked slot and removes it from the live rink schedule.',
+            })}
+          >
+            <XCircle className="h-4 w-4" />
+            Cancel Slot
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderRequestCard = (request: IceBookingRequest) => (
+    <div
+      key={request.id}
+      className={cn(
+        'rounded-xl border border-slate-200 px-4 py-4 transition dark:border-slate-800',
+        highlightedRequestId === request.id && 'border-cyan-300 ring-2 ring-cyan-200/80 dark:border-cyan-500/60 dark:ring-cyan-500/30',
+      )}
+    >
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-3">
+            <div className="flex shrink-0 items-center gap-2">
+              <TeamLogo name={request.requester_team_name || 'Team'} logoUrl={request.requester_team_logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+              {request.away_team_name ? (
+                <TeamLogo name={request.away_team_name} logoUrl={request.away_team_logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+              ) : null}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {bookedSlotTitleFromRequest(request)}
+                </div>
+                <Badge variant={request.final_price_amount_cents != null || request.pricing_mode === 'fixed_price' ? 'outline' : 'warning'}>
+                  {formatPriceLabel(request.final_price_amount_cents != null ? 'fixed_price' : request.pricing_mode, request.final_price_amount_cents ?? request.price_amount_cents, request.final_currency || request.currency)}
+                </Badge>
+                <Badge variant={request.status === 'accepted' ? 'success' : request.status === 'requested' ? 'warning' : request.status === 'rejected' ? 'danger' : 'neutral'}>
+                  {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                </Badge>
+              </div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                {[request.arena_rink_name, request.ice_slot_date ? formatShortDate(request.ice_slot_date) : null, request.ice_slot_start_time ? formatTimeHHMM(request.ice_slot_start_time) || request.ice_slot_start_time : null].filter(Boolean).join(' • ')}
+              </div>
+              <div className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-400">
+                {request.home_locker_room_name || request.away_locker_room_name ? `Locker rooms: ${[request.home_locker_room_name, request.away_locker_room_name].filter(Boolean).join(' / ')}` : 'Locker rooms TBD'}
+              </div>
+              {request.message ? (
+                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                  <span className="font-semibold">Booker note:</span> {request.message}
+                </div>
+              ) : null}
+              {request.response_message ? (
+                <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-100">
+                  <span className="font-semibold">Arena note:</span> {request.response_message}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          {request.status === 'requested' ? (
+            <>
+              <Button type="button" size="sm" onClick={() => setAcceptRequest(request)}>
+                <Check className="h-4 w-4" />
+                Accept
+              </Button>
+              <Button type="button" size="sm" variant="destructive" onClick={() => { setActionRequest(request); setActionMode('reject'); }}>
+                <XCircle className="h-4 w-4" />
+                Reject
+              </Button>
+            </>
+          ) : null}
+          {request.status === 'accepted' && request.ice_slot_date && request.ice_slot_date >= todayIso ? (
+            <>
+              {request.event_id ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => openBookedSlotLockerRooms({
+                    ice_slot_id: request.ice_slot_id,
+                    arena_rink_id: request.arena_rink_id,
+                    title: bookedSlotTitleFromRequest(request),
+                    arena_rink_name: request.arena_rink_name,
+                    date: request.ice_slot_date,
+                    start_time: request.ice_slot_start_time,
+                    event_type: request.event_type as Event['event_type'],
+                    away_team_id: request.away_team_id,
+                    home_locker_room_id: request.home_locker_room_id || '',
+                    away_locker_room_id: request.away_locker_room_id || '',
+                  })}
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit Locker Rooms
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                onClick={() => openCancelSlot({
+                  ice_slot_id: request.ice_slot_id,
+                  title: bookedSlotTitleFromRequest(request),
+                  arena_rink_name: request.arena_rink_name,
+                  date: request.ice_slot_date,
+                  start_time: request.ice_slot_start_time,
+                  description: 'This cancels the booked slot and moves the booking into history for the team.',
+                })}
+              >
+                <XCircle className="h-4 w-4" />
+                Cancel Slot
+              </Button>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderDirectEventCard = (event: Event) => (
+    <div key={event.id} className="rounded-xl border border-slate-200 px-4 py-4 transition dark:border-slate-800">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-3">
+            <div className="flex shrink-0 items-center gap-2">
+              <TeamLogo name={event.home_team_name || 'Team'} logoUrl={event.home_team_logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+              {event.away_team_name ? (
+                <TeamLogo name={event.away_team_name} logoUrl={event.away_team_logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+              ) : null}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {bookedSlotTitleFromEvent(event)}
+                </div>
+                <Badge variant="outline">{event.competition_short_name || event.competition_name || 'Direct booking'}</Badge>
+                <Badge variant="success">Booked</Badge>
+              </div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                {[event.arena_rink_name, formatShortDate(event.date), event.start_time ? formatTimeHHMM(event.start_time) || event.start_time : null].filter(Boolean).join(' • ')}
+              </div>
+              <div className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-400">
+                {event.home_locker_room_name || event.away_locker_room_name ? `Locker rooms: ${[event.home_locker_room_name, event.away_locker_room_name].filter(Boolean).join(' / ')}` : 'Locker rooms TBD'}
+              </div>
+              {event.notes ? (
+                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200">
+                  <span className="font-semibold">Event note:</span> {event.notes}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          {event.date >= todayIso ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => openBookedSlotLockerRooms({
+                ice_slot_id: event.ice_slot_id || '',
+                arena_rink_id: event.arena_rink_id,
+                title: bookedSlotTitleFromEvent(event),
+                arena_rink_name: event.arena_rink_name,
+                date: event.date,
+                start_time: event.start_time,
+                event_type: event.event_type,
+                away_team_id: event.away_team_id,
+                home_locker_room_id: event.home_locker_room_id || '',
+                away_locker_room_id: event.away_locker_room_id || '',
+              })}
+              disabled={!event.ice_slot_id}
+            >
+              <Pencil className="h-4 w-4" />
+              Edit Locker Rooms
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            onClick={() => openCancelSlot({
+              ice_slot_id: event.ice_slot_id || '',
+              title: bookedSlotTitleFromEvent(event),
+              arena_rink_name: event.arena_rink_name,
+              date: event.date,
+              start_time: event.start_time,
+              description: 'This cancels the booked slot and updates the linked team booking records.',
+            })}
+            disabled={!event.ice_slot_id}
+          >
+            <XCircle className="h-4 w-4" />
+            Cancel Slot
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -557,17 +1024,17 @@ export default function ArenaDetailPage() {
         <Card
           role="button"
           tabIndex={0}
-          onClick={() => activeRequests.length > 0 && focusRequests('active')}
+          onClick={() => upcomingItems.length > 0 && focusRequests('active')}
           onKeyDown={(event) => {
-            if ((event.key === 'Enter' || event.key === ' ') && activeRequests.length > 0) {
+            if ((event.key === 'Enter' || event.key === ' ') && upcomingItems.length > 0) {
               event.preventDefault();
               focusRequests('active');
             }
           }}
-          className={`p-4 transition ${activeRequests.length > 0 ? 'cursor-pointer hover:border-cyan-300/60 hover:shadow-md' : 'cursor-not-allowed opacity-70'}`}
+          className={`p-4 transition ${upcomingItems.length > 0 ? 'cursor-pointer hover:border-cyan-300/60 hover:shadow-md' : 'cursor-not-allowed opacity-70'}`}
         >
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Upcoming Bookings</div>
-          <div className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">{activeAcceptedRequests.length}</div>
+          <div className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">{upcomingItems.length}</div>
         </Card>
       </div>
 
@@ -578,7 +1045,7 @@ export default function ArenaDetailPage() {
               key={rink.id}
               type="button"
               onClick={() => selectRink(rink.id)}
-              className={`cursor-pointer rounded-xl border px-4 py-2 text-sm font-medium transition ${selectedRinkId === rink.id ? 'border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100' : 'border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:text-sky-800 dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-300 dark:hover:border-sky-800 dark:hover:text-sky-200'}`}
+              className={`${selectorPillClass} px-4 py-2 ${selectedRinkId === rink.id ? accentSelectorPillActiveClass : selectorPillIdleClass}`}
             >
               {rink.name}
             </button>
@@ -588,6 +1055,10 @@ export default function ArenaDetailPage() {
           <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
             <span>{selectedRink.locker_room_count} locker rooms</span>
             <span>{selectedRink.ice_slot_count} ice slots</span>
+            <Button type="button" variant="outline" size="sm" onClick={() => setLockerManagerOpen(true)}>
+              <DoorOpen className="h-3.5 w-3.5" />
+              Manage Locker Rooms
+            </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => openEditRink(selectedRink)}>
               <Pencil className="h-3.5 w-3.5" />
               Edit Rink
@@ -596,12 +1067,12 @@ export default function ArenaDetailPage() {
               type="button"
               variant="ghost"
               size="icon"
-              className={tableActionButtonClass}
+              className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
               onClick={() => deleteRink(selectedRink)}
               aria-label="Delete rink"
               title="Delete rink"
             >
-              <Trash2 className="h-4 w-4 text-rose-600" />
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         ) : (
@@ -610,27 +1081,54 @@ export default function ArenaDetailPage() {
       </Card>
 
       {selectedRink ? (
-        <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-          <div ref={iceSlotsSectionRef}>
+        <div ref={iceSlotsSectionRef}>
           <Card className="p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Ice Slots</div>
+                <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  Manage the live slot inventory for {selectedRink.name}.
+                </div>
               </div>
-              <Button type="button" size="sm" onClick={() => setSlotModalOpen(true)}>
-                <Plus className="h-3.5 w-3.5" />
-                Add Ice Slot
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => setSlotUploadOpen((current) => !current)}>
+                  <FileUp className="h-3.5 w-3.5" />
+                  {slotUploadOpen ? 'Hide Upload' : 'Upload CSV'}
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setSlotModalOpen(true)}>
+                  <CalendarPlus2 className="h-3.5 w-3.5" />
+                  Add Ice Slot
+                </Button>
+              </div>
             </div>
+            {slotUploadOpen ? (
+              <div className="mt-4 rounded-2xl border border-[color:var(--app-border-subtle)] bg-[var(--app-surface)] p-4">
+                <div className="mb-3 text-sm text-slate-600 dark:text-slate-400">
+                  Upload slot date, time, pricing, and notes in bulk for this rink.
+                </div>
+                <IceSlotCsvUploader
+                  arenaRinkId={selectedRinkId}
+                  onConfirmed={() => {
+                    setSlotUploadOpen(false);
+                    refreshIceSlots();
+                  }}
+                />
+              </div>
+            ) : null}
             <div className="mt-4 space-y-2">
-              {iceSlots.map((slot) => (
-                <div key={slot.id} className="grid grid-cols-[minmax(0,1fr)_5.5rem_4.75rem] items-start gap-3 rounded-xl border border-slate-200 px-3 py-3 text-sm dark:border-slate-800">
+              {iceSlots.map((slot) => {
+                const slotRequest = slot.active_booking_request_id ? bookingRequestsById.get(slot.active_booking_request_id) : undefined;
+                const slotEvent = slot.booked_event_id ? arenaEventsById.get(slot.booked_event_id) : undefined;
+                return (
+                <div
+                  key={slot.id}
+                  className="grid gap-3 rounded-xl border border-slate-200 px-3 py-3 text-sm dark:border-slate-800 md:grid-cols-[minmax(0,1fr)_7.75rem_8.5rem] md:items-start lg:grid-cols-[minmax(0,1fr)_7.75rem_8.5rem_19rem]"
+                >
                   <div className="min-w-0">
                     <div className="truncate font-medium text-slate-900 dark:text-slate-100">
-                        {formatShortDate(slot.date)} • {formatTimeHHMM(slot.start_time) || slot.start_time}
-                        {slot.end_time ? `-${formatTimeHHMM(slot.end_time) || slot.end_time}` : ''}
+                      {formatShortDate(slot.date)} • {formatTimeHHMM(slot.start_time) || slot.start_time}
+                      {slot.end_time ? `-${formatTimeHHMM(slot.end_time) || slot.end_time}` : ''}
                     </div>
-                    <div className="mt-1 text-slate-600 dark:text-slate-400">{formatSlotStatus(slot.status)}</div>
                     {bookedSlotLabel(slot) ? (
                       <div className="mt-1 whitespace-nowrap text-slate-600 dark:text-slate-400">{bookedSlotLabel(slot)}</div>
                     ) : null}
@@ -642,96 +1140,149 @@ export default function ArenaDetailPage() {
                         Requested by {slot.active_booking_request_team_name}
                       </div>
                     ) : null}
+                    {slot.active_proposal_id && slot.status === 'held' ? (
+                      <div className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                        Reserved for proposal: {slot.active_proposal_away_team_name
+                          ? `${slot.active_proposal_home_team_name} vs ${slot.active_proposal_away_team_name}`
+                          : slot.active_proposal_home_team_name}
+                      </div>
+                    ) : null}
                   </div>
                   <Badge
+                    variant={slotStatusVariant(slot.status)}
+                    className="inline-flex h-7 items-center justify-center whitespace-nowrap md:w-[7.75rem]"
+                  >
+                    {slot.status === 'held' ? getHeldSlotLabel(slot) : formatSlotStatus(slot.status)}
+                  </Badge>
+                  <Badge
                     variant={slot.pricing_mode === 'call_for_pricing' ? 'warning' : 'outline'}
-                    className="mt-0.5 inline-flex h-7 w-[5.5rem] shrink-0 items-center justify-center self-start whitespace-nowrap"
+                    className="inline-flex h-7 items-center justify-center whitespace-nowrap md:w-[8.5rem]"
                   >
                     {formatPriceLabel(slot.pricing_mode, slot.price_amount_cents, slot.currency)}
                   </Badge>
-                  <div className="flex w-[4.75rem] items-center justify-end gap-1 self-start">
-                    {slot.booked_event_id ? (
+                  {slot.status === 'available' ? (
+                    <div className="flex items-center justify-start gap-2 md:col-span-3 lg:col-span-1 lg:justify-end">
                       <Button
                         type="button"
-                        size="icon"
-                        variant="ghost"
-                        className={tableActionButtonClass}
-                        onClick={() => navigate(`/schedule/${slot.booked_event_id}`, {
-                          state: {
-                            backTo: `/arenas/${arenaId}/rinks/${selectedRinkId}`,
-                            backLabel: 'Back to Arena',
-                          },
-                        })}
-                        aria-label="View event"
-                        title="View event"
+                        size="sm"
+                        variant="outline"
+                        className="whitespace-nowrap"
+                        onClick={() => openEditSlot(slot)}
                       >
-                        <Eye className="h-4 w-4 text-sky-600" />
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
                       </Button>
-                    ) : null}
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className={tableActionButtonClass}
-                      onClick={() => openEditSlot(slot)}
-                      aria-label="Edit ice slot"
-                      title="Edit ice slot"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className={tableActionButtonClass}
-                      onClick={() => deleteIceSlot(slot)}
-                      aria-label="Delete ice slot"
-                      title="Delete ice slot"
-                    >
-                      <Trash2 className="h-4 w-4 text-rose-600" />
-                    </Button>
-                  </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        className="whitespace-nowrap"
+                        onClick={() => deleteIceSlot(slot)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                    </div>
+                  ) : slot.active_proposal_id && slot.status === 'held' ? (
+                    <div className="flex items-center justify-start md:col-span-3 lg:col-span-1 lg:justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        className="whitespace-nowrap"
+                        onClick={() => openCancelSlot({
+                          ice_slot_id: slot.id,
+                          title: slot.active_proposal_away_team_name
+                            ? `${slot.active_proposal_home_team_name} vs ${slot.active_proposal_away_team_name}`
+                            : slot.active_proposal_home_team_name || 'Reserved proposal',
+                          arena_rink_name: slot.arena_rink_name,
+                          date: slot.date,
+                          start_time: slot.start_time,
+                          description: 'This cancels the reserved proposal slot and removes it from the live rink schedule.',
+                        })}
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                        Cancel Slot
+                      </Button>
+                    </div>
+                  ) : slot.active_booking_request_id && slot.status === 'held' ? (
+                    <div className="flex items-center justify-start md:col-span-3 lg:col-span-1 lg:justify-end">
+                      <Button type="button" size="sm" variant="ghost" className="whitespace-nowrap" onClick={() => focusSlotManagement(slot)}>
+                        Review
+                      </Button>
+                    </div>
+                  ) : slot.status === 'booked' && slot.date >= todayIso ? (
+                    <div className="flex items-center justify-start gap-2 md:col-span-3 lg:col-span-1 lg:justify-end">
+                      {slotRequest ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="whitespace-nowrap"
+                          onClick={() => openBookedSlotLockerRooms({
+                            ice_slot_id: slot.id,
+                            arena_rink_id: slot.arena_rink_id,
+                            title: bookedSlotTitleFromRequest(slotRequest),
+                            arena_rink_name: slot.arena_rink_name,
+                            date: slot.date,
+                            start_time: slot.start_time,
+                            event_type: slotRequest.event_type as Event['event_type'],
+                            away_team_id: slotRequest.away_team_id,
+                            home_locker_room_id: slotRequest.home_locker_room_id || '',
+                            away_locker_room_id: slotRequest.away_locker_room_id || '',
+                          })}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit Locker Rooms
+                        </Button>
+                      ) : slotEvent ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="whitespace-nowrap"
+                          onClick={() => openBookedSlotLockerRooms({
+                            ice_slot_id: slot.id,
+                            arena_rink_id: slot.arena_rink_id,
+                            title: bookedSlotTitleFromEvent(slotEvent),
+                            arena_rink_name: slot.arena_rink_name,
+                            date: slot.date,
+                            start_time: slot.start_time,
+                            event_type: slotEvent.event_type,
+                            away_team_id: slotEvent.away_team_id,
+                            home_locker_room_id: slotEvent.home_locker_room_id || '',
+                            away_locker_room_id: slotEvent.away_locker_room_id || '',
+                          })}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit Locker Rooms
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        className="whitespace-nowrap"
+                        onClick={() => openCancelSlot({
+                          ice_slot_id: slot.id,
+                          title: bookedSlotLabel(slot) || 'Booked slot',
+                          arena_rink_name: slot.arena_rink_name,
+                          date: slot.date,
+                          start_time: slot.start_time,
+                          description: 'This cancels the booked slot and updates the linked team booking records.',
+                        })}
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                        Cancel Slot
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="hidden lg:block" />
+                  )}
                 </div>
-              ))}
+              )})}
               {iceSlots.length === 0 ? (
                 <div className="text-sm text-slate-600 dark:text-slate-400">No ice slots configured for this rink.</div>
-              ) : null}
-            </div>
-          </Card>
-          </div>
-
-          <Card className="p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Locker Rooms</div>
-              </div>
-              <Button type="button" size="sm" onClick={() => setLockerModalOpen(true)}>
-                <Plus className="h-3.5 w-3.5" />
-                Add Locker Room
-              </Button>
-            </div>
-            <div className="mt-4 space-y-2">
-              {lockerRooms.map((lockerRoom) => (
-                <div key={lockerRoom.id} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-3 text-sm dark:border-slate-800">
-                  <div>
-                    <div className="font-medium text-slate-900 dark:text-slate-100">{lockerRoom.name}</div>
-                    {lockerRoom.notes ? <div className="text-slate-600 dark:text-slate-400">{lockerRoom.notes}</div> : null}
-                  </div>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className={tableActionButtonClass}
-                    onClick={() => deleteLockerRoom(lockerRoom)}
-                    aria-label="Delete locker room"
-                    title="Delete locker room"
-                  >
-                    <Trash2 className="h-4 w-4 text-rose-600" />
-                  </Button>
-                </div>
-              ))}
-              {lockerRooms.length === 0 ? (
-                <div className="text-sm text-slate-600 dark:text-slate-400">No locker rooms configured for this rink.</div>
               ) : null}
             </div>
           </Card>
@@ -748,14 +1299,14 @@ export default function ArenaDetailPage() {
           <SegmentedTabs
             value={requestTab}
             onChange={(nextTab) => {
-              if (nextTab === 'active' && activeRequests.length === 0) return;
+              if (nextTab === 'active' && upcomingItems.length === 0) return;
               if (nextTab === 'pending' && pendingRequests.length === 0) return;
               if (nextTab === 'history' && historyRequests.length === 0) return;
               setRequestTab(nextTab);
             }}
             items={[
               {
-                label: <span className={activeRequests.length === 0 ? 'opacity-45' : ''}>Upcoming</span>,
+                label: <span className={upcomingItems.length === 0 ? 'opacity-45' : ''}>Upcoming</span>,
                 value: 'active' as const,
               },
               {
@@ -770,99 +1321,25 @@ export default function ArenaDetailPage() {
           />
         </div>
         <div className="mt-4 space-y-3">
-          {visibleRequests.length === 0 ? (
+          {requestTab === 'active' ? (
+            upcomingItems.length === 0 ? (
+              <div className="text-sm text-slate-600 dark:text-slate-400">No upcoming bookings.</div>
+            ) : (
+              upcomingItems.map((item) => (
+                item.kind === 'request'
+                  ? renderRequestCard(item.request)
+                  : item.kind === 'event'
+                    ? renderDirectEventCard(item.event)
+                    : renderOrphanSlotCard(item.slot)
+              ))
+            )
+          ) : visibleRequests.length === 0 ? (
             <div className="text-sm text-slate-600 dark:text-slate-400">
-              {requestTab === 'active'
-                ? 'No upcoming bookings.'
-                : requestTab === 'pending'
-                  ? 'No pending booking requests.'
-                  : 'No booking request history yet.'}
+              {requestTab === 'pending' ? 'No pending booking requests.' : 'No booking request history yet.'}
             </div>
-          ) : visibleRequests.map((request) => (
-            <div key={request.id} className="rounded-xl border border-slate-200 px-4 py-4 dark:border-slate-800">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start gap-3">
-                    <div className="flex shrink-0 items-center gap-2">
-                      <TeamLogo name={request.requester_team_name || 'Team'} logoUrl={request.requester_team_logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
-                      {request.away_team_name ? (
-                        <TeamLogo name={request.away_team_name} logoUrl={request.away_team_logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
-                      ) : null}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {request.event_id ? (
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/schedule/${request.event_id}`, {
-                              state: {
-                                backTo: `/arenas/${arenaId}/rinks/${selectedRinkId}`,
-                                backLabel: 'Back to Arena',
-                              },
-                            })}
-                            className="truncate text-left text-sm font-semibold text-sky-700 underline decoration-sky-300 underline-offset-2 transition-colors hover:text-sky-800 dark:text-sky-300 dark:decoration-sky-700 dark:hover:text-sky-200"
-                            title="Open event"
-                          >
-                            {request.away_team_name ? `${request.requester_team_name} vs ${request.away_team_name}` : `${request.requester_team_name} ${getCompetitionLabel(request.event_type as any)}`}
-                          </button>
-                        ) : (
-                          <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                            {request.away_team_name ? `${request.requester_team_name} vs ${request.away_team_name}` : `${request.requester_team_name} ${getCompetitionLabel(request.event_type as any)}`}
-                          </div>
-                        )}
-                        <Badge variant={request.final_price_amount_cents != null || request.pricing_mode === 'fixed_price' ? 'outline' : 'warning'}>
-                          {formatPriceLabel(request.final_price_amount_cents != null ? 'fixed_price' : request.pricing_mode, request.final_price_amount_cents ?? request.price_amount_cents, request.final_currency || request.currency)}
-                        </Badge>
-                        <Badge variant={request.status === 'accepted' ? 'success' : request.status === 'requested' ? 'warning' : request.status === 'rejected' ? 'danger' : 'neutral'}>
-                          {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                        </Badge>
-                      </div>
-                      <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                        {[request.arena_rink_name, request.ice_slot_date ? formatShortDate(request.ice_slot_date) : null, request.ice_slot_start_time ? formatTimeHHMM(request.ice_slot_start_time) || request.ice_slot_start_time : null].filter(Boolean).join(' • ')}
-                      </div>
-                      <div className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-400">
-                        {request.home_locker_room_name || request.away_locker_room_name ? `Locker rooms: ${[request.home_locker_room_name, request.away_locker_room_name].filter(Boolean).join(' / ')}` : 'Locker rooms TBD'}
-                      </div>
-                      {request.message ? (
-                        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-                          <span className="font-semibold">Booker note:</span> {request.message}
-                        </div>
-                      ) : null}
-                      {request.response_message ? (
-                        <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-100">
-                          <span className="font-semibold">Arena note:</span> {request.response_message}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                  {request.status === 'requested' ? (
-                    <>
-                      <Button type="button" size="sm" onClick={() => setAcceptRequest(request)}>
-                        Accept
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => { setActionRequest(request); setActionMode('reject'); }}>
-                        Reject
-                      </Button>
-                    </>
-                  ) : null}
-                  {request.status === 'accepted' ? (
-                    <>
-                      {request.event_id && request.ice_slot_date && request.ice_slot_date >= todayIso ? (
-                        <Button type="button" size="sm" variant="outline" onClick={() => setEditLockerRequest(request)}>
-                          Edit Locker Rooms
-                        </Button>
-                      ) : null}
-                      <Button type="button" size="sm" variant="outline" onClick={() => { setActionRequest(request); setActionMode('cancel'); }}>
-                        Cancel Booking
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ))}
+          ) : (
+            visibleRequests.map(renderRequestCard)
+          )}
         </div>
       </Card>
       </div>
@@ -873,8 +1350,14 @@ export default function ArenaDetailPage() {
         title="Edit Arena"
         footer={(
           <>
-            <Button type="button" onClick={saveArena}>Save</Button>
-            <Button type="button" variant="outline" onClick={() => setArenaEditOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={saveArena}>
+              <Save className="h-4 w-4" />
+              Save
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setArenaEditOpen(false)}>
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
           </>
         )}
       >
@@ -901,8 +1384,14 @@ export default function ArenaDetailPage() {
         title={editRink ? 'Edit Arena Rink' : 'Add Arena Rink'}
         footer={(
           <>
-            <Button type="button" onClick={saveRink} disabled={!rinkForm.name}>Save</Button>
-            <Button type="button" variant="outline" onClick={() => setRinkModalOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={saveRink} disabled={!rinkForm.name}>
+              <Save className="h-4 w-4" />
+              Save
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setRinkModalOpen(false)}>
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
           </>
         )}
       >
@@ -913,13 +1402,86 @@ export default function ArenaDetailPage() {
       </Modal>
 
       <Modal
+        open={lockerManagerOpen}
+        onClose={() => setLockerManagerOpen(false)}
+        title="Manage Locker Rooms"
+        footer={(
+          <Button type="button" variant="outline" onClick={() => setLockerManagerOpen(false)}>
+            <Check className="h-4 w-4" />
+            Done
+          </Button>
+        )}
+      >
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/35">
+            <div>
+              <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                {selectedRink ? selectedRink.name : 'Selected rink'}
+              </div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                {lockerRooms.length === 0
+                  ? 'No locker rooms configured yet.'
+                  : `${lockerRooms.length} locker room${lockerRooms.length === 1 ? '' : 's'} configured for assignments.`}
+              </div>
+            </div>
+            <Button
+              type="button"
+              onClick={() => {
+                setLockerForm(emptyLockerForm);
+                setLockerModalOpen(true);
+              }}
+            >
+              <DoorOpen className="h-4 w-4" />
+              Add Locker Room
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            {lockerRooms.map((lockerRoom) => (
+              <div key={lockerRoom.id} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-3 text-sm dark:border-slate-800">
+                <div>
+                  <div className="font-medium text-slate-900 dark:text-slate-100">{lockerRoom.name}</div>
+                  {lockerRoom.notes ? <div className="text-slate-600 dark:text-slate-400">{lockerRoom.notes}</div> : null}
+                </div>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
+                  onClick={() => deleteLockerRoom(lockerRoom)}
+                  aria-label="Delete locker room"
+                  title="Delete locker room"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            {lockerRooms.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
+                Add locker rooms here when a rink needs assigned spaces for teams and officials.
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         open={lockerModalOpen}
-        onClose={() => setLockerModalOpen(false)}
+        onClose={() => {
+          setLockerModalOpen(false);
+          setLockerForm(emptyLockerForm);
+        }}
         title="Add Locker Room"
         footer={(
           <>
-            <Button type="button" onClick={saveLockerRoom} disabled={!lockerForm.name}>Save</Button>
-            <Button type="button" variant="outline" onClick={() => setLockerModalOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={saveLockerRoom} disabled={!lockerForm.name}>
+              <Save className="h-4 w-4" />
+              Save
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { setLockerModalOpen(false); setLockerForm(emptyLockerForm); }}>
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
           </>
         )}
       >
@@ -935,38 +1497,112 @@ export default function ArenaDetailPage() {
         title={editSlot ? 'Edit Ice Slot' : 'Add Ice Slot'}
         footer={(
           <>
-            <Button type="button" onClick={saveIceSlot} disabled={!slotForm.date || !slotForm.start_time || (slotForm.pricing_mode === 'fixed_price' && !slotForm.price)}>
+            <Button
+              type="button"
+              onClick={saveIceSlot}
+              disabled={!slotForm.date || !slotForm.start_time || !!slotTimeError || (slotForm.pricing_mode === 'fixed_price' && !slotForm.price)}
+            >
+              <Save className="h-4 w-4" />
               Save
             </Button>
-            <Button type="button" variant="outline" onClick={() => { setSlotModalOpen(false); setEditSlot(null); setSlotForm(emptySlotForm); }}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => { setSlotModalOpen(false); setEditSlot(null); setSlotForm(emptySlotForm); }}>
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
           </>
         )}
       >
         <div className="grid grid-cols-1 gap-3">
-          <Input type="date" value={slotForm.date} onChange={(event) => setSlotForm((current) => ({ ...current, date: event.target.value }))} />
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Slot Date</label>
+            <Input type="date" value={slotForm.date} onChange={(event) => setSlotForm((current) => ({ ...current, date: event.target.value }))} />
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            <Input type="time" value={slotForm.start_time} onChange={(event) => setSlotForm((current) => ({ ...current, start_time: event.target.value }))} />
-            <Input type="time" value={slotForm.end_time} onChange={(event) => setSlotForm((current) => ({ ...current, end_time: event.target.value }))} />
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Slot Starts</label>
+              <Input type="time" value={slotForm.start_time} onChange={(event) => setSlotForm((current) => ({ ...current, start_time: event.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Slot Ends</label>
+              <Input type="time" min={slotForm.start_time || undefined} value={slotForm.end_time} onChange={(event) => setSlotForm((current) => ({ ...current, end_time: event.target.value }))} />
+            </div>
           </div>
+          {slotTimeError ? (
+            <div className="text-xs font-medium text-rose-600 dark:text-rose-300">{slotTimeError}</div>
+          ) : null}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[0.9fr_1.1fr_0.7fr]">
-            <Select value={slotForm.pricing_mode} onChange={(event) => setSlotForm((current) => ({ ...current, pricing_mode: event.target.value }))}>
-              <option value="fixed_price">Fixed Price</option>
-              <option value="call_for_pricing">Call for Pricing</option>
-            </Select>
-            <Input
-              type="number"
-              min="0"
-              step="1"
-              placeholder={slotForm.pricing_mode === 'fixed_price' ? 'Price in dollars' : 'No price required'}
-              disabled={slotForm.pricing_mode !== 'fixed_price'}
-              value={slotForm.price}
-              onChange={(event) => setSlotForm((current) => ({ ...current, price: event.target.value }))}
-            />
-            <Select value={slotForm.currency} onChange={(event) => setSlotForm((current) => ({ ...current, currency: event.target.value }))}>
-              {CURRENCIES.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
-            </Select>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Pricing Mode</label>
+              <Select value={slotForm.pricing_mode} onChange={(event) => setSlotForm((current) => ({ ...current, pricing_mode: event.target.value }))}>
+                <option value="fixed_price">Fixed Price</option>
+                <option value="call_for_pricing">Call for Pricing</option>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Price</label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                placeholder={slotForm.pricing_mode === 'fixed_price' ? 'Price in dollars' : 'No price required'}
+                disabled={slotForm.pricing_mode !== 'fixed_price'}
+                value={slotForm.price}
+                onChange={(event) => setSlotForm((current) => ({ ...current, price: event.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Currency</label>
+              <Select value={slotForm.currency} onChange={(event) => setSlotForm((current) => ({ ...current, currency: event.target.value }))}>
+                {CURRENCIES.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
+              </Select>
+            </div>
           </div>
-          <Input value={slotForm.notes} onChange={(event) => setSlotForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Notes" />
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Notes</label>
+            <Input value={slotForm.notes} onChange={(event) => setSlotForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Notes" />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!cancelSlotTarget}
+        onClose={() => { setCancelSlotTarget(null); setCancelSlotForm(emptyActionForm); }}
+        title="Cancel Slot"
+        footer={(
+          <>
+            <Button type="button" variant="destructive" onClick={cancelSlot}>
+              <XCircle className="h-4 w-4" />
+              Cancel Slot
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { setCancelSlotTarget(null); setCancelSlotForm(emptyActionForm); }}>
+              <X className="h-4 w-4" />
+              Keep Slot
+            </Button>
+          </>
+        )}
+      >
+        <div className="grid grid-cols-1 gap-3">
+          <div className="rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
+            {cancelSlotTarget ? (
+              <>
+                <div className="font-medium text-slate-900 dark:text-slate-100">
+                  {cancelSlotTarget.date ? formatShortDate(cancelSlotTarget.date) : 'Date TBD'} • {formatTimeHHMM(cancelSlotTarget.start_time) || cancelSlotTarget.start_time || 'Time TBD'}
+                </div>
+                <div className="mt-1">
+                  {[cancelSlotTarget.arena_rink_name, cancelSlotTarget.title].filter(Boolean).join(' • ')}
+                </div>
+              </>
+            ) : null}
+          </div>
+          <div className="text-sm text-slate-600 dark:text-slate-400">
+            {cancelSlotTarget?.description}
+          </div>
+          <Textarea
+            value={cancelSlotForm.response_message}
+            onChange={(event) => setCancelSlotForm({ response_message: event.target.value })}
+            placeholder="Arena note to both teams"
+            rows={3}
+          />
         </div>
       </Modal>
 
@@ -976,8 +1612,14 @@ export default function ArenaDetailPage() {
         title="Accept Booking Request"
         footer={(
           <>
-            <Button type="button" onClick={acceptBookingRequest}>Accept Request</Button>
-            <Button type="button" variant="outline" onClick={() => setAcceptRequest(null)}>Cancel</Button>
+            <Button type="button" onClick={acceptBookingRequest}>
+              <Check className="h-4 w-4" />
+              Accept Request
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setAcceptRequest(null)}>
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
           </>
         )}
       >
@@ -1019,22 +1661,38 @@ export default function ArenaDetailPage() {
       </Modal>
 
       <Modal
-        open={!!editLockerRequest}
-        onClose={() => setEditLockerRequest(null)}
+        open={!!bookedSlotTarget}
+        onClose={() => setBookedSlotTarget(null)}
         title="Edit Locker Rooms"
         footer={(
           <>
-            <Button type="button" onClick={saveEditedLockerRooms}>Save</Button>
-            <Button type="button" variant="outline" onClick={() => setEditLockerRequest(null)}>Cancel</Button>
+            <Button type="button" onClick={saveEditedLockerRooms}>
+              <Save className="h-4 w-4" />
+              Save
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setBookedSlotTarget(null)}>
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
           </>
         )}
       >
         <div className="grid grid-cols-1 gap-3">
+          <div className="rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
+            {bookedSlotTarget ? (
+              <>
+                <div className="font-medium text-slate-900 dark:text-slate-100">{bookedSlotTarget.title}</div>
+                <div className="mt-1">
+                  {[bookedSlotTarget.arena_rink_name, bookedSlotTarget.date ? formatShortDate(bookedSlotTarget.date) : null, bookedSlotTarget.start_time ? formatTimeHHMM(bookedSlotTarget.start_time) || bookedSlotTarget.start_time : null].filter(Boolean).join(' • ')}
+                </div>
+              </>
+            ) : null}
+          </div>
           <Select value={lockerAssignForm.home_locker_room_id} onChange={(event) => setLockerAssignForm((current) => ({ ...current, home_locker_room_id: event.target.value }))}>
             <option value="">Home locker room</option>
             {editLockerRooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
           </Select>
-          {editLockerRequest?.away_team_id ? (
+          {bookedSlotTarget?.away_team_id ? (
             <Select value={lockerAssignForm.away_locker_room_id} onChange={(event) => setLockerAssignForm((current) => ({ ...current, away_locker_room_id: event.target.value }))}>
               <option value="">Away locker room</option>
               {editLockerRooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
@@ -1052,25 +1710,23 @@ export default function ArenaDetailPage() {
       <Modal
         open={!!actionRequest && !!actionMode}
         onClose={() => { setActionRequest(null); setActionMode(null); setActionForm(emptyActionForm); }}
-        title={actionMode === 'reject' ? 'Reject Booking Request' : 'Cancel Booking'}
+        title="Reject Booking Request"
         footer={(
           <>
             <Button
               type="button"
-              variant={actionMode === 'reject' ? 'outline' : 'destructive'}
+              variant="destructive"
               onClick={() => {
                 if (!actionRequest || !actionMode) return;
-                if (actionMode === 'reject') {
-                  void rejectBookingRequest(actionRequest);
-                } else {
-                  void cancelBookingRequest(actionRequest);
-                }
+                void rejectBookingRequest(actionRequest);
               }}
             >
-              {actionMode === 'reject' ? 'Reject Request' : 'Cancel Booking'}
+              <XCircle className="h-4 w-4" />
+              Reject Request
             </Button>
             <Button type="button" variant="outline" onClick={() => { setActionRequest(null); setActionMode(null); setActionForm(emptyActionForm); }}>
-              Close
+              <X className="h-4 w-4" />
+              Cancel
             </Button>
           </>
         )}
@@ -1091,7 +1747,7 @@ export default function ArenaDetailPage() {
           <Textarea
             value={actionForm.response_message}
             onChange={(event) => setActionForm({ response_message: event.target.value })}
-            placeholder={actionMode === 'reject' ? 'Note to requester' : 'Cancellation note to requester'}
+            placeholder="Note to requester"
             rows={3}
           />
         </div>

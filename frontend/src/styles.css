@@ -86,6 +86,21 @@ html.dark {
     background: linear-gradient(to bottom, var(--app-bg-base-start), var(--app-bg-base-mid) 50%, var(--app-bg-base-end));
   }
 
+  a[href],
+  area[href],
+  button:not(:disabled),
+  summary,
+  [role='button']:not([aria-disabled='true']),
+  [role='link']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role='button'][aria-disabled='true'],
+  [role='link'][aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+
   html.dark body {
     color: var(--color-slate-100);
     background: linear-gradient(to bottom, var(--app-bg-base-start), var(--app-bg-base-mid) 45%, var(--app-bg-base-end));

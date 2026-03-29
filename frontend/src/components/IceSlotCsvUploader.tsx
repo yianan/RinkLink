@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Loader2, UploadCloud } from 'lucide-react';
+import { Check, Loader2, UploadCloud, X } from 'lucide-react';
 import { api } from '../api/client';
 import { IceSlotUploadPreview } from '../types';
 import { cn } from '../lib/cn';
@@ -11,6 +11,16 @@ import { Card } from './ui/Card';
 interface Props {
   arenaRinkId: string;
   onConfirmed: () => void;
+}
+
+function formatPriceLabel(pricingMode: string, priceAmountCents: number | null, currency = 'USD') {
+  if (pricingMode === 'call_for_pricing') return 'Call for pricing';
+  if (priceAmountCents == null) return 'Pricing TBD';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency || 'USD',
+    maximumFractionDigits: 0,
+  }).format(priceAmountCents / 100);
 }
 
 export default function IceSlotCsvUploader({ arenaRinkId, onConfirmed }: Props) {
@@ -80,10 +90,11 @@ export default function IceSlotCsvUploader({ arenaRinkId, onConfirmed }: Props) 
                 <UploadCloud className="h-6 w-6" />
               </div>
               <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Drag & drop a CSV file here</div>
-              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Expected columns: Date, Start Time, End Time, Notes</div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Expected columns: Date, Start Time, End Time, optional Pricing Mode, Price, Currency, Notes</div>
 
               <div className="mt-5 flex items-center justify-center">
               <Button type="button" variant="outline" onClick={() => document.getElementById('ice-slot-csv-input')?.click()}>
+                  <UploadCloud className="h-4 w-4" />
                   Browse Files
                 </Button>
                 <input
@@ -125,6 +136,7 @@ export default function IceSlotCsvUploader({ arenaRinkId, onConfirmed }: Props) 
                   <th className="px-3 py-3 sm:px-4">Date</th>
                   <th className="hidden px-3 py-3 sm:table-cell sm:px-4">Start</th>
                   <th className="hidden px-3 py-3 sm:table-cell sm:px-4">End</th>
+                  <th className="hidden px-3 py-3 lg:table-cell lg:px-4">Pricing</th>
                   <th className="hidden px-3 py-3 md:table-cell md:px-4">Notes</th>
                 </tr>
               </thead>
@@ -140,14 +152,19 @@ export default function IceSlotCsvUploader({ arenaRinkId, onConfirmed }: Props) 
                         <div className="mt-0.5 break-words whitespace-normal text-xs font-normal text-slate-500 sm:hidden dark:text-slate-400">
                           {startTime}
                           {endTime ? `–${endTime}` : ''}
+                          {` • ${formatPriceLabel(e.pricing_mode, e.price_amount_cents, e.currency)}`}
                           {e.notes ? ` • ${e.notes}` : ''}
                         </div>
-                        <div className="mt-0.5 hidden break-words whitespace-normal text-xs font-normal text-slate-500 sm:block md:hidden dark:text-slate-400">
-                          {e.notes || '-'}
+                        <div className="mt-0.5 hidden break-words whitespace-normal text-xs font-normal text-slate-500 sm:block lg:hidden dark:text-slate-400">
+                          {formatPriceLabel(e.pricing_mode, e.price_amount_cents, e.currency)}
+                          {e.notes ? ` • ${e.notes}` : ''}
                         </div>
                       </td>
                       <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4 dark:text-slate-300">{startTime}</td>
                       <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap sm:table-cell sm:px-4 dark:text-slate-300">{endTime || '-'}</td>
+                      <td className="hidden px-3 py-3 text-slate-700 whitespace-nowrap lg:table-cell lg:px-4 dark:text-slate-300">
+                        {formatPriceLabel(e.pricing_mode, e.price_amount_cents, e.currency)}
+                      </td>
                       <td className="hidden px-3 py-3 text-slate-700 break-words whitespace-normal md:table-cell md:px-4 dark:text-slate-300">
                         {e.notes || '-'}
                       </td>
@@ -166,10 +183,14 @@ export default function IceSlotCsvUploader({ arenaRinkId, onConfirmed }: Props) 
                   Working…
                 </>
               ) : (
-                `Confirm & Add ${preview.entries.length} Slot(s)`
+                <>
+                  <Check className="h-4 w-4" />
+                  Confirm & Add {preview.entries.length} Slot(s)
+                </>
               )}
             </Button>
             <Button type="button" variant="outline" onClick={() => setPreview(null)}>
+              <X className="h-4 w-4" />
               Cancel
             </Button>
           </div>

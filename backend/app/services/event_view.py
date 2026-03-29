@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from ..models import Arena, ArenaRink, Association, Event, LockerRoom, Team
+from ..models import Arena, ArenaRink, Association, Event, IceBookingRequest, LockerRoom, Team
 from ..schemas import EventOut
 from .arena_logos import arena_logo_url
 from .team_logos import effective_team_logo_url
@@ -23,6 +23,7 @@ def enrich_event(event: Event, db: Session) -> EventOut:
     arena_rink = db.get(ArenaRink, event.arena_rink_id)
     home_locker = db.get(LockerRoom, event.home_locker_room_id) if event.home_locker_room_id else None
     away_locker = db.get(LockerRoom, event.away_locker_room_id) if event.away_locker_room_id else None
+    booking_request = db.query(IceBookingRequest).filter(IceBookingRequest.event_id == event.id).first()
 
     out = EventOut.model_validate(event)
     out.home_team_name = home.name if home else None
@@ -37,6 +38,14 @@ def enrich_event(event: Event, db: Session) -> EventOut:
     out.home_locker_room_name = home_locker.name if home_locker else None
     out.away_locker_room_name = away_locker.name if away_locker else None
     out.location_label = _location_label(arena, arena_rink)
+    if event.proposal:
+        out.response_message = event.proposal.response_message
+        out.response_source = event.proposal.response_source
+        out.responded_at = event.proposal.responded_at
+    elif booking_request:
+        out.response_message = booking_request.response_message
+        out.response_source = "arena" if booking_request.response_message else None
+        out.responded_at = booking_request.responded_at
 
     if event.competition_division:
         out.competition_division_id = event.competition_division.id

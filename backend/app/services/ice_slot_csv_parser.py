@@ -13,6 +13,12 @@ HEADER_MAP = {
     "time": "start_time",
     "end time": "end_time",
     "end": "end_time",
+    "pricing mode": "pricing_mode",
+    "pricing": "pricing_mode",
+    "price": "price",
+    "slot price": "price",
+    "amount": "price",
+    "currency": "currency",
     "notes": "notes",
     "note": "notes",
     "comments": "notes",
@@ -49,6 +55,24 @@ def _parse_time(val: str) -> time | None:
     return None
 
 
+def _parse_price_cents(val: str) -> int | None:
+    cleaned = val.strip().replace("$", "").replace(",", "")
+    if not cleaned:
+        return None
+    return round(float(cleaned) * 100)
+
+
+def _parse_pricing_mode(raw_mode: str, raw_price: str) -> str:
+    mode = raw_mode.strip().lower().replace("-", "_").replace(" ", "_")
+    if mode in {"", "default"}:
+        return "fixed_price" if raw_price.strip() else "call_for_pricing"
+    if mode in {"fixed", "fixed_price", "price", "priced"}:
+        return "fixed_price"
+    if mode in {"call", "call_for_price", "call_for_pricing", "tbd", "pricing_tbd"}:
+        return "call_for_pricing"
+    raise ValueError(f"Unrecognized pricing mode: {raw_mode}")
+
+
 def parse_ice_slot_csv(content: str) -> IceSlotUploadPreview:
     """Parse CSV content into ice slot upload previews."""
     warnings: list[str] = []
@@ -80,10 +104,25 @@ def parse_ice_slot_csv(content: str) -> IceSlotUploadPreview:
             if st is None:
                 raise ValueError("Start time is required")
             et = _parse_time(mapped.get("end_time", ""))
+            pricing_mode = _parse_pricing_mode(mapped.get("pricing_mode", ""), mapped.get("price", ""))
+            price_amount_cents = _parse_price_cents(mapped.get("price", ""))
+            if pricing_mode == "fixed_price" and price_amount_cents is None:
+                raise ValueError("Price is required when pricing mode is fixed_price")
+            if pricing_mode == "call_for_pricing":
+                price_amount_cents = None
+            currency = (mapped.get("currency") or "USD").strip().upper() or "USD"
+            if len(currency) != 3 or not currency.isalpha():
+                raise ValueError(f"Invalid currency code: {currency}")
             notes = mapped.get("notes") or None
 
             entries.append(IceSlotUploadRow(
-                date=d, start_time=st, end_time=et, notes=notes,
+                date=d,
+                start_time=st,
+                end_time=et,
+                pricing_mode=pricing_mode,
+                price_amount_cents=price_amount_cents,
+                currency=currency,
+                notes=notes,
             ))
         except (ValueError, KeyError) as e:
             warnings.append(f"Row {i}: {e}")

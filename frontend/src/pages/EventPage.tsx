@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, MapPin, Navigation, Plus, Save, ShieldCheck, Trash2, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, MapPin, Navigation, Pencil, Plus, Save, ShieldCheck, Trash2, UtensilsCrossed, X, XCircle } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import {
@@ -30,6 +30,7 @@ import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
 import { formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
+import { accentSelectorPillActiveClass, chromeIconButtonClass, destructiveIconButtonClass, selectorPillClass, selectorPillIdleClass, tableActionButtonClass } from '../lib/uiClasses';
 
 const PENALTY_OPTIONS = [
   'Tripping',
@@ -302,7 +303,7 @@ export default function EventPage() {
     return (
       <div className="space-y-4">
         <Alert variant="error">{error}</Alert>
-        <Button type="button" variant="outline" onClick={handleBack}>
+        <Button type="button" variant="ghost" onClick={handleBack}>
           {backLabel}
         </Button>
       </div>
@@ -313,7 +314,7 @@ export default function EventPage() {
     return (
       <div className="space-y-4">
         <Alert variant="error">Event not found.</Alert>
-        <Button type="button" variant="outline" onClick={handleBack}>
+        <Button type="button" variant="ghost" onClick={handleBack}>
           {backLabel}
         </Button>
       </div>
@@ -321,7 +322,7 @@ export default function EventPage() {
   }
 
   const canScore = !!event.away_team_id && event.status !== 'cancelled' && event.date <= todayStr;
-  const canConfirm = !!activeTeam && !!teamRole && !!event.away_team_id && event.status !== 'cancelled';
+  const canConfirm = !!activeTeam && !!teamRole && !!event.away_team_id && event.status !== 'cancelled' && event.status !== 'final';
   const canEditAttendance = !!activeTeam && !!teamRole && event.status !== 'cancelled' && event.date >= todayStr;
   const canEditLockerRooms = event.status !== 'cancelled' && !eventHasStarted(event.date, event.start_time, todayStr);
   const alreadyConfirmed = teamRole === 'home' ? event.home_weekly_confirmed : event.away_weekly_confirmed;
@@ -425,7 +426,7 @@ export default function EventPage() {
     const updated = await api.confirmEvent(event.id, activeTeam.id, confirmed);
     setEvent(updated);
     setScoresheet((current) => (current ? { ...current, event: updated } : current));
-    pushToast({ variant: 'success', title: confirmed ? 'Event confirmed' : 'Confirmation removed' });
+    pushToast({ variant: 'success', title: confirmed ? 'Game confirmed' : 'Confirmation removed' });
   };
 
   const cancelEvent = async () => {
@@ -566,17 +567,19 @@ export default function EventPage() {
         subtitle={`${formatShortDate(event.date)}${event.start_time ? ` • ${formatTimeHHMM(event.start_time) || event.start_time}` : ''}`}
         actions={(
           <>
-            <Button type="button" variant="outline" onClick={handleBack}>
+            <Button type="button" variant="ghost" onClick={handleBack}>
               <ArrowLeft className="h-4 w-4" />
               {backLabel}
             </Button>
             {canConfirm ? (
               <Button type="button" variant="outline" onClick={() => toggleConfirm(!alreadyConfirmed)}>
-                {alreadyConfirmed ? 'Remove Confirmation' : 'Weekly Confirm'}
+                {alreadyConfirmed ? <X className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                {alreadyConfirmed ? 'Rescind Confirmation' : 'Confirm Game'}
               </Button>
             ) : null}
             {event.status !== 'cancelled' ? (
-              <Button type="button" variant="outline" onClick={cancelEvent}>
+              <Button type="button" variant="destructive" onClick={cancelEvent}>
+                <XCircle className="h-4 w-4" />
                 Cancel Event
               </Button>
             ) : null}
@@ -606,11 +609,22 @@ export default function EventPage() {
               {isThisWeek ? <span className="ml-2 text-xs font-medium text-cyan-700 dark:text-cyan-300">This week</span> : null}
             </div>
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              {event.away_team_id ? <Badge variant={event.home_weekly_confirmed ? 'success' : 'outline'}>{event.home_team_name} confirmed</Badge> : null}
-              {event.away_team_id ? <Badge variant={event.away_weekly_confirmed ? 'success' : 'outline'}>{event.away_team_name} confirmed</Badge> : null}
-              {!event.away_team_id || (!event.home_weekly_confirmed || !event.away_weekly_confirmed) ? (
+              {event.away_team_id ? (
+                <>
+                  <Badge variant={event.home_weekly_confirmed ? 'success' : 'outline'}>
+                    {event.home_weekly_confirmed
+                      ? `${event.home_team_name} confirmed`
+                      : `${event.home_team_name} awaiting confirmation`}
+                  </Badge>
+                  <Badge variant={event.away_weekly_confirmed ? 'success' : 'outline'}>
+                    {event.away_weekly_confirmed
+                      ? `${event.away_team_name} confirmed`
+                      : `${event.away_team_name} awaiting confirmation`}
+                  </Badge>
+                </>
+              ) : (
                 <Badge variant="outline">{getGameStatusLabel(event)}</Badge>
-              ) : null}
+              )}
             </div>
             {rinkLabel ? (
               <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
@@ -622,29 +636,33 @@ export default function EventPage() {
 
           {directionsUrl ? (
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="outline" size="icon" onClick={() => window.open(directionsUrl, '_blank', 'noopener,noreferrer')} aria-label="Open directions" title="Directions">
+              <Button type="button" variant="ghost" size="icon" className={chromeIconButtonClass} onClick={() => window.open(directionsUrl, '_blank', 'noopener,noreferrer')} aria-label="Open directions" title="Directions">
                 <Navigation className="h-4 w-4" />
               </Button>
               {restaurantsUrl ? (
-                <Button type="button" variant="outline" size="icon" onClick={() => window.open(restaurantsUrl, '_blank', 'noopener,noreferrer')} aria-label="Open restaurants nearby" title="Restaurants Nearby">
+                <Button type="button" variant="ghost" size="icon" className={chromeIconButtonClass} onClick={() => window.open(restaurantsUrl, '_blank', 'noopener,noreferrer')} aria-label="Open restaurants nearby" title="Restaurants Nearby">
                   <UtensilsCrossed className="h-4 w-4" />
                 </Button>
               ) : null}
               {thingsUrl ? (
-                <Button type="button" variant="outline" size="icon" onClick={() => window.open(thingsUrl, '_blank', 'noopener,noreferrer')} aria-label="Open things to do nearby" title="Things To Do Nearby">
+                <Button type="button" variant="ghost" size="icon" className={chromeIconButtonClass} onClick={() => window.open(thingsUrl, '_blank', 'noopener,noreferrer')} aria-label="Open things to do nearby" title="Things To Do Nearby">
                   <MapPin className="h-4 w-4" />
                 </Button>
               ) : null}
             </div>
           ) : null}
         </div>
+        {event.response_message && event.response_source === 'arena' ? (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/85 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/35 dark:text-amber-100">
+            <div className="font-semibold">Arena note</div>
+            <div className="mt-1 whitespace-pre-line">{event.response_message}</div>
+          </div>
+        ) : null}
       </Card>
 
       <div className="flex flex-wrap gap-2">
         <Badge variant={getCompetitionBadgeVariant(event.event_type)}>{getCompetitionLabel(event.event_type)}</Badge>
-        {!event.away_team_id || (!event.home_weekly_confirmed || !event.away_weekly_confirmed) ? (
-          <Badge variant={getGameStatusVariant(event)}>{getGameStatusLabel(event)}</Badge>
-        ) : null}
+        <Badge variant={getGameStatusVariant(event)}>{getGameStatusLabel(event)}</Badge>
         {event.competition_short_name ? (
           <Badge variant="outline">{event.competition_short_name}{event.division_name ? ` • ${event.division_name}` : ''}</Badge>
         ) : null}
@@ -673,6 +691,7 @@ export default function EventPage() {
                   setLockerRoomModalOpen(true);
                 }}
               >
+                <Pencil className="h-4 w-4" />
                 Edit Locker Rooms
               </Button>
             ) : null}
@@ -748,8 +767,14 @@ export default function EventPage() {
         title="Edit Locker Rooms"
         footer={(
           <>
-            <Button type="button" onClick={saveLockerRooms}>Save</Button>
-            <Button type="button" variant="outline" onClick={() => setLockerRoomModalOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={saveLockerRooms}>
+              <Save className="h-4 w-4" />
+              Save
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setLockerRoomModalOpen(false)}>
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
           </>
         )}
       >
@@ -809,10 +834,10 @@ export default function EventPage() {
                 key={status}
                 type="button"
                 onClick={() => setAttendanceFilter(status)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                className={`${selectorPillClass} px-3 py-1 text-xs ${
                   attendanceFilter === status
-                    ? 'border-cyan-300 bg-cyan-100 text-cyan-900 dark:border-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-100'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/25 dark:text-slate-300 dark:hover:bg-slate-900/45'
+                    ? accentSelectorPillActiveClass
+                    : selectorPillIdleClass
                 }`}
               >
                 {status === 'all' ? 'All' : attendanceStatusLabel(status)}
@@ -1122,8 +1147,8 @@ export default function EventPage() {
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{penalty.minutes}</td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end">
-                          <Button type="button" variant="ghost" size="icon" onClick={() => deletePenalty(penalty)} aria-label="Delete penalty">
-                            <Trash2 className="h-4 w-4 text-rose-600" />
+                          <Button type="button" variant="ghost" size="icon" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`} onClick={() => deletePenalty(penalty)} aria-label="Delete penalty">
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>
@@ -1287,6 +1312,7 @@ export default function EventPage() {
           <Card className="max-w-lg border-cyan-200/70 bg-white/95 p-3 shadow-xl backdrop-blur dark:border-cyan-900/40 dark:bg-slate-950/92" role="status" aria-live="polite">
             <div className="flex flex-wrap items-center justify-end gap-3">
               <Button type="button" onClick={handleSaveAll} aria-label="Save all event changes" disabled={!hasUnsavedChanges}>
+                <Save className="h-4 w-4" />
                 Save All Changes
               </Button>
             </div>

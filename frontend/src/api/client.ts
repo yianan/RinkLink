@@ -169,8 +169,14 @@ export const api = {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').Event[]>(`/teams/${teamId}/events${qs}`);
   },
-  createEvent: (teamId: string, data: Partial<import('../types').Event>) =>
-    request<import('../types').Event>(`/teams/${teamId}/events`, { method: 'POST', body: JSON.stringify(data) }),
+  getArenaEvents: (arenaId: string, params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return request<import('../types').Event[]>(`/arenas/${arenaId}/events${qs}`);
+  },
+  getArenaIceSlots: (arenaId: string, params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return request<import('../types').IceSlot[]>(`/arenas/${arenaId}/ice-slots${qs}`);
+  },
   getEvent: (id: string) => request<import('../types').Event>(`/events/${id}`),
   getEventAttendance: (teamId: string, eventId: string) =>
     request<import('../types').EventAttendancePlayer[]>(`/teams/${teamId}/events/${eventId}/attendance`),
@@ -272,6 +278,20 @@ export const api = {
   updateIceSlot: (id: string, data: Partial<import('../types').IceSlot>) =>
     request<import('../types').IceSlot>(`/ice-slots/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteIceSlot: (id: string) => request<void>(`/ice-slots/${id}`, { method: 'DELETE' }),
+  cancelArenaIceSlot: (arenaId: string, id: string, responseMessage?: string) =>
+    request<void>(`/arenas/${arenaId}/ice-slots/${id}/cancel`, {
+      method: 'PATCH',
+      body: JSON.stringify({ response_message: responseMessage || null }),
+    }),
+  updateArenaIceSlotLockerRooms: (
+    arenaId: string,
+    id: string,
+    data: {
+      home_locker_room_id?: string | null;
+      away_locker_room_id?: string | null;
+      response_message?: string | null;
+    },
+  ) => request<void>(`/arenas/${arenaId}/ice-slots/${id}/locker-rooms`, { method: 'PATCH', body: JSON.stringify(data) }),
   getArenaVenueAssignments: (arenaId: string, params?: Record<string, string>) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').TeamSeasonVenueAssignment[]>(`/arenas/${arenaId}/venue-assignments${qs}`);

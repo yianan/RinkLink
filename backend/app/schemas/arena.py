@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import datetime as dt
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
+
+
+def _validate_time_range(start_time: dt.time | None, end_time: dt.time | None) -> None:
+    if start_time is not None and end_time is not None and end_time < start_time:
+        raise ValueError("End time must be the same as or later than start time")
 
 
 class ArenaCreate(BaseModel):
@@ -118,6 +123,11 @@ class IceSlotCreate(BaseModel):
     currency: str = "USD"
     notes: str | None = None
 
+    @model_validator(mode="after")
+    def validate_time_range(self):
+        _validate_time_range(self.start_time, self.end_time)
+        return self
+
 
 class IceSlotUpdate(BaseModel):
     date: dt.date | None = None
@@ -128,6 +138,16 @@ class IceSlotUpdate(BaseModel):
     price_amount_cents: int | None = None
     currency: str | None = None
     notes: str | None = None
+
+    @model_validator(mode="after")
+    def validate_time_range(self):
+        if self.start_time is not None and self.end_time is not None:
+            _validate_time_range(self.start_time, self.end_time)
+        return self
+
+
+class IceSlotCancel(BaseModel):
+    response_message: str | None = None
 
 
 class IceSlotOut(BaseModel):
@@ -150,6 +170,10 @@ class IceSlotOut(BaseModel):
     active_booking_request_status: str | None = None
     active_booking_request_team_name: str | None = None
     active_booking_request_event_type: str | None = None
+    active_proposal_id: str | None = None
+    active_proposal_status: str | None = None
+    active_proposal_home_team_name: str | None = None
+    active_proposal_away_team_name: str | None = None
     notes: str | None
     arena_id: str | None = None
     arena_name: str | None = None
@@ -164,7 +188,15 @@ class IceSlotUploadRow(BaseModel):
     date: dt.date
     start_time: dt.time
     end_time: dt.time | None = None
+    pricing_mode: str = "call_for_pricing"
+    price_amount_cents: int | None = None
+    currency: str = "USD"
     notes: str | None = None
+
+    @model_validator(mode="after")
+    def validate_time_range(self):
+        _validate_time_range(self.start_time, self.end_time)
+        return self
 
 
 class IceSlotUploadPreview(BaseModel):

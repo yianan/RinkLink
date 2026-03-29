@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { UploadCloud } from 'lucide-react';
+import { Check, UploadCloud, X } from 'lucide-react';
 import { api } from '../api/client';
 import { AvailabilityUploadPreview, AvailabilityUploadRow } from '../types';
 import { cn } from '../lib/cn';
@@ -76,6 +76,7 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
 
           <div className="mt-5 flex items-center justify-center gap-2">
             <Button type="button" variant="primary" disabled={loading} onClick={() => document.getElementById('schedule-csv-input')?.click()}>
+              <UploadCloud className="h-4 w-4" />
               Choose File
             </Button>
             <input
@@ -145,9 +146,11 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
 
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="primary" onClick={handleConfirm} disabled={loading}>
+              <Check className="h-4 w-4" />
               Confirm Upload
             </Button>
             <Button type="button" variant="outline" onClick={() => setPreview(null)} disabled={loading}>
+              <X className="h-4 w-4" />
               Cancel
             </Button>
           </div>

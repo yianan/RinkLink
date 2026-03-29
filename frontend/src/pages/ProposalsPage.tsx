@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDownLeft, ArrowUpRight, CalendarClock, Check, Search, X, XCircle } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Calendar, CalendarClock, Check, SendHorizontal, X, XCircle } from 'lucide-react';
 import { api } from '../api/client';
 import { Arena, ArenaRink, IceSlot, Proposal } from '../types';
 import { useSeason } from '../context/SeasonContext';
@@ -18,7 +18,6 @@ import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competit
 import { formatShortDate, formatTimeHHMM } from '../lib/time';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
-import { tableActionButtonClass } from '../lib/uiClasses';
 import { useNavBadgeRefresh } from '../context/NavBadgeContext';
 import TeamLogo from '../components/TeamLogo';
 
@@ -84,9 +83,15 @@ export default function ProposalsPage() {
       ...(activeTab.status ? { status: activeTab.status } : {}),
     };
     api.getProposals(activeTeam.id, params).then((data) => {
-      const filtered = data.filter((proposal) =>
-        !effectiveSeason || (proposal.proposed_date >= effectiveSeason.start_date && proposal.proposed_date <= effectiveSeason.end_date),
-      );
+      const filtered = data.filter((proposal) => {
+        if (effectiveSeason && (proposal.proposed_date < effectiveSeason.start_date || proposal.proposed_date > effectiveSeason.end_date)) {
+          return false;
+        }
+        if (tab === 'history') {
+          return proposal.status === 'declined' || proposal.status === 'cancelled';
+        }
+        return true;
+      });
       setProposals(filtered);
     });
   };
@@ -177,12 +182,17 @@ export default function ProposalsPage() {
     load();
   };
 
-  const sortedProposals = useMemo(
-    () => proposals.slice().sort((left, right) =>
+  const sortedProposals = useMemo(() => {
+    const next = proposals.slice();
+    if (tab === 'history') {
+      return next.sort((left, right) =>
+        `${right.responded_at || right.updated_at}`.localeCompare(`${left.responded_at || left.updated_at}`),
+      );
+    }
+    return next.sort((left, right) =>
       `${left.proposed_date}${left.proposed_start_time || ''}`.localeCompare(`${right.proposed_date}${right.proposed_start_time || ''}`),
-    ),
-    [proposals],
-  );
+    );
+  }, [proposals, tab]);
 
   return (
     <div className="space-y-4">
@@ -254,85 +264,53 @@ export default function ProposalsPage() {
                         {proposal.message}
                       </div>
                     ) : null}
+                    {proposal.response_message ? (
+                      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/35 dark:text-amber-100">
+                        <span className="font-semibold">
+                          {proposal.response_source === 'arena' ? 'Arena note:' : 'Update:'}
+                        </span>{' '}
+                        {proposal.response_message}
+                      </div>
+                    ) : null}
                     <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                      Created {formatShortDate(proposal.created_at)}
+                      {proposal.responded_at && (proposal.status === 'declined' || proposal.status === 'cancelled')
+                        ? `Updated ${formatShortDate(proposal.responded_at)}`
+                        : `Created ${formatShortDate(proposal.created_at)}`}
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 items-start gap-1">
+                  <div className="flex shrink-0 flex-wrap items-start gap-2 lg:justify-end">
                     {canRespond ? (
                       <>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className={tableActionButtonClass}
-                          onClick={() => acceptProposal(proposal.id)}
-                          aria-label="Accept proposal"
-                          title="Accept proposal"
-                        >
-                          <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+                        <Button type="button" size="sm" onClick={() => acceptProposal(proposal.id)}>
+                          <Check className="h-4 w-4" />
+                          Accept
                         </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className={tableActionButtonClass}
-                          onClick={() => declineProposal(proposal.id)}
-                          aria-label="Decline proposal"
-                          title="Decline proposal"
-                        >
-                          <X className="h-4 w-4 text-rose-600 dark:text-rose-300" />
+                        <Button type="button" size="sm" variant="destructive" onClick={() => declineProposal(proposal.id)}>
+                          <XCircle className="h-4 w-4" />
+                          Decline
                         </Button>
                       </>
                     ) : null}
                     {canCancel ? (
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className={tableActionButtonClass}
-                        onClick={() => cancelProposal(proposal)}
-                        aria-label="Cancel proposal"
-                        title="Cancel proposal"
-                      >
-                        <XCircle className="h-4 w-4 text-rose-600 dark:text-rose-300" />
+                      <Button type="button" size="sm" variant="destructive" onClick={() => cancelProposal(proposal)}>
+                        <XCircle className="h-4 w-4" />
+                        Cancel Proposal
                       </Button>
                     ) : null}
                     {canReschedule ? (
                       <>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className={tableActionButtonClass}
-                          onClick={() => openReschedule(proposal)}
-                          aria-label="Request reschedule"
-                          title="Request reschedule"
-                        >
+                        <Button type="button" size="sm" variant="outline" onClick={() => openReschedule(proposal)}>
                           <CalendarClock className="h-4 w-4" />
+                          Request Reschedule
                         </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className={tableActionButtonClass}
-                          onClick={() => navigate('/schedule')}
-                          aria-label="View schedule"
-                          title="View schedule"
-                        >
-                          <Search className="h-4 w-4" />
+                        <Button type="button" size="sm" variant="ghost" onClick={() => navigate('/schedule')}>
+                          <Calendar className="h-4 w-4" />
+                          Open Schedule
                         </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className={tableActionButtonClass}
-                          onClick={() => cancelProposal(proposal)}
-                          aria-label="Cancel accepted proposal"
-                          title="Cancel accepted proposal"
-                        >
-                          <XCircle className="h-4 w-4 text-rose-600 dark:text-rose-300" />
+                        <Button type="button" size="sm" variant="destructive" onClick={() => cancelProposal(proposal)}>
+                          <XCircle className="h-4 w-4" />
+                          Cancel Proposal
                         </Button>
                       </>
                     ) : null}
@@ -357,9 +335,11 @@ export default function ProposalsPage() {
         footer={(
           <>
             <Button type="button" onClick={submitReschedule} disabled={!rescheduleForm.proposed_date || !rescheduleForm.arena_id || !rescheduleForm.arena_rink_id}>
+              <SendHorizontal className="h-4 w-4" />
               Send Request
             </Button>
             <Button type="button" variant="outline" onClick={() => setRescheduleProposal(null)}>
+              <X className="h-4 w-4" />
               Cancel
             </Button>
           </>

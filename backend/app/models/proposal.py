@@ -29,6 +29,8 @@ class Proposal(Base):
     home_locker_room_id: Mapped[str | None] = mapped_column(ForeignKey("locker_rooms.id"), nullable=True)
     away_locker_room_id: Mapped[str | None] = mapped_column(ForeignKey("locker_rooms.id"), nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    response_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    response_source: Mapped[str | None] = mapped_column(String(20), nullable=True)
     responded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(

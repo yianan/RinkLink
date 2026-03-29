@@ -1,6 +1,7 @@
 import { ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/cn';
+import { subtleLinkClass } from '../lib/uiClasses';
 
 type BreadcrumbItem = {
   label: string;
@@ -23,7 +24,7 @@ export default function Breadcrumbs({
             {item.to && !isLast ? (
               <Link
                 to={item.to}
-                className="text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                className={cn('text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100', subtleLinkClass)}
               >
                 {item.label}
               </Link>

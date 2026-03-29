@@ -55,6 +55,8 @@ class ProposalOut(BaseModel):
     home_locker_room_id: str | None
     away_locker_room_id: str | None
     message: str | None
+    response_message: str | None
+    response_source: str | None
     responded_at: dt.datetime | None
     created_at: dt.datetime
     updated_at: dt.datetime

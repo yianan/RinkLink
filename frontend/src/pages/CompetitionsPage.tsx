@@ -15,7 +15,7 @@ import PageHeader from '../components/PageHeader';
 import TeamLogo from '../components/TeamLogo';
 import { CardListSkeleton } from '../components/ui/TableSkeleton';
 import { cn } from '../lib/cn';
-import { accentLinkClass } from '../lib/uiClasses';
+import { accentLinkClass, filterButtonClass } from '../lib/uiClasses';
 import {
   getCompetitionBadgeVariant,
   getCompetitionHeaderClass,
@@ -407,7 +407,7 @@ export default function CompetitionsPage() {
                                       variant="outline"
                                       size="sm"
                                       onClick={() => openDivisionStandings(division.id)}
-                                      className="h-8 border-slate-300/90 bg-white/95 px-2.5 text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-900 hover:ring-sky-400/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-100 dark:hover:ring-sky-400/25"
+                                      className={filterButtonClass}
                                     >
                                       <Trophy className="h-3.5 w-3.5" />
                                       Standings

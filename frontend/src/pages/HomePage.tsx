@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, CheckCircle2, Inbox, Trophy } from 'lucide-react';
+import { Calendar, CheckCircle2, Inbox, RotateCcw, Trophy } from 'lucide-react';
 import { api } from '../api/client';
 import { Event, IceBookingRequest, Proposal, StandingsEntry, TeamCompetitionMembership, AvailabilityWindow } from '../types';
 import { useSeason } from '../context/SeasonContext';
@@ -14,6 +14,7 @@ import TeamLogo from '../components/TeamLogo';
 import { cn } from '../lib/cn';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
+import { interactiveTitleClass, listRowButtonClass } from '../lib/uiClasses';
 
 const clickableCard =
   'cursor-pointer text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-300/60 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:hover:border-cyan-700/50 dark:hover:shadow-[0_8px_30px_rgba(34,211,238,0.08)] dark:focus-visible:ring-offset-slate-950';
@@ -161,7 +162,7 @@ export default function HomePage() {
   );
 
   const openDates = seasonAvailability.filter((window) => window.status === 'open' && !window.blocked);
-  const upcomingEventsAll = seasonEvents.filter((event) => event.date >= todayStr);
+  const upcomingEventsAll = seasonEvents.filter((event) => event.date >= todayStr && event.status !== 'cancelled');
   const gamesThisWeek = upcomingEventsAll.filter((event) => event.event_type !== 'practice' && event.date <= weekEndStr);
   const practicesThisWeek = seasonEvents.filter(
     (event) => event.event_type === 'practice' && event.date >= todayStr && event.date <= weekEndStr,
@@ -223,6 +224,7 @@ export default function HomePage() {
           {teams.length === 0 ? (
             <div className="mt-5">
               <Button type="button" disabled={seedLoading} onClick={resetDemoData}>
+                <RotateCcw className="h-4 w-4" />
                 {seedLoading ? 'Seeding…' : 'Seed Demo Data'}
               </Button>
             </div>
@@ -254,7 +256,8 @@ export default function HomePage() {
             : 'All Seasons'
         }
         actions={(
-          <Button type="button" disabled={seedLoading} onClick={resetDemoData}>
+          <Button type="button" variant="outline" disabled={seedLoading} onClick={resetDemoData}>
+            <RotateCcw className="h-4 w-4" />
             {seedLoading ? 'Seeding…' : 'Reset Demo Data'}
           </Button>
         )}
@@ -329,7 +332,10 @@ export default function HomePage() {
                   <div className="font-medium text-slate-900 dark:text-slate-100">No upcoming events</div>
                   <div className="mt-1">Schedule a practice or accept a proposal to populate the next event block.</div>
                   <div className="mt-3">
-                    <Button type="button" size="sm" onClick={() => navigate('/schedule')}>Open Schedule</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => navigate('/schedule')}>
+                      <Calendar className="h-4 w-4" />
+                      Open Schedule
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -343,7 +349,7 @@ export default function HomePage() {
                     backLabel: 'Back to Dashboard',
                   },
                 })}
-                className="group w-full px-4 py-4 text-left transition hover:bg-slate-50/70 dark:hover:bg-slate-900/40"
+                className={cn(listRowButtonClass, 'px-4 py-4')}
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0 flex-1">
@@ -406,7 +412,7 @@ export default function HomePage() {
                   Requests waiting on your response.
                 </div>
               </div>
-              <Button type="button" size="sm" variant="outline" onClick={() => navigate('/proposals')}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => navigate('/proposals')}>
                 Open Proposals
               </Button>
             </div>
@@ -424,7 +430,7 @@ export default function HomePage() {
                 type="button"
                 key={proposal.id}
                 onClick={() => navigate('/proposals')}
-                className="group w-full px-4 py-3 text-left transition hover:bg-slate-50/70 dark:hover:bg-slate-900/40"
+                className={cn(listRowButtonClass, 'px-4 py-3')}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -434,7 +440,7 @@ export default function HomePage() {
                         <TeamLogo name={proposal.away_team_name || 'Away'} logoUrl={proposal.away_team_logo_url} className="h-9 w-9 rounded-xl" initialsClassName="text-[11px]" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold text-slate-900 group-hover:text-cyan-700 dark:text-slate-100 dark:group-hover:text-cyan-300">
+                        <div className={cn('truncate text-sm font-semibold text-slate-900 dark:text-slate-100', interactiveTitleClass)}>
                           {proposal.home_team_name} vs {proposal.away_team_name}
                         </div>
                         <div className="mt-1 truncate text-sm text-slate-600 dark:text-slate-400">

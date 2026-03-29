@@ -24,8 +24,8 @@ import SeasonSwitcher from './components/SeasonSwitcher';
 import ThemeToggle from './components/ThemeToggle';
 import { cn } from './lib/cn';
 import { api } from './api/client';
-import { sectionLabelClass } from './lib/uiClasses';
-import { addDays, toLocalDateString } from './lib/time';
+import { chromeIconButtonClass, focusRingClass, sectionLabelClass } from './lib/uiClasses';
+import { toLocalDateString } from './lib/time';
 import { ConfirmDialogProvider } from './context/ConfirmDialogContext';
 import { ToastProvider } from './context/ToastContext';
 import { NavBadgeProvider, useNavBadgeKey } from './context/NavBadgeContext';
@@ -126,10 +126,8 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
       return;
     }
     let cancelled = false;
-    const today = new Date();
-    const todayStr = toLocalDateString(today);
-    const weekEnd = toLocalDateString(addDays(today, 7));
-    const params: Record<string, string> = { date_from: todayStr, date_to: weekEnd };
+    const todayStr = toLocalDateString(new Date());
+    const params: Record<string, string> = { date_from: todayStr };
     if (effectiveSeason) {
       params.season_id = effectiveSeason.id;
     }
@@ -139,15 +137,14 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
       api.getEvents(activeTeam.id, params),
     ]).then(([incomingProposals, events]) => {
       if (cancelled) return;
-      const unconfirmedThisWeek = events.filter((event) => {
-        if (!event.away_team_id || event.status === 'cancelled' || event.date < todayStr || event.date > weekEnd) {
-          return false;
-        }
+      const awaitingConfirmationCount = events.filter((event) => {
+        if (!event.away_team_id) return false;
+        if (event.status === 'cancelled' || event.status === 'final') return false;
         return event.home_team_id === activeTeam.id ? !event.home_weekly_confirmed : !event.away_weekly_confirmed;
       }).length;
       setNavBadges({
         '/proposals': incomingProposals.length,
-        '/schedule': unconfirmedThisWeek,
+        '/schedule': awaitingConfirmationCount,
       });
     }).catch(() => {
       if (!cancelled) setNavBadges({});
@@ -178,11 +175,12 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
                   item.path === '/proposals' && badgeCount > 0
                     ? `${item.label}, ${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
                     : item.path === '/schedule' && badgeCount > 0
-                      ? `${item.label}, ${badgeCount} event${badgeCount === 1 ? '' : 's'} awaiting confirmation`
-                      : item.label
+                      ? `${item.label}, ${badgeCount} event${badgeCount === 1 ? '' : 's'} awaiting your confirmation`
+                    : item.label
                 }
                 className={cn(
                   'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+                  focusRingClass,
                   isActive
                     ? "bg-gradient-to-r from-white via-white to-[color:color-mix(in_srgb,var(--app-surface-strong)_82%,rgb(237_233_254))] text-slate-900 shadow-sm ring-1 ring-[color:var(--app-border-subtle)] before:absolute before:left-1 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-full before:bg-[color:var(--app-accent-link)] before:content-[''] dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 dark:text-slate-100 dark:shadow-none"
                     : 'text-slate-700 hover:bg-white/70 hover:text-slate-900 hover:ring-1 hover:ring-slate-200/70 dark:text-slate-300 dark:hover:bg-slate-900/40 dark:hover:text-slate-100 dark:hover:ring-slate-700/70',
@@ -204,8 +202,8 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
                       item.path === '/proposals'
                         ? `${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
                         : item.path === '/schedule'
-                          ? `${badgeCount} event${badgeCount === 1 ? '' : 's'} awaiting confirmation`
-                          : undefined
+                          ? `${badgeCount} event${badgeCount === 1 ? '' : 's'} awaiting your confirmation`
+                        : undefined
                     }
                   >
                     {badgeCount > 99 ? '99+' : badgeCount}
@@ -267,7 +265,10 @@ function AppContent() {
               <DialogPrimitive.Trigger asChild>
                 <button
                   type="button"
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-900/5 text-slate-800 ring-1 ring-slate-200/70 hover:bg-slate-900/10 hover:text-slate-900 lg:hidden dark:bg-white/10 dark:text-white dark:ring-white/15 dark:hover:bg-white/15 dark:hover:text-white"
+                  className={cn(
+                    'inline-flex shrink-0 items-center justify-center rounded-lg lg:hidden',
+                    chromeIconButtonClass,
+                  )}
                   aria-label="Open navigation"
                 >
                   <Menu className="h-5 w-5" />
@@ -378,7 +379,10 @@ function AppContent() {
                 <DialogPrimitive.Close asChild>
                   <button
                     type="button"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900/60 dark:hover:text-slate-100"
+                    className={cn(
+                      'inline-flex items-center justify-center rounded-lg',
+                      chromeIconButtonClass,
+                    )}
                     aria-label="Close navigation"
                   >
                     <X className="h-5 w-5" />

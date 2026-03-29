@@ -16,6 +16,11 @@ from ..services.season_utils import resolve_season_id
 router = APIRouter(tags=["availability"])
 
 
+def _validate_time_range(start_time, end_time) -> None:
+    if start_time is not None and end_time is not None and end_time < start_time:
+        raise HTTPException(400, "End time must be the same as or later than start time")
+
+
 def _out(window: AvailabilityWindow, db: Session) -> AvailabilityWindowOut:
     out = AvailabilityWindowOut.model_validate(window)
     event = (
@@ -89,6 +94,9 @@ def update_availability(availability_window_id: str, body: AvailabilityWindowUpd
     window = db.get(AvailabilityWindow, availability_window_id)
     if not window:
         raise HTTPException(404, "Availability window not found")
+    next_start_time = body.start_time if body.start_time is not None else window.start_time
+    next_end_time = body.end_time if body.end_time is not None else window.end_time
+    _validate_time_range(next_start_time, next_end_time)
     for key, value in body.model_dump(exclude_unset=True).items():
         setattr(window, key, value)
     db.commit()

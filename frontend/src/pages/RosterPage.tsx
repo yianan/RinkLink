@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FileUp, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { FileUp, Pencil, Save, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
 import { api } from '../api/client';
@@ -18,7 +18,7 @@ import EmptyState from '../components/EmptyState';
 import TeamLogo from '../components/TeamLogo';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
-import { tableActionButtonClass } from '../lib/uiClasses';
+import { destructiveIconButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 
 const emptyForm = {
   first_name: '',
@@ -152,6 +152,7 @@ export default function RosterPage() {
         subtitle={`Manage the ${effectiveSeason.name} Season roster and use it for stats tracking.`}
         actions={(
           <Button type="button" onClick={() => { setEditId(null); setForm({ ...emptyForm }); setOpen(true); }}>
+            <UserPlus className="h-4 w-4" />
             Add Player
           </Button>
         )}
@@ -195,8 +196,8 @@ export default function RosterPage() {
                     <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit" className={tableActionButtonClass}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete" className={tableActionButtonClass}>
-                      <Trash2 className="h-4 w-4 text-rose-600" />
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -212,7 +213,7 @@ export default function RosterPage() {
                     actions={(
                       <>
                         <Button type="button" size="sm" onClick={() => { setEditId(null); setForm({ ...emptyForm }); setOpen(true); }}>
-                          <Plus className="h-4 w-4" />
+                          <UserPlus className="h-4 w-4" />
                           Add Player
                         </Button>
                         <Button type="button" size="sm" variant="outline" onClick={() => setTab(1)}>
@@ -264,8 +265,8 @@ export default function RosterPage() {
                         <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit" className={tableActionButtonClass}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete" className={tableActionButtonClass}>
-                          <Trash2 className="h-4 w-4 text-rose-600" />
+                        <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>
@@ -282,7 +283,7 @@ export default function RosterPage() {
                           actions={(
                             <>
                               <Button type="button" size="sm" onClick={() => { setEditId(null); setForm({ ...emptyForm }); setOpen(true); }}>
-                                <Plus className="h-4 w-4" />
+                                <UserPlus className="h-4 w-4" />
                                 Add Player
                               </Button>
                               <Button type="button" size="sm" variant="outline" onClick={() => setTab(1)}>
@@ -318,9 +319,11 @@ export default function RosterPage() {
         footer={
           <>
             <Button type="button" onClick={handleSave} disabled={!form.first_name || !form.last_name}>
+              <Save className="h-4 w-4" />
               Save
             </Button>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <X className="h-4 w-4" />
               Cancel
             </Button>
           </>

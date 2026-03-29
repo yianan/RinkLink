@@ -1,5 +1,6 @@
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { cn } from '../lib/cn';
+import { selectorPillActiveClass, selectorPillClass, selectorPillIdleClass } from '../lib/uiClasses';
 
 export type FilterOption = {
   value: string;
@@ -72,13 +73,14 @@ export default function FilterPillGroup({
               key={option.value}
               value={option.value}
               className={cn(
-                'rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
+                selectorPillClass,
                 selected
                   ? toneClasses.selected
                   : cn(
-                    'border-[color:var(--app-border-subtle)] bg-white/80 text-slate-700 dark:bg-slate-950/35 dark:text-slate-300',
+                    selectorPillIdleClass,
                     toneClasses.pill,
                   ),
+                selected && selectorPillActiveClass,
               )}
             >
               {option.label}

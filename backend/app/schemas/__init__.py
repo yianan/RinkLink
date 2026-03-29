@@ -14,7 +14,7 @@ from .availability_window import (
 )
 from .proposal import ProposalCreate, ProposalOut, ProposalRescheduleCreate
 from .ice_booking_request import IceBookingRequestAccept, IceBookingRequestAction, IceBookingRequestCreate, IceBookingRequestOut
-from .event import EventCreate, EventLockerRoomUpdate, EventOut, EventUpdate, WeeklyConfirmUpdate
+from .event import EventLockerRoomUpdate, EventOut, EventUpdate, WeeklyConfirmUpdate
 from .notification import NotificationOut
 from .player import (
     PlayerCreate,
@@ -39,7 +39,7 @@ from .arena import (
     ArenaCreate, ArenaUpdate, ArenaOut,
     ArenaRinkCreate, ArenaRinkUpdate, ArenaRinkOut,
     LockerRoomCreate, LockerRoomUpdate, LockerRoomOut,
-    IceSlotCreate, IceSlotUpdate, IceSlotOut,
+    IceSlotCreate, IceSlotUpdate, IceSlotCancel, IceSlotOut,
     IceSlotUploadPreview, IceSlotConfirmUpload,
 )
 from .team_season_venue_assignment import (
@@ -58,7 +58,7 @@ __all__ = [
     "AvailabilityUploadPreview", "AvailabilityConfirmUpload",
     "ProposalCreate", "ProposalOut", "ProposalRescheduleCreate",
     "IceBookingRequestCreate", "IceBookingRequestAccept", "IceBookingRequestAction", "IceBookingRequestOut",
-    "EventCreate", "EventLockerRoomUpdate", "EventOut", "EventUpdate", "WeeklyConfirmUpdate",
+    "EventLockerRoomUpdate", "EventOut", "EventUpdate", "WeeklyConfirmUpdate",
     "NotificationOut",
     "PlayerCreate", "PlayerUpdate", "PlayerOut",
     "PlayerUploadPreview", "PlayerConfirmUpload",
@@ -69,7 +69,7 @@ __all__ = [
     "ArenaCreate", "ArenaUpdate", "ArenaOut",
     "ArenaRinkCreate", "ArenaRinkUpdate", "ArenaRinkOut",
     "LockerRoomCreate", "LockerRoomUpdate", "LockerRoomOut",
-    "IceSlotCreate", "IceSlotUpdate", "IceSlotOut",
+    "IceSlotCreate", "IceSlotUpdate", "IceSlotCancel", "IceSlotOut",
     "IceSlotUploadPreview", "IceSlotConfirmUpload",
     "TeamSeasonVenueAssignmentCreate", "TeamSeasonVenueAssignmentUpdate", "TeamSeasonVenueAssignmentOut",
     "SeasonOut", "TeamSeasonRecordOut", "StandingsEntry",

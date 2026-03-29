@@ -8,7 +8,6 @@ from ..models import Arena, ArenaRink, AvailabilityWindow, Event, IceBookingRequ
 from ..schemas import (
     BulkEventAttendanceUpdate,
     EventAttendancePlayer,
-    EventCreate,
     EventLockerRoomUpdate,
     EventOut,
     EventUpdate,
@@ -61,6 +60,8 @@ def _validate_event_links(db: Session, event: Event) -> None:
             raise HTTPException(400, "Ice slot does not belong to arena rink")
         if slot.date != event.date:
             raise HTTPException(400, "Ice slot date must match event date")
+        if slot.start_time != event.start_time or slot.end_time != event.end_time:
+            raise HTTPException(400, "Event time must match the selected ice slot")
     for locker_room_id in (event.home_locker_room_id, event.away_locker_room_id):
         if not locker_room_id:
             continue
@@ -144,29 +145,24 @@ def list_events(
     return enriched_events
 
 
-@router.post("/teams/{team_id}/events", response_model=EventOut, status_code=201)
-def create_event(team_id: str, body: EventCreate, db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
-        raise HTTPException(404, "Team not found")
-    if not body.ice_slot_id:
-        raise HTTPException(400, "An ice slot is required to create an event")
-    event = Event(home_team_id=team_id, status="scheduled", **body.model_dump())
-    _validate_event_links(db, event)
-    normalize_event_competition(event, db)
-    _book_slot(db, event)
-    db.add(event)
-    db.flush()
-    assign_locker_rooms(
-        db,
-        event=event,
-        home_locker_room_id=event.home_locker_room_id,
-        away_locker_room_id=event.away_locker_room_id,
-    )
-    _sync_availability_on_schedule(db, event)
-    db.commit()
-    db.refresh(event)
-    return enrich_event(event, db)
-
+@router.get("/arenas/{arena_id}/events", response_model=list[EventOut])
+def list_arena_events(
+    arena_id: str,
+    status: str | None = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    if not db.get(Arena, arena_id):
+        raise HTTPException(404, "Arena not found")
+    query = db.query(Event).filter(Event.arena_id == arena_id)
+    if status:
+        query = query.filter(Event.status == status)
+    if date_from:
+        query = query.filter(Event.date >= date_from)
+    if date_to:
+        query = query.filter(Event.date <= date_to)
+    return [enrich_event(event, db) for event in query.order_by(Event.date, Event.start_time).all()]
 
 @router.get("/events/{event_id}", response_model=EventOut)
 def get_event(event_id: str, db: Session = Depends(get_db)):
