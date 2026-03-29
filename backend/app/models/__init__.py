@@ -13,6 +13,17 @@ from .arena import Arena, ArenaRink, LockerRoom, IceSlot
 from .season import Season, TeamSeasonRecord
 from .competition import Competition, CompetitionDivision, TeamCompetitionMembership
 from .team_season_venue_assignment import TeamSeasonVenueAssignment
+from .auth import (
+    AppUser,
+    AssociationMembership,
+    TeamMembership,
+    ArenaMembership,
+    PlayerGuardianship,
+    PlayerMembership,
+    Invite,
+    AccessRequest,
+    AuditLog,
+)
 
 __all__ = [
     "Association",
@@ -39,4 +50,13 @@ __all__ = [
     "CompetitionDivision",
     "TeamCompetitionMembership",
     "TeamSeasonVenueAssignment",
+    "AppUser",
+    "AssociationMembership",
+    "TeamMembership",
+    "ArenaMembership",
+    "PlayerGuardianship",
+    "PlayerMembership",
+    "Invite",
+    "AccessRequest",
+    "AuditLog",
 ]

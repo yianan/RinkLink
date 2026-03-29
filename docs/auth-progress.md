@@ -26,6 +26,14 @@
   - `npm install` succeeded in `auth-service/`
   - `npm run build` succeeded in `auth-service/`
   - `docker compose config` succeeded for the local stack
+- Added backend auth foundation:
+  - backend auth config fields in `app.config`
+  - authorization models for users, memberships, invites, access requests, and audit log
+  - Alembic migration for the new auth tables
+- Validation:
+  - backend auth models compile via `./.venv/bin/python -m compileall app`
+  - `./.venv/bin/alembic upgrade head` succeeded
+  - `./.venv/bin/alembic check` reports no schema drift
 
 ## Planned Commit Sequence
 
