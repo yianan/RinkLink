@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from ..auth.context import AuthorizationContext, authorization_context, ensure_association_access, ensure_team_access
 from ..database import get_db
 from ..models import Arena, ArenaRink, Association, LockerRoom, Team, TeamSeasonVenueAssignment
 from ..schemas import (
@@ -56,15 +57,26 @@ def _validate_assignment_venue(db: Session, *, arena_id: str, arena_rink_id: str
             raise HTTPException(400, "Locker room does not belong to arena rink")
 
 
+def _scoped_teams_query(db: Session, context: AuthorizationContext):
+    if context.user.is_platform_admin:
+        return db.query(Team)
+    if "team.view" not in context.capabilities:
+        return db.query(Team).filter(False)
+    if context.association_ids or context.team_ids:
+        return db.query(Team).filter((Team.association_id.in_(context.association_ids)) | (Team.id.in_(context.team_ids)))
+    return db.query(Team).filter(False)
+
+
 @router.get("/teams", response_model=list[TeamOut])
 def list_teams(
     association_id: str | None = Query(None),
     age_group: str | None = Query(None),
     level: str | None = Query(None),
     season_id: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Team)
+    q = _scoped_teams_query(db, context)
     if association_id:
         q = q.filter(Team.association_id == association_id)
     if age_group:
@@ -77,9 +89,14 @@ def list_teams(
 
 
 @router.post("/teams", response_model=TeamOut, status_code=201)
-def create_team(body: TeamCreate, db: Session = Depends(get_db)):
+def create_team(
+    body: TeamCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     if not db.get(Association, body.association_id):
         raise HTTPException(400, "Association not found")
+    ensure_association_access(context, body.association_id, "association.manage")
     team = Team(**body.model_dump())
     db.add(team)
     db.commit()
@@ -88,19 +105,31 @@ def create_team(body: TeamCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/teams/{id}", response_model=TeamOut)
-def get_team(id: str, season_id: str | None = Query(None), db: Session = Depends(get_db)):
+def get_team(
+    id: str,
+    season_id: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     team = db.get(Team, id)
     if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.view")
     memberships_by_team = memberships_for_teams(db, [team.id], season_id)
     return _enrich(team, db, memberships_by_team)
 
 
 @router.put("/teams/{id}", response_model=TeamOut)
-def update_team(id: str, body: TeamUpdate, db: Session = Depends(get_db)):
+def update_team(
+    id: str,
+    body: TeamUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     team = db.get(Team, id)
     if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage")
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(team, k, v)
     db.commit()
@@ -109,10 +138,16 @@ def update_team(id: str, body: TeamUpdate, db: Session = Depends(get_db)):
 
 
 @router.post("/teams/{id}/logo", response_model=TeamOut)
-async def upload_team_logo(id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_team_logo(
+    id: str,
+    file: UploadFile = File(...),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     team = db.get(Team, id)
     if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage")
     previous_logo_path = team.logo_path
     team.logo_path = await save_team_logo_upload(id, file)
     db.commit()
@@ -122,10 +157,15 @@ async def upload_team_logo(id: str, file: UploadFile = File(...), db: Session = 
 
 
 @router.delete("/teams/{id}/logo", response_model=TeamOut)
-def delete_team_logo(id: str, db: Session = Depends(get_db)):
+def delete_team_logo(
+    id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     team = db.get(Team, id)
     if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage")
     previous_logo_path = team.logo_path
     team.logo_path = None
     db.commit()
@@ -135,18 +175,30 @@ def delete_team_logo(id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/teams/{id}", status_code=204)
-def delete_team(id: str, db: Session = Depends(get_db)):
+def delete_team(
+    id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     team = db.get(Team, id)
     if not team:
         raise HTTPException(404, "Team not found")
+    ensure_association_access(context, team.association_id, "association.manage")
     db.delete(team)
     db.commit()
 
 
 @router.get("/teams/{team_id}/venue-assignments", response_model=list[TeamSeasonVenueAssignmentOut])
-def list_team_venue_assignments(team_id: str, season_id: str | None = Query(None), db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
+def list_team_venue_assignments(
+    team_id: str,
+    season_id: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.view")
     query = db.query(TeamSeasonVenueAssignment).filter(TeamSeasonVenueAssignment.team_id == team_id)
     if season_id:
         query = query.filter(TeamSeasonVenueAssignment.season_id == season_id)
@@ -154,9 +206,16 @@ def list_team_venue_assignments(team_id: str, season_id: str | None = Query(None
 
 
 @router.post("/teams/{team_id}/venue-assignments", response_model=TeamSeasonVenueAssignmentOut, status_code=201)
-def create_team_venue_assignment(team_id: str, body: TeamSeasonVenueAssignmentCreate, db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
+def create_team_venue_assignment(
+    team_id: str,
+    body: TeamSeasonVenueAssignmentCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage_schedule")
     _validate_assignment_venue(
         db,
         arena_id=body.arena_id,
@@ -184,10 +243,18 @@ def create_team_venue_assignment(team_id: str, body: TeamSeasonVenueAssignmentCr
 
 
 @router.put("/venue-assignments/{assignment_id}", response_model=TeamSeasonVenueAssignmentOut)
-def update_team_venue_assignment(assignment_id: str, body: TeamSeasonVenueAssignmentUpdate, db: Session = Depends(get_db)):
+def update_team_venue_assignment(
+    assignment_id: str,
+    body: TeamSeasonVenueAssignmentUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     assignment = db.get(TeamSeasonVenueAssignment, assignment_id)
     if not assignment:
         raise HTTPException(404, "Venue assignment not found")
+    if not assignment.team:
+        raise HTTPException(404, "Team not found")
+    ensure_team_access(context, assignment.team, "team.manage_schedule")
     arena_id = body.arena_id or assignment.arena_id
     arena_rink_id = body.arena_rink_id or assignment.arena_rink_id
     locker_room_id = body.default_locker_room_id if "default_locker_room_id" in body.model_fields_set else assignment.default_locker_room_id
@@ -205,9 +272,16 @@ def update_team_venue_assignment(assignment_id: str, body: TeamSeasonVenueAssign
 
 
 @router.delete("/venue-assignments/{assignment_id}", status_code=204)
-def delete_team_venue_assignment(assignment_id: str, db: Session = Depends(get_db)):
+def delete_team_venue_assignment(
+    assignment_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     assignment = db.get(TeamSeasonVenueAssignment, assignment_id)
     if not assignment:
         raise HTTPException(404, "Venue assignment not found")
+    if not assignment.team:
+        raise HTTPException(404, "Team not found")
+    ensure_team_access(context, assignment.team, "team.manage_schedule")
     db.delete(assignment)
     db.commit()

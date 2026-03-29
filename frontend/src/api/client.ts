@@ -1,9 +1,42 @@
-const BASE_URL = '/api';
+import { authEnabled, clearApiAccessToken, getApiAccessToken } from '../lib/auth-client';
+
+const apiOrigin = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+const BASE_URL = apiOrigin ? `${apiOrigin}/api` : '/api';
+
+async function fetchWithAuth(path: string, options?: RequestInit, retryOnUnauthorized = true): Promise<Response> {
+  const headers = new Headers(options?.headers);
+  if (authEnabled) {
+    const token = await getApiAccessToken();
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+  }
+
+  const response = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (response.status === 401 && authEnabled && retryOnUnauthorized) {
+    clearApiAccessToken();
+    const refreshedToken = await getApiAccessToken(true);
+    if (refreshedToken) {
+      const retryHeaders = new Headers(options?.headers);
+      retryHeaders.set('Authorization', `Bearer ${refreshedToken}`);
+      return fetch(`${BASE_URL}${path}`, {
+        ...options,
+        headers: retryHeaders,
+      });
+    }
+  }
+
+  return response;
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+  const res = await fetchWithAuth(path, {
     ...options,
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
   });
   if (!res.ok) {
     const text = await res.text();
@@ -13,7 +46,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+async function upload<T>(path: string, formData: FormData): Promise<T> {
+  const res = await fetchWithAuth(path, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) {
+    throw new Error(`${res.status}: ${await res.text()}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export const api = {
+  getMe: () => request<import('../types').MeResponse>('/me'),
   getAssociations: () => request<import('../types').Association[]>('/associations'),
   createAssociation: (data: Partial<import('../types').Association>) =>
     request<import('../types').Association>('/associations', { method: 'POST', body: JSON.stringify(data) }),
@@ -23,9 +68,7 @@ export const api = {
   uploadAssociationLogo: async (id: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(`${BASE_URL}/associations/${id}/logo`, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
-    return res.json() as Promise<import('../types').Association>;
+    return upload<import('../types').Association>(`/associations/${id}/logo`, formData);
   },
   deleteAssociationLogo: (id: string) =>
     request<import('../types').Association>(`/associations/${id}/logo`, { method: 'DELETE' }),
@@ -46,9 +89,7 @@ export const api = {
   uploadTeamLogo: async (id: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(`${BASE_URL}/teams/${id}/logo`, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
-    return res.json() as Promise<import('../types').Team>;
+    return upload<import('../types').Team>(`/teams/${id}/logo`, formData);
   },
   deleteTeamLogo: (id: string) =>
     request<import('../types').Team>(`/teams/${id}/logo`, { method: 'DELETE' }),
@@ -75,9 +116,7 @@ export const api = {
   uploadRoster: async (teamId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(`${BASE_URL}/teams/${teamId}/players/upload`, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
-    return res.json() as Promise<import('../types').PlayerUploadPreview>;
+    return upload<import('../types').PlayerUploadPreview>(`/teams/${teamId}/players/upload`, formData);
   },
   confirmRosterUpload: (teamId: string, seasonId: string, entries: import('../types').PlayerUploadRow[], replaceExisting: boolean) =>
     request<import('../types').Player[]>(`/teams/${teamId}/players/confirm-upload`, {
@@ -94,9 +133,7 @@ export const api = {
   uploadAvailability: async (teamId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(`${BASE_URL}/teams/${teamId}/availability/upload`, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
-    return res.json() as Promise<import('../types').AvailabilityUploadPreview>;
+    return upload<import('../types').AvailabilityUploadPreview>(`/teams/${teamId}/availability/upload`, formData);
   },
   confirmAvailabilityUpload: (teamId: string, entries: import('../types').AvailabilityUploadRow[]) =>
     request<import('../types').AvailabilityWindow[]>(`/teams/${teamId}/availability/confirm-upload`, {
@@ -229,9 +266,7 @@ export const api = {
   uploadArenaLogo: async (id: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(`${BASE_URL}/arenas/${id}/logo`, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
-    return res.json() as Promise<import('../types').Arena>;
+    return upload<import('../types').Arena>(`/arenas/${id}/logo`, formData);
   },
   deleteArenaLogo: (id: string) =>
     request<import('../types').Arena>(`/arenas/${id}/logo`, { method: 'DELETE' }),
@@ -262,9 +297,7 @@ export const api = {
   uploadIceSlots: async (arenaRinkId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(`${BASE_URL}/arena-rinks/${arenaRinkId}/ice-slots/upload`, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
-    return res.json() as Promise<import('../types').IceSlotUploadPreview>;
+    return upload<import('../types').IceSlotUploadPreview>(`/arena-rinks/${arenaRinkId}/ice-slots/upload`, formData);
   },
   confirmIceSlotUpload: (arenaRinkId: string, entries: import('../types').IceSlotUploadRow[]) =>
     request<import('../types').IceSlot[]>(`/arena-rinks/${arenaRinkId}/ice-slots/confirm-upload`, {

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { TeamProvider, useTeam } from './context/TeamContext';
 import { SeasonProvider, useSeason } from './context/SeasonContext';
+import { AuthProvider } from './context/AuthContext';
 import TeamSwitcher from './components/TeamSwitcher';
 import SeasonSwitcher from './components/SeasonSwitcher';
 import ThemeToggle from './components/ThemeToggle';
@@ -407,19 +408,21 @@ function AppContent() {
 export default function App() {
   return (
     <TooltipPrimitive.Provider delayDuration={120}>
-      <TeamProvider>
-        <SeasonProvider>
-          <NavBadgeProvider>
-            <ToastProvider>
-              <ConfirmDialogProvider>
-                <BrowserRouter>
-                  <AppContent />
-                </BrowserRouter>
-              </ConfirmDialogProvider>
-            </ToastProvider>
-          </NavBadgeProvider>
-        </SeasonProvider>
-      </TeamProvider>
+      <AuthProvider>
+        <TeamProvider>
+          <SeasonProvider>
+            <NavBadgeProvider>
+              <ToastProvider>
+                <ConfirmDialogProvider>
+                  <BrowserRouter>
+                    <AppContent />
+                  </BrowserRouter>
+                </ConfirmDialogProvider>
+              </ToastProvider>
+            </NavBadgeProvider>
+          </SeasonProvider>
+        </TeamProvider>
+      </AuthProvider>
     </TooltipPrimitive.Provider>
   );
 }

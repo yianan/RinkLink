@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Team } from '../types';
 import { api } from '../api/client';
+import { useAuth } from './AuthContext';
 
 interface TeamContextType {
   teams: Team[];
@@ -19,11 +20,19 @@ const TeamContext = createContext<TeamContextType>({
 });
 
 export function TeamProvider({ children }: { children: ReactNode }) {
+  const { authEnabled, isAuthenticated, loading: authLoading } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTeam, setActiveTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refreshTeams = async () => {
+    if (authEnabled && !isAuthenticated) {
+      setTeams([]);
+      setActiveTeam(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await api.getTeams();
@@ -35,14 +44,20 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         data[0] ??
         null;
       setActiveTeam(nextActiveTeam);
+    } catch {
+      setTeams([]);
+      setActiveTeam(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
     refreshTeams();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (activeTeam?.id) {

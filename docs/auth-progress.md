@@ -46,6 +46,19 @@
   - backend dependencies installed successfully in `.venv`
   - `./.venv/bin/python -m compileall app` succeeded with auth modules
   - `./.venv/bin/python -c "from app.main import app; print('ok')"` succeeded
+- Added first protected app integration slice:
+  - shared backend authorization context for memberships, linked players, and effective capabilities
+  - `/api/me` refactored onto the shared authorization context
+  - `teams` router now enforces scoped reads and write capabilities
+  - `players` router now enforces private roster reads and roster-management writes
+  - frontend Better Auth client scaffold
+  - cached auth-service `/api/auth/token` bridge for FastAPI Bearer tokens
+  - auth-aware API request wrapper with silent token refresh on `401`
+  - frontend `AuthContext` and auth-gated `TeamContext` bootstrap
+- Validation:
+  - backend imports cleanly after route protection via `./.venv/bin/python -c "from app.main import app; print('backend ok')"`
+  - frontend `npm install` succeeded with the Better Auth client dependency
+  - frontend `npm run build` succeeded with the auth client/context changes
 
 ## Planned Commit Sequence
 
@@ -67,6 +80,11 @@
    - `/api/me`
    - auth dependencies
    - first protected routes
+5. Auth-aware frontend foundation:
+   - Better Auth client
+   - auth token bridge
+   - `/api/me` consumption context
+   - auth-gated team bootstrap
 
 ## Notes
 

@@ -10,6 +10,61 @@ export interface Association {
   updated_at: string;
 }
 
+export interface AppUserIdentity {
+  id: string;
+  auth_id: string;
+  email: string;
+  display_name: string | null;
+  status: string;
+  is_platform_admin: boolean;
+  default_team_id: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssociationMembershipRole {
+  association_id: string;
+  role: string;
+}
+
+export interface TeamMembershipRole {
+  team_id: string;
+  role: string;
+}
+
+export interface ArenaMembershipRole {
+  arena_id: string;
+  role: string;
+}
+
+export interface LinkedPlayer {
+  player_id: string;
+  team_id: string;
+  season_id: string;
+  first_name: string;
+  last_name: string;
+  link_type: string;
+}
+
+export interface AccessibleTeam {
+  id: string;
+  association_id: string;
+  name: string;
+  age_group: string;
+  level: string;
+}
+
+export interface MeResponse {
+  user: AppUserIdentity;
+  capabilities: string[];
+  associations: AssociationMembershipRole[];
+  teams: TeamMembershipRole[];
+  arenas: ArenaMembershipRole[];
+  linked_players: LinkedPlayer[];
+  accessible_teams: AccessibleTeam[];
+}
+
 export interface TeamCompetitionMembership {
   id: string;
   team_id: string;

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..auth.context import AuthorizationContext, authorization_context, ensure_team_access
 from ..database import get_db
 from ..models import Player, Team, Season, Event, EventPlayerStat, EventGoalieStat
 from ..schemas.player import (
@@ -17,10 +18,22 @@ from ..services.roster_csv_parser import parse_roster_csv
 router = APIRouter(tags=["players"])
 
 
-@router.get("/teams/{team_id}/players", response_model=list[PlayerOut])
-def list_players(team_id: str, season_id: str | None = Query(None), db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
+def _require_team_for_roster_access(db: Session, team_id: str, context: AuthorizationContext, capability: str) -> Team:
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, capability)
+    return team
+
+
+@router.get("/teams/{team_id}/players", response_model=list[PlayerOut])
+def list_players(
+    team_id: str,
+    season_id: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    _require_team_for_roster_access(db, team_id, context, "team.view_private")
     if season_id and not db.get(Season, season_id):
         raise HTTPException(404, "Season not found")
     q = db.query(Player).filter(Player.team_id == team_id)
@@ -116,9 +129,13 @@ def list_players(team_id: str, season_id: str | None = Query(None), db: Session 
 
 
 @router.post("/teams/{team_id}/players", response_model=PlayerOut, status_code=201)
-def create_player(team_id: str, body: PlayerCreate, db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
-        raise HTTPException(404, "Team not found")
+def create_player(
+    team_id: str,
+    body: PlayerCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    _require_team_for_roster_access(db, team_id, context, "team.manage_roster")
     if not db.get(Season, body.season_id):
         raise HTTPException(404, "Season not found")
     p = Player(team_id=team_id, **body.model_dump())
@@ -129,10 +146,18 @@ def create_player(team_id: str, body: PlayerCreate, db: Session = Depends(get_db
 
 
 @router.put("/players/{id}", response_model=PlayerOut)
-def update_player(id: str, body: PlayerUpdate, db: Session = Depends(get_db)):
+def update_player(
+    id: str,
+    body: PlayerUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     p = db.get(Player, id)
     if not p:
         raise HTTPException(404, "Player not found")
+    if not p.team:
+        raise HTTPException(404, "Team not found")
+    ensure_team_access(context, p.team, "team.manage_roster")
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(p, k, v)
     db.commit()
@@ -141,26 +166,41 @@ def update_player(id: str, body: PlayerUpdate, db: Session = Depends(get_db)):
 
 
 @router.delete("/players/{id}", status_code=204)
-def delete_player(id: str, db: Session = Depends(get_db)):
+def delete_player(
+    id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     p = db.get(Player, id)
     if not p:
         raise HTTPException(404, "Player not found")
+    if not p.team:
+        raise HTTPException(404, "Team not found")
+    ensure_team_access(context, p.team, "team.manage_roster")
     db.delete(p)
     db.commit()
 
 
 @router.post("/teams/{team_id}/players/upload", response_model=PlayerUploadPreview)
-async def upload_roster(team_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
-        raise HTTPException(404, "Team not found")
+async def upload_roster(
+    team_id: str,
+    file: UploadFile = File(...),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    _require_team_for_roster_access(db, team_id, context, "team.manage_roster")
     content = (await file.read()).decode("utf-8-sig")
     return parse_roster_csv(content)
 
 
 @router.post("/teams/{team_id}/players/confirm-upload", response_model=list[PlayerOut], status_code=201)
-def confirm_roster_upload(team_id: str, body: PlayerConfirmUpload, db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
-        raise HTTPException(404, "Team not found")
+def confirm_roster_upload(
+    team_id: str,
+    body: PlayerConfirmUpload,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    _require_team_for_roster_access(db, team_id, context, "team.manage_roster")
     if not db.get(Season, body.season_id):
         raise HTTPException(404, "Season not found")
 
