@@ -235,6 +235,22 @@
 - Validation:
   - `npm run build` succeeded in `frontend/`
   - Playwright browser validation confirmed the manager shell hides `Access`, shows `Family Links`, loads the family-only invite page correctly, and redirects direct `/access` visits back to the dashboard
+- Completed the association-admin browser validation pass:
+  - created and accepted a real `association_admin` invite from the platform-admin access page
+  - confirmed the shell is scoped to the association’s teams, with no arena-management invite target exposed in the access page
+  - verified the active-team switcher is limited to the association’s teams and that the association admin page loads with edit controls for the owned association
+- Completed the arena-ops browser validation pass:
+  - created and accepted a real `arena_ops` invite from the platform-admin access page
+  - identified that the dashboard was still falling back to the generic team/seed empty state and that the shell still exposed the team `Schedule` nav item for arena-only users
+  - replaced the fallback dashboard with an arena-ops summary showing assigned arenas and direct navigation into arena detail
+  - removed the arena-only `Schedule` nav path so the shell now matches the planned arena workflow centered on arena detail pages
+- Validation:
+  - `npm run build` succeeded in `frontend/`
+  - Playwright browser validation confirmed:
+    - association-admin access is scoped to association/team/family targets only
+    - association-admin team switching stays within the owned association
+    - arena-ops users now see only `Dashboard` and `Arenas` in navigation
+    - arena-ops dashboard loads the assigned-arena summary and links correctly into the operational arena detail view
 
 ## Planned Commit Sequence
 

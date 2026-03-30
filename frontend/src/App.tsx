@@ -167,7 +167,6 @@ function canViewPath(path: string, me: MeResponse | null, runtimeAuthEnabled: bo
     case '/schedule':
       return (
         hasCapability(me, 'team.view')
-        || hasCapability(me, 'arena.view')
         || hasCapability(me, 'player.respond_guarded')
         || hasCapability(me, 'player.respond_self')
       );

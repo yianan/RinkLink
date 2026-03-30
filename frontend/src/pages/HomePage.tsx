@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, CheckCircle2, Inbox, RotateCcw, Trophy } from 'lucide-react';
 import { api } from '../api/client';
-import { Event, IceBookingRequest, Proposal, StandingsEntry, TeamCompetitionMembership, AvailabilityWindow } from '../types';
+import { Arena, Event, IceBookingRequest, Proposal, StandingsEntry, TeamCompetitionMembership, AvailabilityWindow } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
@@ -101,6 +101,7 @@ export default function HomePage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [bookingRequests, setBookingRequests] = useState<IceBookingRequest[]>([]);
+  const [assignedArenas, setAssignedArenas] = useState<Arena[]>([]);
   const [record, setRecord] = useState<StandingsEntry | null>(null);
   const [competitionRecord, setCompetitionRecord] = useState<StandingsEntry | null>(null);
   const [primaryMembership, setPrimaryMembership] = useState<TeamCompetitionMembership | null>(null);
@@ -119,6 +120,7 @@ export default function HomePage() {
   const canViewProposalSummary = canManageProposals;
   const canViewIceRequestSummary = canManageSchedule;
   const familyMode = !canManageSchedule && !canManageProposals && !canViewPrivateRoster && (me?.linked_players.length || 0) > 0;
+  const arenaOnlyMode = !activeTeam && (me?.arenas.length || 0) > 0 && (me?.accessible_teams.length || 0) === 0 && !familyMode;
   const linkedPlayersForActiveTeam = (me?.linked_players || []).filter((player) => player.team_id === activeTeam?.id);
 
   useEffect(() => {
@@ -155,6 +157,28 @@ export default function HomePage() {
       setCompetitionRecord(divisionStandings.find((entry) => entry.team_id === activeTeam.id) || null);
     });
   }, [activeTeam, canViewAvailabilitySummary, canViewIceRequestSummary, canViewProposalSummary, effectiveSeason, familyMode, todayStr]);
+
+  useEffect(() => {
+    if (!arenaOnlyMode || !me) {
+      setAssignedArenas([]);
+      return;
+    }
+    let cancelled = false;
+    api.getArenas().then((allArenas) => {
+      if (cancelled) {
+        return;
+      }
+      const arenaIds = new Set(me.arenas.map((arena) => arena.arena_id));
+      setAssignedArenas(allArenas.filter((arena) => arenaIds.has(arena.id)));
+    }).catch(() => {
+      if (!cancelled) {
+        setAssignedArenas([]);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [arenaOnlyMode, me]);
 
   const seasonAvailability = useMemo(
     () =>
@@ -220,6 +244,55 @@ export default function HomePage() {
   };
 
   if (!activeTeam) {
+    if (arenaOnlyMode) {
+      return (
+        <div className="space-y-6">
+          <PageHeader
+            title="Arena Operations"
+            subtitle="Review assigned arenas and jump into rink, locker-room, and booking workflows."
+          />
+          <div className="grid gap-4 md:grid-cols-3">
+            <StatCard
+              title="Assigned Arenas"
+              value={assignedArenas.length}
+              subtitle="Arena records in your operational scope"
+              icon={<Calendar className="h-4 w-4 text-cyan-700 dark:text-cyan-200" />}
+              color="bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-100"
+            />
+          </div>
+          <Card className="p-6">
+            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">Assigned Arenas</div>
+            <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Open an assigned arena to manage slots, locker rooms, and booking responses.
+            </div>
+            <div className="mt-5 space-y-3">
+              {assignedArenas.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                  No assigned arenas are available yet.
+                </div>
+              ) : assignedArenas.map((arena) => (
+                <button
+                  key={arena.id}
+                  type="button"
+                  onClick={() => navigate(`/arenas/${arena.id}`)}
+                  className={cn('w-full rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4 text-left dark:border-slate-800 dark:bg-slate-900/60', clickableCard)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-base font-semibold text-slate-900 dark:text-slate-100">{arena.name}</div>
+                      <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                        {[arena.city, arena.state].filter(Boolean).join(', ') || 'Location unavailable'}
+                      </div>
+                    </div>
+                    <Badge variant="outline">{arena.rink_count} rink{arena.rink_count === 1 ? '' : 's'}</Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </Card>
+        </div>
+      );
+    }
     return (
       <div className="space-y-6">
         <PageHeader
