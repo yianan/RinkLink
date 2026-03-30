@@ -68,6 +68,17 @@
 - Validation:
   - `./.venv/bin/python -m compileall app` succeeded after the second router protection pass
   - `./.venv/bin/python -c "from app.main import app; print('ok')"` succeeded after wiring the new authorization helpers
+- Added the third protected router slice:
+  - `notifications` router now enforces team-scoped reads and read acknowledgements
+  - `search` router now enforces proposal-management access on the requesting team
+  - `ice_booking_requests` router now enforces team scheduling permissions and arena booking-request permissions
+  - `arenas` router now enforces read-vs-manage-vs-slot-operation access across arenas, rinks, locker rooms, and ice slots
+  - `associations` router now enforces scoped association reads and platform-only destructive operations
+  - `competitions` and `seasons` endpoints now require an authenticated active user, with team membership checks on team-specific competition lookups
+  - `seed` endpoint is now auth-gated and limited to development only
+- Validation:
+  - `./.venv/bin/python -m compileall app` succeeded after the admin and ops protection pass
+  - `./.venv/bin/python -c "from app.main import app; print('ok')"` succeeded after protecting admin and utility routers
 
 ## Planned Commit Sequence
 
@@ -99,6 +110,13 @@
    - events
    - proposals
    - scoresheet
+7. Remaining admin and utility coverage:
+   - arenas
+   - associations
+   - booking requests
+   - notifications
+   - search
+   - seed hardening
 
 ## Notes
 

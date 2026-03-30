@@ -117,6 +117,10 @@ def can_access_association(context: AuthorizationContext, association_id: str, c
     return capability in context.capabilities and association_id in context.association_ids
 
 
+def has_capability(context: AuthorizationContext, capability: str) -> bool:
+    return context.user.is_platform_admin or capability in context.capabilities
+
+
 def can_access_team(
     context: AuthorizationContext,
     team: Team,
@@ -173,6 +177,12 @@ def ensure_association_access(context: AuthorizationContext, association_id: str
     if can_access_association(context, association_id, capability):
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this association")
+
+
+def ensure_capability(context: AuthorizationContext, capability: str, detail: str = "You do not have permission to access this resource") -> None:
+    if has_capability(context, capability):
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
 
 def ensure_team_access(

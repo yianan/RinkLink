@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from ..auth.context import AuthorizationContext, authorization_context, ensure_team_access
 from ..database import get_db
 from ..models import CompetitionDivision, Team
 from ..schemas import CompetitionDivisionOut, CompetitionOut, StandingsEntry, TeamCompetitionMembershipOut
@@ -13,6 +14,7 @@ router = APIRouter(tags=["competitions"])
 @router.get("/competitions", response_model=list[CompetitionOut])
 def get_competitions(
     season_id: str | None = Query(None),
+    _: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
     ensure_standard_seasons(db)
@@ -23,6 +25,7 @@ def get_competitions(
 def get_competition_divisions(
     season_id: str = Query(...),
     standings_enabled: bool | None = Query(None),
+    _: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
     ensure_standard_seasons(db)
@@ -33,16 +36,23 @@ def get_competition_divisions(
 def get_team_competition_memberships(
     team_id: str,
     season_id: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
-    if not db.get(Team, team_id):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.view")
     ensure_standard_seasons(db)
     return list_team_memberships(db, team_id, season_id)
 
 
 @router.get("/competition-divisions/{division_id}", response_model=CompetitionDivisionOut)
-def get_competition_division(division_id: str, db: Session = Depends(get_db)):
+def get_competition_division(
+    division_id: str,
+    _: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     division = db.get(CompetitionDivision, division_id)
     if not division:
         raise HTTPException(404, "Competition division not found")
@@ -54,7 +64,11 @@ def get_competition_division(division_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/competition-divisions/{division_id}/standings", response_model=list[StandingsEntry])
-def get_competition_division_standings(division_id: str, db: Session = Depends(get_db)):
+def get_competition_division_standings(
+    division_id: str,
+    _: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     division = db.get(CompetitionDivision, division_id)
     if not division:
         raise HTTPException(404, "Competition division not found")

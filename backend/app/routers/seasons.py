@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..auth.context import AuthorizationContext, authorization_context
 from ..database import get_db
 from ..models import Association, Event, Season, Team
 from ..schemas.season import SeasonOut, StandingsEntry
@@ -21,13 +22,13 @@ router = APIRouter(tags=["seasons"])
 
 
 @router.get("/seasons", response_model=list[SeasonOut])
-def list_seasons(db: Session = Depends(get_db)):
+def list_seasons(_: AuthorizationContext = Depends(authorization_context), db: Session = Depends(get_db)):
     seasons = ensure_standard_seasons(db)
     return [_season_with_game_count(db, season) for season in seasons]
 
 
 @router.get("/seasons/{id}", response_model=SeasonOut)
-def get_season(id: str, db: Session = Depends(get_db)):
+def get_season(id: str, _: AuthorizationContext = Depends(authorization_context), db: Session = Depends(get_db)):
     ensure_standard_seasons(db)
     season = db.get(Season, id)
     if not season:
@@ -41,6 +42,7 @@ def get_standings(
     association_id: str | None = Query(None),
     age_group: str | None = Query(None),
     level: str | None = Query(None),
+    _: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
     ensure_standard_seasons(db)

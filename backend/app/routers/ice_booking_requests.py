@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from ..auth.context import AuthorizationContext, authorization_context, ensure_arena_access, ensure_team_access
 from ..database import get_db
 from ..models import Arena, ArenaRink, Association, Event, IceBookingRequest, IceSlot, LockerRoom, Team
 from ..schemas import IceBookingRequestAccept, IceBookingRequestAction, IceBookingRequestCreate, IceBookingRequestOut
@@ -100,10 +101,13 @@ def _release_slot(slot: IceSlot | None) -> None:
 def list_team_ice_booking_requests(
     team_id: str,
     status: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
-    if not db.get(Team, team_id):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage_schedule")
     query = db.query(IceBookingRequest).filter(IceBookingRequest.requester_team_id == team_id)
     if status:
         query = query.filter(IceBookingRequest.status == status)
@@ -112,10 +116,16 @@ def list_team_ice_booking_requests(
 
 
 @router.post("/teams/{team_id}/ice-booking-requests", response_model=IceBookingRequestOut, status_code=201)
-def create_team_ice_booking_request(team_id: str, body: IceBookingRequestCreate, db: Session = Depends(get_db)):
+def create_team_ice_booking_request(
+    team_id: str,
+    body: IceBookingRequestCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     team = db.get(Team, team_id)
     if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage_schedule")
     slot = db.get(IceSlot, body.ice_slot_id)
     if not slot:
         raise HTTPException(404, "Ice slot not found")
@@ -154,10 +164,12 @@ def create_team_ice_booking_request(team_id: str, body: IceBookingRequestCreate,
 def list_arena_ice_booking_requests(
     arena_id: str,
     status: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
     if not db.get(Arena, arena_id):
         raise HTTPException(404, "Arena not found")
+    ensure_arena_access(context, arena_id, "arena.manage_booking_requests")
     query = db.query(IceBookingRequest).filter(IceBookingRequest.arena_id == arena_id)
     if status:
         query = query.filter(IceBookingRequest.status == status)
@@ -170,8 +182,10 @@ def accept_ice_booking_request(
     arena_id: str,
     request_id: str,
     body: IceBookingRequestAccept,
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
+    ensure_arena_access(context, arena_id, "arena.manage_booking_requests")
     request_row = db.get(IceBookingRequest, request_id)
     if not request_row or request_row.arena_id != arena_id:
         raise HTTPException(404, "Ice booking request not found")
@@ -252,8 +266,10 @@ def reject_ice_booking_request(
     arena_id: str,
     request_id: str,
     body: IceBookingRequestAction,
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
+    ensure_arena_access(context, arena_id, "arena.manage_booking_requests")
     request_row = db.get(IceBookingRequest, request_id)
     if not request_row or request_row.arena_id != arena_id:
         raise HTTPException(404, "Ice booking request not found")
@@ -292,8 +308,13 @@ def cancel_team_ice_booking_request(
     team_id: str,
     request_id: str,
     body: IceBookingRequestAction,
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
+    team = db.get(Team, team_id)
+    if not team:
+        raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage_schedule")
     request_row = db.get(IceBookingRequest, request_id)
     if not request_row or request_row.requester_team_id != team_id:
         raise HTTPException(404, "Ice booking request not found")
@@ -318,8 +339,10 @@ def cancel_arena_ice_booking_request(
     arena_id: str,
     request_id: str,
     body: IceBookingRequestAction,
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
+    ensure_arena_access(context, arena_id, "arena.manage_booking_requests")
     request_row = db.get(IceBookingRequest, request_id)
     if not request_row or request_row.arena_id != arena_id:
         raise HTTPException(404, "Ice booking request not found")

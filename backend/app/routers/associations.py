@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from ..auth.context import AuthorizationContext, authorization_context, ensure_association_access, ensure_capability
 from ..database import get_db
 from ..models import Association
 from ..schemas import AssociationCreate, AssociationUpdate, AssociationOut
@@ -27,12 +28,24 @@ def get_association_logo(filename: str):
 
 
 @router.get("/associations", response_model=list[AssociationOut])
-def list_associations(db: Session = Depends(get_db)):
-    return [_association_out(association) for association in db.query(Association).order_by(Association.name).all()]
+def list_associations(
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_capability(context, "association.view")
+    query = db.query(Association)
+    if not context.user.is_platform_admin:
+        query = query.filter(Association.id.in_(context.association_ids))
+    return [_association_out(association) for association in query.order_by(Association.name).all()]
 
 
 @router.post("/associations", response_model=AssociationOut, status_code=201)
-def create_association(body: AssociationCreate, db: Session = Depends(get_db)):
+def create_association(
+    body: AssociationCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_capability(context, "platform.manage")
     assoc = Association(**body.model_dump())
     db.add(assoc)
     db.commit()
@@ -41,18 +54,29 @@ def create_association(body: AssociationCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/associations/{id}", response_model=AssociationOut)
-def get_association(id: str, db: Session = Depends(get_db)):
+def get_association(
+    id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     assoc = db.get(Association, id)
     if not assoc:
         raise HTTPException(404, "Association not found")
+    ensure_association_access(context, assoc.id, "association.view")
     return _association_out(assoc)
 
 
 @router.put("/associations/{id}", response_model=AssociationOut)
-def update_association(id: str, body: AssociationUpdate, db: Session = Depends(get_db)):
+def update_association(
+    id: str,
+    body: AssociationUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     assoc = db.get(Association, id)
     if not assoc:
         raise HTTPException(404, "Association not found")
+    ensure_association_access(context, assoc.id, "association.manage")
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(assoc, k, v)
     db.commit()
@@ -61,10 +85,16 @@ def update_association(id: str, body: AssociationUpdate, db: Session = Depends(g
 
 
 @router.post("/associations/{id}/logo", response_model=AssociationOut)
-async def upload_association_logo(id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_association_logo(
+    id: str,
+    file: UploadFile = File(...),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     assoc = db.get(Association, id)
     if not assoc:
         raise HTTPException(404, "Association not found")
+    ensure_association_access(context, assoc.id, "association.manage")
     previous_logo_path = assoc.logo_path
     assoc.logo_path = await save_association_logo_upload(id, file)
     db.commit()
@@ -74,10 +104,15 @@ async def upload_association_logo(id: str, file: UploadFile = File(...), db: Ses
 
 
 @router.delete("/associations/{id}/logo", response_model=AssociationOut)
-def delete_association_logo(id: str, db: Session = Depends(get_db)):
+def delete_association_logo(
+    id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     assoc = db.get(Association, id)
     if not assoc:
         raise HTTPException(404, "Association not found")
+    ensure_association_access(context, assoc.id, "association.manage")
     previous_logo_path = assoc.logo_path
     assoc.logo_path = None
     db.commit()
@@ -87,9 +122,14 @@ def delete_association_logo(id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/associations/{id}", status_code=204)
-def delete_association(id: str, db: Session = Depends(get_db)):
+def delete_association(
+    id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     assoc = db.get(Association, id)
     if not assoc:
         raise HTTPException(404, "Association not found")
+    ensure_capability(context, "platform.manage")
     db.delete(assoc)
     db.commit()

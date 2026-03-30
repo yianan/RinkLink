@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from ..auth.context import AuthorizationContext, authorization_context, ensure_team_access
 from ..database import get_db
 from ..models import Association, Arena, AvailabilityWindow, Proposal, Team, TeamSeasonVenueAssignment
 from ..schemas.search import AutoMatchResult, OpponentResult
@@ -35,11 +36,13 @@ def search_opponents(
     min_ranking: int | None = Query(None),
     max_ranking: int | None = Query(None),
     arena_id: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
     team = db.get(Team, team_id)
     if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage_proposals")
     my_window = db.get(AvailabilityWindow, availability_window_id)
     if not my_window:
         raise HTTPException(404, "Availability window not found")
@@ -140,5 +143,13 @@ def search_opponents(
 
 
 @router.get("/search/auto-matches", response_model=list[AutoMatchResult])
-def auto_matches(team_id: str = Query(...), db: Session = Depends(get_db)):
+def auto_matches(
+    team_id: str = Query(...),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    team = db.get(Team, team_id)
+    if not team:
+        raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage_proposals")
     return find_auto_matches(db, team_id)

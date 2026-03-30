@@ -4,6 +4,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, Up
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from ..auth.context import (
+    AuthorizationContext,
+    authorization_context,
+    ensure_arena_access,
+    ensure_capability,
+)
 from ..database import get_db
 from ..models import Arena, ArenaRink, Event, IceBookingRequest, IceSlot, LockerRoom, Proposal, TeamSeasonVenueAssignment
 from ..schemas import (
@@ -108,6 +114,52 @@ def _slot_reference_conflict_detail(db: Session, ice_slot_id: str) -> str | None
     return None
 
 
+def _require_arena(db: Session, arena_id: str) -> Arena:
+    arena = db.get(Arena, arena_id)
+    if not arena:
+        raise HTTPException(404, "Arena not found")
+    return arena
+
+
+def _require_arena_rink(db: Session, arena_rink_id: str) -> ArenaRink:
+    arena_rink = db.get(ArenaRink, arena_rink_id)
+    if not arena_rink:
+        raise HTTPException(404, "Arena rink not found")
+    return arena_rink
+
+
+def _require_locker_room(db: Session, locker_room_id: str) -> LockerRoom:
+    locker_room = db.get(LockerRoom, locker_room_id)
+    if not locker_room:
+        raise HTTPException(404, "Locker room not found")
+    return locker_room
+
+
+def _require_ice_slot(db: Session, ice_slot_id: str) -> IceSlot:
+    slot = db.get(IceSlot, ice_slot_id)
+    if not slot:
+        raise HTTPException(404, "Ice slot not found")
+    return slot
+
+
+def _arena_id_for_rink(arena_rink: ArenaRink) -> str:
+    return arena_rink.arena_id
+
+
+def _arena_id_for_locker_room(db: Session, locker_room: LockerRoom) -> str:
+    arena_rink = db.get(ArenaRink, locker_room.arena_rink_id)
+    if not arena_rink:
+        raise HTTPException(404, "Arena rink not found")
+    return arena_rink.arena_id
+
+
+def _arena_id_for_slot(db: Session, slot: IceSlot) -> str:
+    arena_rink = db.get(ArenaRink, slot.arena_rink_id)
+    if not arena_rink:
+        raise HTTPException(404, "Arena rink not found")
+    return arena_rink.arena_id
+
+
 def _arena_out(arena: Arena, db: Session) -> ArenaOut:
     out = ArenaOut.model_validate(arena)
     out.logo_url = arena_logo_url(arena.logo_path)
@@ -190,12 +242,21 @@ def _venue_assignment_out(assignment: TeamSeasonVenueAssignment, db: Session) ->
 
 
 @router.get("/arenas", response_model=list[ArenaOut])
-def list_arenas(db: Session = Depends(get_db)):
+def list_arenas(
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_capability(context, "arena.view")
     return [_arena_out(arena, db) for arena in db.query(Arena).order_by(Arena.name).all()]
 
 
 @router.post("/arenas", response_model=ArenaOut, status_code=201)
-def create_arena(body: ArenaCreate, db: Session = Depends(get_db)):
+def create_arena(
+    body: ArenaCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_capability(context, "platform.manage")
     arena = Arena(**body.model_dump())
     db.add(arena)
     db.commit()
@@ -204,18 +265,25 @@ def create_arena(body: ArenaCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/arenas/{arena_id}", response_model=ArenaOut)
-def get_arena(arena_id: str, db: Session = Depends(get_db)):
-    arena = db.get(Arena, arena_id)
-    if not arena:
-        raise HTTPException(404, "Arena not found")
+def get_arena(
+    arena_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_capability(context, "arena.view")
+    arena = _require_arena(db, arena_id)
     return _arena_out(arena, db)
 
 
 @router.put("/arenas/{arena_id}", response_model=ArenaOut)
-def update_arena(arena_id: str, body: ArenaUpdate, db: Session = Depends(get_db)):
-    arena = db.get(Arena, arena_id)
-    if not arena:
-        raise HTTPException(404, "Arena not found")
+def update_arena(
+    arena_id: str,
+    body: ArenaUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    arena = _require_arena(db, arena_id)
+    ensure_arena_access(context, arena_id, "arena.manage")
     for key, value in body.model_dump(exclude_unset=True).items():
         setattr(arena, key, value)
     db.commit()
@@ -224,10 +292,14 @@ def update_arena(arena_id: str, body: ArenaUpdate, db: Session = Depends(get_db)
 
 
 @router.post("/arenas/{arena_id}/logo", response_model=ArenaOut)
-async def upload_arena_logo(arena_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    arena = db.get(Arena, arena_id)
-    if not arena:
-        raise HTTPException(404, "Arena not found")
+async def upload_arena_logo(
+    arena_id: str,
+    file: UploadFile = File(...),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    arena = _require_arena(db, arena_id)
+    ensure_arena_access(context, arena_id, "arena.manage")
     previous_logo_path = arena.logo_path
     arena.logo_path = await save_arena_logo_upload(arena_id, file)
     db.commit()
@@ -237,10 +309,13 @@ async def upload_arena_logo(arena_id: str, file: UploadFile = File(...), db: Ses
 
 
 @router.delete("/arenas/{arena_id}/logo", response_model=ArenaOut)
-def delete_arena_logo(arena_id: str, db: Session = Depends(get_db)):
-    arena = db.get(Arena, arena_id)
-    if not arena:
-        raise HTTPException(404, "Arena not found")
+def delete_arena_logo(
+    arena_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    arena = _require_arena(db, arena_id)
+    ensure_arena_access(context, arena_id, "arena.manage")
     previous_logo_path = arena.logo_path
     arena.logo_path = None
     db.commit()
@@ -250,10 +325,13 @@ def delete_arena_logo(arena_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/arenas/{arena_id}", status_code=204)
-def delete_arena(arena_id: str, db: Session = Depends(get_db)):
-    arena = db.get(Arena, arena_id)
-    if not arena:
-        raise HTTPException(404, "Arena not found")
+def delete_arena(
+    arena_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_capability(context, "platform.manage")
+    arena = _require_arena(db, arena_id)
     today = date.today()
     future_event_count = db.query(Event).filter(Event.arena_id == arena_id, Event.date >= today).count()
     historical_event_count = db.query(Event).filter(Event.arena_id == arena_id, Event.date < today).count()
@@ -281,9 +359,13 @@ def delete_arena(arena_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/arenas/{arena_id}/rinks", response_model=list[ArenaRinkOut])
-def list_arena_rinks(arena_id: str, db: Session = Depends(get_db)):
-    if not db.get(Arena, arena_id):
-        raise HTTPException(404, "Arena not found")
+def list_arena_rinks(
+    arena_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_capability(context, "arena.view")
+    _require_arena(db, arena_id)
     rinks = (
         db.query(ArenaRink)
         .filter(ArenaRink.arena_id == arena_id)
@@ -299,10 +381,11 @@ def list_arena_ice_slots(
     status: str | None = Query(None),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
-    if not db.get(Arena, arena_id):
-        raise HTTPException(404, "Arena not found")
+    ensure_capability(context, "arena.view")
+    _require_arena(db, arena_id)
     query = (
         db.query(IceSlot)
         .join(ArenaRink, ArenaRink.id == IceSlot.arena_rink_id)
@@ -321,9 +404,14 @@ def list_arena_ice_slots(
 
 
 @router.post("/arenas/{arena_id}/rinks", response_model=ArenaRinkOut, status_code=201)
-def create_arena_rink(arena_id: str, body: ArenaRinkCreate, db: Session = Depends(get_db)):
-    if not db.get(Arena, arena_id):
-        raise HTTPException(404, "Arena not found")
+def create_arena_rink(
+    arena_id: str,
+    body: ArenaRinkCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    _require_arena(db, arena_id)
+    ensure_arena_access(context, arena_id, "arena.manage")
     arena_rink = ArenaRink(arena_id=arena_id, **body.model_dump())
     db.add(arena_rink)
     db.commit()
@@ -332,18 +420,25 @@ def create_arena_rink(arena_id: str, body: ArenaRinkCreate, db: Session = Depend
 
 
 @router.get("/arena-rinks/{arena_rink_id}", response_model=ArenaRinkOut)
-def get_arena_rink(arena_rink_id: str, db: Session = Depends(get_db)):
-    arena_rink = db.get(ArenaRink, arena_rink_id)
-    if not arena_rink:
-        raise HTTPException(404, "Arena rink not found")
+def get_arena_rink(
+    arena_rink_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_capability(context, "arena.view")
+    arena_rink = _require_arena_rink(db, arena_rink_id)
     return _arena_rink_out(arena_rink, db)
 
 
 @router.put("/arena-rinks/{arena_rink_id}", response_model=ArenaRinkOut)
-def update_arena_rink(arena_rink_id: str, body: ArenaRinkUpdate, db: Session = Depends(get_db)):
-    arena_rink = db.get(ArenaRink, arena_rink_id)
-    if not arena_rink:
-        raise HTTPException(404, "Arena rink not found")
+def update_arena_rink(
+    arena_rink_id: str,
+    body: ArenaRinkUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    arena_rink = _require_arena_rink(db, arena_rink_id)
+    ensure_arena_access(context, _arena_id_for_rink(arena_rink), "arena.manage")
     for key, value in body.model_dump(exclude_unset=True).items():
         setattr(arena_rink, key, value)
     db.commit()
@@ -352,18 +447,25 @@ def update_arena_rink(arena_rink_id: str, body: ArenaRinkUpdate, db: Session = D
 
 
 @router.delete("/arena-rinks/{arena_rink_id}", status_code=204)
-def delete_arena_rink(arena_rink_id: str, db: Session = Depends(get_db)):
-    arena_rink = db.get(ArenaRink, arena_rink_id)
-    if not arena_rink:
-        raise HTTPException(404, "Arena rink not found")
+def delete_arena_rink(
+    arena_rink_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    arena_rink = _require_arena_rink(db, arena_rink_id)
+    ensure_arena_access(context, _arena_id_for_rink(arena_rink), "arena.manage")
     db.delete(arena_rink)
     db.commit()
 
 
 @router.get("/arena-rinks/{arena_rink_id}/locker-rooms", response_model=list[LockerRoomOut])
-def list_locker_rooms(arena_rink_id: str, db: Session = Depends(get_db)):
-    if not db.get(ArenaRink, arena_rink_id):
-        raise HTTPException(404, "Arena rink not found")
+def list_locker_rooms(
+    arena_rink_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_capability(context, "arena.view")
+    _require_arena_rink(db, arena_rink_id)
     rooms = (
         db.query(LockerRoom)
         .filter(LockerRoom.arena_rink_id == arena_rink_id)
@@ -374,9 +476,14 @@ def list_locker_rooms(arena_rink_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/arena-rinks/{arena_rink_id}/locker-rooms", response_model=LockerRoomOut, status_code=201)
-def create_locker_room(arena_rink_id: str, body: LockerRoomCreate, db: Session = Depends(get_db)):
-    if not db.get(ArenaRink, arena_rink_id):
-        raise HTTPException(404, "Arena rink not found")
+def create_locker_room(
+    arena_rink_id: str,
+    body: LockerRoomCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    arena_rink = _require_arena_rink(db, arena_rink_id)
+    ensure_arena_access(context, _arena_id_for_rink(arena_rink), "arena.manage_slots")
     room = LockerRoom(arena_rink_id=arena_rink_id, **body.model_dump())
     db.add(room)
     db.commit()
@@ -385,10 +492,14 @@ def create_locker_room(arena_rink_id: str, body: LockerRoomCreate, db: Session =
 
 
 @router.put("/locker-rooms/{locker_room_id}", response_model=LockerRoomOut)
-def update_locker_room(locker_room_id: str, body: LockerRoomUpdate, db: Session = Depends(get_db)):
-    room = db.get(LockerRoom, locker_room_id)
-    if not room:
-        raise HTTPException(404, "Locker room not found")
+def update_locker_room(
+    locker_room_id: str,
+    body: LockerRoomUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    room = _require_locker_room(db, locker_room_id)
+    ensure_arena_access(context, _arena_id_for_locker_room(db, room), "arena.manage_slots")
     for key, value in body.model_dump(exclude_unset=True).items():
         setattr(room, key, value)
     db.commit()
@@ -397,10 +508,13 @@ def update_locker_room(locker_room_id: str, body: LockerRoomUpdate, db: Session 
 
 
 @router.delete("/locker-rooms/{locker_room_id}", status_code=204)
-def delete_locker_room(locker_room_id: str, db: Session = Depends(get_db)):
-    room = db.get(LockerRoom, locker_room_id)
-    if not room:
-        raise HTTPException(404, "Locker room not found")
+def delete_locker_room(
+    locker_room_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    room = _require_locker_room(db, locker_room_id)
+    ensure_arena_access(context, _arena_id_for_locker_room(db, room), "arena.manage_slots")
     db.delete(room)
     db.commit()
 
@@ -411,10 +525,11 @@ def list_ice_slots(
     status: str | None = Query(None),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
-    if not db.get(ArenaRink, arena_rink_id):
-        raise HTTPException(404, "Arena rink not found")
+    ensure_capability(context, "arena.view")
+    _require_arena_rink(db, arena_rink_id)
     query = db.query(IceSlot).filter(IceSlot.arena_rink_id == arena_rink_id)
     if status:
         query = query.filter(IceSlot.status == status)
@@ -428,9 +543,14 @@ def list_ice_slots(
 
 
 @router.post("/arena-rinks/{arena_rink_id}/ice-slots", response_model=IceSlotOut, status_code=201)
-def create_ice_slot(arena_rink_id: str, body: IceSlotCreate, db: Session = Depends(get_db)):
-    if not db.get(ArenaRink, arena_rink_id):
-        raise HTTPException(404, "Arena rink not found")
+def create_ice_slot(
+    arena_rink_id: str,
+    body: IceSlotCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    arena_rink = _require_arena_rink(db, arena_rink_id)
+    ensure_arena_access(context, _arena_id_for_rink(arena_rink), "arena.manage_slots")
     _validate_slot_pricing(body.pricing_mode, body.price_amount_cents)
     payload = body.model_dump()
     if payload["pricing_mode"] == "call_for_pricing":
@@ -443,17 +563,27 @@ def create_ice_slot(arena_rink_id: str, body: IceSlotCreate, db: Session = Depen
 
 
 @router.post("/arena-rinks/{arena_rink_id}/ice-slots/upload", response_model=IceSlotUploadPreview)
-async def upload_ice_slots(arena_rink_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    if not db.get(ArenaRink, arena_rink_id):
-        raise HTTPException(404, "Arena rink not found")
+async def upload_ice_slots(
+    arena_rink_id: str,
+    file: UploadFile = File(...),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    arena_rink = _require_arena_rink(db, arena_rink_id)
+    ensure_arena_access(context, _arena_id_for_rink(arena_rink), "arena.manage_slots")
     content = (await file.read()).decode("utf-8-sig")
     return parse_ice_slot_csv(content)
 
 
 @router.post("/arena-rinks/{arena_rink_id}/ice-slots/confirm-upload", response_model=list[IceSlotOut], status_code=201)
-def confirm_ice_slot_upload(arena_rink_id: str, body: IceSlotConfirmUpload, db: Session = Depends(get_db)):
-    if not db.get(ArenaRink, arena_rink_id):
-        raise HTTPException(404, "Arena rink not found")
+def confirm_ice_slot_upload(
+    arena_rink_id: str,
+    body: IceSlotConfirmUpload,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    arena_rink = _require_arena_rink(db, arena_rink_id)
+    ensure_arena_access(context, _arena_id_for_rink(arena_rink), "arena.manage_slots")
     created: list[IceSlot] = []
     for row in body.entries:
         slot = IceSlot(arena_rink_id=arena_rink_id, **row.model_dump())
@@ -466,9 +596,14 @@ def confirm_ice_slot_upload(arena_rink_id: str, body: IceSlotConfirmUpload, db: 
 
 
 @router.get("/arena-rinks/{arena_rink_id}/available-ice-slots", response_model=list[IceSlotOut])
-def get_available_ice_slots(arena_rink_id: str, date: date = Query(...), db: Session = Depends(get_db)):
-    if not db.get(ArenaRink, arena_rink_id):
-        raise HTTPException(404, "Arena rink not found")
+def get_available_ice_slots(
+    arena_rink_id: str,
+    date: date = Query(...),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_capability(context, "arena.view")
+    _require_arena_rink(db, arena_rink_id)
     slots = (
         db.query(IceSlot)
         .filter(IceSlot.arena_rink_id == arena_rink_id, IceSlot.date == date, IceSlot.status == "available")
@@ -484,8 +619,10 @@ def list_open_ice_slots(
     date_to: date | None = Query(None),
     arena_id: str | None = Query(None),
     arena_rink_id: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
+    ensure_capability(context, "arena.view")
     query = (
         db.query(IceSlot)
         .join(ArenaRink, ArenaRink.id == IceSlot.arena_rink_id)
@@ -496,23 +633,24 @@ def list_open_ice_slots(
     else:
         query = query.filter(IceSlot.date == date_from)
     if arena_id:
-        if not db.get(Arena, arena_id):
-            raise HTTPException(404, "Arena not found")
+        _require_arena(db, arena_id)
         query = query.filter(ArenaRink.arena_id == arena_id)
     if arena_rink_id:
-        arena_rink = db.get(ArenaRink, arena_rink_id)
-        if not arena_rink:
-            raise HTTPException(404, "Arena rink not found")
+        _require_arena_rink(db, arena_rink_id)
         query = query.filter(IceSlot.arena_rink_id == arena_rink_id)
     slots = query.order_by(IceSlot.date, IceSlot.start_time, IceSlot.created_at).all()
     return [_slot_out(slot, db) for slot in slots]
 
 
 @router.put("/ice-slots/{ice_slot_id}", response_model=IceSlotOut)
-def update_ice_slot(ice_slot_id: str, body: IceSlotUpdate, db: Session = Depends(get_db)):
-    slot = db.get(IceSlot, ice_slot_id)
-    if not slot:
-        raise HTTPException(404, "Ice slot not found")
+def update_ice_slot(
+    ice_slot_id: str,
+    body: IceSlotUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    slot = _require_ice_slot(db, ice_slot_id)
+    ensure_arena_access(context, _arena_id_for_slot(db, slot), "arena.manage_slots")
     if slot.status != "available":
         raise HTTPException(409, "Only open ice slots can be edited")
     conflict_detail = _slot_reference_conflict_detail(db, ice_slot_id)
@@ -535,10 +673,13 @@ def update_ice_slot(ice_slot_id: str, body: IceSlotUpdate, db: Session = Depends
 
 
 @router.delete("/ice-slots/{ice_slot_id}", status_code=204)
-def delete_ice_slot(ice_slot_id: str, db: Session = Depends(get_db)):
-    slot = db.get(IceSlot, ice_slot_id)
-    if not slot:
-        raise HTTPException(404, "Ice slot not found")
+def delete_ice_slot(
+    ice_slot_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    slot = _require_ice_slot(db, ice_slot_id)
+    ensure_arena_access(context, _arena_id_for_slot(db, slot), "arena.manage_slots")
     if slot.status != "available":
         raise HTTPException(409, "Only open ice slots can be deleted")
     conflict_detail = _slot_reference_conflict_detail(db, ice_slot_id)
@@ -549,10 +690,15 @@ def delete_ice_slot(ice_slot_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/arenas/{arena_id}/ice-slots/{ice_slot_id}/cancel", status_code=204)
-def cancel_arena_ice_slot(arena_id: str, ice_slot_id: str, body: IceSlotCancel, db: Session = Depends(get_db)):
-    slot = db.get(IceSlot, ice_slot_id)
-    if not slot:
-        raise HTTPException(404, "Ice slot not found")
+def cancel_arena_ice_slot(
+    arena_id: str,
+    ice_slot_id: str,
+    body: IceSlotCancel,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_arena_access(context, arena_id, "arena.manage_slots")
+    slot = _require_ice_slot(db, ice_slot_id)
     arena_rink = db.get(ArenaRink, slot.arena_rink_id)
     if not arena_rink or arena_rink.arena_id != arena_id:
         raise HTTPException(404, "Ice slot not found for arena")
@@ -632,10 +778,15 @@ def cancel_arena_ice_slot(arena_id: str, ice_slot_id: str, body: IceSlotCancel, 
 
 
 @router.patch("/arenas/{arena_id}/ice-slots/{ice_slot_id}/locker-rooms", status_code=204)
-def update_arena_ice_slot_locker_rooms(arena_id: str, ice_slot_id: str, body: EventLockerRoomUpdate, db: Session = Depends(get_db)):
-    slot = db.get(IceSlot, ice_slot_id)
-    if not slot:
-        raise HTTPException(404, "Ice slot not found")
+def update_arena_ice_slot_locker_rooms(
+    arena_id: str,
+    ice_slot_id: str,
+    body: EventLockerRoomUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_arena_access(context, arena_id, "arena.manage_booking_requests")
+    slot = _require_ice_slot(db, ice_slot_id)
     arena_rink = db.get(ArenaRink, slot.arena_rink_id)
     if not arena_rink or arena_rink.arena_id != arena_id:
         raise HTTPException(404, "Ice slot not found for arena")
@@ -684,9 +835,14 @@ def update_arena_ice_slot_locker_rooms(arena_id: str, ice_slot_id: str, body: Ev
 
 
 @router.get("/arenas/{arena_id}/venue-assignments", response_model=list[TeamSeasonVenueAssignmentOut])
-def list_arena_venue_assignments(arena_id: str, season_id: str | None = Query(None), db: Session = Depends(get_db)):
-    if not db.get(Arena, arena_id):
-        raise HTTPException(404, "Arena not found")
+def list_arena_venue_assignments(
+    arena_id: str,
+    season_id: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_capability(context, "arena.view")
+    _require_arena(db, arena_id)
     query = db.query(TeamSeasonVenueAssignment).filter(TeamSeasonVenueAssignment.arena_id == arena_id)
     if season_id:
         query = query.filter(TeamSeasonVenueAssignment.season_id == season_id)

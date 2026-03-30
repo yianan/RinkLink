@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from ..auth.context import AuthorizationContext, authorization_context, ensure_team_access
 from ..database import get_db
 from ..models import Event, Notification, Team
 from ..schemas import NotificationOut
@@ -58,10 +59,13 @@ def ensure_weekly_confirm_notification(db: Session, team_id: str) -> None:
 def list_notifications(
     team_id: str,
     unread_only: bool = Query(False),
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
-    if not db.get(Team, team_id):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.view")
 
     ensure_weekly_confirm_notification(db, team_id)
 
@@ -72,10 +76,17 @@ def list_notifications(
 
 
 @router.patch("/notifications/{id}/read", response_model=NotificationOut)
-def mark_read(id: str, db: Session = Depends(get_db)):
+def mark_read(
+    id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     n = db.get(Notification, id)
     if not n:
         raise HTTPException(404, "Notification not found")
+    if not n.team:
+        raise HTTPException(404, "Team not found")
+    ensure_team_access(context, n.team, "team.view")
     if n.read_at is None:
         from datetime import datetime, timezone
 
