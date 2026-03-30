@@ -22,6 +22,12 @@ if (!frontendUrl) {
   throw new Error("FRONTEND_URL is required for auth-service");
 }
 
+const apiAudience = process.env.API_AUDIENCE;
+
+if (!apiAudience) {
+  throw new Error("API_AUDIENCE is required for auth-service");
+}
+
 const pool = new Pool({
   connectionString: databaseUrl,
 });
@@ -58,6 +64,23 @@ export const auth = betterAuth({
   baseURL,
   database: pool,
   trustedOrigins: [frontendUrl, "https://appleid.apple.com"],
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 100,
+    customRules: {
+      "/sign-in/email": { window: 60, max: 5 },
+      "/sign-up/email": { window: 60, max: 5 },
+      "/forget-password": { window: 3600, max: 3 },
+      "/reset-password": { window: 3600, max: 5 },
+    },
+  },
+  // Better Auth does not support account lockout natively.
+  // Rate limiting on sign-in (5/min) is the primary brute-force defense.
+  // Add a custom lockout hook here if needed in the future.
+  account: {
+    accountLinking: { enabled: true },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
@@ -65,6 +88,7 @@ export const auth = betterAuth({
     minPasswordLength: 8,
     maxPasswordLength: 128,
     sendResetPassword: async ({ user, url }) => {
+      // TODO: Replace with production email provider (SendGrid, SES, etc.)
       console.info(`[auth-service] Reset password requested for ${user.email}: ${url}`);
     },
   },
@@ -73,6 +97,7 @@ export const auth = betterAuth({
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
+      // TODO: Replace with production email provider (SendGrid, SES, etc.)
       console.info(`[auth-service] Verify email for ${user.email}: ${url}`);
     },
   },
@@ -83,8 +108,7 @@ export const auth = betterAuth({
         jwksPath: "/.well-known/jwks.json",
       },
       jwt: {
-        // FastAPI validates service tokens against this audience.
-        audience: ["http://localhost:8000"],
+        audience: [apiAudience],
       },
     }),
   ],

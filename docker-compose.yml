@@ -58,6 +58,7 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/rinklink?options=-c%20search_path%3Dauth
       BETTER_AUTH_URL: http://localhost:3000
       FRONTEND_URL: http://localhost:5173
+      API_AUDIENCE: http://localhost:8000
       APP_ENV: development
       BETTER_AUTH_SECRET: local-dev-secret-change-this-to-a-long-random-value
     command: >
