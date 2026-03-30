@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   Search,
+  Link2,
   ShieldCheck,
   Snowflake,
   Trophy,
@@ -59,6 +60,7 @@ const ProposalsPage = lazy(() => import('./pages/ProposalsPage'));
 const ArenaListPage = lazy(() => import('./pages/ArenaListPage'));
 const ArenaDetailPage = lazy(() => import('./pages/ArenaDetailPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const FamilyLinksPage = lazy(() => import('./pages/FamilyLinksPage'));
 
 function RouteFallback() {
   return (
@@ -145,7 +147,7 @@ const NAV_SECTIONS = [
     label: 'Team',
     items: [
       { path: '/roster', label: 'Roster', icon: ClipboardList },
-      { path: '/family-links', label: 'Family Links', icon: ShieldCheck },
+      { path: '/family-links', label: 'Family Links', icon: Link2 },
       { path: '/availability', label: 'Availability', icon: Calendar },
       { path: '/schedule', label: 'Schedule', icon: ClipboardSignature },
     ],
@@ -572,7 +574,7 @@ function AppContent() {
                     <Route path="/invite/:token" element={<InviteAcceptancePage />} />
                     <Route path="/" element={<HomePage />} />
                 <Route path="/access" element={<AccessPage />} />
-                <Route path="/family-links" element={<AccessPage />} />
+                <Route path="/family-links" element={<FamilyLinksPage />} />
                     <Route path="/associations" element={<AssociationListPage />} />
                     <Route path="/competitions" element={<CompetitionsPage />} />
                     <Route path="/standings" element={<StandingsPage />} />
