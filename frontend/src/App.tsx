@@ -527,18 +527,6 @@ function AppContent() {
               </div>
               {runtimeAuthEnabled ? (
                 <>
-                  <Tooltip content="Account settings">
-                    <NavLink
-                      to="/settings"
-                      className={cn(
-                        'hidden sm:inline-flex shrink-0 items-center justify-center rounded-lg',
-                        chromeIconButtonClass,
-                      )}
-                      aria-label="Account settings"
-                    >
-                      <UserCog className="h-4 w-4" />
-                    </NavLink>
-                  </Tooltip>
                   <Tooltip content="Sign out">
                     <button
                       type="button"
@@ -597,8 +585,7 @@ function AppContent() {
                     <Route path="/events/:eventId" element={<LegacyEventRedirect />} />
                     <Route path="/search" element={<SearchPage />} />
                     <Route path="/proposals" element={<ProposalsPage />} />
-                    <Route path="/settings" element={<SettingsPage tab="account" />} />
-                    <Route path="/settings/security" element={<SettingsPage tab="security" />} />
+                    <Route path="/settings/:tab?" element={<SettingsPage />} />
                     <Route path="/arenas" element={<ArenaListPage />} />
                     <Route path="/arenas/:arenaId" element={<ArenaDetailPage />} />
                     <Route path="/arenas/:arenaId/rinks/:arenaRinkId" element={<ArenaDetailPage />} />

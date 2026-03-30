@@ -1,5 +1,6 @@
 import { AccountSettingsCards, SecuritySettingsCards } from '@daveyplate/better-auth-ui';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useParams } from 'react-router-dom';
 
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
@@ -33,17 +34,19 @@ const settingsCardClassNames = {
   },
 } as const;
 
-type SettingsPageProps = {
-  tab: SettingsTab;
-};
-
-export default function SettingsPage({ tab }: SettingsPageProps) {
-  const navigate = useNavigate();
+export default function SettingsPage() {
+  const { tab: tabParam } = useParams<{ tab?: string }>();
+  const [tab, setTab] = useState<SettingsTab>(tabParam === 'security' ? 'security' : 'account');
 
   const tabs = [
     { label: 'Account', value: 'account' as const },
     { label: 'Security', value: 'security' as const },
   ];
+
+  const handleTabChange = (nextTab: SettingsTab) => {
+    setTab(nextTab);
+    window.history.replaceState(null, '', nextTab === 'account' ? '/settings' : '/settings/security');
+  };
 
   const pageMeta = tab === 'security'
     ? {
@@ -62,7 +65,7 @@ export default function SettingsPage({ tab }: SettingsPageProps) {
           <SegmentedTabs
             items={tabs}
             value={tab}
-            onChange={(nextTab) => navigate(nextTab === 'account' ? '/settings' : '/settings/security')}
+            onChange={handleTabChange}
           />
         )}
       />
