@@ -554,9 +554,9 @@ html.dark {
   }
 
   .rinklink-auth-forgot-link {
-    color: var(--app-accent-link) !important;
+    color: var(--color-slate-500) !important;
     text-decoration: none !important;
-    font-weight: 600;
+    font-weight: 500;
     transition: color 160ms ease;
   }
 
@@ -612,7 +612,7 @@ html.dark {
 
   .rinklink-auth-footer-link:hover,
   .rinklink-auth-forgot-link:hover {
-    color: var(--app-accent-link-hover) !important;
+    color: var(--app-accent-link) !important;
     text-decoration: none !important;
   }
 
@@ -1189,7 +1189,7 @@ html.dark {
   }
 
   html.dark .rinklink-auth-forgot-link {
-    color: var(--app-accent-link) !important;
+    color: var(--color-slate-400) !important;
   }
 
   html.dark .rinklink-auth-footer-link:hover,
