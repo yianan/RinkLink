@@ -55,6 +55,12 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -420,7 +426,7 @@ def accept_invite(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This invite is for a different email address")
     if invite.status != "pending":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This invite is no longer pending")
-    if invite.expires_at <= _utcnow():
+    if _as_utc(invite.expires_at) <= _utcnow():
         invite.status = "expired"
         db.commit()
         raise HTTPException(status_code=status.HTTP_410_GONE, detail="This invite has expired")

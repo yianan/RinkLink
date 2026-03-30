@@ -4,7 +4,11 @@ const authOrigin = (import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:3000
 const authApiBaseUrl = `${authOrigin}/api/auth`;
 const tokenRefreshSkewMs = 30_000;
 
-export const authEnabled = import.meta.env.VITE_AUTH_ENABLED === 'true';
+const authFlag = import.meta.env.VITE_AUTH_ENABLED;
+
+export const authEnabled = authFlag === undefined
+  ? import.meta.env.DEV
+  : authFlag === 'true';
 export const authClient = createAuthClient({
   baseURL: authOrigin,
 });

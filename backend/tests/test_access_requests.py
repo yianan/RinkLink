@@ -7,8 +7,8 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth.context import build_authorization_context
-from app.models import AccessRequest, AppUser, Arena, Association, Player, Season, Team, TeamMembership
-from app.routers.access import create_access_request, list_access_targets
+from app.models import AccessRequest, AppUser, Arena, Association, Invite, Player, Season, Team, TeamMembership
+from app.routers.access import accept_invite, create_access_request, list_access_targets
 from app.schemas import AccessRequestCreate
 
 
@@ -130,3 +130,59 @@ def test_existing_membership_blocks_redundant_access_request(db: Session) -> Non
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == "You already have access to this resource"
+
+
+def test_accept_invite_activates_pending_user_membership(db: Session) -> None:
+    association = make_association(db, "Invite Association")
+    team = make_team(db, association, "Invite Team")
+    pending_user = make_user(db, "invitee@example.com", status="pending")
+    db.add(
+        Invite(
+            token="invite-token",
+            email="invitee@example.com",
+            target_type="team",
+            target_id=team.id,
+            role="manager",
+            invited_by_user_id=pending_user.id,
+            status="pending",
+            expires_at=date.max,
+        )
+    )
+    db.commit()
+
+    context = build_authorization_context(db, pending_user)
+    accepted = accept_invite(token="invite-token", context=context, db=db)
+
+    db.refresh(pending_user)
+    assert accepted.status == "accepted"
+    assert pending_user.status == "active"
+    membership = db.query(TeamMembership).filter(TeamMembership.user_id == pending_user.id, TeamMembership.team_id == team.id).one()
+    assert membership.role == "manager"
+
+
+def test_accept_invite_rejects_wrong_email(db: Session) -> None:
+    association = make_association(db, "Wrong Email Association")
+    team = make_team(db, association, "Wrong Email Team")
+    invited_user = make_user(db, "correct@example.com", status="pending")
+    wrong_user = make_user(db, "wrong@example.com", status="pending")
+    db.add(
+        Invite(
+            token="wrong-email-token",
+            email="correct@example.com",
+            target_type="team",
+            target_id=team.id,
+            role="coach",
+            invited_by_user_id=invited_user.id,
+            status="pending",
+            expires_at=date.max,
+        )
+    )
+    db.commit()
+
+    context = build_authorization_context(db, wrong_user)
+
+    with pytest.raises(HTTPException) as exc_info:
+        accept_invite(token="wrong-email-token", context=context, db=db)
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "This invite is for a different email address"

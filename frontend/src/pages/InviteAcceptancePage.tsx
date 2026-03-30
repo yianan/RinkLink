@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { authClient, clearApiAccessToken } from '../lib/auth-client';
 import { useAuth } from '../context/AuthContext';
 import type { Invite } from '../types';
 
@@ -113,6 +114,13 @@ export default function InviteAcceptancePage() {
     }
   };
 
+  const signOutAndSwitchAccount = async () => {
+    clearApiAccessToken();
+    await authClient.signOut();
+    window.sessionStorage.setItem(RETURN_TO_KEY, `/invite/${token}`);
+    window.location.href = '/auth/sign-in';
+  };
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-4 py-8 sm:px-6">
       <Card className="w-full p-8 sm:p-10">
@@ -173,6 +181,9 @@ export default function InviteAcceptancePage() {
             disabled={!invite || invite.status !== 'pending' || submitting}
           >
             {submitting ? 'Accepting…' : 'Accept invite'}
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => void signOutAndSwitchAccount()} disabled={submitting}>
+            Sign out and switch account
           </Button>
           {inviteResolved ? (
             <Button type="button" variant="ghost" onClick={() => navigate('/')}>

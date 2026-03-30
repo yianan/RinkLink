@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Season } from '../types';
 import { api } from '../api/client';
+import { useAuth } from './AuthContext';
 
 interface SeasonContextType {
   seasons: Season[];
@@ -19,11 +20,24 @@ const SeasonContext = createContext<SeasonContextType>({
 });
 
 export function SeasonProvider({ children }: { children: ReactNode }) {
+  const { authEnabled, isAuthenticated, loading: authLoading, me } = useAuth();
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [activeSeason, setActiveSeason] = useState<Season | null>(null);
   const [loading, setLoading] = useState(true);
+  const appAccessReady = !authEnabled || (
+    isAuthenticated
+    && !!me
+    && (me.user.is_platform_admin || me.user.status === 'active')
+  );
 
   const refreshSeasons = async () => {
+    if (!appAccessReady) {
+      setSeasons([]);
+      setActiveSeason(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await api.getSeasons();
@@ -42,8 +56,11 @@ export function SeasonProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
     refreshSeasons();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [appAccessReady, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (activeSeason?.id) {

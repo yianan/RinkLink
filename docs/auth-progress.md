@@ -176,6 +176,18 @@
   - users with an existing membership are rejected when requesting the same access again
 - Validation:
   - `backend/.venv/bin/pytest tests/test_auth_context.py tests/test_access_requests.py -q` passed (`7 passed`)
+- Hardened the invite acceptance flow:
+  - invite acceptance now normalizes DB timestamps before comparing expiry, which avoids naive-vs-aware datetime crashes across adapters
+  - invite review now gives the user a direct "sign out and switch account" path when they are authenticated under the wrong email
+  - backend tests now cover successful invite activation and wrong-email rejection cases
+- Hardened the local browser auth path:
+  - frontend auth now defaults to enabled in Vite development when `VITE_AUTH_ENABLED` is unset, which keeps local browser runs aligned with the auth rollout plan
+  - season and team bootstrap now wait for an authenticated active app user before calling protected APIs, which removes early `401` churn on the Better Auth sign-in screen
+  - Playwright verification now lands cleanly on `/auth/sign-in` with no frontend console errors after the auth-context bootstrap fixes
+- Validation:
+  - `backend/.venv/bin/pytest tests/test_auth_context.py tests/test_access_requests.py -q` passed (`9 passed`)
+  - `npm run build` succeeded in `frontend/`
+  - Playwright browser check reached `http://localhost:5173/auth/sign-in` with no console errors
 
 ## Planned Commit Sequence
 

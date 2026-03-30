@@ -24,6 +24,11 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTeam, setActiveTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
+  const appAccessReady = !authEnabled || (
+    isAuthenticated
+    && !!me
+    && (me.user.is_platform_admin || me.user.status === 'active')
+  );
 
   const accessibleTeamsFallback: Team[] = (me?.accessible_teams || []).map((team) => ({
     id: team.id,
@@ -47,7 +52,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   }));
 
   const refreshTeams = async () => {
-    if (authEnabled && !isAuthenticated) {
+    if (!appAccessReady) {
       setTeams([]);
       setActiveTeam(null);
       setLoading(false);
@@ -92,7 +97,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       return;
     }
     refreshTeams();
-  }, [authLoading, isAuthenticated, me?.accessible_teams]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [appAccessReady, authLoading, me?.accessible_teams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (activeTeam?.id) {
