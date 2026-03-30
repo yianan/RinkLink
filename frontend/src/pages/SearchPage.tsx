@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { Arena, ArenaRink, AutoMatchResult, AvailabilityWindow, IceSlot, OpponentResult, Proposal } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
+import { useAuth } from '../context/AuthContext';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -20,6 +21,7 @@ import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competit
 import { addDays, formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time';
 import { useToast } from '../context/ToastContext';
 import { cn } from '../lib/cn';
+import { canManageProposals } from '../lib/permissions';
 import { filterButtonClass } from '../lib/uiClasses';
 
 const EVENT_TYPES: Proposal['event_type'][] = ['league', 'tournament', 'practice', 'showcase', 'scrimmage', 'exhibition'];
@@ -84,7 +86,9 @@ export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const { activeTeam } = useTeam();
   const { activeSeason, seasons } = useSeason();
+  const { authEnabled, me } = useAuth();
   const pushToast = useToast();
+  const proposalAccess = !authEnabled || canManageProposals(me);
 
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const standardLevels = standardLevelsForAgeGroup(activeTeam?.age_group || '');
@@ -224,6 +228,9 @@ export default function SearchPage() {
 
   if (!activeTeam) {
     return <Alert variant="info">Select a team to search for opponents.</Alert>;
+  }
+  if (!proposalAccess) {
+    return <Alert variant="error">You do not have permission to create or manage proposals for this team.</Alert>;
   }
 
   if (!effectiveSeason) {

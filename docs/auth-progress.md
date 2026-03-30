@@ -127,6 +127,15 @@
   - `./.venv/bin/python -m compileall app` succeeded after the family authz path changes
   - `./.venv/bin/python -c "from app.main import app; print('ok')"` succeeded after the family event access updates
   - `npm run build` succeeded after the family dashboard, schedule, and event-detail changes
+- Added frontend role-aware page gating for the remaining admin and operations surfaces:
+  - introduced a shared frontend capability helper in `frontend/src/lib/permissions.ts`
+  - roster now supports coach-style read-only mode while hiding add/edit/delete/upload affordances from non-roster managers
+  - availability, search, and proposals now short-circuit with clear access messaging when the active user lacks schedule/proposal permissions
+  - team, association, and arena directory pages now differentiate read-only visibility from create/update/delete rights
+  - arena detail now preserves read-only arena visibility while hiding rink, slot, locker-room, and booking-request operations from users without the corresponding arena capabilities
+  - generic auth pages remain on `better-auth-ui`; these changes are only for custom RinkLink authorization-driven surfaces
+- Validation:
+  - `npm run build` succeeded after the shared frontend permission helper and page-gating pass
 
 ## Planned Commit Sequence
 

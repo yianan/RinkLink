@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { Association, Team } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
+import { useAuth } from '../context/AuthContext';
 import AgeLevelSelect from '../components/AgeLevelSelect';
 import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
 import { FilterPanel, FilterPanelTrigger } from '../components/FilterPanel';
@@ -17,6 +18,7 @@ import { Badge } from '../components/ui/Badge';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
+import { canManageTeams, canViewTeams } from '../lib/permissions';
 import { accentLinkClass, destructiveIconButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 import TeamLogo from '../components/TeamLogo';
 
@@ -40,9 +42,12 @@ function ageGroupSortValue(value: string) {
 export default function TeamListPage() {
   const { refreshTeams } = useTeam();
   const { activeSeason, seasons } = useSeason();
+  const { authEnabled, me } = useAuth();
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const confirm = useConfirmDialog();
   const pushToast = useToast();
+  const teamVisible = !authEnabled || canViewTeams(me);
+  const teamEditable = !authEnabled || canManageTeams(me);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [associations, setAssociations] = useState<Association[]>([]);
@@ -62,7 +67,7 @@ export default function TeamListPage() {
   const load = async () => {
     const [teamData, associationData] = await Promise.all([
       api.getTeams(effectiveSeason ? { season_id: effectiveSeason.id } : undefined),
-      api.getAssociations(),
+      teamEditable ? api.getAssociations() : Promise.resolve([] as Association[]),
     ]);
     setTeams(teamData);
     setAssociations(associationData);
@@ -224,6 +229,10 @@ export default function TeamListPage() {
     setSelectedLevels([]);
   };
 
+  if (!teamVisible) {
+    return <Card className="p-6 text-sm text-slate-600 dark:text-slate-400">You do not have access to the team directory.</Card>;
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -236,10 +245,12 @@ export default function TeamListPage() {
         actions={(
           <>
             <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((open) => !open)} />
-            <Button type="button" onClick={openCreateTeam}>
-              <Users className="h-4 w-4" />
-              Add Team
-            </Button>
+            {teamEditable ? (
+              <Button type="button" onClick={openCreateTeam}>
+                <Users className="h-4 w-4" />
+                Add Team
+              </Button>
+            ) : null}
           </>
         )}
       />
@@ -277,30 +288,32 @@ export default function TeamListPage() {
                     <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">{team.association_name || 'No association'}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className={tableActionButtonClass}
-                    onClick={() => openEditTeam(team)}
-                    aria-label="Edit team"
-                    title="Edit team"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
-                    onClick={() => deleteTeam(team)}
-                    aria-label="Delete team"
-                    title="Delete team"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                {teamEditable ? (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={tableActionButtonClass}
+                      onClick={() => openEditTeam(team)}
+                      aria-label="Edit team"
+                      title="Edit team"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
+                      onClick={() => deleteTeam(team)}
+                      aria-label="Delete team"
+                      title="Delete team"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : null}
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">

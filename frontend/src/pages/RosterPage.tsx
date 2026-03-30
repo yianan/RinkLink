@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { FileUp, Pencil, Save, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
 import { useSeason } from '../context/SeasonContext';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import { Player } from '../types';
 import RosterCsvUploader from '../components/RosterCsvUploader';
@@ -18,6 +19,7 @@ import EmptyState from '../components/EmptyState';
 import TeamLogo from '../components/TeamLogo';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
+import { canManageRoster, canViewPrivateRoster } from '../lib/permissions';
 import { destructiveIconButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 
 const emptyForm = {
@@ -76,6 +78,7 @@ function SeasonTotalsChips({ player }: { player: Player }) {
 export default function RosterPage() {
   const { activeTeam } = useTeam();
   const { activeSeason, seasons } = useSeason();
+  const { authEnabled, me } = useAuth();
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const [tab, setTab] = useState(0);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -84,6 +87,8 @@ export default function RosterPage() {
   const [form, setForm] = useState({ ...emptyForm });
   const confirm = useConfirmDialog();
   const pushToast = useToast();
+  const rosterVisible = !authEnabled || canViewPrivateRoster(me);
+  const rosterEditable = !authEnabled || canManageRoster(me);
 
   const load = () => {
     if (!activeTeam || !effectiveSeason) return;
@@ -144,26 +149,29 @@ export default function RosterPage() {
   if (!effectiveSeason) {
     return <Alert variant="info">No season is available yet.</Alert>;
   }
+  if (!rosterVisible) {
+    return <Alert variant="error">You do not have access to this team roster.</Alert>;
+  }
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="Roster"
         subtitle={`Manage the ${effectiveSeason.name} Season roster and use it for stats tracking.`}
-        actions={(
+        actions={rosterEditable ? (
           <Button type="button" onClick={() => { setEditId(null); setForm({ ...emptyForm }); setOpen(true); }}>
             <UserPlus className="h-4 w-4" />
             Add Player
           </Button>
-        )}
+        ) : undefined}
       />
       <SegmentedTabs
         items={[
           { label: `Players (${players.length})`, value: 0 },
-          { label: 'Upload CSV', value: 1 },
+          ...(rosterEditable ? [{ label: 'Upload CSV', value: 1 as const }] : []),
         ]}
         value={tab}
-        onChange={setTab}
+        onChange={(value) => setTab(value)}
       />
 
       {tab === 0 && (
@@ -192,14 +200,16 @@ export default function RosterPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit" className={tableActionButtonClass}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  {rosterEditable ? (
+                    <div className="flex items-center gap-1">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit" className={tableActionButtonClass}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -210,7 +220,7 @@ export default function RosterPage() {
                     icon={<Users className="h-5 w-5" />}
                     title="No players yet"
                     description="Add players manually or upload a roster CSV."
-                    actions={(
+                    actions={rosterEditable ? (
                       <>
                         <Button type="button" size="sm" onClick={() => { setEditId(null); setForm({ ...emptyForm }); setOpen(true); }}>
                           <UserPlus className="h-4 w-4" />
@@ -221,7 +231,7 @@ export default function RosterPage() {
                           Upload CSV
                         </Button>
                       </>
-                    )}
+                    ) : undefined}
                     className="border-0 shadow-none"
                   />
                 </div>
@@ -236,7 +246,7 @@ export default function RosterPage() {
                   <th scope="col" className="w-[30%] px-4 py-3">Player</th>
                   <th scope="col" className="w-[28%] px-4 py-3">Season Totals</th>
                   <th scope="col" className="w-32 px-4 py-3">Position</th>
-                  <th scope="col" className="w-28 px-4 py-3 text-right">Actions</th>
+                  {rosterEditable ? <th scope="col" className="w-28 px-4 py-3 text-right">Actions</th> : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
@@ -260,27 +270,29 @@ export default function RosterPage() {
                         {positionLabel(p.position)}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 align-middle">
-                      <div className="flex justify-end gap-1">
-                        <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit" className={tableActionButtonClass}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
+                    {rosterEditable ? (
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex justify-end gap-1">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(p)} aria-label="Edit" className={tableActionButtonClass}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(p.id)} aria-label="Delete" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
 
                   {players.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6">
+                      <td colSpan={rosterEditable ? 5 : 4} className="px-4 py-6">
                         <EmptyState
                           icon={<Users className="h-5 w-5" />}
                           title="No players yet"
                           description="Add players manually or upload a roster CSV."
-                          actions={(
+                          actions={rosterEditable ? (
                             <>
                               <Button type="button" size="sm" onClick={() => { setEditId(null); setForm({ ...emptyForm }); setOpen(true); }}>
                                 <UserPlus className="h-4 w-4" />
@@ -291,7 +303,7 @@ export default function RosterPage() {
                                 Upload CSV
                               </Button>
                             </>
-                          )}
+                          ) : undefined}
                           className="border-0 shadow-none"
                         />
                       </td>
@@ -303,7 +315,7 @@ export default function RosterPage() {
         </Card>
       )}
 
-      {tab === 1 && (
+      {tab === 1 && rosterEditable && (
         <RosterCsvUploader
           teamId={activeTeam.id}
           seasonId={effectiveSeason.id}

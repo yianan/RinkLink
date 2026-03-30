@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { CalendarPlus2, Check, ChevronLeft, DoorOpen, FileUp, Pencil, Plus, Save, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../api/client';
 import { Arena, ArenaRink, Event, IceBookingRequest, IceSlot, LockerRoom } from '../types';
+import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/PageHeader';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
@@ -18,6 +19,7 @@ import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { formatShortDate, formatTimeHHMM, hasInvalidTimeRange } from '../lib/time';
 import { cn } from '../lib/cn';
+import { canManageArena, canManageArenaBookingRequests, canManageArenaSlots, canViewArenas } from '../lib/permissions';
 import { accentSelectorPillActiveClass, destructiveIconButtonClass, selectorPillClass, selectorPillIdleClass, tableActionButtonClass } from '../lib/uiClasses';
 import TeamLogo from '../components/TeamLogo';
 import { getCompetitionLabel } from '../lib/competition';
@@ -117,8 +119,13 @@ type CancelSlotTarget = {
 export default function ArenaDetailPage() {
   const navigate = useNavigate();
   const { arenaId = '', arenaRinkId } = useParams();
+  const { authEnabled, me } = useAuth();
   const confirm = useConfirmDialog();
   const pushToast = useToast();
+  const arenaVisible = !authEnabled || canViewArenas(me);
+  const arenaEditable = !authEnabled || canManageArena(me);
+  const slotEditable = !authEnabled || canManageArenaSlots(me);
+  const bookingEditable = !authEnabled || canManageArenaBookingRequests(me);
 
   const [arena, setArena] = useState<Arena | null>(null);
   const [rinks, setRinks] = useState<ArenaRink[]>([]);
@@ -633,6 +640,10 @@ export default function ArenaDetailPage() {
     }
   };
 
+  if (!arenaVisible) {
+    return <Alert variant="error">You do not have access to this arena.</Alert>;
+  }
+
   if (!arena) {
     return <Alert variant="info">Loading arena…</Alert>;
   }
@@ -963,14 +974,18 @@ export default function ArenaDetailPage() {
               <ChevronLeft className="h-4 w-4" />
               Back to Arenas
             </Button>
-            <Button type="button" variant="outline" onClick={() => setArenaEditOpen(true)}>
-              <Pencil className="h-4 w-4" />
-              Edit Arena
-            </Button>
-            <Button type="button" onClick={openCreateRink}>
-              <Plus className="h-4 w-4" />
-              Add Rink
-            </Button>
+            {arenaEditable ? (
+              <Button type="button" variant="outline" onClick={() => setArenaEditOpen(true)}>
+                <Pencil className="h-4 w-4" />
+                Edit Arena
+              </Button>
+            ) : null}
+            {arenaEditable ? (
+              <Button type="button" onClick={openCreateRink}>
+                <Plus className="h-4 w-4" />
+                Add Rink
+              </Button>
+            ) : null}
           </>
         )}
       />
@@ -1055,25 +1070,29 @@ export default function ArenaDetailPage() {
           <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
             <span>{selectedRink.locker_room_count} locker rooms</span>
             <span>{selectedRink.ice_slot_count} ice slots</span>
-            <Button type="button" variant="outline" size="sm" onClick={() => setLockerManagerOpen(true)}>
-              <DoorOpen className="h-3.5 w-3.5" />
-              Manage Locker Rooms
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => openEditRink(selectedRink)}>
-              <Pencil className="h-3.5 w-3.5" />
-              Edit Rink
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
-              onClick={() => deleteRink(selectedRink)}
-              aria-label="Delete rink"
-              title="Delete rink"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {arenaEditable ? (
+              <>
+                <Button type="button" variant="outline" size="sm" onClick={() => setLockerManagerOpen(true)}>
+                  <DoorOpen className="h-3.5 w-3.5" />
+                  Manage Locker Rooms
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => openEditRink(selectedRink)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit Rink
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
+                  onClick={() => deleteRink(selectedRink)}
+                  aria-label="Delete rink"
+                  title="Delete rink"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            ) : null}
           </div>
         ) : (
           <div className="mt-4 text-sm text-slate-600 dark:text-slate-400">Add a rink to manage locker rooms and ice slots.</div>
@@ -1090,18 +1109,20 @@ export default function ArenaDetailPage() {
                   Manage the live slot inventory for {selectedRink.name}.
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" size="sm" variant="outline" onClick={() => setSlotUploadOpen((current) => !current)}>
-                  <FileUp className="h-3.5 w-3.5" />
-                  {slotUploadOpen ? 'Hide Upload' : 'Upload CSV'}
-                </Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => setSlotModalOpen(true)}>
-                  <CalendarPlus2 className="h-3.5 w-3.5" />
-                  Add Ice Slot
-                </Button>
-              </div>
+              {slotEditable ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => setSlotUploadOpen((current) => !current)}>
+                    <FileUp className="h-3.5 w-3.5" />
+                    {slotUploadOpen ? 'Hide Upload' : 'Upload CSV'}
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => setSlotModalOpen(true)}>
+                    <CalendarPlus2 className="h-3.5 w-3.5" />
+                    Add Ice Slot
+                  </Button>
+                </div>
+              ) : null}
             </div>
-            {slotUploadOpen ? (
+            {slotUploadOpen && slotEditable ? (
               <div className="mt-4 rounded-2xl border border-[color:var(--app-border-subtle)] bg-[var(--app-surface)] p-4">
                 <div className="mb-3 text-sm text-slate-600 dark:text-slate-400">
                   Upload slot date, time, pricing, and notes in bulk for this rink.
@@ -1160,7 +1181,7 @@ export default function ArenaDetailPage() {
                   >
                     {formatPriceLabel(slot.pricing_mode, slot.price_amount_cents, slot.currency)}
                   </Badge>
-                  {slot.status === 'available' ? (
+                  {slot.status === 'available' && slotEditable ? (
                     <div className="flex items-center justify-start gap-2 md:col-span-3 lg:col-span-1 lg:justify-end">
                       <Button
                         type="button"
@@ -1183,7 +1204,7 @@ export default function ArenaDetailPage() {
                         Delete
                       </Button>
                     </div>
-                  ) : slot.active_proposal_id && slot.status === 'held' ? (
+                  ) : slot.active_proposal_id && slot.status === 'held' && slotEditable ? (
                     <div className="flex items-center justify-start md:col-span-3 lg:col-span-1 lg:justify-end">
                       <Button
                         type="button"
@@ -1205,13 +1226,13 @@ export default function ArenaDetailPage() {
                         Cancel Slot
                       </Button>
                     </div>
-                  ) : slot.active_booking_request_id && slot.status === 'held' ? (
+                  ) : slot.active_booking_request_id && slot.status === 'held' && bookingEditable ? (
                     <div className="flex items-center justify-start md:col-span-3 lg:col-span-1 lg:justify-end">
                       <Button type="button" size="sm" variant="ghost" className="whitespace-nowrap" onClick={() => focusSlotManagement(slot)}>
                         Review
                       </Button>
                     </div>
-                  ) : slot.status === 'booked' && slot.date >= todayIso ? (
+                  ) : slot.status === 'booked' && slot.date >= todayIso && bookingEditable ? (
                     <div className="flex items-center justify-start gap-2 md:col-span-3 lg:col-span-1 lg:justify-end">
                       {slotRequest ? (
                         <Button
@@ -1289,7 +1310,8 @@ export default function ArenaDetailPage() {
         </div>
       ) : null}
 
-      <div ref={bookingRequestsSectionRef}>
+      {bookingEditable ? (
+        <div ref={bookingRequestsSectionRef}>
       <Card className="p-4">
         <div className="space-y-3">
           <div>
@@ -1343,6 +1365,7 @@ export default function ArenaDetailPage() {
         </div>
       </Card>
       </div>
+      ) : null}
 
       <Modal
         open={arenaEditOpen}

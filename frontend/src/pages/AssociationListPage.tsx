@@ -11,12 +11,14 @@ import { FilterPanel, FilterPanelTrigger } from '../components/FilterPanel';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { useTeam } from '../context/TeamContext';
+import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/PageHeader';
 import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
 import { cn } from '../lib/cn';
 import { accentLinkClass, destructiveIconButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
+import { canManageAssociations, canViewAssociations } from '../lib/permissions';
 import TeamLogo from '../components/TeamLogo';
 
 const emptyForm = { name: '', address: '', city: '', state: '', zip_code: '' };
@@ -30,6 +32,7 @@ function ageGroupSortValue(value: string) {
 export default function AssociationListPage() {
   const navigate = useNavigate();
   const { setActiveTeam } = useTeam();
+  const { authEnabled, me } = useAuth();
   const [associations, setAssociations] = useState<Association[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +49,8 @@ export default function AssociationListPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const confirm = useConfirmDialog();
   const pushToast = useToast();
+  const associationVisible = !authEnabled || canViewAssociations(me);
+  const associationEditable = !authEnabled || canManageAssociations(me);
 
   const load = () => {
     let cancelled = false;
@@ -215,6 +220,10 @@ export default function AssociationListPage() {
     navigate('/');
   };
 
+  if (!associationVisible) {
+    return <Card className="p-6 text-sm text-slate-600 dark:text-slate-400">You do not have access to the association directory.</Card>;
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -223,10 +232,12 @@ export default function AssociationListPage() {
         actions={(
           <>
             <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((open) => !open)} />
-            <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setAssociationLogoFile(null); setRemoveAssociationLogo(false); setAssociationLogoPreviewUrl(null); setOpen(true); }}>
-              <Building2 className="h-4 w-4" />
-              Add Association
-            </Button>
+            {associationEditable ? (
+              <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setAssociationLogoFile(null); setRemoveAssociationLogo(false); setAssociationLogoPreviewUrl(null); setOpen(true); }}>
+                <Building2 className="h-4 w-4" />
+                Add Association
+              </Button>
+            ) : null}
           </>
         )}
       />
@@ -313,14 +324,16 @@ export default function AssociationListPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(a)} aria-label="Edit" className={tableActionButtonClass}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  {associationEditable ? (
+                    <div className="flex items-center gap-1">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(a)} aria-label="Edit" className={tableActionButtonClass}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             );
@@ -350,7 +363,7 @@ export default function AssociationListPage() {
                 <th scope="col" className="px-4 py-3">State</th>
                 <th scope="col" className="px-4 py-3">Zip</th>
                 <th scope="col" className="px-4 py-3">Teams</th>
-                <th scope="col" className="px-4 py-3 text-right">Actions</th>
+                {associationEditable ? <th scope="col" className="px-4 py-3 text-right">Actions</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
@@ -383,36 +396,38 @@ export default function AssociationListPage() {
                       '-'
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(a)} aria-label="Edit" className={tableActionButtonClass}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
+                  {associationEditable ? (
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-1">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(a)} aria-label="Edit" className={tableActionButtonClass}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(a.id)} aria-label="Delete" className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
 
               {loading && (
                 <tr>
-                  <td colSpan={6} className="p-0">
+                  <td colSpan={associationEditable ? 6 : 5} className="p-0">
                     <TableSkeleton columns={6} rows={4} compact />
                   </td>
                 </tr>
               )}
               {!loading && associations.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                  <td colSpan={associationEditable ? 6 : 5} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No associations yet. Add one or seed demo data.
                   </td>
                 </tr>
               )}
               {!loading && associations.length > 0 && filteredAssociations.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+                  <td colSpan={associationEditable ? 6 : 5} className="px-4 py-10 text-center text-sm text-slate-600 dark:text-slate-400">
                     No associations match the current filters.
                   </td>
                 </tr>

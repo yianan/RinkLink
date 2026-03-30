@@ -8,6 +8,7 @@ import { FilterPanel, FilterPanelTrigger } from '../components/FilterPanel';
 import { AvailabilityWindow } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
+import { useAuth } from '../context/AuthContext';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -32,6 +33,7 @@ import {
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { cn } from '../lib/cn';
+import { canManageProposals, canManageSchedule } from '../lib/permissions';
 import { compactChipButtonClass, destructiveIconButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 
 const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
@@ -103,8 +105,11 @@ export default function AvailabilityPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeTeam } = useTeam();
   const { activeSeason, seasons } = useSeason();
+  const { authEnabled, me } = useAuth();
   const confirm = useConfirmDialog();
   const pushToast = useToast();
+  const scheduleEditable = !authEnabled || canManageSchedule(me);
+  const proposalEditable = !authEnabled || canManageProposals(me);
 
   const [availability, setAvailability] = useState<AvailabilityWindow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,6 +190,9 @@ export default function AvailabilityPage() {
 
   if (!activeTeam) {
     return <Alert variant="info">Select a team to manage availability.</Alert>;
+  }
+  if (!scheduleEditable) {
+    return <Alert variant="error">You do not have permission to manage availability for this team.</Alert>;
   }
 
   const sortedAvailability = [...availability].sort((left, right) => {
@@ -430,7 +438,7 @@ export default function AvailabilityPage() {
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       {window.status === 'open' || window.blocked ? (
                         <>
-                          {!window.blocked ? (
+                          {!window.blocked && proposalEditable ? (
                             <Button type="button" size="sm" onClick={() => navigate(`/search?availability=${window.id}&from=availability&tab=${tab}&month=${monthKeyForDate(window.date)}&date=${window.date}`)} className="justify-center">
                               <Search className="h-3.5 w-3.5" />
                               Find Opponents
@@ -520,7 +528,7 @@ export default function AvailabilityPage() {
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{window.notes || '-'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          {window.status === 'open' && !window.blocked ? (
+                          {window.status === 'open' && !window.blocked && proposalEditable ? (
                             <Button
                               type="button"
                               variant="ghost"

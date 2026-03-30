@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Pencil, Save, Trash2, Warehouse, X } from 'lucide-react';
 import { api } from '../api/client';
 import { Arena } from '../types';
+import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -10,6 +11,7 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
+import { canManageArena, canViewArenas } from '../lib/permissions';
 import { accentLinkClass, destructiveIconButtonClass, focusRingClass, interactiveTitleClass, tableActionButtonClass } from '../lib/uiClasses';
 import TeamLogo from '../components/TeamLogo';
 
@@ -27,6 +29,7 @@ const emptyForm = {
 
 export default function ArenaListPage() {
   const navigate = useNavigate();
+  const { authEnabled, me } = useAuth();
   const confirm = useConfirmDialog();
   const pushToast = useToast();
   const [arenas, setArenas] = useState<Arena[]>([]);
@@ -36,6 +39,8 @@ export default function ArenaListPage() {
   const [arenaLogoFile, setArenaLogoFile] = useState<File | null>(null);
   const [removeArenaLogo, setRemoveArenaLogo] = useState(false);
   const [arenaLogoPreviewUrl, setArenaLogoPreviewUrl] = useState<string | null>(null);
+  const arenaVisible = !authEnabled || canViewArenas(me);
+  const arenaEditable = !authEnabled || canManageArena(me);
 
   const load = () => {
     api.getArenas().then(setArenas);
@@ -44,6 +49,10 @@ export default function ArenaListPage() {
   useEffect(() => {
     load();
   }, []);
+
+  if (!arenaVisible) {
+    return <Card className="p-6 text-sm text-slate-600 dark:text-slate-400">You do not have access to the arena directory.</Card>;
+  }
 
   const setField = (key: keyof typeof emptyForm, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -139,12 +148,12 @@ export default function ArenaListPage() {
       <PageHeader
         title="Arenas"
         subtitle="Manage arena records, then drill into each rink for locker rooms and ice slots."
-        actions={(
+        actions={arenaEditable ? (
           <Button type="button" onClick={openCreate}>
             <Warehouse className="h-4 w-4" />
             Add Arena
           </Button>
-        )}
+        ) : undefined}
       />
 
       <div className="grid max-w-6xl gap-3 md:grid-cols-2 2xl:grid-cols-3">
@@ -166,30 +175,32 @@ export default function ArenaListPage() {
                   </div>
                 </button>
               </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className={tableActionButtonClass}
-                  onClick={() => openEdit(arena)}
-                  aria-label="Edit arena"
-                  title="Edit arena"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
-                  onClick={() => deleteArena(arena)}
-                  aria-label="Delete arena"
-                  title="Delete arena"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+              {arenaEditable ? (
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className={tableActionButtonClass}
+                    onClick={() => openEdit(arena)}
+                    aria-label="Edit arena"
+                    title="Edit arena"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
+                    onClick={() => deleteArena(arena)}
+                    aria-label="Delete arena"
+                    title="Delete arena"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : null}
             </div>
             <div className="mt-3 space-y-1.5 text-sm text-slate-600 dark:text-slate-400">
               <div className="line-clamp-2">{arena.address}</div>

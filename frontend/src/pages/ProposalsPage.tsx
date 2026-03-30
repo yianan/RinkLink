@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { Arena, ArenaRink, IceSlot, Proposal } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
+import { useAuth } from '../context/AuthContext';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -20,6 +21,7 @@ import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { useNavBadgeRefresh } from '../context/NavBadgeContext';
 import TeamLogo from '../components/TeamLogo';
+import { canManageProposals } from '../lib/permissions';
 
 const TABS = [
   { label: 'Incoming', value: 'incoming' as const, direction: 'incoming', status: 'proposed' },
@@ -54,9 +56,11 @@ export default function ProposalsPage() {
   const navigate = useNavigate();
   const { activeTeam } = useTeam();
   const { activeSeason, seasons } = useSeason();
+  const { authEnabled, me } = useAuth();
   const confirm = useConfirmDialog();
   const pushToast = useToast();
   const refreshNavBadges = useNavBadgeRefresh();
+  const proposalAccess = !authEnabled || canManageProposals(me);
 
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
 
@@ -120,6 +124,9 @@ export default function ProposalsPage() {
 
   if (!activeTeam) {
     return <Alert variant="info">Select a team to review proposals.</Alert>;
+  }
+  if (!proposalAccess) {
+    return <Alert variant="error">You do not have permission to manage proposals for this team.</Alert>;
   }
 
   const acceptProposal = async (proposalId: string) => {
