@@ -261,6 +261,12 @@
   - rebuilt the Better Auth service
   - reran the destructive local auth bootstrap path to restore a clean active platform-admin demo environment
   - reran the fresh-user local auth smoke path to confirm signup, verification, JWT exchange, and `/api/me` still work end to end after the role-shell fixes
+- Completed the Better Auth visual integration pass:
+  - kept the built-in Better Auth auth screens in place for sign-in, sign-up, forgot/reset password, callback, and sign-out flows
+  - switched the signed-in account surface to Better Auth's built-in account views instead of leaving `/auth/settings` on the auth view fallback
+  - themed the Better Auth auth and account screens so they inherit the RinkLink visual shell, typography, spacing, buttons, and card treatments
+  - added an in-app account-settings entry point in the authenticated header so the Better Auth settings/security screens are reachable from the main shell
+  - verified the built-in `settings` and `security` screens in the browser after the theming pass
 - Validation:
   - `backend/.venv/bin/pytest backend/tests -q` passed (`11 passed`)
   - `npm run build` succeeded in `frontend/`

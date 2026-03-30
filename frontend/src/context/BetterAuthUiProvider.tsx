@@ -28,7 +28,12 @@ export function BetterAuthUiProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthUIProvider authClient={authClient} navigate={navigate} Link={BetterAuthLink}>
+    <AuthUIProvider
+      authClient={authClient}
+      navigate={navigate}
+      Link={BetterAuthLink}
+      account={{ basePath: '/auth' }}
+    >
       {children}
     </AuthUIProvider>
   );

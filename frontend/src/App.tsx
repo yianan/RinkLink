@@ -17,6 +17,7 @@ import {
   Snowflake,
   Trophy,
   Users,
+  UserCog,
   X,
 } from 'lucide-react';
 import { TeamProvider, useTeam } from './context/TeamContext';
@@ -99,6 +100,26 @@ function consumeAuthReturnTo() {
   }
   window.sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
   return returnTo;
+}
+
+function AuthRedirectRoute() {
+  const { pathname = 'sign-in' } = useParams();
+
+  if (pathname === 'settings' || pathname === 'security' || pathname === 'sign-out' || pathname === 'callback') {
+    return <AuthPage />;
+  }
+
+  return <Navigate to={consumeAuthReturnTo() || '/'} replace />;
+}
+
+function PendingAuthRedirectRoute() {
+  const { pathname = 'sign-in' } = useParams();
+
+  if (pathname === 'settings' || pathname === 'security' || pathname === 'sign-out' || pathname === 'callback') {
+    return <AuthPage />;
+  }
+
+  return <Navigate to={consumeAuthReturnTo() || '/pending'} replace />;
 }
 
 const NAV_SECTIONS = [
@@ -384,7 +405,7 @@ function AppContent() {
         <Routes>
           <Route path="/pending" element={<PendingApprovalPage />} />
           <Route path="/invite/:token" element={<InviteAcceptancePage />} />
-          <Route path="/auth/:pathname" element={<Navigate to={consumeAuthReturnTo() || '/pending'} replace />} />
+          <Route path="/auth/:pathname" element={<PendingAuthRedirectRoute />} />
           <Route path="*" element={<Navigate to="/pending" replace />} />
         </Routes>
       </Suspense>
@@ -466,21 +487,33 @@ function AppContent() {
                 <ThemeToggle />
               </div>
               {runtimeAuthEnabled ? (
-                <button
-                  type="button"
-                  className={cn(
-                    'hidden sm:inline-flex shrink-0 items-center justify-center rounded-lg',
-                    chromeIconButtonClass,
-                  )}
-                  aria-label="Sign out"
-                  onClick={async () => {
-                    clearApiAccessToken();
-                    await authClient.signOut();
-                    window.location.href = '/auth/sign-in';
-                  }}
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
+                <>
+                  <NavLink
+                    to="/auth/settings"
+                    className={cn(
+                      'hidden sm:inline-flex shrink-0 items-center justify-center rounded-lg',
+                      chromeIconButtonClass,
+                    )}
+                    aria-label="Account settings"
+                  >
+                    <UserCog className="h-4 w-4" />
+                  </NavLink>
+                  <button
+                    type="button"
+                    className={cn(
+                      'hidden sm:inline-flex shrink-0 items-center justify-center rounded-lg',
+                      chromeIconButtonClass,
+                    )}
+                    aria-label="Sign out"
+                    onClick={async () => {
+                      clearApiAccessToken();
+                      await authClient.signOut();
+                      window.location.href = '/auth/sign-in';
+                    }}
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </button>
+                </>
               ) : null}
             </div>
           </div>
@@ -506,7 +539,7 @@ function AppContent() {
               <Suspense fallback={<RouteFallback />}>
                 <div key={location.pathname} className="animate-fade-slide-in">
                   <Routes>
-                    <Route path="/auth/:pathname" element={<Navigate to={consumeAuthReturnTo() || '/'} replace />} />
+                    <Route path="/auth/:pathname" element={<AuthRedirectRoute />} />
                     <Route path="/pending" element={<Navigate to="/" replace />} />
                     <Route path="/login" element={<Navigate to={authEnabled ? '/auth/sign-in' : '/'} replace />} />
                     <Route path="/invite/:token" element={<InviteAcceptancePage />} />

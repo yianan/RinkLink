@@ -149,6 +149,358 @@ html.dark {
 }
 
 @layer components {
+  .rinklink-auth-shell {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top left, var(--app-bg-accent-primary), transparent 32%),
+      radial-gradient(circle at bottom right, var(--app-bg-accent-secondary), transparent 34%),
+      linear-gradient(180deg, var(--app-bg-base-start), var(--app-bg-base-mid) 48%, var(--app-bg-base-end));
+  }
+
+  .rinklink-auth-layout {
+    margin: 0 auto;
+    display: grid;
+    min-height: 100vh;
+    width: 100%;
+    max-width: 1280px;
+    gap: 2rem;
+    padding: 1.5rem;
+  }
+
+  .rinklink-auth-hero {
+    display: none;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    border: 1px solid var(--app-border-subtle);
+    background:
+      linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(245, 243, 255, 0.86)),
+      linear-gradient(135deg, rgba(34, 211, 238, 0.08), rgba(124, 58, 237, 0.1));
+    border-radius: 2rem;
+    box-shadow: var(--shadow-soft);
+    padding: 2rem;
+    position: relative;
+  }
+
+  .rinklink-auth-hero::before {
+    content: '';
+    position: absolute;
+    inset: auto -10% -15% auto;
+    height: 16rem;
+    width: 16rem;
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgba(34, 211, 238, 0.18), transparent 70%);
+    pointer-events: none;
+  }
+
+  .rinklink-auth-hero-badge {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(34, 211, 238, 0.22);
+    background: rgba(255, 255, 255, 0.72);
+    padding: 0.5rem 0.85rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(14, 116, 144, 1);
+  }
+
+  .rinklink-auth-hero-copy {
+    max-width: 34rem;
+    display: grid;
+    gap: 1rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .rinklink-auth-hero-eyebrow {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(109, 40, 217, 1);
+  }
+
+  .rinklink-auth-hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(2.3rem, 4vw, 3.8rem);
+    line-height: 1.02;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: var(--color-slate-950);
+    max-width: 11ch;
+  }
+
+  .rinklink-auth-hero-description {
+    max-width: 36rem;
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--color-slate-600);
+  }
+
+  .rinklink-auth-hero-grid {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 1rem;
+  }
+
+  .rinklink-auth-hero-card {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.9rem;
+    border-radius: 1.35rem;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    background: rgba(255, 255, 255, 0.68);
+    padding: 1rem 1.1rem;
+    backdrop-filter: blur(10px);
+  }
+
+  .rinklink-auth-hero-icon {
+    display: inline-flex;
+    height: 2.4rem;
+    width: 2.4rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.95rem;
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.14), rgba(124, 58, 237, 0.18));
+    color: rgba(79, 70, 229, 1);
+  }
+
+  .rinklink-auth-hero-card-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-slate-900);
+  }
+
+  .rinklink-auth-hero-card-copy {
+    margin-top: 0.25rem;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--color-slate-600);
+  }
+
+  .rinklink-auth-panel {
+    display: flex;
+    min-height: 100vh;
+    align-items: center;
+    justify-content: center;
+    padding-block: 1rem;
+  }
+
+  .rinklink-auth-card {
+    width: 100%;
+    max-width: 32rem;
+    border-radius: 1.75rem;
+    border: 1px solid var(--app-border-subtle);
+    background: var(--app-surface-strong);
+    box-shadow:
+      0 24px 60px rgba(15, 23, 42, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(18px);
+    overflow: hidden;
+  }
+
+  .rinklink-auth-card--wide {
+    max-width: 64rem;
+  }
+
+  .rinklink-auth-header {
+    padding: 1.75rem 1.75rem 0.75rem;
+  }
+
+  .rinklink-auth-title {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: var(--color-slate-950);
+  }
+
+  .rinklink-auth-description {
+    margin-top: 0.45rem;
+    color: var(--color-slate-600);
+    line-height: 1.6;
+  }
+
+  .rinklink-auth-content {
+    padding: 1rem 1.75rem 1.5rem;
+  }
+
+  .rinklink-auth-footer {
+    padding: 0 1.75rem 1.5rem;
+    color: var(--color-slate-500);
+  }
+
+  .rinklink-auth-footer-link,
+  .rinklink-auth-forgot-link {
+    color: rgba(109, 40, 217, 1) !important;
+    text-decoration: none !important;
+    font-weight: 600;
+  }
+
+  .rinklink-auth-footer-link:hover,
+  .rinklink-auth-forgot-link:hover {
+    color: rgba(76, 29, 149, 1) !important;
+  }
+
+  .rinklink-auth-continue {
+    color: var(--color-slate-500);
+  }
+
+  .rinklink-auth-separator {
+    background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.4), transparent) !important;
+  }
+
+  .rinklink-auth-form {
+    gap: 1rem;
+  }
+
+  .rinklink-auth-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-slate-500);
+  }
+
+  .rinklink-auth-input {
+    height: 3rem !important;
+    border-radius: 1rem !important;
+    border-color: rgba(148, 163, 184, 0.22) !important;
+    background: rgba(248, 250, 252, 0.9) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+    color: var(--color-slate-900) !important;
+    padding-inline: 0.95rem !important;
+  }
+
+  .rinklink-auth-input::placeholder {
+    color: var(--color-slate-400) !important;
+  }
+
+  .rinklink-auth-input:focus-visible {
+    border-color: rgba(34, 211, 238, 0.55) !important;
+    box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.16) !important;
+  }
+
+  .rinklink-auth-button {
+    border-radius: 1rem !important;
+    font-weight: 600 !important;
+  }
+
+  .rinklink-auth-primary-button {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 1), rgba(109, 40, 217, 0.96)) !important;
+    border: 0 !important;
+    color: white !important;
+    box-shadow: 0 12px 28px rgba(79, 70, 229, 0.22) !important;
+  }
+
+  .rinklink-auth-primary-button:hover {
+    filter: saturate(1.05) brightness(0.98);
+  }
+
+  .rinklink-auth-outline-button,
+  .rinklink-auth-provider-button,
+  .rinklink-auth-secondary-button {
+    border-color: rgba(148, 163, 184, 0.22) !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+    color: var(--color-slate-700) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55) !important;
+  }
+
+  .rinklink-auth-outline-button:hover,
+  .rinklink-auth-provider-button:hover,
+  .rinklink-auth-secondary-button:hover {
+    background: rgba(248, 250, 252, 0.96) !important;
+    color: var(--color-slate-900) !important;
+  }
+
+  .rinklink-auth-error {
+    border-radius: 1rem !important;
+    border-color: rgba(244, 63, 94, 0.24) !important;
+    background: rgba(255, 241, 242, 0.92) !important;
+    color: rgba(159, 18, 57, 1) !important;
+  }
+
+  .rinklink-auth-destructive-button {
+    border-radius: 1rem !important;
+    border-color: rgba(244, 63, 94, 0.24) !important;
+    background: rgba(255, 241, 242, 0.92) !important;
+    color: rgba(190, 24, 93, 1) !important;
+    font-weight: 600 !important;
+  }
+
+  .rinklink-auth-account-base {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .rinklink-auth-account-sidebar {
+    width: 100%;
+    gap: 0.4rem !important;
+  }
+
+  .rinklink-auth-account-button {
+    justify-content: flex-start !important;
+    border-radius: 1rem !important;
+    color: var(--color-slate-600) !important;
+    min-height: 2.9rem !important;
+  }
+
+  .rinklink-auth-account-button:hover {
+    background: rgba(248, 250, 252, 0.9) !important;
+    color: var(--color-slate-900) !important;
+  }
+
+  .rinklink-auth-account-button-active {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(109, 40, 217, 0.12)) !important;
+    color: rgba(15, 23, 42, 1) !important;
+    box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.18) !important;
+  }
+
+  .rinklink-auth-account-cards {
+    gap: 1rem !important;
+  }
+
+  .rinklink-auth-settings-card {
+    border-radius: 1.35rem !important;
+    border-color: var(--app-border-subtle) !important;
+    background: rgba(255, 255, 255, 0.82) !important;
+    box-shadow:
+      0 16px 36px rgba(15, 23, 42, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.56) !important;
+    overflow: hidden !important;
+  }
+
+  .rinklink-auth-settings-header {
+    padding: 1.35rem 1.35rem 0.55rem !important;
+  }
+
+  .rinklink-auth-settings-title {
+    font-family: var(--font-display) !important;
+    font-size: 1.1rem !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.02em !important;
+    color: var(--color-slate-950) !important;
+  }
+
+  .rinklink-auth-settings-description {
+    color: var(--color-slate-600) !important;
+    line-height: 1.6 !important;
+  }
+
+  .rinklink-auth-settings-content {
+    padding: 0.75rem 1.35rem 0 !important;
+  }
+
+  .rinklink-auth-settings-footer {
+    padding: 0.95rem 1.35rem 1.2rem !important;
+  }
 
   .rl-range {
     appearance: none;
@@ -212,5 +564,155 @@ html.dark {
   html.dark .rl-range::-moz-range-thumb {
     border-color: rgba(2, 6, 23, 0.9);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+  }
+
+  html.dark .rinklink-auth-hero {
+    background:
+      linear-gradient(160deg, rgba(2, 6, 23, 0.72), rgba(15, 23, 42, 0.64)),
+      linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(124, 58, 237, 0.14));
+  }
+
+  html.dark .rinklink-auth-hero-badge {
+    border-color: rgba(34, 211, 238, 0.2);
+    background: rgba(2, 6, 23, 0.5);
+    color: rgba(103, 232, 249, 1);
+  }
+
+  html.dark .rinklink-auth-hero-eyebrow {
+    color: rgba(165, 180, 252, 1);
+  }
+
+  html.dark .rinklink-auth-hero-title {
+    color: var(--color-slate-50);
+  }
+
+  html.dark .rinklink-auth-hero-description,
+  html.dark .rinklink-auth-hero-card-copy {
+    color: var(--color-slate-300);
+  }
+
+  html.dark .rinklink-auth-hero-card {
+    border-color: rgba(51, 65, 85, 0.52);
+    background: rgba(2, 6, 23, 0.52);
+  }
+
+  html.dark .rinklink-auth-hero-card-title {
+    color: var(--color-slate-100);
+  }
+
+  html.dark .rinklink-auth-hero-icon {
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.16), rgba(124, 58, 237, 0.2));
+    color: rgba(125, 211, 252, 1);
+  }
+
+  html.dark .rinklink-auth-card {
+    border-color: rgba(51, 65, 85, 0.56);
+    background: rgba(2, 6, 23, 0.72);
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.34),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  html.dark .rinklink-auth-title {
+    color: var(--color-slate-50);
+  }
+
+  html.dark .rinklink-auth-description,
+  html.dark .rinklink-auth-footer,
+  html.dark .rinklink-auth-continue {
+    color: var(--color-slate-400);
+  }
+
+  html.dark .rinklink-auth-input {
+    border-color: rgba(51, 65, 85, 0.62) !important;
+    background: rgba(15, 23, 42, 0.86) !important;
+    color: var(--color-slate-100) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+  }
+
+  html.dark .rinklink-auth-input::placeholder {
+    color: var(--color-slate-500) !important;
+  }
+
+  html.dark .rinklink-auth-outline-button,
+  html.dark .rinklink-auth-provider-button,
+  html.dark .rinklink-auth-secondary-button {
+    border-color: rgba(51, 65, 85, 0.56) !important;
+    background: rgba(15, 23, 42, 0.78) !important;
+    color: var(--color-slate-200) !important;
+  }
+
+  html.dark .rinklink-auth-outline-button:hover,
+  html.dark .rinklink-auth-provider-button:hover,
+  html.dark .rinklink-auth-secondary-button:hover {
+    background: rgba(30, 41, 59, 0.86) !important;
+    color: var(--color-slate-50) !important;
+  }
+
+  html.dark .rinklink-auth-error {
+    border-color: rgba(225, 29, 72, 0.28) !important;
+    background: rgba(76, 5, 25, 0.5) !important;
+    color: rgba(254, 205, 211, 1) !important;
+  }
+
+  html.dark .rinklink-auth-destructive-button {
+    border-color: rgba(225, 29, 72, 0.3) !important;
+    background: rgba(76, 5, 25, 0.5) !important;
+    color: rgba(254, 205, 211, 1) !important;
+  }
+
+  html.dark .rinklink-auth-account-button {
+    color: var(--color-slate-300) !important;
+  }
+
+  html.dark .rinklink-auth-account-button:hover {
+    background: rgba(15, 23, 42, 0.78) !important;
+    color: var(--color-slate-50) !important;
+  }
+
+  html.dark .rinklink-auth-account-button-active {
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.12), rgba(109, 40, 217, 0.16)) !important;
+    color: var(--color-slate-50) !important;
+    box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.18) !important;
+  }
+
+  html.dark .rinklink-auth-settings-card {
+    border-color: rgba(51, 65, 85, 0.56) !important;
+    background: rgba(15, 23, 42, 0.76) !important;
+    box-shadow:
+      0 18px 44px rgba(0, 0, 0, 0.26),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+  }
+
+  html.dark .rinklink-auth-settings-title {
+    color: var(--color-slate-50) !important;
+  }
+
+  html.dark .rinklink-auth-settings-description {
+    color: var(--color-slate-300) !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  @layer components {
+    .rinklink-auth-layout {
+      grid-template-columns: minmax(0, 1.2fr) minmax(22rem, 30rem);
+      align-items: stretch;
+      padding: 2rem;
+    }
+
+    .rinklink-auth-hero {
+      display: flex;
+    }
+
+    .rinklink-auth-panel {
+      padding-inline: 1rem;
+    }
+
+    .rinklink-auth-account-base {
+      flex-direction: row;
+      gap: 2rem;
+      align-items: flex-start;
+    }
   }
 }
