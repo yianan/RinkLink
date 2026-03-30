@@ -115,6 +115,9 @@ export default function HomePage() {
   const canManageProposals = !!me?.capabilities.includes('team.manage_proposals');
   const canViewPrivateRoster = !!me?.capabilities.includes('team.view_private');
   const canSeedDemoData = !me || me.user.is_platform_admin;
+  const canViewAvailabilitySummary = canManageSchedule;
+  const canViewProposalSummary = canManageProposals;
+  const canViewIceRequestSummary = canManageSchedule;
   const familyMode = !canManageSchedule && !canManageProposals && !canViewPrivateRoster && (me?.linked_players.length || 0) > 0;
   const linkedPlayersForActiveTeam = (me?.linked_players || []).filter((player) => player.team_id === activeTeam?.id);
 
@@ -122,10 +125,10 @@ export default function HomePage() {
     if (!activeTeam) return;
 
     Promise.all([
-      familyMode ? Promise.resolve([]) : api.getAvailability(activeTeam.id),
+      canViewAvailabilitySummary ? api.getAvailability(activeTeam.id) : Promise.resolve([]),
       api.getEvents(activeTeam.id, { date_from: todayStr }),
-      familyMode ? Promise.resolve([]) : api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }),
-      familyMode ? Promise.resolve([]) : api.getTeamIceBookingRequests(activeTeam.id, { status: 'requested' }),
+      canViewProposalSummary ? api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }) : Promise.resolve([]),
+      canViewIceRequestSummary ? api.getTeamIceBookingRequests(activeTeam.id, { status: 'requested' }) : Promise.resolve([]),
       familyMode || !effectiveSeason ? Promise.resolve([]) : api.getStandings(effectiveSeason.id),
       familyMode || !effectiveSeason ? Promise.resolve([]) : api.getTeamCompetitionMemberships(activeTeam.id, { season_id: effectiveSeason.id }),
     ]).then(async ([availabilityData, eventData, proposalData, requestData, standings, memberships]) => {
@@ -151,7 +154,7 @@ export default function HomePage() {
       const divisionStandings = await api.getCompetitionDivisionStandings(standingsMembership.competition_division_id);
       setCompetitionRecord(divisionStandings.find((entry) => entry.team_id === activeTeam.id) || null);
     });
-  }, [activeTeam, effectiveSeason, familyMode, todayStr]);
+  }, [activeTeam, canViewAvailabilitySummary, canViewIceRequestSummary, canViewProposalSummary, effectiveSeason, familyMode, todayStr]);
 
   const seasonAvailability = useMemo(
     () =>
@@ -318,7 +321,7 @@ export default function HomePage() {
           icon={<CheckCircle2 className="h-4 w-4" />}
           color="bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400"
         />
-        {!familyMode ? (
+        {!familyMode && canViewAvailabilitySummary ? (
           <StatCard
             title="Open Availability"
             value={openDates.length}
@@ -328,7 +331,7 @@ export default function HomePage() {
             color="bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400"
           />
         ) : null}
-        {!familyMode ? (
+        {!familyMode && canViewProposalSummary ? (
           <StatCard
             title="Incoming Proposals"
             value={proposals.length}
@@ -337,7 +340,7 @@ export default function HomePage() {
             color="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
           />
         ) : null}
-        {!familyMode ? (
+        {!familyMode && canViewIceRequestSummary ? (
           <StatCard
             title="Pending Ice Requests"
             value={bookingRequests.length}
@@ -349,7 +352,7 @@ export default function HomePage() {
         ) : null}
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-[1.35fr_0.95fr]">
+      <div className={cn('grid gap-3', familyMode || canViewProposalSummary ? 'xl:grid-cols-[1.35fr_0.95fr]' : 'xl:grid-cols-1')}>
         <Card className="overflow-hidden p-0">
           <div className="border-b border-slate-200 bg-white/85 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/30">
             <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Upcoming Schedule</div>
@@ -439,7 +442,8 @@ export default function HomePage() {
           </div>
         </Card>
 
-        <Card className="overflow-hidden p-0">
+        {familyMode || canViewProposalSummary ? (
+          <Card className="overflow-hidden p-0">
           <div className="border-b border-slate-200 bg-white/85 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/30">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -450,7 +454,7 @@ export default function HomePage() {
                   {familyMode ? 'Players you can respond for from this account.' : 'Requests waiting on your response.'}
                 </div>
               </div>
-              {!familyMode ? (
+              {!familyMode && canViewProposalSummary ? (
                 <Button type="button" size="sm" variant="ghost" onClick={() => navigate('/proposals')}>
                   Open Proposals
                 </Button>
@@ -530,7 +534,8 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-        </Card>
+          </Card>
+        ) : null}
       </div>
     </div>
   );

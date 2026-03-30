@@ -210,6 +210,14 @@
   - `./scripts/local-auth-demo-bootstrap.sh` succeeded and left a seeded active platform-admin user
   - `npm run build` succeeded in `frontend/`
   - Playwright browser checks reached the sign-in, pending, access-review, approved-user, wrong-account invite, accepted-parent family flow, accepted-player self-link flow, and player RSVP event flow with no console errors after the fixes
+- Completed the coach browser validation pass:
+  - created and accepted a real `coach` invite through the Access page and Better Auth invite flow
+  - confirmed the coach shell exposes only the expected navigation and read/write surfaces
+  - fixed the dashboard summary fetches so coaches no longer request availability, proposal, or ice-booking data they are not authorized to read
+  - confirmed the corrected coach dashboard reloads with no browser console errors
+- Validation:
+  - `npm run build` succeeded in `frontend/`
+  - Playwright browser validation confirmed the coach dashboard no longer renders staff-admin summary cards or triggers `403` fetches on reload
 
 ## Planned Commit Sequence
 
