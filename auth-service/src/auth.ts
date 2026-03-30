@@ -57,7 +57,7 @@ export const auth = betterAuth({
   appName: "RinkLink",
   baseURL,
   database: pool,
-  trustedOrigins: [frontendUrl],
+  trustedOrigins: [frontendUrl, "https://appleid.apple.com"],
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
