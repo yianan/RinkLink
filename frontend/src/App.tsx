@@ -110,6 +110,7 @@ const NAV_SECTIONS = [
     label: 'Team',
     items: [
       { path: '/roster', label: 'Roster', icon: ClipboardList },
+      { path: '/family-links', label: 'Family Links', icon: ShieldCheck },
       { path: '/availability', label: 'Availability', icon: Calendar },
       { path: '/schedule', label: 'Schedule', icon: ClipboardSignature },
     ],
@@ -155,6 +156,12 @@ function canViewPath(path: string, me: MeResponse | null, runtimeAuthEnabled: bo
       return true;
     case '/roster':
       return hasCapability(me, 'team.view_private');
+    case '/family-links':
+      return (
+        hasCapability(me, 'platform.manage')
+        || hasCapability(me, 'association.manage')
+        || hasCapability(me, 'team.manage_roster')
+      );
     case '/availability':
       return hasCapability(me, 'team.manage_schedule');
     case '/schedule':
@@ -182,7 +189,6 @@ function canViewPath(path: string, me: MeResponse | null, runtimeAuthEnabled: bo
         hasCapability(me, 'platform.manage')
         || hasCapability(me, 'association.manage')
         || hasCapability(me, 'team.manage_staff')
-        || hasCapability(me, 'team.manage_roster')
         || hasCapability(me, 'arena.manage')
       );
     case '/associations':
@@ -506,7 +512,8 @@ function AppContent() {
                     <Route path="/login" element={<Navigate to={authEnabled ? '/auth/sign-in' : '/'} replace />} />
                     <Route path="/invite/:token" element={<InviteAcceptancePage />} />
                     <Route path="/" element={<HomePage />} />
-                    <Route path="/access" element={<AccessPage />} />
+                <Route path="/access" element={<AccessPage />} />
+                <Route path="/family-links" element={<AccessPage />} />
                     <Route path="/associations" element={<AssociationListPage />} />
                     <Route path="/competitions" element={<CompetitionsPage />} />
                     <Route path="/standings" element={<StandingsPage />} />

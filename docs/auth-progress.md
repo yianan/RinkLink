@@ -227,6 +227,14 @@
   - `backend/.venv/bin/pytest backend/tests/test_auth_context.py -q` passed (`4 passed`)
   - `npm run build` succeeded in `frontend/`
   - Playwright browser validation confirmed the scheduler shell hides `Roster`, direct `/roster` visits render the expected access message, and the page reload completes without new console errors
+- Completed the manager browser validation pass:
+  - created and accepted a real `manager` invite through the Access page and Better Auth invite flow
+  - identified that the frontend was still exposing the full admin `Access` surface to managers even though the backend correctly blocks team-role staff invites without `team.manage_staff`
+  - split the UI into a true admin `/access` page and a team-scoped `/family-links` workflow so managers retain guardian/player invite capability without seeing staff/admin access-review controls
+  - verified that managers are redirected away from `/access` while retaining a dedicated family-link workflow in the main team navigation
+- Validation:
+  - `npm run build` succeeded in `frontend/`
+  - Playwright browser validation confirmed the manager shell hides `Access`, shows `Family Links`, loads the family-only invite page correctly, and redirects direct `/access` visits back to the dashboard
 
 ## Planned Commit Sequence
 

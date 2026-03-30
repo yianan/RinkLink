@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { Copy, MailPlus, RefreshCcw, ShieldCheck, UserCheck, XCircle } from 'lucide-react';
 
 import { api } from '../api/client';
@@ -39,7 +39,6 @@ function canManageAccess(capabilities: string[]) {
     capability === 'platform.manage'
     || capability === 'association.manage'
     || capability === 'team.manage_staff'
-    || capability === 'team.manage_roster'
     || capability === 'arena.manage'
   ));
 }
@@ -60,6 +59,7 @@ function targetTypeLabel(targetType: string) {
 }
 
 export default function AccessPage() {
+  const location = useLocation();
   const { authEnabled, me } = useAuth();
   const pushToast = useToast();
   const [loading, setLoading] = useState(true);
@@ -78,14 +78,19 @@ export default function AccessPage() {
   const [inviteRole, setInviteRole] = useState<string>('team_admin');
   const [invitePlayerTeamId, setInvitePlayerTeamId] = useState('');
 
-  const manageAccess = useMemo(() => canManageAccess(me?.capabilities || []), [me?.capabilities]);
+  const familyOnlyMode = location.pathname === '/family-links';
   const teams = useMemo<AccessibleTeam[]>(() => me?.accessible_teams || [], [me?.accessible_teams]);
   const capabilities = me?.capabilities || [];
+  const manageAccess = useMemo(() => canManageAccess(capabilities), [capabilities]);
   const canInviteAssociations = capabilities.includes('platform.manage') || capabilities.includes('association.manage');
   const canInviteTeams = canInviteAssociations || capabilities.includes('team.manage_staff');
   const canInviteArenas = capabilities.includes('platform.manage') || capabilities.includes('arena.manage');
   const canInviteFamilyLinks = canInviteAssociations || capabilities.includes('team.manage_roster');
+  const pageVisible = familyOnlyMode ? canInviteFamilyLinks : manageAccess;
   const availableTargetTypes = useMemo<(typeof TARGET_TYPES)[number][]>(() => {
+    if (familyOnlyMode) {
+      return canInviteFamilyLinks ? ['guardian_link', 'player_link'] : [];
+    }
     const next: (typeof TARGET_TYPES)[number][] = [];
     if (canInviteAssociations) next.push('association');
     if (canInviteTeams) next.push('team');
@@ -94,7 +99,21 @@ export default function AccessPage() {
       next.push('guardian_link', 'player_link');
     }
     return next;
-  }, [canInviteArenas, canInviteAssociations, canInviteFamilyLinks, canInviteTeams]);
+  }, [canInviteArenas, canInviteAssociations, canInviteFamilyLinks, canInviteTeams, familyOnlyMode]);
+
+  const filteredInvites = useMemo(() => {
+    if (!familyOnlyMode) {
+      return invites;
+    }
+    return invites.filter((invite) => invite.target.type === 'guardian_link' || invite.target.type === 'player_link');
+  }, [familyOnlyMode, invites]);
+
+  const filteredRequests = useMemo(() => {
+    if (!familyOnlyMode) {
+      return requests;
+    }
+    return requests.filter((request) => request.target.type === 'guardian_link' || request.target.type === 'player_link');
+  }, [familyOnlyMode, requests]);
 
   const resourceOptions = useMemo(() => {
     if (inviteTargetType === 'association') {
@@ -130,7 +149,7 @@ export default function AccessPage() {
   const loadQueues = async () => {
     const [nextInvites, nextRequests] = await Promise.all([
       api.getInvites({ direction: 'managed', status: 'pending' }),
-      api.getAccessRequests({ scope: 'review', status: 'pending' }),
+      familyOnlyMode ? Promise.resolve([]) : api.getAccessRequests({ scope: 'review', status: 'pending' }),
     ]);
     setInvites(nextInvites);
     setRequests(nextRequests);
@@ -168,9 +187,9 @@ export default function AccessPage() {
   };
 
   useEffect(() => {
-    if (!manageAccess) return;
+    if (!pageVisible) return;
     void load();
-  }, [canInviteArenas, canInviteAssociations, manageAccess]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [canInviteArenas, canInviteAssociations, familyOnlyMode, pageVisible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (availableTargetTypes.length === 0) {
@@ -241,7 +260,7 @@ export default function AccessPage() {
     return <Navigate to="/" replace />;
   }
 
-  if (!manageAccess) {
+  if (!pageVisible) {
     return <Navigate to="/" replace />;
   }
 
@@ -338,8 +357,10 @@ export default function AccessPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Access"
-        subtitle="Create app-level invites, review pending access requests, and manage the onboarding queue for the resources you administer."
+        title={familyOnlyMode ? 'Family Links' : 'Access'}
+        subtitle={familyOnlyMode
+          ? 'Create and manage parent/guardian and player account links for the teams you administer.'
+          : 'Create app-level invites, review pending access requests, and manage the onboarding queue for the resources you administer.'}
         actions={(
           <Button type="button" variant="outline" onClick={() => void load()} disabled={loading || !!busyKey}>
             <RefreshCcw className="h-4 w-4" />
@@ -359,7 +380,9 @@ export default function AccessPage() {
           <div>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Create Invite</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Use invites for the exact account email you want linked to a team, association, arena, parent/guardian relationship, or player account.
+              {familyOnlyMode
+                ? 'Use invites for the exact account email you want linked to a parent/guardian relationship or self-managed player account.'
+                : 'Use invites for the exact account email you want linked to a team, association, arena, parent/guardian relationship, or player account.'}
             </p>
           </div>
           <Badge variant="outline">Preferred onboarding path</Badge>
@@ -472,29 +495,30 @@ export default function AccessPage() {
         </div>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-        <Card className="p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Review Queue</h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                These requests are waiting for approval on teams, associations, arenas, or family/player links that you manage.
-              </p>
+      <div className={`grid gap-6 ${familyOnlyMode ? '' : 'xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]'}`}>
+        {!familyOnlyMode ? (
+          <Card className="p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Review Queue</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  These requests are waiting for approval on teams, associations, arenas, or family/player links that you manage.
+                </p>
+              </div>
+              <Badge variant="outline">{filteredRequests.length} open</Badge>
             </div>
-            <Badge variant="outline">{requests.length} open</Badge>
-          </div>
 
-          <div className="mt-5 space-y-4">
-            {loading ? (
-              <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                Loading access requests…
-              </div>
-            ) : requests.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                No pending access requests for the resources you manage.
-              </div>
-            ) : (
-              requests.map((request) => {
+            <div className="mt-5 space-y-4">
+              {loading ? (
+                <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                  Loading access requests…
+                </div>
+              ) : filteredRequests.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                  No pending access requests for the resources you manage.
+                </div>
+              ) : (
+                filteredRequests.map((request) => {
                 const requestRoleOptions = roleOptionsForTarget(request.target.type);
                 const selectedRole = requestRoles[request.id] ?? requestRoleOptions[0] ?? '';
 
@@ -555,20 +579,25 @@ export default function AccessPage() {
                     </div>
                   </div>
                 );
-              })
-            )}
-          </div>
-        </Card>
+                })
+              )}
+            </div>
+          </Card>
+        ) : null}
 
         <Card className="p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Managed Invites</h2>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {familyOnlyMode ? 'Family Invites' : 'Managed Invites'}
+              </h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                Open invites for the resources you can administer. Copy links for testing or cancel stale entries.
+                {familyOnlyMode
+                  ? 'Open parent/guardian and player invites for the teams you can manage. Copy links for testing or cancel stale entries.'
+                  : 'Open invites for the resources you can administer. Copy links for testing or cancel stale entries.'}
               </p>
             </div>
-            <Badge variant="outline">{invites.length} open</Badge>
+            <Badge variant="outline">{filteredInvites.length} open</Badge>
           </div>
 
           <div className="mt-5 space-y-4">
@@ -576,12 +605,12 @@ export default function AccessPage() {
               <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                 Loading invites…
               </div>
-            ) : invites.length === 0 ? (
+            ) : filteredInvites.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                 No pending invites on resources you manage yet.
               </div>
             ) : (
-              invites.map((invite) => (
+              filteredInvites.map((invite) => (
                 <div
                   key={invite.id}
                   className="rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4 dark:border-slate-800 dark:bg-slate-900/60"
