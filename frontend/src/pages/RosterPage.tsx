@@ -91,13 +91,20 @@ export default function RosterPage() {
   const rosterEditable = !authEnabled || canManageRoster(me);
 
   const load = () => {
-    if (!activeTeam || !effectiveSeason) return;
+    if (!activeTeam || !effectiveSeason || !rosterVisible) {
+      setPlayers([]);
+      return;
+    }
     api.getPlayers(activeTeam.id, { season_id: effectiveSeason.id }).then(setPlayers);
   };
 
   useEffect(() => {
+    if (!rosterVisible) {
+      setPlayers([]);
+      return;
+    }
     load();
-  }, [activeTeam, effectiveSeason]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTeam, effectiveSeason, rosterVisible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleEdit = (p: Player) => {
     setEditId(p.id);

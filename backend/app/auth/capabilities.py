@@ -66,7 +66,6 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
         "team.view",
         "team.manage_schedule",
         "team.manage_proposals",
-        "team.view_private",
         "arena.view",
     },
     "coach": {

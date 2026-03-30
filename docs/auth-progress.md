@@ -218,6 +218,15 @@
 - Validation:
   - `npm run build` succeeded in `frontend/`
   - Playwright browser validation confirmed the coach dashboard no longer renders staff-admin summary cards or triggers `403` fetches on reload
+- Completed the scheduler browser validation pass:
+  - created and accepted a real `scheduler` invite through the Access page and Better Auth invite flow
+  - identified a role-map mismatch where schedulers still inherited `team.view_private`, which exposed the roster nav and backend roster API contrary to the implementation plan
+  - removed `team.view_private` from the scheduler capability map and added regression coverage to keep roster access hidden for that role
+  - tightened the roster page bootstrap so direct `/roster` visits do not fire unauthorized API calls before rendering the access error state
+- Validation:
+  - `backend/.venv/bin/pytest backend/tests/test_auth_context.py -q` passed (`4 passed`)
+  - `npm run build` succeeded in `frontend/`
+  - Playwright browser validation confirmed the scheduler shell hides `Roster`, direct `/roster` visits render the expected access message, and the page reload completes without new console errors
 
 ## Planned Commit Sequence
 

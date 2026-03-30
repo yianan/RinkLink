@@ -103,6 +103,19 @@ def test_effective_capabilities_include_association_private_and_coach_scoresheet
     assert "team.manage_scoresheet" in coach_capabilities
     assert "team.manage_attendance" in coach_capabilities
 
+    scheduler = AppUser(auth_id="auth-scheduler", email="scheduler@example.com", status="active")
+    scheduler_capabilities = effective_capabilities(
+        user=scheduler,
+        association_roles=[],
+        team_roles=["scheduler"],
+        arena_roles=[],
+        has_guardian_link=False,
+        has_player_link=False,
+    )
+    assert "team.manage_schedule" in scheduler_capabilities
+    assert "team.manage_proposals" in scheduler_capabilities
+    assert "team.view_private" not in scheduler_capabilities
+
 
 def test_association_admin_gets_private_team_access_only_for_owned_association(db: Session) -> None:
     association = make_association(db, "North Stars")
