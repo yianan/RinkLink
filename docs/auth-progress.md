@@ -170,6 +170,12 @@
   - conditional resource loading avoids `403` failures on the Access page for non-platform/non-association admins
 - Validation:
   - `npm run build` succeeded in `frontend/` after the capability-scoped Access page update
+- Added backend regression coverage for the new pending-user flows:
+  - direct router tests now cover requestable target lookup for pending users
+  - duplicate access requests reuse the existing pending row instead of creating duplicates
+  - users with an existing membership are rejected when requesting the same access again
+- Validation:
+  - `backend/.venv/bin/pytest tests/test_auth_context.py tests/test_access_requests.py -q` passed (`7 passed`)
 
 ## Planned Commit Sequence
 
