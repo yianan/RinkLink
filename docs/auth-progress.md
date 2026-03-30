@@ -193,11 +193,15 @@
   - fixed a hook-order crash in `AppContent` that appeared when moving from pending/unauthenticated routes into the authenticated admin shell
   - used Playwright to verify pending-user sign-in, request submission, admin review, approval, and post-approval sign-in back into the main app
   - restricted the dashboard demo-seed controls to platform-admin or auth-disabled contexts so normal team users no longer see a dev-only reset action
+- Completed the first parent/guardian browser validation pass:
+  - used a team-scoped access manager to create a guardian-link invite for a seeded player, then verified wrong-account recovery, correct-account invite acceptance, and the post-accept family dashboard flow
+  - tightened `AppNav` badge fetching so family users do not call proposal or schedule-confirmation endpoints they are not authorized to read
+  - confirmed the accepted parent session lands on the family-safe shell with only the expected navigation and no console errors after a clean reload
 - Validation:
   - `backend/.venv/bin/pytest tests/test_auth_context.py tests/test_access_requests.py -q` passed (`9 passed`)
   - `./scripts/local-auth-demo-bootstrap.sh` succeeded and left a seeded active platform-admin user
   - `npm run build` succeeded in `frontend/`
-  - Playwright browser checks reached the sign-in, pending, access-review, and approved-user app flows with no console errors after the fixes
+  - Playwright browser checks reached the sign-in, pending, access-review, approved-user, wrong-account invite, and accepted-parent family flows with no console errors after the fixes
 
 ## Planned Commit Sequence
 

@@ -202,9 +202,11 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const [navBadges, setNavBadges] = useState<Record<string, number>>({});
   const navBadgeKey = useNavBadgeKey();
+  const canManageSchedule = hasCapability(me, 'team.manage_schedule');
+  const canManageProposals = hasCapability(me, 'team.manage_proposals');
 
   useEffect(() => {
-    if (!activeTeam) {
+    if (!activeTeam || (!canManageSchedule && !canManageProposals)) {
       setNavBadges({});
       return;
     }
@@ -216,8 +218,8 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
     }
 
     Promise.all([
-      api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }),
-      api.getEvents(activeTeam.id, params),
+      canManageProposals ? api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }) : Promise.resolve([]),
+      canManageSchedule ? api.getEvents(activeTeam.id, params) : Promise.resolve([]),
     ]).then(([incomingProposals, events]) => {
       if (cancelled) return;
       const awaitingConfirmationCount = events.filter((event) => {
@@ -226,8 +228,8 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
         return event.home_team_id === activeTeam.id ? !event.home_weekly_confirmed : !event.away_weekly_confirmed;
       }).length;
       setNavBadges({
-        '/proposals': incomingProposals.length,
-        '/schedule': awaitingConfirmationCount,
+        '/proposals': canManageProposals ? incomingProposals.length : 0,
+        '/schedule': canManageSchedule ? awaitingConfirmationCount : 0,
       });
     }).catch(() => {
       if (!cancelled) setNavBadges({});
@@ -236,7 +238,7 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [activeTeam, effectiveSeason, navBadgeKey]);
+  }, [activeTeam, canManageProposals, canManageSchedule, effectiveSeason, navBadgeKey]);
 
   return (
     <nav className="p-3">
