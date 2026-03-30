@@ -102,6 +102,13 @@
   - `./.venv/bin/python -m compileall app` succeeded after the access router addition
   - `./.venv/bin/python -c "from app.main import app; print('ok')"` succeeded with the invite/access-request router wired into FastAPI
   - `npm run build` succeeded with the new invite acceptance and pending approval flows
+- Added the first reviewer/admin UI slice:
+  - new `/access` page for managed invites and reviewable access requests
+  - role selection for approving team, association, and arena access requests
+  - invite-link copy and cancel actions for managed invites
+  - capability-based navigation filtering so the frontend no longer shows the same nav to every persona
+- Validation:
+  - `npm run build` succeeded after adding the access management page and capability-based nav filtering
 
 ## Planned Commit Sequence
 
@@ -149,6 +156,10 @@
    - invite review and acceptance
    - access request APIs
    - pending approval data surfaces
+10. Reviewer/admin access management:
+   - managed invites list
+   - review queue UI
+   - capability-aware nav filtering
 
 ## Notes
 

@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   Search,
+  ShieldCheck,
   Snowflake,
   Trophy,
   Users,
@@ -36,11 +37,13 @@ import { NavBadgeProvider, useNavBadgeKey } from './context/NavBadgeContext';
 import { Skeleton } from './components/ui/Skeleton';
 import { Button } from './components/ui/Button';
 import { authClient, authEnabled, clearApiAccessToken } from './lib/auth-client';
+import type { MeResponse } from './types';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const PendingApprovalPage = lazy(() => import('./pages/PendingApprovalPage'));
 const InviteAcceptancePage = lazy(() => import('./pages/InviteAcceptancePage'));
+const AccessPage = lazy(() => import('./pages/AccessPage'));
 const AssociationListPage = lazy(() => import('./pages/AssociationListPage'));
 const CompetitionsPage = lazy(() => import('./pages/CompetitionsPage'));
 const StandingsPage = lazy(() => import('./pages/StandingsPage'));
@@ -129,16 +132,73 @@ const NAV_SECTIONS = [
   {
     label: 'Admin',
     items: [
+      { path: '/access', label: 'Access', icon: ShieldCheck },
       { path: '/associations', label: 'Associations', icon: Building2 },
       { path: '/arenas', label: 'Arenas', icon: Snowflake },
     ],
   },
 ];
 
+function hasCapability(me: MeResponse | null, capability: string) {
+  return !!me?.capabilities.includes(capability);
+}
+
+function canViewPath(path: string, me: MeResponse | null, runtimeAuthEnabled: boolean) {
+  if (!runtimeAuthEnabled) {
+    return true;
+  }
+  if (!me) {
+    return false;
+  }
+  switch (path) {
+    case '/':
+      return true;
+    case '/roster':
+      return hasCapability(me, 'team.view_private');
+    case '/availability':
+      return hasCapability(me, 'team.manage_schedule');
+    case '/schedule':
+      return (
+        hasCapability(me, 'team.view')
+        || hasCapability(me, 'arena.view')
+        || hasCapability(me, 'player.respond_guarded')
+        || hasCapability(me, 'player.respond_self')
+      );
+    case '/search':
+    case '/proposals':
+      return hasCapability(me, 'team.manage_proposals');
+    case '/competitions':
+    case '/standings':
+      return (
+        hasCapability(me, 'team.view')
+        || hasCapability(me, 'association.view')
+        || hasCapability(me, 'player.respond_guarded')
+        || hasCapability(me, 'player.respond_self')
+      );
+    case '/teams':
+      return hasCapability(me, 'team.view') || hasCapability(me, 'association.view');
+    case '/access':
+      return (
+        hasCapability(me, 'platform.manage')
+        || hasCapability(me, 'association.manage')
+        || hasCapability(me, 'team.manage_staff')
+        || hasCapability(me, 'team.manage_roster')
+        || hasCapability(me, 'arena.manage')
+      );
+    case '/associations':
+      return hasCapability(me, 'association.view');
+    case '/arenas':
+      return hasCapability(me, 'arena.view');
+    default:
+      return true;
+  }
+}
+
 function AppNav({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
   const { activeTeam } = useTeam();
   const { activeSeason, seasons } = useSeason();
+  const { authEnabled: runtimeAuthEnabled, me } = useAuth();
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const [navBadges, setNavBadges] = useState<Record<string, number>>({});
   const navBadgeKey = useNavBadgeKey();
@@ -180,63 +240,69 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav className="p-3">
-      {NAV_SECTIONS.map((section) => (
-        <div key={section.label} className="space-y-1">
-          <div className={sectionLabelClass}>{section.label}</div>
-          {section.items.map((item) => {
-            const Icon = item.icon;
-            const isActive = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path);
-            const badgeCount = navBadges[item.path] || 0;
+      {NAV_SECTIONS.map((section) => {
+        const visibleItems = section.items.filter((item) => canViewPath(item.path, me, runtimeAuthEnabled));
+        if (visibleItems.length === 0) {
+          return null;
+        }
+        return (
+          <div key={section.label} className="space-y-1">
+            <div className={sectionLabelClass}>{section.label}</div>
+            {visibleItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path);
+              const badgeCount = navBadges[item.path] || 0;
 
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === '/'}
-                onClick={onNavigate}
-                aria-label={
-                  item.path === '/proposals' && badgeCount > 0
-                    ? `${item.label}, ${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
-                    : item.path === '/schedule' && badgeCount > 0
-                      ? `${item.label}, ${badgeCount} event${badgeCount === 1 ? '' : 's'} awaiting your confirmation`
-                    : item.label
-                }
-                className={cn(
-                  'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                  focusRingClass,
-                  isActive
-                    ? "bg-gradient-to-r from-white via-white to-[color:color-mix(in_srgb,var(--app-surface-strong)_82%,rgb(237_233_254))] text-slate-900 shadow-sm ring-1 ring-[color:var(--app-border-subtle)] before:absolute before:left-1 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-full before:bg-[color:var(--app-accent-link)] before:content-[''] dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 dark:text-slate-100 dark:shadow-none"
-                    : 'text-slate-700 hover:bg-white/70 hover:text-slate-900 hover:ring-1 hover:ring-slate-200/70 dark:text-slate-300 dark:hover:bg-slate-900/40 dark:hover:text-slate-100 dark:hover:ring-slate-700/70',
-                )}
-              >
-                <Icon
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === '/'}
+                  onClick={onNavigate}
+                  aria-label={
+                    item.path === '/proposals' && badgeCount > 0
+                      ? `${item.label}, ${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
+                      : item.path === '/schedule' && badgeCount > 0
+                        ? `${item.label}, ${badgeCount} event${badgeCount === 1 ? '' : 's'} awaiting your confirmation`
+                        : item.label
+                  }
                   className={cn(
-                    'h-4 w-4',
+                    'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+                    focusRingClass,
                     isActive
-                      ? 'text-[color:var(--app-accent-link)]'
-                      : 'text-slate-500 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300',
+                      ? "bg-gradient-to-r from-white via-white to-[color:color-mix(in_srgb,var(--app-surface-strong)_82%,rgb(237_233_254))] text-slate-900 shadow-sm ring-1 ring-[color:var(--app-border-subtle)] before:absolute before:left-1 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-full before:bg-[color:var(--app-accent-link)] before:content-[''] dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 dark:text-slate-100 dark:shadow-none"
+                      : 'text-slate-700 hover:bg-white/70 hover:text-slate-900 hover:ring-1 hover:ring-slate-200/70 dark:text-slate-300 dark:hover:bg-slate-900/40 dark:hover:text-slate-100 dark:hover:ring-slate-700/70',
                   )}
-                />
-                <span className="truncate">{item.label}</span>
-                {badgeCount > 0 ? (
-                  <span
-                    className="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-sm dark:bg-rose-500"
-                    aria-label={
-                      item.path === '/proposals'
-                        ? `${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
-                        : item.path === '/schedule'
-                          ? `${badgeCount} event${badgeCount === 1 ? '' : 's'} awaiting your confirmation`
-                        : undefined
-                    }
-                  >
-                    {badgeCount > 99 ? '99+' : badgeCount}
-                  </span>
-                ) : null}
-              </NavLink>
-            );
-          })}
-        </div>
-      ))}
+                >
+                  <Icon
+                    className={cn(
+                      'h-4 w-4',
+                      isActive
+                        ? 'text-[color:var(--app-accent-link)]'
+                        : 'text-slate-500 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300',
+                    )}
+                  />
+                  <span className="truncate">{item.label}</span>
+                  {badgeCount > 0 ? (
+                    <span
+                      className="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-sm dark:bg-rose-500"
+                      aria-label={
+                        item.path === '/proposals'
+                          ? `${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
+                          : item.path === '/schedule'
+                            ? `${badgeCount} event${badgeCount === 1 ? '' : 's'} awaiting your confirmation`
+                            : undefined
+                      }
+                    >
+                      {badgeCount > 99 ? '99+' : badgeCount}
+                    </span>
+                  ) : null}
+                </NavLink>
+              );
+            })}
+          </div>
+        );
+      })}
     </nav>
   );
 }
@@ -438,6 +504,7 @@ function AppContent() {
                     <Route path="/login" element={<Navigate to={authEnabled ? '/auth/sign-in' : '/'} replace />} />
                     <Route path="/invite/:token" element={<InviteAcceptancePage />} />
                     <Route path="/" element={<HomePage />} />
+                    <Route path="/access" element={<AccessPage />} />
                     <Route path="/associations" element={<AssociationListPage />} />
                     <Route path="/competitions" element={<CompetitionsPage />} />
                     <Route path="/standings" element={<StandingsPage />} />
