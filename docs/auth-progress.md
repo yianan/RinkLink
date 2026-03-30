@@ -136,6 +136,12 @@
   - generic auth pages remain on `better-auth-ui`; these changes are only for custom RinkLink authorization-driven surfaces
 - Validation:
   - `npm run build` succeeded after the shared frontend permission helper and page-gating pass
+- Added the first backend auth regression tests:
+  - introduced `pytest` to the backend environment
+  - added an isolated SQLite test harness under `backend/tests/`
+  - covered association-admin private team visibility, coach/association capability derivation, linked-family team and event access, and separation between team-vs-arena memberships
+- Validation:
+  - `backend/.venv/bin/pytest backend/tests/test_auth_context.py -q` passed (`4 passed`)
 
 ## Planned Commit Sequence
 
