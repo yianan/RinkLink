@@ -10,6 +10,12 @@ const app = new Hono();
 const port = Number(process.env.PORT || 3000);
 const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
 
+function authProxyRequest(request: Request, pathname: string): Request {
+  const url = new URL(request.url);
+  url.pathname = pathname;
+  return new Request(url, request);
+}
+
 app.use(
   "/api/auth/*",
   cors({
@@ -23,7 +29,9 @@ app.use(
 app.get("/health", (c) => c.json({ status: "ok" }));
 
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
-app.get("/.well-known/jwks.json", (c) => auth.handler(c.req.raw));
+app.get("/.well-known/jwks.json", (c) =>
+  auth.handler(authProxyRequest(c.req.raw, "/api/auth/.well-known/jwks.json")),
+);
 
 serve(
   {

@@ -31,6 +31,11 @@ services:
       MEDIA_ROOT: /workspace/backend/media
       CORS_ORIGINS: http://localhost:5173
       APP_ENV: development
+      AUTH_ENABLED: "true"
+      AUTH_BYPASS_DEV_ONLY: "false"
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      AUTH_ISSUER: http://localhost:3000
+      AUTH_AUDIENCE: http://localhost:8000
     command: >
       sh -c "pip install --no-cache-dir -r requirements.txt &&
       alembic upgrade head &&
@@ -54,6 +59,7 @@ services:
       BETTER_AUTH_URL: http://localhost:3000
       FRONTEND_URL: http://localhost:5173
       APP_ENV: development
+      BETTER_AUTH_SECRET: local-dev-secret-change-this-to-a-long-random-value
     command: >
       sh -c "npm install &&
       npm run dev"

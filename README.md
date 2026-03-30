@@ -30,6 +30,8 @@ Start the shared services from the repo root:
 docker compose up postgres auth-service backend
 ```
 
+The auth service runs Better Auth schema migrations automatically during startup.
+
 This starts:
 
 - Postgres on `localhost:5432`
@@ -68,6 +70,10 @@ Defaults:
 - `DATABASE_URL`: `postgresql://postgres:postgres@localhost:5432/rinklink`
 - `MEDIA_ROOT`: `backend/media`
 - `CORS_ORIGINS`: `http://localhost:5173,http://localhost:5174`
+- `AUTH_ENABLED`: `true`
+- `AUTH_JWKS_URL`: `http://localhost:3000/.well-known/jwks.json`
+- `AUTH_ISSUER`: `http://localhost:3000`
+- `AUTH_AUDIENCE`: `http://localhost:8000`
 
 Important:
 
@@ -97,6 +103,24 @@ Important local URLs:
 - Better Auth base URL: `http://localhost:3000`
 - Better Auth routes: `http://localhost:3000/api/auth/*`
 - JWKS URL: `http://localhost:3000/.well-known/jwks.json`
+
+### Minimal local auth smoke flow
+
+Once `postgres`, `auth-service`, and `backend` are running, you can verify the auth bridge without the frontend:
+
+```bash
+./scripts/local-auth-smoke.sh
+```
+
+The script does all of the following against the local stack:
+
+- sign up a new Better Auth user
+- read the verification URL from `auth-service` logs
+- verify the email and capture the Better Auth session cookie
+- exchange that session for a FastAPI audience JWT
+- call `GET /api/me`
+
+The first authenticated `/api/me` response should create an `app_users` row automatically and return a `pending` user profile until that user is granted memberships or activated.
 
 ### Seed Demo Data
 

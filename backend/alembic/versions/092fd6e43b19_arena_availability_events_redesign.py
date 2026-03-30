@@ -23,6 +23,21 @@ down_revision: Union[str, Sequence[str], None] = "7f2b6c8a91d3"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+_DEFERRED_TABLES = {
+    # Added in later revisions and must not be materialized during the redesign reset.
+    "event_attendance",
+    "ice_booking_requests",
+    "app_users",
+    "association_memberships",
+    "team_memberships",
+    "arena_memberships",
+    "player_guardianships",
+    "player_memberships",
+    "invites",
+    "access_requests",
+    "audit_log",
+}
+
 
 def upgrade() -> None:
     """Upgrade schema.
@@ -46,7 +61,12 @@ def upgrade() -> None:
             continue
         table.drop(bind=bind, checkfirst=True)
 
-    Base.metadata.create_all(bind=bind)
+    redesign_tables = [
+        table
+        for table in Base.metadata.sorted_tables
+        if table.name not in _DEFERRED_TABLES
+    ]
+    Base.metadata.create_all(bind=bind, tables=redesign_tables)
 
 
 def downgrade() -> None:

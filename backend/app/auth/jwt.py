@@ -15,7 +15,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
     return pyjwt.decode(
         token,
         key=key,
-        algorithms=["RS256"],
+        algorithms=["EdDSA", "RS256"],
         issuer=settings.auth_issuer,
         audience=settings.auth_audience,
         options={"require": ["exp", "iat", "sub"]},

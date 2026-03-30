@@ -142,6 +142,19 @@
   - covered association-admin private team visibility, coach/association capability derivation, linked-family team and event access, and separation between team-vs-arena memberships
 - Validation:
   - `backend/.venv/bin/pytest backend/tests/test_auth_context.py -q` passed (`4 passed`)
+- Closed the local auth integration loop:
+  - auth-service now runs Better Auth schema migrations automatically on startup in both `dev` and `start`
+  - auth-service now serves the advertised root JWKS URL by proxying it to Better Auth's internal auth route
+  - backend JWT verification now accepts Better Auth's `EdDSA` tokens in addition to `RS256`
+  - local auth service env defaults now include a non-trivial development secret
+  - the legacy redesign Alembic migration now defers later auth/attendance/booking tables so local Postgres bootstraps cleanly
+  - the auth authorization migration is now idempotent, which avoids duplicate-table failures during local Compose bootstrap
+  - added `scripts/local-auth-smoke.sh` to exercise signup, verification, token exchange, and `/api/me`
+- Validation:
+  - `docker compose up -d postgres auth-service backend` succeeds with auth enabled
+  - `npm run build` succeeds in `auth-service/`
+  - `backend/.venv/bin/python -m compileall app` succeeds
+  - `./scripts/local-auth-smoke.sh` reaches `GET /api/me` and returns a `pending` app user
 
 ## Planned Commit Sequence
 
