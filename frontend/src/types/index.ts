@@ -65,6 +65,42 @@ export interface MeResponse {
   accessible_teams: AccessibleTeam[];
 }
 
+export interface AccessTarget {
+  type: string;
+  id: string;
+  name: string;
+  context: string | null;
+}
+
+export interface Invite {
+  id: string;
+  token: string;
+  email: string;
+  role: string | null;
+  status: string;
+  expires_at: string;
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+  invited_by_user_id: string;
+  invited_by_email: string | null;
+  target: AccessTarget;
+}
+
+export interface AccessRequest {
+  id: string;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  reviewed_at: string | null;
+  user_id: string;
+  user_email: string | null;
+  reviewed_by_user_id: string | null;
+  reviewed_by_email: string | null;
+  target: AccessTarget;
+}
+
 export interface TeamCompetitionMembership {
   id: string;
   team_id: string;

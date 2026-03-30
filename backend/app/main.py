@@ -57,6 +57,7 @@ from .routers import (  # noqa: E402
     seasons,
     competitions,
     me,
+    access,
     seed as seed_router,
 )
 
@@ -74,6 +75,7 @@ app.include_router(scoresheet.router, prefix="/api")
 app.include_router(seasons.router, prefix="/api")
 app.include_router(competitions.router, prefix="/api")
 app.include_router(me.router, prefix="/api")
+app.include_router(access.router, prefix="/api")
 app.include_router(seed_router.router, prefix="/api")
 
 # Serve the React SPA for all non-API routes (production only — only present in Docker image)

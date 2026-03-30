@@ -92,6 +92,16 @@
   - `./.venv/bin/python -c "from app.main import app; print('ok')"` succeeded after the auth UI backend dependency change
   - `npm install @daveyplate/better-auth-ui@latest` succeeded
   - `npm run build` succeeded with `AuthUIProvider`, `AuthView`, and the protected auth routing changes
+- Added the first custom app-owned onboarding slice on top of Better Auth UI:
+  - backend invite and access-request schemas
+  - new `/api/invites` and `/api/access-requests` router with target validation, resource-scoped authorization, membership/link grants, and audit log writes
+  - custom invite review/acceptance page at `/invite/:token`
+  - pending approval page now loads and displays invites plus submitted access requests
+  - added authenticated return-to handling so invite links survive the sign-in round trip
+- Validation:
+  - `./.venv/bin/python -m compileall app` succeeded after the access router addition
+  - `./.venv/bin/python -c "from app.main import app; print('ok')"` succeeded with the invite/access-request router wired into FastAPI
+  - `npm run build` succeeded with the new invite acceptance and pending approval flows
 
 ## Planned Commit Sequence
 
@@ -135,6 +145,10 @@
    - auth routes
    - pending approval screen
    - app shell auth redirects
+9. Custom onboarding and access flows:
+   - invite review and acceptance
+   - access request APIs
+   - pending approval data surfaces
 
 ## Notes
 

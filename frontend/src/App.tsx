@@ -40,6 +40,7 @@ import { authClient, authEnabled, clearApiAccessToken } from './lib/auth-client'
 const HomePage = lazy(() => import('./pages/HomePage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const PendingApprovalPage = lazy(() => import('./pages/PendingApprovalPage'));
+const InviteAcceptancePage = lazy(() => import('./pages/InviteAcceptancePage'));
 const AssociationListPage = lazy(() => import('./pages/AssociationListPage'));
 const CompetitionsPage = lazy(() => import('./pages/CompetitionsPage'));
 const StandingsPage = lazy(() => import('./pages/StandingsPage'));
@@ -81,6 +82,20 @@ function RouteFallback() {
 function LegacyEventRedirect() {
   const { eventId = '' } = useParams();
   return <Navigate to={`/schedule/${eventId}`} replace />;
+}
+
+const AUTH_RETURN_TO_KEY = 'rinklink.returnTo';
+
+function consumeAuthReturnTo() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const returnTo = window.sessionStorage.getItem(AUTH_RETURN_TO_KEY);
+  if (!returnTo) {
+    return null;
+  }
+  window.sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
+  return returnTo;
 }
 
 const NAV_SECTIONS = [
@@ -258,6 +273,7 @@ function AppContent() {
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/auth/:pathname" element={<AuthPage />} />
+          <Route path="/invite/:token" element={<InviteAcceptancePage />} />
           <Route path="/login" element={<Navigate to="/auth/sign-in" replace />} />
           <Route path="*" element={<Navigate to="/auth/sign-in" replace />} />
         </Routes>
@@ -270,7 +286,8 @@ function AppContent() {
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/pending" element={<PendingApprovalPage />} />
-          <Route path="/auth/:pathname" element={<Navigate to="/pending" replace />} />
+          <Route path="/invite/:token" element={<InviteAcceptancePage />} />
+          <Route path="/auth/:pathname" element={<Navigate to={consumeAuthReturnTo() || '/pending'} replace />} />
           <Route path="*" element={<Navigate to="/pending" replace />} />
         </Routes>
       </Suspense>
@@ -416,9 +433,10 @@ function AppContent() {
               <Suspense fallback={<RouteFallback />}>
                 <div key={location.pathname} className="animate-fade-slide-in">
                   <Routes>
-                    <Route path="/auth/:pathname" element={<Navigate to="/" replace />} />
+                    <Route path="/auth/:pathname" element={<Navigate to={consumeAuthReturnTo() || '/'} replace />} />
                     <Route path="/pending" element={<Navigate to="/" replace />} />
                     <Route path="/login" element={<Navigate to={authEnabled ? '/auth/sign-in' : '/'} replace />} />
+                    <Route path="/invite/:token" element={<InviteAcceptancePage />} />
                     <Route path="/" element={<HomePage />} />
                     <Route path="/associations" element={<AssociationListPage />} />
                     <Route path="/competitions" element={<CompetitionsPage />} />

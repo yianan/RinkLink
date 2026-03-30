@@ -57,6 +57,12 @@ from .auth import (
     LinkedPlayerOut,
     AccessibleTeamOut,
     MeOut,
+    AccessTargetOut,
+    InviteCreate,
+    InviteOut,
+    AccessRequestCreate,
+    AccessRequestDecision,
+    AccessRequestOut,
 )
 
 __all__ = [
@@ -85,4 +91,6 @@ __all__ = [
     "CompetitionOut", "CompetitionDivisionOut", "TeamCompetitionMembershipOut",
     "AppUserOut", "AssociationMembershipOut", "TeamMembershipOut", "ArenaMembershipOut",
     "LinkedPlayerOut", "AccessibleTeamOut", "MeOut",
+    "AccessTargetOut", "InviteCreate", "InviteOut",
+    "AccessRequestCreate", "AccessRequestDecision", "AccessRequestOut",
 ]

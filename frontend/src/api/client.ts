@@ -59,6 +59,33 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
 
 export const api = {
   getMe: () => request<import('../types').MeResponse>('/me'),
+  getInvites: (params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return request<import('../types').Invite[]>(`/invites${qs}`);
+  },
+  getInviteByToken: (token: string) => request<import('../types').Invite>(`/invites/by-token/${token}`),
+  createInvite: (data: {
+    email: string;
+    target_type: string;
+    target_id: string;
+    role?: string | null;
+    expires_in_days?: number;
+  }) => request<import('../types').Invite>('/invites', { method: 'POST', body: JSON.stringify(data) }),
+  acceptInvite: (token: string) => request<import('../types').Invite>(`/invites/${token}/accept`, { method: 'POST' }),
+  cancelInvite: (inviteId: string) => request<void>(`/invites/${inviteId}`, { method: 'DELETE' }),
+  getAccessRequests: (params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return request<import('../types').AccessRequest[]>(`/access-requests${qs}`);
+  },
+  createAccessRequest: (data: { target_type: string; target_id: string; notes?: string | null }) =>
+    request<import('../types').AccessRequest>('/access-requests', { method: 'POST', body: JSON.stringify(data) }),
+  approveAccessRequest: (requestId: string, role?: string | null) =>
+    request<import('../types').AccessRequest>(`/access-requests/${requestId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ role: role ?? null }),
+    }),
+  rejectAccessRequest: (requestId: string) =>
+    request<import('../types').AccessRequest>(`/access-requests/${requestId}/reject`, { method: 'POST' }),
   getAssociations: () => request<import('../types').Association[]>('/associations'),
   createAssociation: (data: Partial<import('../types').Association>) =>
     request<import('../types').Association>('/associations', { method: 'POST', body: JSON.stringify(data) }),
