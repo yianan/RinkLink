@@ -59,6 +59,15 @@
   - backend imports cleanly after route protection via `./.venv/bin/python -c "from app.main import app; print('backend ok')"`
   - frontend `npm install` succeeded with the Better Auth client dependency
   - frontend `npm run build` succeeded with the auth client/context changes
+- Added the second protected router slice:
+  - arena, event, proposal, and availability helper checks in the shared backend auth context
+  - `availability` router now enforces `team.manage_schedule`
+  - `events` router now enforces scoped event reads, attendance permissions, schedule edits, and weekly confirmation permissions
+  - `proposals` router now enforces proposal ownership/counterparty permissions and validates that proposal windows match the selected teams
+  - `scoresheet` router now enforces `team.view_private` for reads and `team.manage_scoresheet` for writes
+- Validation:
+  - `./.venv/bin/python -m compileall app` succeeded after the second router protection pass
+  - `./.venv/bin/python -c "from app.main import app; print('ok')"` succeeded after wiring the new authorization helpers
 
 ## Planned Commit Sequence
 
@@ -85,6 +94,11 @@
    - auth token bridge
    - `/api/me` consumption context
    - auth-gated team bootstrap
+6. Expanded protected backend coverage:
+   - availability
+   - events
+   - proposals
+   - scoresheet
 
 ## Notes
 

@@ -3,6 +3,13 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from ..auth.context import (
+    AuthorizationContext,
+    authorization_context,
+    ensure_proposal_counterparty_access,
+    ensure_proposal_team_access,
+    ensure_team_access,
+)
 from ..database import get_db
 from ..models import Arena, ArenaRink, AvailabilityWindow, Event, IceSlot, LockerRoom, Proposal, Team
 from ..schemas import ProposalCreate, ProposalOut, ProposalRescheduleCreate
@@ -86,8 +93,20 @@ def _validate_windows(db: Session, home_window_id: str, away_window_id: str):
 
 
 @router.post("/proposals", response_model=ProposalOut, status_code=201)
-def create_proposal(body: ProposalCreate, db: Session = Depends(get_db)):
-    _validate_windows(db, body.home_availability_window_id, body.away_availability_window_id)
+def create_proposal(
+    body: ProposalCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    if body.proposed_by_team_id not in {body.home_team_id, body.away_team_id}:
+        raise HTTPException(400, "Proposing team must be part of the proposal")
+    proposing_team = db.get(Team, body.proposed_by_team_id)
+    if not proposing_team:
+        raise HTTPException(404, "Proposing team not found")
+    ensure_team_access(context, proposing_team, "team.manage_proposals")
+    home_window, away_window = _validate_windows(db, body.home_availability_window_id, body.away_availability_window_id)
+    if home_window.team_id != body.home_team_id or away_window.team_id != body.away_team_id:
+        raise HTTPException(400, "Availability windows must match the selected teams")
     _, _, slot = _validate_venue(
         db,
         arena_id=body.arena_id,
@@ -124,10 +143,16 @@ def create_proposal(body: ProposalCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/proposals/{proposal_id}/reschedule", response_model=ProposalOut, status_code=201)
-def request_reschedule(proposal_id: str, body: ProposalRescheduleCreate, db: Session = Depends(get_db)):
+def request_reschedule(
+    proposal_id: str,
+    body: ProposalRescheduleCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     base = db.get(Proposal, proposal_id)
     if not base:
         raise HTTPException(404, "Proposal not found")
+    ensure_proposal_team_access(context, base, "team.manage_proposals")
     if base.status != "accepted":
         raise HTTPException(400, f"Cannot reschedule proposal with status '{base.status}'")
     _, _, slot = _validate_venue(
@@ -160,10 +185,13 @@ def list_proposals(
     team_id: str,
     status: str | None = Query(None),
     direction: str = Query("all"),
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
-    if not db.get(Team, team_id):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage_proposals")
     query = db.query(Proposal)
     if direction == "incoming":
         query = query.filter(
@@ -181,10 +209,15 @@ def list_proposals(
 
 
 @router.patch("/proposals/{proposal_id}/accept", response_model=ProposalOut)
-def accept_proposal(proposal_id: str, db: Session = Depends(get_db)):
+def accept_proposal(
+    proposal_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     proposal = db.get(Proposal, proposal_id)
     if not proposal:
         raise HTTPException(404, "Proposal not found")
+    ensure_proposal_counterparty_access(context, proposal, "team.manage_proposals")
     if proposal.status != "proposed":
         raise HTTPException(400, f"Cannot accept proposal with status '{proposal.status}'")
     proposal.status = "accepted"
@@ -257,10 +290,15 @@ def accept_proposal(proposal_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/proposals/{proposal_id}/decline", response_model=ProposalOut)
-def decline_proposal(proposal_id: str, db: Session = Depends(get_db)):
+def decline_proposal(
+    proposal_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     proposal = db.get(Proposal, proposal_id)
     if not proposal:
         raise HTTPException(404, "Proposal not found")
+    ensure_proposal_counterparty_access(context, proposal, "team.manage_proposals")
     if proposal.status != "proposed":
         raise HTTPException(400, f"Cannot decline proposal with status '{proposal.status}'")
     proposal.status = "declined"
@@ -272,10 +310,15 @@ def decline_proposal(proposal_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/proposals/{proposal_id}/cancel", response_model=ProposalOut)
-def cancel_proposal(proposal_id: str, db: Session = Depends(get_db)):
+def cancel_proposal(
+    proposal_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     proposal = db.get(Proposal, proposal_id)
     if not proposal:
         raise HTTPException(404, "Proposal not found")
+    ensure_proposal_team_access(context, proposal, "team.manage_proposals")
     cancel_proposal_record(db, proposal)
     db.commit()
     db.refresh(proposal)

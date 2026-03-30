@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from ..auth.context import AuthorizationContext, authorization_context, ensure_event_team_access, ensure_team_access
 from ..database import get_db
 from ..models import (
     Event,
@@ -42,11 +43,24 @@ def _require_player_on_team(player_id: str, team_id: str, event: Event, db: Sess
         raise HTTPException(400, "Player is not on this team's roster for the event's season")
 
 
+def _event_team(event: Event, team_id: str) -> Team:
+    if event.home_team_id == team_id and event.home_team is not None:
+        return event.home_team
+    if event.away_team_id == team_id and event.away_team is not None:
+        return event.away_team
+    raise HTTPException(400, "Team is not part of this event")
+
+
 @router.get("/events/{event_id}/scoresheet", response_model=EventScoresheetOut)
-def get_scoresheet(event_id: str, db: Session = Depends(get_db)):
+def get_scoresheet(
+    event_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
+    ensure_event_team_access(context, event, "team.view_private")
 
     return EventScoresheetOut(
         event=enrich_event(event, db),
@@ -58,7 +72,12 @@ def get_scoresheet(event_id: str, db: Session = Depends(get_db)):
 
 
 @router.put("/events/{event_id}/player-stats", response_model=list[EventPlayerStatOut])
-def upsert_player_stats(event_id: str, body: UpsertPlayerStats, db: Session = Depends(get_db)):
+def upsert_player_stats(
+    event_id: str,
+    body: UpsertPlayerStats,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
@@ -66,6 +85,7 @@ def upsert_player_stats(event_id: str, body: UpsertPlayerStats, db: Session = De
     for stat in body.stats:
         _require_team_in_event(stat.team_id, event)
         _require_player_on_team(stat.player_id, stat.team_id, event, db)
+        ensure_team_access(context, _event_team(event, stat.team_id), "team.manage_scoresheet")
 
         existing = (
             db.query(EventPlayerStat)
@@ -92,18 +112,30 @@ def upsert_player_stats(event_id: str, body: UpsertPlayerStats, db: Session = De
 
 
 @router.get("/events/{event_id}/penalties", response_model=list[EventPenaltyOut])
-def list_penalties(event_id: str, db: Session = Depends(get_db)):
-    if not db.get(Event, event_id):
+def list_penalties(
+    event_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    event = db.get(Event, event_id)
+    if not event:
         raise HTTPException(404, "Event not found")
+    ensure_event_team_access(context, event, "team.view_private")
     return db.query(EventPenalty).filter(EventPenalty.event_id == event_id).order_by(EventPenalty.created_at).all()
 
 
 @router.post("/events/{event_id}/penalties", response_model=EventPenaltyOut, status_code=201)
-def create_penalty(event_id: str, body: EventPenaltyCreate, db: Session = Depends(get_db)):
+def create_penalty(
+    event_id: str,
+    body: EventPenaltyCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
     _require_team_in_event(body.team_id, event)
+    ensure_team_access(context, _event_team(event, body.team_id), "team.manage_scoresheet")
     if body.player_id:
         _require_player_on_team(body.player_id, body.team_id, event, db)
 
@@ -121,16 +153,29 @@ def create_penalty(event_id: str, body: EventPenaltyCreate, db: Session = Depend
 
 
 @router.delete("/event-penalties/{id}", status_code=204)
-def delete_penalty(id: str, db: Session = Depends(get_db)):
+def delete_penalty(
+    id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     penalty = db.get(EventPenalty, id)
     if not penalty:
         raise HTTPException(404, "Penalty not found")
+    event = db.get(Event, penalty.event_id)
+    if not event:
+        raise HTTPException(404, "Event not found")
+    ensure_team_access(context, _event_team(event, penalty.team_id), "team.manage_scoresheet")
     db.delete(penalty)
     db.commit()
 
 
 @router.put("/events/{event_id}/goalie-stats", response_model=list[EventGoalieStatOut])
-def upsert_goalie_stats(event_id: str, body: UpsertGoalieStats, db: Session = Depends(get_db)):
+def upsert_goalie_stats(
+    event_id: str,
+    body: UpsertGoalieStats,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
@@ -138,6 +183,7 @@ def upsert_goalie_stats(event_id: str, body: UpsertGoalieStats, db: Session = De
     for stat in body.stats:
         _require_team_in_event(stat.team_id, event)
         _require_player_on_team(stat.player_id, stat.team_id, event, db)
+        ensure_team_access(context, _event_team(event, stat.team_id), "team.manage_scoresheet")
 
         existing = (
             db.query(EventGoalieStat)
@@ -164,20 +210,34 @@ def upsert_goalie_stats(event_id: str, body: UpsertGoalieStats, db: Session = De
 
 
 @router.get("/events/{event_id}/signatures", response_model=list[EventSignatureOut])
-def list_signatures(event_id: str, db: Session = Depends(get_db)):
-    if not db.get(Event, event_id):
+def list_signatures(
+    event_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    event = db.get(Event, event_id)
+    if not event:
         raise HTTPException(404, "Event not found")
+    ensure_event_team_access(context, event, "team.view_private")
     return db.query(EventSignature).filter(EventSignature.event_id == event_id).order_by(EventSignature.created_at).all()
 
 
 @router.post("/events/{event_id}/signatures", response_model=EventSignatureOut, status_code=201)
-def sign(event_id: str, body: EventSignatureCreate, db: Session = Depends(get_db)):
+def sign(
+    event_id: str,
+    body: EventSignatureCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
 
     if body.team_id:
         _require_team_in_event(body.team_id, event)
+        ensure_team_access(context, _event_team(event, body.team_id), "team.manage_scoresheet")
+    else:
+        ensure_event_team_access(context, event, "team.manage_scoresheet")
 
     existing = (
         db.query(EventSignature)

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from ..auth.context import AuthorizationContext, authorization_context, ensure_team_access
 from ..database import get_db
 from ..models import AvailabilityWindow, Event, Team
 from ..schemas import (
@@ -36,9 +37,15 @@ def _out(window: AvailabilityWindow, db: Session) -> AvailabilityWindowOut:
 
 
 @router.get("/teams/{team_id}/availability", response_model=list[AvailabilityWindowOut])
-def list_availability(team_id: str, db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
+def list_availability(
+    team_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage_schedule")
     windows = (
         db.query(AvailabilityWindow)
         .filter(AvailabilityWindow.team_id == team_id)
@@ -49,9 +56,16 @@ def list_availability(team_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/teams/{team_id}/availability", response_model=AvailabilityWindowOut, status_code=201)
-def create_availability(team_id: str, body: AvailabilityWindowCreate, db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
+def create_availability(
+    team_id: str,
+    body: AvailabilityWindowCreate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage_schedule")
     data = body.model_dump()
     if not data.get("season_id"):
         data["season_id"] = resolve_season_id(db, body.date)
@@ -63,17 +77,31 @@ def create_availability(team_id: str, body: AvailabilityWindowCreate, db: Sessio
 
 
 @router.post("/teams/{team_id}/availability/upload", response_model=AvailabilityUploadPreview)
-async def upload_availability(team_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
+async def upload_availability(
+    team_id: str,
+    file: UploadFile = File(...),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage_schedule")
     content = (await file.read()).decode("utf-8-sig")
     return parse_csv(content)
 
 
 @router.post("/teams/{team_id}/availability/confirm-upload", response_model=list[AvailabilityWindowOut], status_code=201)
-def confirm_availability_upload(team_id: str, body: AvailabilityConfirmUpload, db: Session = Depends(get_db)):
-    if not db.get(Team, team_id):
+def confirm_availability_upload(
+    team_id: str,
+    body: AvailabilityConfirmUpload,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.manage_schedule")
     created: list[AvailabilityWindow] = []
     for row in body.entries:
         entry = AvailabilityWindow(
@@ -90,10 +118,18 @@ def confirm_availability_upload(team_id: str, body: AvailabilityConfirmUpload, d
 
 
 @router.put("/availability-windows/{availability_window_id}", response_model=AvailabilityWindowOut)
-def update_availability(availability_window_id: str, body: AvailabilityWindowUpdate, db: Session = Depends(get_db)):
+def update_availability(
+    availability_window_id: str,
+    body: AvailabilityWindowUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     window = db.get(AvailabilityWindow, availability_window_id)
     if not window:
         raise HTTPException(404, "Availability window not found")
+    if not window.team:
+        raise HTTPException(404, "Team not found")
+    ensure_team_access(context, window.team, "team.manage_schedule")
     next_start_time = body.start_time if body.start_time is not None else window.start_time
     next_end_time = body.end_time if body.end_time is not None else window.end_time
     _validate_time_range(next_start_time, next_end_time)
@@ -105,9 +141,16 @@ def update_availability(availability_window_id: str, body: AvailabilityWindowUpd
 
 
 @router.delete("/availability-windows/{availability_window_id}", status_code=204)
-def delete_availability(availability_window_id: str, db: Session = Depends(get_db)):
+def delete_availability(
+    availability_window_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     window = db.get(AvailabilityWindow, availability_window_id)
     if not window:
         raise HTTPException(404, "Availability window not found")
+    if not window.team:
+        raise HTTPException(404, "Team not found")
+    ensure_team_access(context, window.team, "team.manage_schedule")
     db.delete(window)
     db.commit()

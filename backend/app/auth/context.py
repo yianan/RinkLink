@@ -10,8 +10,10 @@ from ..models import (
     AppUser,
     AssociationMembership,
     ArenaMembership,
+    Event,
     PlayerGuardianship,
     PlayerMembership,
+    Proposal,
     Team,
     TeamMembership,
 )
@@ -133,6 +135,40 @@ def can_access_team(
     return False
 
 
+def can_access_arena(context: AuthorizationContext, arena_id: str, capability: str) -> bool:
+    if context.user.is_platform_admin:
+        return True
+    return capability in context.capabilities and arena_id in context.arena_ids
+
+
+def can_access_any_event_team(
+    context: AuthorizationContext,
+    event: Event,
+    capability: str,
+    *,
+    allow_linked_family: bool = False,
+) -> bool:
+    teams = [team for team in (event.home_team, event.away_team) if team is not None]
+    return any(
+        can_access_team(context, team, capability, allow_linked_family=allow_linked_family)
+        for team in teams
+    )
+
+
+def can_access_any_proposal_team(context: AuthorizationContext, proposal: Proposal, capability: str) -> bool:
+    teams = [team for team in (proposal.home_team, proposal.away_team) if team is not None]
+    return any(can_access_team(context, team, capability) for team in teams)
+
+
+def can_access_proposal_counterparty(context: AuthorizationContext, proposal: Proposal, capability: str) -> bool:
+    teams = [
+        team
+        for team in (proposal.home_team, proposal.away_team)
+        if team is not None and team.id != proposal.proposed_by_team_id
+    ]
+    return any(can_access_team(context, team, capability) for team in teams)
+
+
 def ensure_association_access(context: AuthorizationContext, association_id: str, capability: str) -> None:
     if can_access_association(context, association_id, capability):
         return
@@ -149,3 +185,36 @@ def ensure_team_access(
     if can_access_team(context, team, capability, allow_linked_family=allow_linked_family):
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this team")
+
+
+def ensure_arena_access(context: AuthorizationContext, arena_id: str, capability: str) -> None:
+    if can_access_arena(context, arena_id, capability):
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this arena")
+
+
+def ensure_event_team_access(
+    context: AuthorizationContext,
+    event: Event,
+    capability: str,
+    *,
+    allow_linked_family: bool = False,
+) -> None:
+    if can_access_any_event_team(context, event, capability, allow_linked_family=allow_linked_family):
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this event")
+
+
+def ensure_proposal_team_access(context: AuthorizationContext, proposal: Proposal, capability: str) -> None:
+    if can_access_any_proposal_team(context, proposal, capability):
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this proposal")
+
+
+def ensure_proposal_counterparty_access(context: AuthorizationContext, proposal: Proposal, capability: str) -> None:
+    if can_access_proposal_counterparty(context, proposal, capability):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have permission to respond to this proposal",
+    )

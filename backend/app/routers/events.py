@@ -3,6 +3,14 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from ..auth.context import (
+    AuthorizationContext,
+    authorization_context,
+    can_access_arena,
+    can_access_team,
+    ensure_event_team_access,
+    ensure_team_access,
+)
 from ..database import get_db
 from ..models import Arena, ArenaRink, AvailabilityWindow, Event, IceBookingRequest, IceSlot, LockerRoom, Team
 from ..schemas import (
@@ -124,10 +132,13 @@ def list_events(
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
     season_id: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
-    if not db.get(Team, team_id):
+    team = db.get(Team, team_id)
+    if not team:
         raise HTTPException(404, "Team not found")
+    ensure_team_access(context, team, "team.view")
     query = db.query(Event).filter((Event.home_team_id == team_id) | (Event.away_team_id == team_id))
     if status:
         query = query.filter(Event.status == status)
@@ -151,10 +162,13 @@ def list_arena_events(
     status: str | None = Query(None),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
     if not db.get(Arena, arena_id):
         raise HTTPException(404, "Arena not found")
+    if not can_access_arena(context, arena_id, "arena.view"):
+        raise HTTPException(403, "You do not have access to this arena")
     query = db.query(Event).filter(Event.arena_id == arena_id)
     if status:
         query = query.filter(Event.status == status)
@@ -165,19 +179,34 @@ def list_arena_events(
     return [enrich_event(event, db) for event in query.order_by(Event.date, Event.start_time).all()]
 
 @router.get("/events/{event_id}", response_model=EventOut)
-def get_event(event_id: str, db: Session = Depends(get_db)):
+def get_event(
+    event_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
+    if not ensure_event_team_or_arena_read_access(context, event):
+        raise HTTPException(403, "You do not have access to this event")
     return enrich_event(event, db)
 
 
 @router.get("/teams/{team_id}/events/{event_id}/attendance", response_model=list[EventAttendancePlayer])
-def get_event_attendance(team_id: str, event_id: str, db: Session = Depends(get_db)):
+def get_event_attendance(
+    team_id: str,
+    event_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
     validate_attendance_team(event, team_id)
+    target_team = event.home_team if event.home_team_id == team_id else event.away_team
+    if not target_team:
+        raise HTTPException(404, "Team not found")
+    ensure_team_access(context, target_team, "team.view_private")
     return build_attendance_players(db, event, team_id)
 
 
@@ -186,12 +215,17 @@ def update_event_attendance(
     team_id: str,
     event_id: str,
     body: BulkEventAttendanceUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
     validate_attendance_team(event, team_id)
+    target_team = event.home_team if event.home_team_id == team_id else event.away_team
+    if not target_team:
+        raise HTTPException(404, "Team not found")
+    ensure_team_access(context, target_team, "team.manage_attendance")
     updates = {item.player_id: item.status for item in body.updates}
     players = upsert_attendance_updates(db, event, team_id, updates)
     db.commit()
@@ -199,10 +233,16 @@ def update_event_attendance(
 
 
 @router.patch("/events/{event_id}", response_model=EventOut)
-def update_event(event_id: str, body: EventUpdate, db: Session = Depends(get_db)):
+def update_event(
+    event_id: str,
+    body: EventUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
+    ensure_event_team_access(context, event, "team.manage_schedule")
     if {"home_score", "away_score"} & body.model_fields_set and event.date > date.today():
         raise HTTPException(400, "Scores cannot be recorded for future events")
     if {"home_score", "away_score"} & body.model_fields_set and (body.home_score is None or body.away_score is None):
@@ -230,10 +270,15 @@ def update_event(event_id: str, body: EventUpdate, db: Session = Depends(get_db)
 
 
 @router.patch("/events/{event_id}/cancel", response_model=EventOut)
-def cancel_event(event_id: str, db: Session = Depends(get_db)):
+def cancel_event(
+    event_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
+    ensure_event_team_access(context, event, "team.manage_schedule")
     was_recordable = is_recordable_event(event)
     event.status = "cancelled"
     event.home_weekly_confirmed = False
@@ -253,10 +298,20 @@ def cancel_event(event_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/events/{event_id}/locker-rooms", response_model=EventOut)
-def update_event_locker_rooms(event_id: str, body: EventLockerRoomUpdate, db: Session = Depends(get_db)):
+def update_event_locker_rooms(
+    event_id: str,
+    body: EventLockerRoomUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
+    if not (
+        can_access_arena(context, event.arena_id, "arena.manage_booking_requests")
+        or ensure_event_team_or_arena_schedule_access(context, event)
+    ):
+        raise HTTPException(403, "You do not have access to update locker rooms for this event")
     if event.status == "cancelled":
         raise HTTPException(400, "Locker rooms cannot be changed for cancelled events")
     if event_has_started(event):
@@ -292,12 +347,21 @@ def update_event_locker_rooms(event_id: str, body: EventLockerRoomUpdate, db: Se
 
 
 @router.patch("/events/{event_id}/weekly-confirm", response_model=EventOut)
-def weekly_confirm(event_id: str, body: WeeklyConfirmUpdate, db: Session = Depends(get_db)):
+def weekly_confirm(
+    event_id: str,
+    body: WeeklyConfirmUpdate,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
     if body.team_id not in {event.home_team_id, event.away_team_id}:
         raise HTTPException(400, "Team is not part of this event")
+    target_team = event.home_team if event.home_team_id == body.team_id else event.away_team
+    if not target_team:
+        raise HTTPException(404, "Team not found")
+    ensure_team_access(context, target_team, "team.manage_schedule")
     if body.team_id == event.home_team_id:
         event.home_weekly_confirmed = body.confirmed
     else:
@@ -309,3 +373,17 @@ def weekly_confirm(event_id: str, body: WeeklyConfirmUpdate, db: Session = Depen
     db.commit()
     db.refresh(event)
     return enrich_event(event, db)
+
+
+def ensure_event_team_or_arena_read_access(context: AuthorizationContext, event: Event) -> bool:
+    return any(
+        team is not None and can_access_team(context, team, "team.view")
+        for team in (event.home_team, event.away_team)
+    ) or can_access_arena(context, event.arena_id, "arena.view")
+
+
+def ensure_event_team_or_arena_schedule_access(context: AuthorizationContext, event: Event) -> bool:
+    return (
+        (event.home_team is not None and can_access_team(context, event.home_team, "team.manage_schedule"))
+        or (event.away_team is not None and can_access_team(context, event.away_team, "team.manage_schedule"))
+    )
