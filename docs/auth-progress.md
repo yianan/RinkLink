@@ -79,6 +79,19 @@
 - Validation:
   - `./.venv/bin/python -m compileall app` succeeded after the admin and ops protection pass
   - `./.venv/bin/python -c "from app.main import app; print('ok')"` succeeded after protecting admin and utility routers
+- Added the first auth UI slice:
+  - `/api/me` now supports authenticated pending users so the frontend can render approval status correctly
+  - BrowserRouter moved to the app entrypoint to support Better Auth UI’s React Router integration
+  - added `@daveyplate/better-auth-ui` and wired `AuthUIProvider`
+  - added `AuthView`-backed auth routing at `/auth/:pathname`
+  - kept `PendingApprovalPage` custom, per plan, for approval-state UX
+  - added authenticated shell redirects for unauthenticated users, pending users, and profile-load failures
+  - added a simple authenticated sign-out action in the app shell
+- Validation:
+  - `./.venv/bin/python -m compileall app` succeeded after the pending-user `/api/me` change
+  - `./.venv/bin/python -c "from app.main import app; print('ok')"` succeeded after the auth UI backend dependency change
+  - `npm install @daveyplate/better-auth-ui@latest` succeeded
+  - `npm run build` succeeded with `AuthUIProvider`, `AuthView`, and the protected auth routing changes
 
 ## Planned Commit Sequence
 
@@ -117,6 +130,11 @@
    - notifications
    - search
    - seed hardening
+8. Commodity auth UI integration:
+   - Better Auth UI provider
+   - auth routes
+   - pending approval screen
+   - app shell auth redirects
 
 ## Notes
 

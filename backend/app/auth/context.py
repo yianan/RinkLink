@@ -18,7 +18,7 @@ from ..models import (
     TeamMembership,
 )
 from .capabilities import ALL_CAPABILITIES, effective_capabilities
-from .dependencies import require_active_user
+from .dependencies import current_user, require_active_user
 
 
 @dataclass(slots=True)
@@ -106,6 +106,13 @@ def build_authorization_context(db: Session, user: AppUser) -> AuthorizationCont
 
 def authorization_context(
     user: AppUser = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> AuthorizationContext:
+    return build_authorization_context(db, user)
+
+
+def current_authorization_context(
+    user: AppUser = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> AuthorizationContext:
     return build_authorization_context(db, user)

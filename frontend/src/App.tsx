@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import {
   Building2,
   Calendar,
@@ -10,6 +10,7 @@ import {
   Flag,
   Home,
   Inbox,
+  LogOut,
   Menu,
   Search,
   Snowflake,
@@ -20,6 +21,8 @@ import {
 import { TeamProvider, useTeam } from './context/TeamContext';
 import { SeasonProvider, useSeason } from './context/SeasonContext';
 import { AuthProvider } from './context/AuthContext';
+import { BetterAuthUiProvider } from './context/BetterAuthUiProvider';
+import { useAuth } from './context/AuthContext';
 import TeamSwitcher from './components/TeamSwitcher';
 import SeasonSwitcher from './components/SeasonSwitcher';
 import ThemeToggle from './components/ThemeToggle';
@@ -31,8 +34,12 @@ import { ConfirmDialogProvider } from './context/ConfirmDialogContext';
 import { ToastProvider } from './context/ToastContext';
 import { NavBadgeProvider, useNavBadgeKey } from './context/NavBadgeContext';
 import { Skeleton } from './components/ui/Skeleton';
+import { Button } from './components/ui/Button';
+import { authClient, authEnabled, clearApiAccessToken } from './lib/auth-client';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
+const AuthPage = lazy(() => import('./pages/AuthPage'));
+const PendingApprovalPage = lazy(() => import('./pages/PendingApprovalPage'));
 const AssociationListPage = lazy(() => import('./pages/AssociationListPage'));
 const CompetitionsPage = lazy(() => import('./pages/CompetitionsPage'));
 const StandingsPage = lazy(() => import('./pages/StandingsPage'));
@@ -220,6 +227,7 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function AppContent() {
+  const { authEnabled: runtimeAuthEnabled, isAuthenticated, me, loading: authLoading, error: authError } = useAuth();
   const { loading: teamsLoading } = useTeam();
   const { loading: seasonsLoading } = useSeason();
   const location = useLocation();
@@ -229,6 +237,76 @@ function AppContent() {
   const mobileNavContentRef = useRef<HTMLDivElement | null>(null);
   const mobileNavScrollRef = useRef<HTMLDivElement | null>(null);
   const appLoading = teamsLoading || seasonsLoading;
+  const pendingApproval = runtimeAuthEnabled && isAuthenticated && !!me && !me.user.is_platform_admin && me.user.status !== 'active';
+
+  if (runtimeAuthEnabled && authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-2xl border border-[color:var(--app-border-subtle)] bg-[var(--app-surface)] px-5 py-4 shadow-soft">
+          <div className="space-y-3">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-3/4" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (runtimeAuthEnabled && !isAuthenticated) {
+    return (
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/auth/:pathname" element={<AuthPage />} />
+          <Route path="/login" element={<Navigate to="/auth/sign-in" replace />} />
+          <Route path="*" element={<Navigate to="/auth/sign-in" replace />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  if (pendingApproval) {
+    return (
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/pending" element={<PendingApprovalPage />} />
+          <Route path="/auth/:pathname" element={<Navigate to="/pending" replace />} />
+          <Route path="*" element={<Navigate to="/pending" replace />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  if (runtimeAuthEnabled && isAuthenticated && !me) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="w-full max-w-lg rounded-2xl border border-[color:var(--app-border-subtle)] bg-[var(--app-surface)] p-6 shadow-soft">
+          <div className="font-display text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            Unable to load your access profile
+          </div>
+          <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            {authError || 'The session is valid, but the app profile could not be loaded.'}
+          </div>
+          <div className="mt-4 flex gap-3">
+            <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={async () => {
+                clearApiAccessToken();
+                await authClient.signOut();
+                window.location.href = '/auth/sign-in';
+              }}
+            >
+              Sign out
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -297,6 +375,23 @@ function AppContent() {
               <div className="hidden sm:block">
                 <ThemeToggle />
               </div>
+              {runtimeAuthEnabled ? (
+                <button
+                  type="button"
+                  className={cn(
+                    'hidden sm:inline-flex shrink-0 items-center justify-center rounded-lg',
+                    chromeIconButtonClass,
+                  )}
+                  aria-label="Sign out"
+                  onClick={async () => {
+                    clearApiAccessToken();
+                    await authClient.signOut();
+                    window.location.href = '/auth/sign-in';
+                  }}
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              ) : null}
             </div>
           </div>
         </header>
@@ -321,6 +416,9 @@ function AppContent() {
               <Suspense fallback={<RouteFallback />}>
                 <div key={location.pathname} className="animate-fade-slide-in">
                   <Routes>
+                    <Route path="/auth/:pathname" element={<Navigate to="/" replace />} />
+                    <Route path="/pending" element={<Navigate to="/" replace />} />
+                    <Route path="/login" element={<Navigate to={authEnabled ? '/auth/sign-in' : '/'} replace />} />
                     <Route path="/" element={<HomePage />} />
                     <Route path="/associations" element={<AssociationListPage />} />
                     <Route path="/competitions" element={<CompetitionsPage />} />
@@ -408,21 +506,21 @@ function AppContent() {
 export default function App() {
   return (
     <TooltipPrimitive.Provider delayDuration={120}>
-      <AuthProvider>
-        <TeamProvider>
-          <SeasonProvider>
-            <NavBadgeProvider>
-              <ToastProvider>
-                <ConfirmDialogProvider>
-                  <BrowserRouter>
+      <BetterAuthUiProvider>
+        <AuthProvider>
+          <TeamProvider>
+            <SeasonProvider>
+              <NavBadgeProvider>
+                <ToastProvider>
+                  <ConfirmDialogProvider>
                     <AppContent />
-                  </BrowserRouter>
-                </ConfirmDialogProvider>
-              </ToastProvider>
-            </NavBadgeProvider>
-          </SeasonProvider>
-        </TeamProvider>
-      </AuthProvider>
+                  </ConfirmDialogProvider>
+                </ToastProvider>
+              </NavBadgeProvider>
+            </SeasonProvider>
+          </TeamProvider>
+        </AuthProvider>
+      </BetterAuthUiProvider>
     </TooltipPrimitive.Provider>
   );
 }

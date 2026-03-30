@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from ..auth.context import authorization_context
+from ..auth.context import current_authorization_context
 from ..database import get_db
 from ..models import Team
 from ..schemas import (
@@ -16,7 +16,7 @@ router = APIRouter(tags=["auth"])
 
 
 @router.get("/me", response_model=MeOut)
-def get_me(context=Depends(authorization_context), db: Session = Depends(get_db)):
+def get_me(context=Depends(current_authorization_context), db: Session = Depends(get_db)):
     accessible_team_ids = set(context.team_ids)
     if context.association_memberships:
         accessible_team_ids.update(
