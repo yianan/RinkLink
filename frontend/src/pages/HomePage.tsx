@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, CheckCircle2, Inbox, RotateCcw, Trophy } from 'lucide-react';
 import { api } from '../api/client';
 import { Event, IceBookingRequest, Proposal, StandingsEntry, TeamCompetitionMembership, AvailabilityWindow } from '../types';
+import { useAuth } from '../context/AuthContext';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
 import { addDays, formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time';
@@ -93,6 +94,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { activeTeam, teams } = useTeam();
   const { activeSeason, seasons } = useSeason();
+  const { me } = useAuth();
   const confirm = useConfirmDialog();
 
   const [availability, setAvailability] = useState<AvailabilityWindow[]>([]);
@@ -109,17 +111,22 @@ export default function HomePage() {
   const today = new Date();
   const todayStr = toLocalDateString(today);
   const weekEndStr = toLocalDateString(addDays(today, 7));
+  const canManageSchedule = !!me?.capabilities.includes('team.manage_schedule');
+  const canManageProposals = !!me?.capabilities.includes('team.manage_proposals');
+  const canViewPrivateRoster = !!me?.capabilities.includes('team.view_private');
+  const familyMode = !canManageSchedule && !canManageProposals && !canViewPrivateRoster && (me?.linked_players.length || 0) > 0;
+  const linkedPlayersForActiveTeam = (me?.linked_players || []).filter((player) => player.team_id === activeTeam?.id);
 
   useEffect(() => {
     if (!activeTeam) return;
 
     Promise.all([
-      api.getAvailability(activeTeam.id),
+      familyMode ? Promise.resolve([]) : api.getAvailability(activeTeam.id),
       api.getEvents(activeTeam.id, { date_from: todayStr }),
-      api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }),
-      api.getTeamIceBookingRequests(activeTeam.id, { status: 'requested' }),
-      effectiveSeason ? api.getStandings(effectiveSeason.id) : Promise.resolve([]),
-      effectiveSeason ? api.getTeamCompetitionMemberships(activeTeam.id, { season_id: effectiveSeason.id }) : Promise.resolve([]),
+      familyMode ? Promise.resolve([]) : api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }),
+      familyMode ? Promise.resolve([]) : api.getTeamIceBookingRequests(activeTeam.id, { status: 'requested' }),
+      familyMode || !effectiveSeason ? Promise.resolve([]) : api.getStandings(effectiveSeason.id),
+      familyMode || !effectiveSeason ? Promise.resolve([]) : api.getTeamCompetitionMemberships(activeTeam.id, { season_id: effectiveSeason.id }),
     ]).then(async ([availabilityData, eventData, proposalData, requestData, standings, memberships]) => {
       setAvailability(availabilityData);
       setEvents(eventData);
@@ -135,7 +142,7 @@ export default function HomePage() {
         ?? memberships.find((membership) => membership.standings_enabled)
         ?? null;
 
-      if (!standingsMembership) {
+      if (familyMode || !standingsMembership) {
         setCompetitionRecord(null);
         return;
       }
@@ -143,7 +150,7 @@ export default function HomePage() {
       const divisionStandings = await api.getCompetitionDivisionStandings(standingsMembership.competition_division_id);
       setCompetitionRecord(divisionStandings.find((entry) => entry.team_id === activeTeam.id) || null);
     });
-  }, [activeTeam, effectiveSeason, todayStr]);
+  }, [activeTeam, effectiveSeason, familyMode, todayStr]);
 
   const seasonAvailability = useMemo(
     () =>
@@ -184,6 +191,9 @@ export default function HomePage() {
   );
 
   const snapshotRecord = competitionRecord || record;
+  const linkedPlayerLabel = linkedPlayersForActiveTeam.length === 1
+    ? `${linkedPlayersForActiveTeam[0].first_name} ${linkedPlayersForActiveTeam[0].last_name}`
+    : `${linkedPlayersForActiveTeam.length} linked players`;
 
   const resetDemoData = async () => {
     const shouldReset = await confirm({
@@ -245,21 +255,27 @@ export default function HomePage() {
         title={(
           <span className="inline-flex items-center gap-3">
             <TeamLogo name={activeTeam.name} logoUrl={activeTeam.logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
-            <span>{activeTeam.name} Dashboard</span>
+            <span>{familyMode ? `${activeTeam.name} Family Dashboard` : `${activeTeam.name} Dashboard`}</span>
           </span>
         )}
         subtitle={
-          effectiveSeason
+          familyMode
+            ? linkedPlayersForActiveTeam.length > 0
+              ? `Attendance and event view for ${linkedPlayerLabel}`
+              : 'Attendance and schedule view for your linked players'
+            : effectiveSeason
             ? primaryMembership
               ? `${effectiveSeason.name} Season • ${primaryMembership.competition_short_name} ${primaryMembership.division_name}`
               : `${effectiveSeason.name} Season`
             : 'All Seasons'
         }
         actions={(
-          <Button type="button" variant="outline" disabled={seedLoading} onClick={resetDemoData}>
-            <RotateCcw className="h-4 w-4" />
-            {seedLoading ? 'Seeding…' : 'Reset Demo Data'}
-          </Button>
+          !familyMode ? (
+            <Button type="button" variant="outline" disabled={seedLoading} onClick={resetDemoData}>
+              <RotateCcw className="h-4 w-4" />
+              {seedLoading ? 'Seeding…' : 'Reset Demo Data'}
+            </Button>
+          ) : null
         )}
       />
 
@@ -269,7 +285,16 @@ export default function HomePage() {
         </div>
       ) : null}
 
-      <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2', snapshotRecord ? 'xl:grid-cols-5' : 'xl:grid-cols-4')}>
+      <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2', familyMode ? 'xl:grid-cols-3' : snapshotRecord ? 'xl:grid-cols-5' : 'xl:grid-cols-4')}>
+        {familyMode ? (
+          <StatCard
+            title="Linked Players"
+            value={linkedPlayersForActiveTeam.length}
+            subtitle={linkedPlayersForActiveTeam.length > 0 ? linkedPlayerLabel : 'No linked players on this team'}
+            icon={<Trophy className="h-4 w-4" />}
+            color="bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-400"
+          />
+        ) : null}
         {snapshotRecord ? (
           <StatCard
             title={competitionRecord ? 'League Record' : effectiveSeason ? 'Season Record' : 'Overall Record'}
@@ -292,29 +317,35 @@ export default function HomePage() {
           icon={<CheckCircle2 className="h-4 w-4" />}
           color="bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400"
         />
-        <StatCard
-          title="Open Availability"
-          value={openDates.length}
-          subtitle={`${openDates.filter((window) => window.date <= weekEndStr).length} this week`}
-          onClick={() => navigate('/availability')}
-          icon={<Calendar className="h-4 w-4" />}
-          color="bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400"
-        />
-        <StatCard
-          title="Incoming Proposals"
-          value={proposals.length}
-          onClick={() => navigate('/proposals')}
-          icon={<Inbox className="h-4 w-4" />}
-          color="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-        />
-        <StatCard
-          title="Pending Ice Requests"
-          value={bookingRequests.length}
-          subtitle={bookingRequests.length > 0 ? 'Awaiting arena response' : 'No pending requests'}
-          onClick={bookingRequests.length > 0 ? () => navigate('/schedule?tab=requests') : undefined}
-          icon={<Inbox className="h-4 w-4" />}
-          color="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-        />
+        {!familyMode ? (
+          <StatCard
+            title="Open Availability"
+            value={openDates.length}
+            subtitle={`${openDates.filter((window) => window.date <= weekEndStr).length} this week`}
+            onClick={() => navigate('/availability')}
+            icon={<Calendar className="h-4 w-4" />}
+            color="bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400"
+          />
+        ) : null}
+        {!familyMode ? (
+          <StatCard
+            title="Incoming Proposals"
+            value={proposals.length}
+            onClick={() => navigate('/proposals')}
+            icon={<Inbox className="h-4 w-4" />}
+            color="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+          />
+        ) : null}
+        {!familyMode ? (
+          <StatCard
+            title="Pending Ice Requests"
+            value={bookingRequests.length}
+            subtitle={bookingRequests.length > 0 ? 'Awaiting arena response' : 'No pending requests'}
+            onClick={bookingRequests.length > 0 ? () => navigate('/schedule?tab=requests') : undefined}
+            icon={<Inbox className="h-4 w-4" />}
+            color="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+          />
+        ) : null}
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[1.35fr_0.95fr]">
@@ -330,7 +361,11 @@ export default function HomePage() {
               <div className="px-4 py-4">
                 <div className="rounded-xl border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
                   <div className="font-medium text-slate-900 dark:text-slate-100">No upcoming events</div>
-                  <div className="mt-1">Schedule a practice or accept a proposal to populate the next event block.</div>
+                  <div className="mt-1">
+                    {familyMode
+                      ? 'Upcoming practices and games for your linked players will appear here.'
+                      : 'Schedule a practice or accept a proposal to populate the next event block.'}
+                  </div>
                   <div className="mt-3">
                     <Button type="button" size="sm" variant="outline" onClick={() => navigate('/schedule')}>
                       <Calendar className="h-4 w-4" />
@@ -407,18 +442,52 @@ export default function HomePage() {
           <div className="border-b border-slate-200 bg-white/85 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/30">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Incoming Proposals</div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {familyMode ? 'Linked Players' : 'Incoming Proposals'}
+                </div>
                 <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                  Requests waiting on your response.
+                  {familyMode ? 'Players you can respond for from this account.' : 'Requests waiting on your response.'}
                 </div>
               </div>
-              <Button type="button" size="sm" variant="ghost" onClick={() => navigate('/proposals')}>
-                Open Proposals
-              </Button>
+              {!familyMode ? (
+                <Button type="button" size="sm" variant="ghost" onClick={() => navigate('/proposals')}>
+                  Open Proposals
+                </Button>
+              ) : null}
             </div>
           </div>
           <div className="divide-y divide-slate-200 dark:divide-slate-800">
-            {incomingProposals.length === 0 ? (
+            {familyMode ? (
+              linkedPlayersForActiveTeam.length === 0 ? (
+                <div className="px-4 py-4">
+                  <div className="rounded-xl border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
+                    <div className="font-medium text-slate-900 dark:text-slate-100">No linked players on this team</div>
+                    <div className="mt-1">Switch teams or accept a player or guardian invite to see attendance here.</div>
+                  </div>
+                </div>
+              ) : linkedPlayersForActiveTeam.map((player) => (
+                <button
+                  type="button"
+                  key={player.player_id}
+                  onClick={() => navigate('/schedule')}
+                  className={cn(listRowButtonClass, 'px-4 py-3')}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className={cn('truncate text-sm font-semibold text-slate-900 dark:text-slate-100', interactiveTitleClass)}>
+                        {player.first_name} {player.last_name}
+                      </div>
+                      <div className="mt-1 truncate text-sm text-slate-600 dark:text-slate-400">
+                        {player.link_type === 'player' ? 'Self-managed player access' : 'Parent/guardian access'}
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="shrink-0">
+                      {player.link_type === 'player' ? 'Player' : 'Guardian'}
+                    </Badge>
+                  </div>
+                </button>
+              ))
+            ) : incomingProposals.length === 0 ? (
               <div className="px-4 py-4">
                 <div className="rounded-xl border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
                   <div className="font-medium text-slate-900 dark:text-slate-100">No incoming proposals</div>

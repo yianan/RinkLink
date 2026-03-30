@@ -45,6 +45,10 @@ def attendance_rows_by_player(db: Session, event_id: str, player_ids: list[str])
 
 def build_attendance_players(db: Session, event: Event, team_id: str) -> list[EventAttendancePlayer]:
     roster = team_roster_for_event(db, event, team_id)
+    return attendance_players_for_roster(db, event, roster)
+
+
+def attendance_players_for_roster(db: Session, event: Event, roster: list[Player]) -> list[EventAttendancePlayer]:
     rows = attendance_rows_by_player(db, event.id, [player.id for player in roster])
     return [
         EventAttendancePlayer(

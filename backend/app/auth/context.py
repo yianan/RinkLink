@@ -137,11 +137,14 @@ def can_access_team(
 ) -> bool:
     if context.user.is_platform_admin:
         return True
+    if allow_linked_family and team.id in context.linked_team_ids:
+        if context.guardian_player_ids and "player.respond_guarded" in context.capabilities:
+            return True
+        if context.player_ids and "player.respond_self" in context.capabilities:
+            return True
     if capability not in context.capabilities:
         return False
     if team.id in context.team_ids or team.association_id in context.association_ids:
-        return True
-    if allow_linked_family and team.id in context.linked_team_ids:
         return True
     return False
 

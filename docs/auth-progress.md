@@ -116,6 +116,17 @@
   - invite creation now lives in-app instead of requiring direct API usage
 - Validation:
   - `npm run build` succeeded after the access-page invite creation workflow was added
+- Added the first family-facing authz slice:
+  - linked family access now works through the shared team/event authorization path instead of only staff capabilities
+  - event attendance reads and writes now allow parent/player users only for their linked players
+  - team selection falls back to `/api/me` accessible teams for linked family accounts
+  - schedule page hides staff-only scheduling and ice-request controls for family users
+  - event detail page now renders a family-safe attendance flow without loading private roster/scoresheet data
+  - dashboard now has a family variant focused on linked players and upcoming events
+- Validation:
+  - `./.venv/bin/python -m compileall app` succeeded after the family authz path changes
+  - `./.venv/bin/python -c "from app.main import app; print('ok')"` succeeded after the family event access updates
+  - `npm run build` succeeded after the family dashboard, schedule, and event-detail changes
 
 ## Planned Commit Sequence
 
@@ -170,6 +181,10 @@
 11. Invite creation UI:
    - association/team/arena invites
    - guardian/player-link invites
+12. Family-facing access:
+   - linked-team selection fallback
+   - family dashboard variant
+   - family event schedule and RSVP flow
 
 ## Notes
 

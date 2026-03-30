@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CalendarPlus2, Save, SendHorizontal, X, XCircle } from 'lucide-react';
 import { api } from '../api/client';
 import { Arena, ArenaRink, Event, IceBookingRequest, IceSlot, Team } from '../types';
+import { useAuth } from '../context/AuthContext';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
 import { Alert } from '../components/ui/Alert';
@@ -77,6 +78,7 @@ export default function EventsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeTeam, teams } = useTeam();
   const { activeSeason, seasons } = useSeason();
+  const { me } = useAuth();
   const pushToast = useToast();
   const [tab, setTab] = useState<'upcoming' | 'past' | 'all' | 'requests'>(() => {
     const requestedTab = searchParams.get('tab');
@@ -97,14 +99,21 @@ export default function EventsPage() {
 
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const todayStr = toLocalDateString(new Date());
+  const canManageSchedule = !!me?.capabilities.includes('team.manage_schedule');
+  const canManageRequests = canManageSchedule;
+  const visibleTab = tab === 'requests' && !canManageRequests ? 'upcoming' : tab;
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
     const normalizedTab = requestedTab === 'past' || requestedTab === 'all' || requestedTab === 'requests' ? requestedTab : 'upcoming';
-    if (normalizedTab !== tab) setTab(normalizedTab);
-  }, [searchParams, tab]);
+    const nextTab = normalizedTab === 'requests' && !canManageRequests ? 'upcoming' : normalizedTab;
+    if (nextTab !== tab) setTab(nextTab);
+  }, [canManageRequests, searchParams, tab]);
 
   const handleTabChange = (nextTab: 'upcoming' | 'past' | 'all' | 'requests') => {
+    if (nextTab === 'requests' && !canManageRequests) {
+      return;
+    }
     setTab(nextTab);
     const nextParams = new URLSearchParams(searchParams);
     if (nextTab === 'upcoming') {
@@ -119,18 +128,18 @@ export default function EventsPage() {
     if (!activeTeam) return;
     Promise.all([
       api.getEvents(activeTeam.id),
-      api.getTeamIceBookingRequests(activeTeam.id),
+      canManageRequests ? api.getTeamIceBookingRequests(activeTeam.id) : Promise.resolve([]),
     ]).then(([eventData, requestData]) => {
       setEvents(eventData);
       setBookingRequests(requestData);
       setScoreEdits({});
     });
-  }, [activeTeam?.id]);
+  }, [activeTeam?.id, canManageRequests]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !canManageSchedule) return;
     api.getArenas().then(setArenas);
-  }, [open]);
+  }, [open, canManageSchedule]);
 
   useEffect(() => {
     if (!form.arena_id) {
@@ -189,9 +198,9 @@ export default function EventsPage() {
 
   const seasonEvents = events.filter((event) => !effectiveSeason || (event.date >= effectiveSeason.start_date && event.date <= effectiveSeason.end_date));
   const filtered = seasonEvents.filter((event) => {
-    if (tab === 'upcoming') return event.date >= todayStr;
-    if (tab === 'past') return event.date < todayStr;
-    if (tab === 'requests') return false;
+    if (visibleTab === 'upcoming') return event.date >= todayStr;
+    if (visibleTab === 'past') return event.date < todayStr;
+    if (visibleTab === 'requests') return false;
     return true;
   }).filter((event) => (
     (selectedEventTypes.length === 0 || selectedEventTypes.includes(event.event_type))
@@ -199,7 +208,7 @@ export default function EventsPage() {
     && (selectedArenaNames.length === 0 || (event.arena_name && selectedArenaNames.includes(event.arena_name)))
   ));
   const filteredRequests = bookingRequests.filter((request) => {
-    if (tab !== 'requests') return false;
+    if (visibleTab !== 'requests') return false;
     return true;
   });
 
@@ -266,16 +275,18 @@ export default function EventsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Schedule"
-        subtitle="Scheduled events and open-ice requests live together here."
+        subtitle={canManageRequests ? 'Scheduled events and open-ice requests live together here.' : 'Upcoming and past team events for your selected team.'}
         actions={(
           <>
-            {tab !== 'requests' ? (
+            {visibleTab !== 'requests' ? (
               <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((current) => !current)} />
             ) : null}
-            <Button type="button" onClick={() => setOpen(true)}>
-              <CalendarPlus2 className="h-4 w-4" />
-              Schedule Event
-            </Button>
+            {canManageSchedule ? (
+              <Button type="button" onClick={() => setOpen(true)}>
+                <CalendarPlus2 className="h-4 w-4" />
+                Schedule Event
+              </Button>
+            ) : null}
           </>
         )}
       />
@@ -285,13 +296,13 @@ export default function EventsPage() {
           { label: 'Upcoming', value: 'upcoming' as const },
           { label: 'Past', value: 'past' as const },
           { label: 'All', value: 'all' as const },
-          { label: 'Ice Requests', value: 'requests' as const },
+          ...(canManageRequests ? [{ label: 'Ice Requests', value: 'requests' as const }] : []),
         ]}
-        value={tab}
+        value={visibleTab}
         onChange={handleTabChange}
       />
 
-      {tab !== 'requests' ? (
+      {visibleTab !== 'requests' ? (
         <FilterPanel
           title="Filter events"
           description="Narrow the list by event type, status, and arena."
@@ -305,7 +316,7 @@ export default function EventsPage() {
         </FilterPanel>
       ) : null}
 
-      {tab === 'requests' ? (
+      {visibleTab === 'requests' ? (
         <Card className="overflow-hidden">
           <div className="divide-y divide-slate-200 dark:divide-slate-800">
             {filteredRequests.length === 0 ? (

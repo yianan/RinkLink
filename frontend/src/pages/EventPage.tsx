@@ -14,6 +14,7 @@ import {
   LockerRoom,
   Player,
 } from '../types';
+import { useAuth } from '../context/AuthContext';
 import { useTeam } from '../context/TeamContext';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
@@ -159,6 +160,7 @@ export default function EventPage() {
   const location = useLocation();
   const { eventId = '' } = useParams();
   const { activeTeam } = useTeam();
+  const { me } = useAuth();
   const confirm = useConfirmDialog();
   const pushToast = useToast();
 
@@ -196,21 +198,33 @@ export default function EventPage() {
   };
 
   const todayStr = toLocalDateString(new Date());
+  const activeTeamLinkedPlayers = useMemo(
+    () => (me?.linked_players || []).filter((player) => player.team_id === activeTeam?.id),
+    [activeTeam?.id, me?.linked_players],
+  );
 
   const load = async () => {
     setLoading(true);
     setError('');
     try {
-      const [eventData, scoresheetData] = await Promise.all([
-        api.getEvent(eventId),
-        api.getEventScoresheet(eventId),
-      ]);
+      const eventData = await api.getEvent(eventId);
+      const canViewPrivateRoster =
+        !!me?.capabilities.includes('team.view_private')
+        && !!activeTeam
+        && (activeTeam.id === eventData.home_team_id || activeTeam.id === eventData.away_team_id);
+      const canViewAttendance =
+        (!!activeTeam && (activeTeam.id === eventData.home_team_id || activeTeam.id === eventData.away_team_id))
+        && (canViewPrivateRoster || activeTeamLinkedPlayers.length > 0);
+
+      const scoresheetData = canViewPrivateRoster
+        ? await api.getEventScoresheet(eventId)
+        : { event: eventData, player_stats: [], penalties: [], goalie_stats: [], signatures: [] };
 
       const playerParams = eventData.season_id ? { season_id: eventData.season_id } : undefined;
       const [homeRoster, awayRoster, attendanceData] = await Promise.all([
-        api.getPlayers(eventData.home_team_id, playerParams),
-        eventData.away_team_id ? api.getPlayers(eventData.away_team_id, playerParams) : Promise.resolve([]),
-        activeTeam && (activeTeam.id === eventData.home_team_id || activeTeam.id === eventData.away_team_id)
+        canViewPrivateRoster ? api.getPlayers(eventData.home_team_id, playerParams) : Promise.resolve([]),
+        canViewPrivateRoster && eventData.away_team_id ? api.getPlayers(eventData.away_team_id, playerParams) : Promise.resolve([]),
+        canViewAttendance
           ? api.getEventAttendance(activeTeam.id, eventId)
           : Promise.resolve([]),
       ]);
@@ -271,7 +285,7 @@ export default function EventPage() {
   useEffect(() => {
     if (!eventId) return;
     load();
-  }, [eventId, activeTeam?.id]);
+  }, [eventId, activeTeam?.id, me?.capabilities, activeTeamLinkedPlayers.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const teamRole = useMemo(() => {
     if (!event || !activeTeam) return null;
@@ -279,6 +293,11 @@ export default function EventPage() {
     if (event.away_team_id === activeTeam.id) return 'away';
     return null;
   }, [event, activeTeam]);
+  const canManageAttendance = !!me?.capabilities.includes('team.manage_attendance') && !!teamRole;
+  const canManageScoresheet = !!me?.capabilities.includes('team.manage_scoresheet') && !!teamRole;
+  const canManageSchedule = !!me?.capabilities.includes('team.manage_schedule') && !!teamRole;
+  const hasLinkedFamilyAttendance = !!teamRole && activeTeamLinkedPlayers.length > 0;
+  const canViewPrivateRoster = !!me?.capabilities.includes('team.view_private') && !!teamRole;
 
   const playerMap = useMemo(
     () => Object.fromEntries([...homePlayers, ...awayPlayers].map((player) => [player.id, player])),
@@ -310,7 +329,7 @@ export default function EventPage() {
     );
   }
 
-  if (!event || !scoresheet) {
+  if (!event) {
     return (
       <div className="space-y-4">
         <Alert variant="error">Event not found.</Alert>
@@ -321,10 +340,18 @@ export default function EventPage() {
     );
   }
 
-  const canScore = !!event.away_team_id && event.status !== 'cancelled' && event.date <= todayStr;
-  const canConfirm = !!activeTeam && !!teamRole && !!event.away_team_id && event.status !== 'cancelled' && event.status !== 'final';
-  const canEditAttendance = !!activeTeam && !!teamRole && event.status !== 'cancelled' && event.date >= todayStr;
-  const canEditLockerRooms = event.status !== 'cancelled' && !eventHasStarted(event.date, event.start_time, todayStr);
+  const effectiveScoresheet = scoresheet ?? {
+    event,
+    player_stats: [],
+    penalties: [],
+    goalie_stats: [],
+    signatures: [],
+  };
+
+  const canScore = canManageScoresheet && !!event.away_team_id && event.status !== 'cancelled' && event.date <= todayStr;
+  const canConfirm = canManageSchedule && !!activeTeam && !!teamRole && !!event.away_team_id && event.status !== 'cancelled' && event.status !== 'final';
+  const canEditAttendance = !!activeTeam && !!teamRole && event.status !== 'cancelled' && event.date >= todayStr && (canManageAttendance || hasLinkedFamilyAttendance);
+  const canEditLockerRooms = canManageSchedule && event.status !== 'cancelled' && !eventHasStarted(event.date, event.start_time, todayStr);
   const alreadyConfirmed = teamRole === 'home' ? event.home_weekly_confirmed : event.away_weekly_confirmed;
   const persistedAttendanceMap = Object.fromEntries(attendancePlayers.map((player) => [player.player_id, player.status]));
   const effectiveAttendancePlayers = attendancePlayers.map((player) => ({
@@ -347,16 +374,16 @@ export default function EventPage() {
   const scoreDirty = effectiveScoreDraft.home !== persistedHomeScore || effectiveScoreDraft.away !== persistedAwayScore;
   const playerStatsDirty = (
     buildPlayerStatSnapshot(homePlayers, event.home_team_id, statDraft) !== homePlayers.map((player) => {
-      const stat = scoresheet.player_stats.find((entry) => entry.player_id === player.id);
+      const stat = effectiveScoresheet.player_stats.find((entry) => entry.player_id === player.id);
       return `${player.id}:${stat?.goals ?? 0}:${stat?.assists ?? 0}:${stat?.shots_on_goal ?? 0}`;
     }).join('|')
     || buildPlayerStatSnapshot(awayPlayers, event.away_team_id || '', statDraft) !== awayPlayers.map((player) => {
-      const stat = scoresheet.player_stats.find((entry) => entry.player_id === player.id);
+      const stat = effectiveScoresheet.player_stats.find((entry) => entry.player_id === player.id);
       return `${player.id}:${stat?.goals ?? 0}:${stat?.assists ?? 0}:${stat?.shots_on_goal ?? 0}`;
     }).join('|')
   );
   const goalieStatsDirty = [event.home_team_id, event.away_team_id].filter(Boolean).some((teamId) => {
-    const latest = [...scoresheet.goalie_stats].reverse().find((entry) => entry.team_id === teamId);
+    const latest = [...effectiveScoresheet.goalie_stats].reverse().find((entry) => entry.team_id === teamId);
     const draft = goalieDraft[teamId!] || { player_id: '', saves: '0', shootout_shots: '0', shootout_saves: '0' };
     return (
       draft.player_id !== (latest?.player_id ?? '')
@@ -367,9 +394,9 @@ export default function EventPage() {
   });
   const dirtySections = [
     attendanceDirty ? 'attendance' : null,
-    scoreDirty ? 'score' : null,
-    playerStatsDirty ? 'player stats' : null,
-    goalieStatsDirty ? 'goalie stats' : null,
+    canViewPrivateRoster && scoreDirty ? 'score' : null,
+    canViewPrivateRoster && playerStatsDirty ? 'player stats' : null,
+    canViewPrivateRoster && goalieStatsDirty ? 'goalie stats' : null,
   ].filter(Boolean) as string[];
   const hasUnsavedChanges = dirtySections.length > 0;
   const rinkLabel = event.location_label || [event.arena_name, event.arena_rink_name].filter(Boolean).join(', ');
@@ -813,8 +840,12 @@ export default function EventPage() {
                 {attendanceDirty ? <Badge variant="warning">Unsaved</Badge> : null}
               </div>
               <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                {canEditAttendance
+                {canManageAttendance && canEditAttendance
                   ? 'Record attendance for the active team roster.'
+                  : hasLinkedFamilyAttendance && canEditAttendance
+                    ? activeTeamLinkedPlayers.some((player) => player.link_type === 'player')
+                      ? 'Update attendance for your own player account.'
+                      : 'Update attendance for your linked child players.'
                   : event.status === 'cancelled'
                     ? 'Attendance is read-only for cancelled events.'
                     : 'Attendance is read-only for past events.'}
@@ -847,7 +878,7 @@ export default function EventPage() {
 
       <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
             <div className="grid grid-cols-[minmax(0,1fr)_10rem] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:border-slate-800 dark:bg-slate-900/35 dark:text-slate-400">
-              <div>{activeTeam.name} Roster</div>
+              <div>{canManageAttendance ? `${activeTeam.name} Roster` : 'Linked Players'}</div>
               <div>Status</div>
             </div>
             <div className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -1139,7 +1170,7 @@ export default function EventPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
-                  {scoresheet.penalties.map((penalty) => (
+                  {effectiveScoresheet.penalties.map((penalty) => (
                     <tr key={penalty.id}>
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{penalty.team_id === event.home_team_id ? event.home_team_name : event.away_team_name}</td>
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{playerName(penalty.player_id)}</td>
@@ -1154,7 +1185,7 @@ export default function EventPage() {
                       </td>
                     </tr>
                   ))}
-                  {scoresheet.penalties.length === 0 ? (
+                  {effectiveScoresheet.penalties.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-600 dark:text-slate-400">
                         No penalties recorded.
@@ -1256,7 +1287,7 @@ export default function EventPage() {
 
             <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
               {signatureRoles.map((signatureRole) => {
-                const existing = scoresheet.signatures.find((signature) => signature.role === signatureRole.role) || null;
+                const existing = effectiveScoresheet.signatures.find((signature) => signature.role === signatureRole.role) || null;
                 return (
                   <Card key={signatureRole.role} className="border-slate-200 p-4 dark:border-slate-800">
                     <div className="flex items-start justify-between gap-3">
@@ -1298,7 +1329,7 @@ export default function EventPage() {
             </div>
           </Card>
         </>
-      ) : event.away_team_id ? (
+      ) : (canViewPrivateRoster || canManageScoresheet) && event.away_team_id ? (
         <Card className="p-4">
           <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Score and Scoresheet</div>
           <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">

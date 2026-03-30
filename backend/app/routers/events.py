@@ -23,7 +23,9 @@ from ..schemas import (
 )
 from ..services.attendance import (
     attach_attendance_summary,
+    attendance_players_for_roster,
     build_attendance_players,
+    team_roster_for_event,
     upsert_attendance_updates,
     validate_attendance_team,
 )
@@ -138,7 +140,8 @@ def list_events(
     team = db.get(Team, team_id)
     if not team:
         raise HTTPException(404, "Team not found")
-    ensure_team_access(context, team, "team.view")
+    if not can_access_team(context, team, "team.view", allow_linked_family=True):
+        raise HTTPException(403, "You do not have access to this team")
     query = db.query(Event).filter((Event.home_team_id == team_id) | (Event.away_team_id == team_id))
     if status:
         query = query.filter(Event.status == status)
@@ -206,8 +209,19 @@ def get_event_attendance(
     target_team = event.home_team if event.home_team_id == team_id else event.away_team
     if not target_team:
         raise HTTPException(404, "Team not found")
-    ensure_team_access(context, target_team, "team.view_private")
-    return build_attendance_players(db, event, team_id)
+    if can_access_team(context, target_team, "team.view_private"):
+        return build_attendance_players(db, event, team_id)
+
+    if team_id not in context.linked_team_ids:
+        raise HTTPException(403, "You do not have access to this team attendance")
+    roster = [
+        player
+        for player in team_roster_for_event(db, event, team_id)
+        if player.id in (context.guardian_player_ids | context.player_ids)
+    ]
+    if not roster:
+        return []
+    return attendance_players_for_roster(db, event, roster)
 
 
 @router.put("/teams/{team_id}/events/{event_id}/attendance", response_model=list[EventAttendancePlayer])
@@ -225,8 +239,20 @@ def update_event_attendance(
     target_team = event.home_team if event.home_team_id == team_id else event.away_team
     if not target_team:
         raise HTTPException(404, "Team not found")
-    ensure_team_access(context, target_team, "team.manage_attendance")
     updates = {item.player_id: item.status for item in body.updates}
+    if can_access_team(context, target_team, "team.manage_attendance"):
+        players = upsert_attendance_updates(db, event, team_id, updates)
+        db.commit()
+        return players
+
+    if team_id not in context.linked_team_ids:
+        raise HTTPException(403, "You do not have access to update attendance for this team")
+    allowed_player_ids = context.guardian_player_ids | context.player_ids
+    if not allowed_player_ids:
+        raise HTTPException(403, "You do not have access to update attendance for this team")
+    invalid_updates = set(updates) - allowed_player_ids
+    if invalid_updates:
+        raise HTTPException(403, "You can only update attendance for linked players")
     players = upsert_attendance_updates(db, event, team_id, updates)
     db.commit()
     return players
@@ -377,7 +403,7 @@ def weekly_confirm(
 
 def ensure_event_team_or_arena_read_access(context: AuthorizationContext, event: Event) -> bool:
     return any(
-        team is not None and can_access_team(context, team, "team.view")
+        team is not None and can_access_team(context, team, "team.view", allow_linked_family=True)
         for team in (event.home_team, event.away_team)
     ) or can_access_arena(context, event.arena_id, "arena.view")
 

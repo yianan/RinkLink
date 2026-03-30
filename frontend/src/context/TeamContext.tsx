@@ -20,10 +20,31 @@ const TeamContext = createContext<TeamContextType>({
 });
 
 export function TeamProvider({ children }: { children: ReactNode }) {
-  const { authEnabled, isAuthenticated, loading: authLoading } = useAuth();
+  const { authEnabled, isAuthenticated, loading: authLoading, me } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTeam, setActiveTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const accessibleTeamsFallback: Team[] = (me?.accessible_teams || []).map((team) => ({
+    id: team.id,
+    association_id: team.association_id,
+    name: team.name,
+    age_group: team.age_group,
+    level: team.level,
+    manager_name: '',
+    manager_email: '',
+    manager_phone: '',
+    logo_url: null,
+    myhockey_ranking: null,
+    wins: 0,
+    losses: 0,
+    ties: 0,
+    association_name: null,
+    primary_membership: null,
+    memberships: [],
+    created_at: '',
+    updated_at: '',
+  }));
 
   const refreshTeams = async () => {
     if (authEnabled && !isAuthenticated) {
@@ -35,7 +56,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-      const data = await api.getTeams();
+      let data = await api.getTeams();
+      if (data.length === 0 && accessibleTeamsFallback.length > 0) {
+        data = accessibleTeamsFallback;
+      }
       setTeams(data);
       const savedTeamId = window.localStorage.getItem('rinklink.activeTeamId');
       const nextActiveTeam =
@@ -45,8 +69,19 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         null;
       setActiveTeam(nextActiveTeam);
     } catch {
-      setTeams([]);
-      setActiveTeam(null);
+      if (accessibleTeamsFallback.length > 0) {
+        setTeams(accessibleTeamsFallback);
+        const savedTeamId = window.localStorage.getItem('rinklink.activeTeamId');
+        const nextActiveTeam =
+          (savedTeamId ? accessibleTeamsFallback.find((team) => team.id === savedTeamId) : null) ??
+          (activeTeam ? accessibleTeamsFallback.find((team) => team.id === activeTeam.id) ?? null : null) ??
+          accessibleTeamsFallback[0] ??
+          null;
+        setActiveTeam(nextActiveTeam);
+      } else {
+        setTeams([]);
+        setActiveTeam(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -57,7 +92,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       return;
     }
     refreshTeams();
-  }, [authLoading, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, me?.accessible_teams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (activeTeam?.id) {
