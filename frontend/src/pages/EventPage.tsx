@@ -208,12 +208,19 @@ export default function EventPage() {
     setError('');
     try {
       const eventData = await api.getEvent(eventId);
+      const teamRoleForEvent = activeTeam
+        ? (activeTeam.id === eventData.home_team_id ? 'home' : activeTeam.id === eventData.away_team_id ? 'away' : null)
+        : null;
       const canViewPrivateRoster =
         !!me?.capabilities.includes('team.view_private')
         && !!activeTeam
         && (activeTeam.id === eventData.home_team_id || activeTeam.id === eventData.away_team_id);
+      const canManageScheduleForEvent =
+        !!me?.capabilities.includes('team.manage_schedule')
+        && !!teamRoleForEvent;
+      const attendanceTeamId = teamRoleForEvent ? activeTeam?.id ?? null : null;
       const canViewAttendance =
-        (!!activeTeam && (activeTeam.id === eventData.home_team_id || activeTeam.id === eventData.away_team_id))
+        !!attendanceTeamId
         && (canViewPrivateRoster || activeTeamLinkedPlayers.length > 0);
 
       const scoresheetData = canViewPrivateRoster
@@ -224,8 +231,8 @@ export default function EventPage() {
       const [homeRoster, awayRoster, attendanceData] = await Promise.all([
         canViewPrivateRoster ? api.getPlayers(eventData.home_team_id, playerParams) : Promise.resolve([]),
         canViewPrivateRoster && eventData.away_team_id ? api.getPlayers(eventData.away_team_id, playerParams) : Promise.resolve([]),
-        canViewAttendance
-          ? api.getEventAttendance(activeTeam.id, eventId)
+        canViewAttendance && attendanceTeamId
+          ? api.getEventAttendance(attendanceTeamId, eventId)
           : Promise.resolve([]),
       ]);
 
@@ -262,14 +269,18 @@ export default function EventPage() {
       });
       setGoalieDraft(nextGoalieDraft);
       setPenaltyForm(emptyPenaltyForm);
-      api.getLockerRooms(eventData.arena_rink_id).then((rooms) => {
-        setLockerRooms(rooms);
-        setLockerRoomForm({
-          home_locker_room_id: eventData.home_locker_room_id || '',
-          away_locker_room_id: eventData.away_locker_room_id || '',
-          response_message: '',
-        });
+      setLockerRoomForm({
+        home_locker_room_id: eventData.home_locker_room_id || '',
+        away_locker_room_id: eventData.away_locker_room_id || '',
+        response_message: '',
       });
+      if (canManageScheduleForEvent) {
+        api.getLockerRooms(eventData.arena_rink_id).then((rooms) => {
+          setLockerRooms(rooms);
+        });
+      } else {
+        setLockerRooms([]);
+      }
     } catch (loadError) {
       setEvent(null);
       setScoresheet(null);
@@ -350,6 +361,7 @@ export default function EventPage() {
 
   const canScore = canManageScoresheet && !!event.away_team_id && event.status !== 'cancelled' && event.date <= todayStr;
   const canConfirm = canManageSchedule && !!activeTeam && !!teamRole && !!event.away_team_id && event.status !== 'cancelled' && event.status !== 'final';
+  const canCancelEvent = canManageSchedule && event.status !== 'cancelled';
   const canEditAttendance = !!activeTeam && !!teamRole && event.status !== 'cancelled' && event.date >= todayStr && (canManageAttendance || hasLinkedFamilyAttendance);
   const canEditLockerRooms = canManageSchedule && event.status !== 'cancelled' && !eventHasStarted(event.date, event.start_time, todayStr);
   const alreadyConfirmed = teamRole === 'home' ? event.home_weekly_confirmed : event.away_weekly_confirmed;
@@ -604,7 +616,7 @@ export default function EventPage() {
                 {alreadyConfirmed ? 'Rescind Confirmation' : 'Confirm Game'}
               </Button>
             ) : null}
-            {event.status !== 'cancelled' ? (
+            {canCancelEvent ? (
               <Button type="button" variant="destructive" onClick={cancelEvent}>
                 <XCircle className="h-4 w-4" />
                 Cancel Event

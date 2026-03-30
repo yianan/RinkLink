@@ -253,9 +253,14 @@ def update_event_attendance(
     invalid_updates = set(updates) - allowed_player_ids
     if invalid_updates:
         raise HTTPException(403, "You can only update attendance for linked players")
+    roster = [
+        player
+        for player in team_roster_for_event(db, event, team_id)
+        if player.id in allowed_player_ids
+    ]
     players = upsert_attendance_updates(db, event, team_id, updates)
     db.commit()
-    return players
+    return attendance_players_for_roster(db, event, roster)
 
 
 @router.patch("/events/{event_id}", response_model=EventOut)

@@ -200,11 +200,16 @@
 - Added backend regression coverage for the family invite path:
   - guardian-link invite acceptance is now covered directly in `backend/tests/test_access_requests.py`
   - the test asserts that the invited user is activated and a `player_guardianships` row is created for the linked player
+- Completed the player self-link and RSVP validation pass:
+  - used the Access page to create a player-link invite, accepted it through the real browser flow, and verified the player lands on the family-safe shell with self-managed copy
+  - fixed `EventPage` so family users no longer see schedule-management actions or preload locker-room admin data they cannot access
+  - fixed the family attendance update response path so guardian/player RSVP saves return only linked player rows instead of leaking the full team roster
+  - added backend regression coverage for self-link attendance updates in `backend/tests/test_event_attendance.py`
 - Validation:
-  - `backend/.venv/bin/pytest backend/tests/test_auth_context.py backend/tests/test_access_requests.py -q` passed (`10 passed`)
+  - `backend/.venv/bin/pytest backend/tests/test_auth_context.py backend/tests/test_access_requests.py backend/tests/test_event_attendance.py -q` passed (`11 passed`)
   - `./scripts/local-auth-demo-bootstrap.sh` succeeded and left a seeded active platform-admin user
   - `npm run build` succeeded in `frontend/`
-  - Playwright browser checks reached the sign-in, pending, access-review, approved-user, wrong-account invite, and accepted-parent family flows with no console errors after the fixes
+  - Playwright browser checks reached the sign-in, pending, access-review, approved-user, wrong-account invite, accepted-parent family flow, accepted-player self-link flow, and player RSVP event flow with no console errors after the fixes
 
 ## Planned Commit Sequence
 
