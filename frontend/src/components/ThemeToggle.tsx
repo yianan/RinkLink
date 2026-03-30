@@ -6,9 +6,13 @@ import { chromeIconButtonClass } from '../lib/uiClasses';
 type Theme = 'light' | 'dark';
 
 const STORAGE_KEY = 'rinklink.theme';
+const EXPLICIT_STORAGE_KEY = 'rinklink.theme.explicit';
 
 function getStoredTheme(): Theme | null {
   try {
+    if (localStorage.getItem(EXPLICIT_STORAGE_KEY) !== 'true') {
+      return null;
+    }
     const v = localStorage.getItem(STORAGE_KEY);
     return v === 'light' || v === 'dark' ? v : null;
   } catch {
@@ -21,7 +25,7 @@ function applyTheme(theme: Theme) {
 }
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(() => getStoredTheme() || 'dark');
+  const [theme, setTheme] = useState<Theme>(() => getStoredTheme() || 'light');
 
   useEffect(() => {
     applyTheme(theme);
@@ -40,6 +44,7 @@ export default function ThemeToggle() {
         const next = isDark ? 'light' : 'dark';
         try {
           localStorage.setItem(STORAGE_KEY, next);
+          localStorage.setItem(EXPLICIT_STORAGE_KEY, 'true');
         } catch {
           // ignore
         }

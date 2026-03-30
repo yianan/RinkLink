@@ -151,157 +151,362 @@ html.dark {
 @layer components {
   .rinklink-auth-shell {
     min-height: 100vh;
-    background:
-      radial-gradient(circle at top left, var(--app-bg-accent-primary), transparent 32%),
-      radial-gradient(circle at bottom right, var(--app-bg-accent-secondary), transparent 34%),
-      linear-gradient(180deg, var(--app-bg-base-start), var(--app-bg-base-mid) 48%, var(--app-bg-base-end));
+    background: transparent;
   }
 
   .rinklink-auth-layout {
     margin: 0 auto;
-    display: grid;
-    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
     width: 100%;
-    max-width: 1280px;
-    gap: 2rem;
-    padding: 1.5rem;
+    max-width: 72rem;
+    gap: 1.75rem;
+    padding: 1.5rem 1rem 2.5rem;
   }
 
   .rinklink-auth-hero {
-    display: none;
-    flex-direction: column;
-    justify-content: space-between;
-    overflow: hidden;
+    display: grid;
+    gap: 1.25rem;
+    border-radius: 1.75rem;
     border: 1px solid var(--app-border-subtle);
     background:
-      linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(245, 243, 255, 0.86)),
-      linear-gradient(135deg, rgba(34, 211, 238, 0.08), rgba(124, 58, 237, 0.1));
-    border-radius: 2rem;
+      linear-gradient(135deg, color-mix(in srgb, var(--app-accent-link) 4%, white), rgba(255, 255, 255, 0.9)),
+      var(--app-surface);
+    padding: 1.5rem;
     box-shadow: var(--shadow-soft);
-    padding: 2rem;
-    position: relative;
   }
 
-  .rinklink-auth-hero::before {
-    content: '';
-    position: absolute;
-    inset: auto -10% -15% auto;
-    height: 16rem;
-    width: 16rem;
-    border-radius: 9999px;
-    background: radial-gradient(circle, rgba(34, 211, 238, 0.18), transparent 70%);
-    pointer-events: none;
-  }
-
-  .rinklink-auth-hero-badge {
-    display: inline-flex;
-    width: fit-content;
+  .rinklink-auth-brand {
+    display: flex;
     align-items: center;
-    gap: 0.5rem;
-    border-radius: 9999px;
-    border: 1px solid rgba(34, 211, 238, 0.22);
-    background: rgba(255, 255, 255, 0.72);
-    padding: 0.5rem 0.85rem;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: rgba(14, 116, 144, 1);
-  }
-
-  .rinklink-auth-hero-copy {
-    max-width: 34rem;
-    display: grid;
-    gap: 1rem;
-    position: relative;
-    z-index: 1;
-  }
-
-  .rinklink-auth-hero-eyebrow {
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: rgba(109, 40, 217, 1);
+    gap: 0.9rem;
   }
 
   .rinklink-auth-hero-title {
+    max-width: 14ch;
     font-family: var(--font-display);
-    font-size: clamp(2.3rem, 4vw, 3.8rem);
-    line-height: 1.02;
+    font-size: clamp(2rem, 4vw, 3.3rem);
+    line-height: 0.98;
     font-weight: 800;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.05em;
     color: var(--color-slate-950);
-    max-width: 11ch;
   }
 
-  .rinklink-auth-hero-description {
-    max-width: 36rem;
+  .rinklink-auth-hero-subtitle {
+    max-width: 56rem;
     font-size: 1rem;
-    line-height: 1.7;
+    line-height: 1.65;
     color: var(--color-slate-600);
   }
 
-  .rinklink-auth-hero-grid {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    gap: 1rem;
+  .rinklink-auth-feature {
+    border-radius: 1.1rem;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(255, 255, 255, 0.72);
+    padding: 1rem 1rem 1.05rem;
   }
 
-  .rinklink-auth-hero-card {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.9rem;
-    border-radius: 1.35rem;
-    border: 1px solid rgba(148, 163, 184, 0.16);
-    background: rgba(255, 255, 255, 0.68);
-    padding: 1rem 1.1rem;
-    backdrop-filter: blur(10px);
-  }
-
-  .rinklink-auth-hero-icon {
-    display: inline-flex;
-    height: 2.4rem;
-    width: 2.4rem;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.95rem;
-    background: linear-gradient(135deg, rgba(34, 211, 238, 0.14), rgba(124, 58, 237, 0.18));
-    color: rgba(79, 70, 229, 1);
-  }
-
-  .rinklink-auth-hero-card-title {
+  .rinklink-auth-feature-title {
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--color-slate-900);
   }
 
-  .rinklink-auth-hero-card-copy {
-    margin-top: 0.25rem;
-    font-size: 0.9rem;
+  .rinklink-auth-feature-copy {
+    margin-top: 0.35rem;
+    font-size: 0.875rem;
     line-height: 1.55;
     color: var(--color-slate-600);
   }
 
   .rinklink-auth-panel {
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .rinklink-auth-footer--back {
     display: flex;
-    min-height: 100vh;
     align-items: center;
     justify-content: center;
-    padding-block: 1rem;
+  }
+
+  .rinklink-auth-page [data-slot="card"] {
+    border-radius: 1.5rem !important;
+    border: 1px solid var(--app-border-subtle) !important;
+    background: var(--app-surface) !important;
+    box-shadow: var(--shadow-soft) !important;
+    color: var(--color-slate-900) !important;
+  }
+
+  .rinklink-auth-page [data-slot="card"].rinklink-auth-card {
+    width: 100% !important;
+    max-width: 32rem !important;
+  }
+
+  .rinklink-auth-page [data-slot="card"].rinklink-auth-card--signup {
+    max-width: 32rem !important;
+  }
+
+  .rinklink-auth-page [data-slot="card-header"] {
+    padding: 1.5rem 1.5rem 0.25rem !important;
+    gap: 0.35rem !important;
+  }
+
+  .rinklink-auth-page [data-slot="card-title"] {
+    font-family: var(--font-display) !important;
+    font-size: 1.5rem !important;
+    line-height: 1.15 !important;
+    letter-spacing: -0.025em !important;
+    color: var(--color-slate-950) !important;
+  }
+
+  .rinklink-auth-page [data-slot="card-description"] {
+    font-size: 0.95rem !important;
+    line-height: 1.55 !important;
+    color: var(--color-slate-600) !important;
+  }
+
+  .rinklink-auth-page [data-slot="card-content"] {
+    padding: 0.75rem 1.5rem 1rem !important;
+  }
+
+  .rinklink-auth-page [data-slot="card-footer"] {
+    padding: 0 1.5rem 1.5rem !important;
+    background: transparent !important;
+    border-top: 0 !important;
+    color: var(--color-slate-500) !important;
+  }
+
+  .rinklink-auth-page [data-slot="label"],
+  .rinklink-auth-page [data-slot="form-label"],
+  .rinklink-auth-page [data-slot="field-label"] {
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    color: var(--color-slate-700) !important;
+  }
+
+  .rinklink-auth-page [data-slot="input"],
+  .rinklink-auth-page [data-slot="textarea"],
+  .rinklink-auth-page [data-slot="select-trigger"] {
+    min-height: 2.75rem !important;
+    border-radius: 0.875rem !important;
+    border-color: var(--app-border-subtle) !important;
+    background: var(--app-surface-strong) !important;
+    box-shadow: none !important;
+    color: var(--color-slate-900) !important;
+    font-size: 0.95rem !important;
+  }
+
+  .rinklink-auth-page [data-slot="input"]::placeholder,
+  .rinklink-auth-page [data-slot="textarea"]::placeholder {
+    color: var(--color-slate-400) !important;
+  }
+
+  .rinklink-auth-page [data-slot="button"] {
+    border-radius: 0.875rem !important;
+    min-height: 2.5rem !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease !important;
+  }
+
+  .rinklink-auth-page [data-slot="button"]:not(.rinklink-auth-primary-button):not(.rinklink-auth-destructive-button) {
+    border-color: var(--app-border-subtle) !important;
+    background: var(--app-surface-strong) !important;
+    color: var(--color-slate-700) !important;
+  }
+
+  .rinklink-auth-page [data-slot="button"]:not(.rinklink-auth-primary-button):not(.rinklink-auth-destructive-button):hover {
+    background: color-mix(in srgb, var(--app-accent-link) 7%, white) !important;
+    color: var(--app-accent-link-hover) !important;
+  }
+
+  .rinklink-auth-page .relative > [data-slot="button"].absolute {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: var(--color-slate-500) !important;
+    border-radius: 0 !important;
+  }
+
+  .rinklink-auth-page .relative > [data-slot="button"].absolute:hover,
+  .rinklink-auth-page .relative > [data-slot="button"].absolute:focus-visible {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: var(--color-slate-500) !important;
+    box-shadow: none !important;
+  }
+
+  .rinklink-auth-page [data-slot="separator"],
+  .rinklink-auth-page [data-slot="field-separator"] {
+    background: rgba(148, 163, 184, 0.22) !important;
+  }
+
+  .rinklink-auth-page [data-slot="field-separator-content"] {
+    color: var(--color-slate-500) !important;
+    font-size: 0.875rem !important;
+  }
+
+  .rinklink-auth-card-eyebrow {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(8, 145, 178, 1);
+  }
+
+  .rinklink-auth-card-title {
+    font-family: var(--font-display);
+    font-size: 1.7rem;
+    line-height: 1.05;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: var(--color-slate-950);
+  }
+
+  .rinklink-auth-card-title--signup {
+    font-size: 1.25rem;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    text-wrap: nowrap;
+  }
+
+  .rinklink-auth-card-copy {
+    max-width: 28rem;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--color-slate-600);
+  }
+
+  .rinklink-auth-page [data-slot="form-message"],
+  .rinklink-auth-page [data-slot="field-error"] {
+    color: rgba(159, 18, 57, 1) !important;
+  }
+
+  .rinklink-settings-page [data-slot="card"] {
+    border-radius: 1.5rem !important;
+    border: 1px solid var(--app-border-subtle) !important;
+    background: var(--app-surface) !important;
+    box-shadow: var(--shadow-soft) !important;
+    color: var(--color-slate-900) !important;
+  }
+
+  .rinklink-settings-page [data-slot="card-header"] {
+    padding: 1.35rem 1.35rem 0.4rem !important;
+    gap: 0.3rem !important;
+  }
+
+  .rinklink-settings-page [data-slot="card-title"] {
+    font-family: var(--font-display) !important;
+    font-size: 1.15rem !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.02em !important;
+    color: var(--color-slate-950) !important;
+  }
+
+  .rinklink-settings-page [data-slot="card-description"] {
+    font-size: 0.9rem !important;
+    line-height: 1.55 !important;
+    color: var(--color-slate-600) !important;
+  }
+
+  .rinklink-settings-page [data-slot="card-content"] {
+    padding: 0.85rem 1.35rem 0.35rem !important;
+  }
+
+  .rinklink-settings-page [data-slot="card-footer"] {
+    padding: 0.25rem 1.35rem 1.2rem !important;
+    background: transparent !important;
+    border-top: 0 !important;
+    gap: 0.75rem !important;
+  }
+
+  .rinklink-settings-page [data-slot="label"],
+  .rinklink-settings-page [data-slot="form-label"],
+  .rinklink-settings-page [data-slot="field-label"] {
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    color: var(--color-slate-700) !important;
+  }
+
+  .rinklink-settings-page [data-slot="input"],
+  .rinklink-settings-page [data-slot="textarea"],
+  .rinklink-settings-page [data-slot="select-trigger"] {
+    min-height: 2.75rem !important;
+    border-radius: 0.875rem !important;
+    border-color: var(--app-border-subtle) !important;
+    background: var(--app-surface-strong) !important;
+    box-shadow: none !important;
+    color: var(--color-slate-900) !important;
+    font-size: 0.95rem !important;
+  }
+
+  .rinklink-settings-page [data-slot="input"]::placeholder,
+  .rinklink-settings-page [data-slot="textarea"]::placeholder {
+    color: var(--color-slate-400) !important;
+  }
+
+  .rinklink-settings-page [data-slot="button"] {
+    border-radius: 0.875rem !important;
+    min-height: 2.5rem !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease !important;
+  }
+
+  .rinklink-settings-page [data-slot="button"]:not(.rinklink-settings-button-primary):not(.rinklink-settings-button-destructive) {
+    border-color: var(--app-border-subtle) !important;
+    background: var(--app-surface-strong) !important;
+    color: var(--color-slate-700) !important;
+  }
+
+  .rinklink-settings-page [data-slot="button"]:not(.rinklink-settings-button-primary):not(.rinklink-settings-button-destructive):hover {
+    background: color-mix(in srgb, var(--app-accent-link) 7%, white) !important;
+    color: var(--app-accent-link-hover) !important;
+  }
+
+  .rinklink-settings-page [data-slot="separator"],
+  .rinklink-settings-page [data-slot="field-separator"] {
+    background: rgba(148, 163, 184, 0.18) !important;
+  }
+
+  .rinklink-settings-page [data-slot="field-separator-content"],
+  .rinklink-settings-page [data-slot="form-description"] {
+    color: var(--color-slate-500) !important;
+    font-size: 0.875rem !important;
+  }
+
+  .rinklink-settings-page [data-slot="dropdown-menu-content"],
+  .rinklink-settings-page [data-slot="select-content"],
+  .rinklink-settings-page [data-slot="dialog-content"] {
+    border-radius: 1rem !important;
+    border: 1px solid var(--app-border-subtle) !important;
+    background: var(--app-surface-strong) !important;
+    box-shadow: var(--shadow-soft) !important;
+    backdrop-filter: blur(8px) !important;
+  }
+
+  .rinklink-settings-page [data-slot="dropdown-menu-item"],
+  .rinklink-settings-page [data-slot="select-item"] {
+    border-radius: 0.75rem !important;
+  }
+
+  .rinklink-settings-page [data-slot="checkbox"] {
+    border-color: var(--app-border-subtle) !important;
+    background: var(--app-surface-strong) !important;
   }
 
   .rinklink-auth-card {
     width: 100%;
     max-width: 32rem;
-    border-radius: 1.75rem;
+    border-radius: 1.5rem;
     border: 1px solid var(--app-border-subtle);
-    background: var(--app-surface-strong);
-    box-shadow:
-      0 24px 60px rgba(15, 23, 42, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(18px);
+    background: var(--app-surface);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(1px);
     overflow: hidden;
   }
 
@@ -309,43 +514,106 @@ html.dark {
     max-width: 64rem;
   }
 
+  .rinklink-auth-card--signup {
+    max-width: 32rem;
+  }
+
   .rinklink-auth-header {
-    padding: 1.75rem 1.75rem 0.75rem;
+    padding: 1.5rem 1.5rem 0.5rem;
   }
 
   .rinklink-auth-title {
     font-family: var(--font-display);
-    font-size: 1.6rem;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
+    font-size: 1.5rem;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
     color: var(--color-slate-950);
   }
 
   .rinklink-auth-description {
-    margin-top: 0.45rem;
+    margin-top: 0.35rem;
+    font-size: 0.95rem;
     color: var(--color-slate-600);
-    line-height: 1.6;
+    line-height: 1.55;
   }
 
   .rinklink-auth-content {
-    padding: 1rem 1.75rem 1.5rem;
+    padding: 0.875rem 1.5rem 1.5rem;
   }
 
   .rinklink-auth-footer {
-    padding: 0 1.75rem 1.5rem;
+    padding: 0 1.5rem 1.5rem;
     color: var(--color-slate-500);
   }
 
-  .rinklink-auth-footer-link,
-  .rinklink-auth-forgot-link {
-    color: rgba(109, 40, 217, 1) !important;
+  .rinklink-auth-footer-link {
+    color: var(--color-slate-600) !important;
     text-decoration: none !important;
     font-weight: 600;
+    transition: color 160ms ease;
+  }
+
+  .rinklink-auth-forgot-link {
+    color: var(--app-accent-link) !important;
+    text-decoration: none !important;
+    font-weight: 600;
+    transition: color 160ms ease;
+  }
+
+  .rinklink-auth-footer--back .rinklink-auth-footer-link {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    white-space: nowrap;
+  }
+
+  .rinklink-auth-page a.rinklink-auth-footer-link {
+    display: inline-flex !important;
+    align-items: center;
+    background: transparent !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    white-space: nowrap;
+  }
+
+  .rinklink-auth-page button.rinklink-auth-footer-link,
+  .rinklink-auth-page a.rinklink-auth-footer-link button,
+  .rinklink-auth-page a.rinklink-auth-footer-link [data-slot="button"] {
+    all: unset !important;
+    display: inline !important;
+    cursor: pointer !important;
+    pointer-events: none !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    color: inherit !important;
+    font: inherit !important;
+    line-height: inherit !important;
+    text-decoration: none !important;
+  }
+
+  .rinklink-auth-page button.rinklink-auth-footer-link:hover,
+  .rinklink-auth-page a.rinklink-auth-footer-link:hover button,
+  .rinklink-auth-page a.rinklink-auth-footer-link:hover [data-slot="button"],
+  .rinklink-auth-page a.rinklink-auth-footer-link button:hover,
+  .rinklink-auth-page a.rinklink-auth-footer-link [data-slot="button"]:hover {
+    background: transparent !important;
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+
+  .rinklink-auth-page button.rinklink-auth-footer-link:focus-visible,
+  .rinklink-auth-page a.rinklink-auth-footer-link button:focus-visible,
+  .rinklink-auth-page a.rinklink-auth-footer-link [data-slot="button"]:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
   }
 
   .rinklink-auth-footer-link:hover,
   .rinklink-auth-forgot-link:hover {
-    color: rgba(76, 29, 149, 1) !important;
+    color: var(--app-accent-link-hover) !important;
+    text-decoration: none !important;
   }
 
   .rinklink-auth-continue {
@@ -353,29 +621,30 @@ html.dark {
   }
 
   .rinklink-auth-separator {
-    background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.4), transparent) !important;
+    background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.22), transparent) !important;
   }
 
   .rinklink-auth-form {
-    gap: 1rem;
+    gap: 0.875rem;
   }
 
   .rinklink-auth-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--color-slate-500);
+    font-size: 0.875rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--color-slate-700);
   }
 
   .rinklink-auth-input {
-    height: 3rem !important;
-    border-radius: 1rem !important;
-    border-color: rgba(148, 163, 184, 0.22) !important;
-    background: rgba(248, 250, 252, 0.9) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+    min-height: 2.75rem !important;
+    border-radius: 0.875rem !important;
+    border-color: var(--app-border-subtle) !important;
+    background: var(--app-surface-strong) !important;
+    box-shadow: none !important;
     color: var(--color-slate-900) !important;
-    padding-inline: 0.95rem !important;
+    padding-inline: 0.875rem !important;
+    font-size: 0.95rem !important;
   }
 
   .rinklink-auth-input::placeholder {
@@ -383,40 +652,42 @@ html.dark {
   }
 
   .rinklink-auth-input:focus-visible {
-    border-color: rgba(34, 211, 238, 0.55) !important;
-    box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.16) !important;
+    border-color: rgba(56, 189, 248, 0.7) !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18) !important;
   }
 
   .rinklink-auth-button {
-    border-radius: 1rem !important;
+    border-radius: 0.875rem !important;
+    min-height: 2.5rem !important;
     font-weight: 600 !important;
+    box-shadow: none !important;
   }
 
   .rinklink-auth-primary-button {
-    background: linear-gradient(135deg, rgba(14, 165, 233, 1), rgba(109, 40, 217, 0.96)) !important;
+    background: linear-gradient(90deg, rgb(8 145 178), rgb(2 132 199), rgb(109 40 217)) !important;
     border: 0 !important;
     color: white !important;
-    box-shadow: 0 12px 28px rgba(79, 70, 229, 0.22) !important;
+    box-shadow: 0 10px 24px rgba(8, 47, 73, 0.18) !important;
   }
 
   .rinklink-auth-primary-button:hover {
-    filter: saturate(1.05) brightness(0.98);
+    filter: brightness(1.03);
   }
 
   .rinklink-auth-outline-button,
   .rinklink-auth-provider-button,
   .rinklink-auth-secondary-button {
-    border-color: rgba(148, 163, 184, 0.22) !important;
-    background: rgba(255, 255, 255, 0.8) !important;
+    border-color: var(--app-border-subtle) !important;
+    background: var(--app-surface-strong) !important;
     color: var(--color-slate-700) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55) !important;
+    box-shadow: none !important;
   }
 
   .rinklink-auth-outline-button:hover,
   .rinklink-auth-provider-button:hover,
   .rinklink-auth-secondary-button:hover {
-    background: rgba(248, 250, 252, 0.96) !important;
-    color: var(--color-slate-900) !important;
+    background: color-mix(in srgb, var(--app-accent-link) 7%, white) !important;
+    color: var(--app-accent-link-hover) !important;
   }
 
   .rinklink-auth-error {
@@ -438,6 +709,7 @@ html.dark {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    min-width: 0;
   }
 
   .rinklink-auth-account-sidebar {
@@ -464,6 +736,8 @@ html.dark {
   }
 
   .rinklink-auth-account-cards {
+    flex: 1 1 auto;
+    min-width: 0;
     gap: 1rem !important;
   }
 
@@ -500,6 +774,156 @@ html.dark {
 
   .rinklink-auth-settings-footer {
     padding: 0.95rem 1.35rem 1.2rem !important;
+  }
+
+  .rinklink-settings-card {
+    border-radius: 1.5rem !important;
+    border: 1px solid var(--app-border-subtle) !important;
+    background: var(--app-surface) !important;
+    box-shadow: var(--shadow-soft) !important;
+    overflow: hidden !important;
+  }
+
+  .rinklink-settings-header {
+    padding: 1.35rem 1.35rem 0.4rem !important;
+  }
+
+  .rinklink-settings-title {
+    font-family: var(--font-display) !important;
+    font-size: 1.15rem !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.02em !important;
+    color: var(--color-slate-950) !important;
+  }
+
+  .rinklink-settings-description {
+    margin-top: 0.2rem !important;
+    font-size: 0.9rem !important;
+    line-height: 1.55 !important;
+    color: var(--color-slate-600) !important;
+  }
+
+  .rinklink-settings-content {
+    display: grid !important;
+    gap: 0.9rem !important;
+    padding: 0.85rem 1.35rem 0.35rem !important;
+  }
+
+  .rinklink-settings-footer {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.75rem !important;
+    border-top: 0 !important;
+    background: transparent !important;
+    padding: 0.25rem 1.35rem 1.2rem !important;
+  }
+
+  .rinklink-settings-label {
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    color: var(--color-slate-700) !important;
+  }
+
+  .rinklink-settings-input {
+    min-height: 2.75rem !important;
+    border-radius: 0.875rem !important;
+    border-color: var(--app-border-subtle) !important;
+    background: var(--app-surface-strong) !important;
+    box-shadow: none !important;
+    color: var(--color-slate-900) !important;
+    font-size: 0.95rem !important;
+  }
+
+  .rinklink-settings-input::placeholder {
+    color: var(--color-slate-400) !important;
+  }
+
+  .rinklink-settings-input:focus-visible {
+    border-color: rgba(56, 189, 248, 0.7) !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18) !important;
+  }
+
+  .rinklink-settings-checkbox {
+    border-color: var(--app-border-subtle) !important;
+    background: var(--app-surface-strong) !important;
+  }
+
+  .rinklink-settings-button {
+    border-radius: 0.875rem !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+  }
+
+  .rinklink-settings-button-primary {
+    background: linear-gradient(90deg, rgb(8 145 178), rgb(2 132 199), rgb(109 40 217)) !important;
+    color: white !important;
+    border: 0 !important;
+    box-shadow: 0 10px 24px rgba(8, 47, 73, 0.18) !important;
+  }
+
+  .rinklink-settings-button-outline,
+  .rinklink-settings-button-secondary {
+    border-color: var(--app-border-subtle) !important;
+    background: var(--app-surface-strong) !important;
+    color: var(--color-slate-700) !important;
+  }
+
+  .rinklink-settings-button-outline:hover,
+  .rinklink-settings-button-secondary:hover {
+    background: color-mix(in srgb, var(--app-accent-link) 7%, white) !important;
+    color: var(--app-accent-link-hover) !important;
+  }
+
+  .rinklink-settings-button-destructive {
+    border-color: rgba(244, 63, 94, 0.24) !important;
+    background: rgba(255, 241, 242, 0.92) !important;
+    color: rgba(190, 24, 93, 1) !important;
+  }
+
+  .rinklink-settings-instructions {
+    text-align: left !important;
+    font-size: 0.8125rem !important;
+    color: var(--color-slate-500) !important;
+  }
+
+  .rinklink-settings-cell {
+    border-radius: 1rem !important;
+    border: 1px solid var(--app-border-subtle) !important;
+    background: var(--app-surface-strong) !important;
+    box-shadow: none !important;
+  }
+
+  .rinklink-settings-icon {
+    color: var(--color-slate-500) !important;
+  }
+
+  .rinklink-settings-skeleton {
+    background: rgba(148, 163, 184, 0.16) !important;
+  }
+
+  .rinklink-settings-error {
+    border-radius: 0.875rem !important;
+    border-color: rgba(244, 63, 94, 0.24) !important;
+    background: rgba(255, 241, 242, 0.9) !important;
+    color: rgba(159, 18, 57, 1) !important;
+  }
+
+  .rinklink-settings-dialog-content {
+    border-radius: 1.25rem !important;
+    border: 1px solid var(--app-border-subtle) !important;
+    background: var(--app-surface) !important;
+    box-shadow: var(--shadow-soft) !important;
+  }
+
+  .rinklink-settings-dialog-header {
+    gap: 0.35rem !important;
+  }
+
+  .rinklink-settings-dialog-footer {
+    gap: 0.75rem !important;
   }
 
   .rl-range {
@@ -566,48 +990,9 @@ html.dark {
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
   }
 
-  html.dark .rinklink-auth-hero {
-    background:
-      linear-gradient(160deg, rgba(2, 6, 23, 0.72), rgba(15, 23, 42, 0.64)),
-      linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(124, 58, 237, 0.14));
-  }
-
-  html.dark .rinklink-auth-hero-badge {
-    border-color: rgba(34, 211, 238, 0.2);
-    background: rgba(2, 6, 23, 0.5);
-    color: rgba(103, 232, 249, 1);
-  }
-
-  html.dark .rinklink-auth-hero-eyebrow {
-    color: rgba(165, 180, 252, 1);
-  }
-
-  html.dark .rinklink-auth-hero-title {
-    color: var(--color-slate-50);
-  }
-
-  html.dark .rinklink-auth-hero-description,
-  html.dark .rinklink-auth-hero-card-copy {
-    color: var(--color-slate-300);
-  }
-
-  html.dark .rinklink-auth-hero-card {
-    border-color: rgba(51, 65, 85, 0.52);
-    background: rgba(2, 6, 23, 0.52);
-  }
-
-  html.dark .rinklink-auth-hero-card-title {
-    color: var(--color-slate-100);
-  }
-
-  html.dark .rinklink-auth-hero-icon {
-    background: linear-gradient(135deg, rgba(34, 211, 238, 0.16), rgba(124, 58, 237, 0.2));
-    color: rgba(125, 211, 252, 1);
-  }
-
   html.dark .rinklink-auth-card {
     border-color: rgba(51, 65, 85, 0.56);
-    background: rgba(2, 6, 23, 0.72);
+    background: rgba(2, 6, 23, 0.82);
     box-shadow:
       0 24px 60px rgba(0, 0, 0, 0.34),
       inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -615,6 +1000,31 @@ html.dark {
 
   html.dark .rinklink-auth-title {
     color: var(--color-slate-50);
+  }
+
+  html.dark .rinklink-auth-hero {
+    border-color: rgba(51, 65, 85, 0.56);
+    background:
+      linear-gradient(135deg, rgba(8, 47, 73, 0.34), rgba(15, 23, 42, 0.82)),
+      rgba(2, 6, 23, 0.78);
+  }
+
+  html.dark .rinklink-auth-hero-title {
+    color: var(--color-slate-50);
+  }
+
+  html.dark .rinklink-auth-hero-subtitle,
+  html.dark .rinklink-auth-feature-copy {
+    color: var(--color-slate-300);
+  }
+
+  html.dark .rinklink-auth-feature {
+    border-color: rgba(51, 65, 85, 0.56);
+    background: rgba(15, 23, 42, 0.74);
+  }
+
+  html.dark .rinklink-auth-feature-title {
+    color: var(--color-slate-100);
   }
 
   html.dark .rinklink-auth-description,
@@ -625,9 +1035,9 @@ html.dark {
 
   html.dark .rinklink-auth-input {
     border-color: rgba(51, 65, 85, 0.62) !important;
-    background: rgba(15, 23, 42, 0.86) !important;
+    background: rgba(15, 23, 42, 0.92) !important;
     color: var(--color-slate-100) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+    box-shadow: none !important;
   }
 
   html.dark .rinklink-auth-input::placeholder {
@@ -638,7 +1048,7 @@ html.dark {
   html.dark .rinklink-auth-provider-button,
   html.dark .rinklink-auth-secondary-button {
     border-color: rgba(51, 65, 85, 0.56) !important;
-    background: rgba(15, 23, 42, 0.78) !important;
+    background: rgba(15, 23, 42, 0.92) !important;
     color: var(--color-slate-200) !important;
   }
 
@@ -691,28 +1101,255 @@ html.dark {
   html.dark .rinklink-auth-settings-description {
     color: var(--color-slate-300) !important;
   }
+
+  html.dark .rinklink-auth-page [data-slot="card"],
+  html.dark .rinklink-settings-page [data-slot="card"] {
+    border-color: rgba(51, 65, 85, 0.56) !important;
+    background: rgba(2, 6, 23, 0.82) !important;
+    color: var(--color-slate-50) !important;
+  }
+
+  html.dark .rinklink-auth-page [data-slot="card-title"],
+  html.dark .rinklink-settings-page [data-slot="card-title"] {
+    color: var(--color-slate-50) !important;
+  }
+
+  html.dark .rinklink-auth-page [data-slot="card-description"],
+  html.dark .rinklink-settings-page [data-slot="card-description"],
+  html.dark .rinklink-auth-page [data-slot="form-description"],
+  html.dark .rinklink-settings-page [data-slot="form-description"],
+  html.dark .rinklink-auth-page [data-slot="field-separator-content"],
+  html.dark .rinklink-settings-page [data-slot="field-separator-content"] {
+    color: var(--color-slate-300) !important;
+  }
+
+  html.dark .rinklink-auth-card-eyebrow {
+    color: rgba(103, 232, 249, 1);
+  }
+
+  html.dark .rinklink-auth-card-title {
+    color: var(--color-slate-50);
+  }
+
+  html.dark .rinklink-auth-card-copy {
+    color: var(--color-slate-300);
+  }
+
+  html.dark .rinklink-auth-page [data-slot="label"],
+  html.dark .rinklink-auth-page [data-slot="form-label"],
+  html.dark .rinklink-auth-page [data-slot="field-label"],
+  html.dark .rinklink-settings-page [data-slot="label"],
+  html.dark .rinklink-settings-page [data-slot="form-label"],
+  html.dark .rinklink-settings-page [data-slot="field-label"] {
+    color: var(--color-slate-200) !important;
+  }
+
+  html.dark .rinklink-auth-page [data-slot="input"],
+  html.dark .rinklink-auth-page [data-slot="textarea"],
+  html.dark .rinklink-auth-page [data-slot="select-trigger"],
+  html.dark .rinklink-settings-page [data-slot="input"],
+  html.dark .rinklink-settings-page [data-slot="textarea"],
+  html.dark .rinklink-settings-page [data-slot="select-trigger"] {
+    border-color: rgba(51, 65, 85, 0.62) !important;
+    background: rgba(15, 23, 42, 0.92) !important;
+    color: var(--color-slate-100) !important;
+  }
+
+  html.dark .rinklink-auth-page [data-slot="input"]::placeholder,
+  html.dark .rinklink-auth-page [data-slot="textarea"]::placeholder,
+  html.dark .rinklink-settings-page [data-slot="input"]::placeholder,
+  html.dark .rinklink-settings-page [data-slot="textarea"]::placeholder {
+    color: var(--color-slate-500) !important;
+  }
+
+  html.dark .rinklink-auth-page [data-slot="button"]:not(.rinklink-auth-primary-button):not(.rinklink-auth-destructive-button),
+  html.dark .rinklink-settings-page [data-slot="button"]:not(.rinklink-settings-button-primary):not(.rinklink-settings-button-destructive) {
+    border-color: rgba(51, 65, 85, 0.56) !important;
+    background: rgba(15, 23, 42, 0.92) !important;
+    color: var(--color-slate-200) !important;
+  }
+
+  html.dark .rinklink-auth-page [data-slot="button"]:not(.rinklink-auth-primary-button):not(.rinklink-auth-destructive-button):hover,
+  html.dark .rinklink-settings-page [data-slot="button"]:not(.rinklink-settings-button-primary):not(.rinklink-settings-button-destructive):hover {
+    background: color-mix(in srgb, var(--app-accent-link) 18%, transparent) !important;
+    color: var(--app-accent-link) !important;
+  }
+
+  html.dark .rinklink-auth-page .relative > [data-slot="button"].absolute,
+  html.dark .rinklink-auth-page .relative > [data-slot="button"].absolute:hover,
+  html.dark .rinklink-auth-page .relative > [data-slot="button"].absolute:focus-visible {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: var(--color-slate-400) !important;
+    box-shadow: none !important;
+  }
+
+  html.dark .rinklink-auth-footer-link {
+    color: var(--color-slate-300) !important;
+  }
+
+  html.dark .rinklink-auth-forgot-link {
+    color: var(--app-accent-link) !important;
+  }
+
+  html.dark .rinklink-auth-footer-link:hover,
+  html.dark .rinklink-auth-forgot-link:hover {
+    color: var(--app-accent-link) !important;
+  }
+
+  .rinklink-auth-page a.rinklink-auth-footer-link button.rinklink-auth-footer-link:not(.rinklink-auth-primary-button):not(.rinklink-auth-destructive-button),
+  .rinklink-auth-page a.rinklink-auth-footer-link [data-slot="button"].rinklink-auth-footer-link:not(.rinklink-auth-primary-button):not(.rinklink-auth-destructive-button),
+  html.dark .rinklink-auth-page a.rinklink-auth-footer-link button.rinklink-auth-footer-link:not(.rinklink-auth-primary-button):not(.rinklink-auth-destructive-button),
+  html.dark .rinklink-auth-page a.rinklink-auth-footer-link [data-slot="button"].rinklink-auth-footer-link:not(.rinklink-auth-primary-button):not(.rinklink-auth-destructive-button) {
+    all: unset !important;
+    display: inline !important;
+    cursor: pointer !important;
+    pointer-events: none !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    color: inherit !important;
+    font: inherit !important;
+    line-height: inherit !important;
+    text-decoration: none !important;
+    transition: color 160ms ease !important;
+  }
+
+  .rinklink-auth-page a.rinklink-auth-footer-link:hover button.rinklink-auth-footer-link:not(.rinklink-auth-primary-button):not(.rinklink-auth-destructive-button),
+  .rinklink-auth-page a.rinklink-auth-footer-link:hover [data-slot="button"].rinklink-auth-footer-link:not(.rinklink-auth-primary-button):not(.rinklink-auth-destructive-button),
+  html.dark .rinklink-auth-page a.rinklink-auth-footer-link:hover button.rinklink-auth-footer-link:not(.rinklink-auth-primary-button):not(.rinklink-auth-destructive-button),
+  html.dark .rinklink-auth-page a.rinklink-auth-footer-link:hover [data-slot="button"].rinklink-auth-footer-link:not(.rinklink-auth-primary-button):not(.rinklink-auth-destructive-button) {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    color: inherit !important;
+  }
+
+  html.dark .rinklink-settings-page [data-slot="dropdown-menu-content"],
+  html.dark .rinklink-settings-page [data-slot="select-content"],
+  html.dark .rinklink-settings-page [data-slot="dialog-content"] {
+    border-color: rgba(51, 65, 85, 0.56) !important;
+    background: rgba(2, 6, 23, 0.94) !important;
+  }
+
+  html.dark .rinklink-settings-page [data-slot="separator"],
+  html.dark .rinklink-settings-page [data-slot="field-separator"],
+  html.dark .rinklink-auth-page [data-slot="separator"],
+  html.dark .rinklink-auth-page [data-slot="field-separator"] {
+    background: rgba(51, 65, 85, 0.65) !important;
+  }
+
+  html.dark .rinklink-settings-card {
+    border-color: rgba(51, 65, 85, 0.56) !important;
+    background: rgba(2, 6, 23, 0.82) !important;
+    box-shadow:
+      0 18px 44px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+  }
+
+  html.dark .rinklink-settings-title {
+    color: var(--color-slate-50) !important;
+  }
+
+  html.dark .rinklink-settings-description,
+  html.dark .rinklink-settings-instructions {
+    color: var(--color-slate-300) !important;
+  }
+
+  html.dark .rinklink-settings-input {
+    border-color: rgba(51, 65, 85, 0.62) !important;
+    background: rgba(15, 23, 42, 0.92) !important;
+    color: var(--color-slate-100) !important;
+  }
+
+  html.dark .rinklink-settings-input::placeholder {
+    color: var(--color-slate-500) !important;
+  }
+
+  html.dark .rinklink-settings-checkbox {
+    border-color: rgba(51, 65, 85, 0.62) !important;
+    background: rgba(15, 23, 42, 0.92) !important;
+  }
+
+  html.dark .rinklink-settings-button-outline,
+  html.dark .rinklink-settings-button-secondary {
+    border-color: rgba(51, 65, 85, 0.56) !important;
+    background: rgba(15, 23, 42, 0.92) !important;
+    color: var(--color-slate-200) !important;
+  }
+
+  html.dark .rinklink-settings-button-outline:hover,
+  html.dark .rinklink-settings-button-secondary:hover {
+    background: color-mix(in srgb, var(--app-accent-link) 18%, transparent) !important;
+    color: var(--app-accent-link) !important;
+  }
+
+  html.dark .rinklink-settings-button-destructive {
+    border-color: rgba(225, 29, 72, 0.3) !important;
+    background: rgba(76, 5, 25, 0.5) !important;
+    color: rgba(254, 205, 211, 1) !important;
+  }
+
+  html.dark .rinklink-settings-cell {
+    border-color: rgba(51, 65, 85, 0.56) !important;
+    background: rgba(15, 23, 42, 0.9) !important;
+  }
+
+  html.dark .rinklink-settings-icon {
+    color: var(--color-slate-400) !important;
+  }
+
+  html.dark .rinklink-settings-error {
+    border-color: rgba(225, 29, 72, 0.28) !important;
+    background: rgba(76, 5, 25, 0.5) !important;
+    color: rgba(254, 205, 211, 1) !important;
+  }
+
+  html.dark .rinklink-settings-dialog-content {
+    border-color: rgba(51, 65, 85, 0.56) !important;
+    background: rgba(2, 6, 23, 0.92) !important;
+  }
 }
 
 @media (min-width: 1024px) {
   @layer components {
+    .rinklink-auth-card-title--signup {
+      white-space: nowrap;
+    }
+
+    .rinklink-auth-shell {
+      min-height: 100vh;
+    }
+
     .rinklink-auth-layout {
-      grid-template-columns: minmax(0, 1.2fr) minmax(22rem, 30rem);
-      align-items: stretch;
-      padding: 2rem;
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(26rem, 34rem);
+      align-items: start;
+      gap: 2rem;
+      padding: 2rem 1rem 2.75rem;
     }
 
     .rinklink-auth-hero {
-      display: flex;
-    }
-
-    .rinklink-auth-panel {
-      padding-inline: 1rem;
+      position: sticky;
+      top: 2rem;
     }
 
     .rinklink-auth-account-base {
       flex-direction: row;
       gap: 2rem;
       align-items: flex-start;
+    }
+
+    .rinklink-auth-account-sidebar {
+      width: 16rem;
+      flex: 0 0 16rem;
+      position: sticky;
+      top: 1rem;
     }
   }
 }

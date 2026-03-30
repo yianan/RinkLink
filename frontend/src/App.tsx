@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import { NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Building2,
   Calendar,
@@ -37,6 +37,7 @@ import { ToastProvider } from './context/ToastContext';
 import { NavBadgeProvider, useNavBadgeKey } from './context/NavBadgeContext';
 import { Skeleton } from './components/ui/Skeleton';
 import { Button } from './components/ui/Button';
+import { Tooltip } from './components/ui/Tooltip';
 import { authClient, authEnabled, clearApiAccessToken } from './lib/auth-client';
 import type { MeResponse } from './types';
 
@@ -57,6 +58,7 @@ const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ProposalsPage = lazy(() => import('./pages/ProposalsPage'));
 const ArenaListPage = lazy(() => import('./pages/ArenaListPage'));
 const ArenaDetailPage = lazy(() => import('./pages/ArenaDetailPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 function RouteFallback() {
   return (
@@ -106,6 +108,12 @@ function AuthRedirectRoute() {
   const { pathname = 'sign-in' } = useParams();
 
   if (pathname === 'settings' || pathname === 'security' || pathname === 'sign-out' || pathname === 'callback') {
+    if (pathname === 'settings') {
+      return <Navigate to="/settings" replace />;
+    }
+    if (pathname === 'security') {
+      return <Navigate to="/settings/security" replace />;
+    }
     return <AuthPage />;
   }
 
@@ -116,6 +124,12 @@ function PendingAuthRedirectRoute() {
   const { pathname = 'sign-in' } = useParams();
 
   if (pathname === 'settings' || pathname === 'security' || pathname === 'sign-out' || pathname === 'callback') {
+    if (pathname === 'settings') {
+      return <Navigate to="/settings" replace />;
+    }
+    if (pathname === 'security') {
+      return <Navigate to="/settings/security" replace />;
+    }
     return <AuthPage />;
   }
 
@@ -157,6 +171,12 @@ const NAV_SECTIONS = [
       { path: '/access', label: 'Access', icon: ShieldCheck },
       { path: '/associations', label: 'Associations', icon: Building2 },
       { path: '/arenas', label: 'Arenas', icon: Snowflake },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [
+      { path: '/settings', label: 'Settings', icon: UserCog },
     ],
   },
 ];
@@ -340,7 +360,9 @@ function AppContent() {
   const { loading: teamsLoading } = useTeam();
   const { loading: seasonsLoading } = useSeason();
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(56);
   const headerRef = useRef<HTMLElement | null>(null);
   const mobileNavContentRef = useRef<HTMLDivElement | null>(null);
@@ -351,6 +373,12 @@ function AppContent() {
   useEffect(() => {
     setMobileNavOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setSigningOut(false);
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const header = headerRef.current;
@@ -372,7 +400,22 @@ function AppContent() {
     };
   }, []);
 
-  if (runtimeAuthEnabled && authLoading) {
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    clearApiAccessToken();
+    navigate('/auth/sign-in', { replace: true });
+    let signedOut = false;
+    try {
+      await authClient.signOut();
+      signedOut = true;
+    } finally {
+      if (!signedOut) {
+        setSigningOut(false);
+      }
+    }
+  };
+
+  if (runtimeAuthEnabled && authLoading && !signingOut) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="w-full max-w-md rounded-2xl border border-[color:var(--app-border-subtle)] bg-[var(--app-surface)] px-5 py-4 shadow-soft">
@@ -386,7 +429,7 @@ function AppContent() {
     );
   }
 
-  if (runtimeAuthEnabled && !isAuthenticated) {
+  if (runtimeAuthEnabled && (!isAuthenticated || signingOut)) {
     return (
       <Suspense fallback={<RouteFallback />}>
         <Routes>
@@ -429,11 +472,7 @@ function AppContent() {
             <Button
               type="button"
               variant="ghost"
-              onClick={async () => {
-                clearApiAccessToken();
-                await authClient.signOut();
-                window.location.href = '/auth/sign-in';
-              }}
+              onClick={() => void handleSignOut()}
             >
               Sign out
             </Button>
@@ -488,31 +527,31 @@ function AppContent() {
               </div>
               {runtimeAuthEnabled ? (
                 <>
-                  <NavLink
-                    to="/auth/settings"
-                    className={cn(
-                      'hidden sm:inline-flex shrink-0 items-center justify-center rounded-lg',
-                      chromeIconButtonClass,
-                    )}
-                    aria-label="Account settings"
-                  >
-                    <UserCog className="h-4 w-4" />
-                  </NavLink>
-                  <button
-                    type="button"
-                    className={cn(
-                      'hidden sm:inline-flex shrink-0 items-center justify-center rounded-lg',
-                      chromeIconButtonClass,
-                    )}
-                    aria-label="Sign out"
-                    onClick={async () => {
-                      clearApiAccessToken();
-                      await authClient.signOut();
-                      window.location.href = '/auth/sign-in';
-                    }}
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </button>
+                  <Tooltip content="Account settings">
+                    <NavLink
+                      to="/settings"
+                      className={cn(
+                        'hidden sm:inline-flex shrink-0 items-center justify-center rounded-lg',
+                        chromeIconButtonClass,
+                      )}
+                      aria-label="Account settings"
+                    >
+                      <UserCog className="h-4 w-4" />
+                    </NavLink>
+                  </Tooltip>
+                  <Tooltip content="Sign out">
+                    <button
+                      type="button"
+                      className={cn(
+                        'hidden sm:inline-flex shrink-0 items-center justify-center rounded-lg',
+                        chromeIconButtonClass,
+                      )}
+                      aria-label="Sign out"
+                      onClick={() => void handleSignOut()}
+                    >
+                      <LogOut className="h-4 w-4" />
+                    </button>
+                  </Tooltip>
                 </>
               ) : null}
             </div>
@@ -558,6 +597,8 @@ function AppContent() {
                     <Route path="/events/:eventId" element={<LegacyEventRedirect />} />
                     <Route path="/search" element={<SearchPage />} />
                     <Route path="/proposals" element={<ProposalsPage />} />
+                    <Route path="/settings" element={<SettingsPage tab="account" />} />
+                    <Route path="/settings/security" element={<SettingsPage tab="security" />} />
                     <Route path="/arenas" element={<ArenaListPage />} />
                     <Route path="/arenas/:arenaId" element={<ArenaDetailPage />} />
                     <Route path="/arenas/:arenaId/rinks/:arenaRinkId" element={<ArenaDetailPage />} />
@@ -632,21 +673,21 @@ function AppContent() {
 export default function App() {
   return (
     <TooltipPrimitive.Provider delayDuration={120}>
-      <BetterAuthUiProvider>
-        <AuthProvider>
-          <TeamProvider>
-            <SeasonProvider>
-              <NavBadgeProvider>
-                <ToastProvider>
+      <ToastProvider>
+        <BetterAuthUiProvider>
+          <AuthProvider>
+            <TeamProvider>
+              <SeasonProvider>
+                <NavBadgeProvider>
                   <ConfirmDialogProvider>
                     <AppContent />
                   </ConfirmDialogProvider>
-                </ToastProvider>
-              </NavBadgeProvider>
-            </SeasonProvider>
-          </TeamProvider>
-        </AuthProvider>
-      </BetterAuthUiProvider>
+                </NavBadgeProvider>
+              </SeasonProvider>
+            </TeamProvider>
+          </AuthProvider>
+        </BetterAuthUiProvider>
+      </ToastProvider>
     </TooltipPrimitive.Provider>
   );
 }

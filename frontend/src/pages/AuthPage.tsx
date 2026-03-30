@@ -1,6 +1,9 @@
-import { AccountView, AuthView } from '@daveyplate/better-auth-ui';
-import { CalendarRange, ShieldCheck, Users } from 'lucide-react';
-import { Navigate, useParams } from 'react-router-dom';
+import { AuthView, ForgotPasswordForm, ResetPasswordForm } from '@daveyplate/better-auth-ui';
+import { ArrowLeft } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Link as RouterLink, Navigate, useParams } from 'react-router-dom';
+
+import { cn } from '../lib/cn';
 
 const allowedPathnames = new Set([
   'sign-in',
@@ -8,46 +11,114 @@ const allowedPathnames = new Set([
   'forgot-password',
   'reset-password',
   'sign-out',
-  'settings',
-  'security',
   'callback',
 ]);
 
 export default function AuthPage() {
   const { pathname = 'sign-in' } = useParams();
+  const isSignUp = pathname === 'sign-up';
+  const isForgotPassword = pathname === 'forgot-password';
+  const isResetPassword = pathname === 'reset-password';
 
   if (!allowedPathnames.has(pathname)) {
     return <Navigate to="/auth/sign-in" replace />;
   }
 
-  const isAccountView = pathname === 'settings' || pathname === 'security';
-
-  const spotlight = pathname === 'sign-up'
-    ? {
-        eyebrow: 'Create Your Account',
-        title: 'Bring every team, family, and arena into one secure workflow.',
-        description: 'Use the built-in Better Auth registration flow inside a RinkLink shell that matches the rest of the product.',
-      }
-    : pathname === 'forgot-password' || pathname === 'reset-password'
+  const pageMeta = pathname === 'sign-up'
       ? {
-          eyebrow: 'Secure Recovery',
-          title: 'Recover access without leaving the app experience.',
-          description: 'Password recovery stays in the same visual system as the operational screens your staff and families use every day.',
+        mastheadTitle: 'Join the teams, families, and arenas already running on RinkLink.',
+        mastheadSubtitle: 'Create your account to manage schedules, availability, invites, and team operations in one place.',
+        cardEyebrow: 'Create account',
+        cardTitle: 'Create your RinkLink account',
+        cardDescription: null,
+      }
+    : pathname === 'forgot-password'
+      ? {
+          mastheadTitle: 'Reset your password.',
+          mastheadSubtitle: 'Use the email on your RinkLink account and we will send you a secure reset link.',
+          cardEyebrow: 'Reset password',
+          cardTitle: 'Recover your account',
+          cardDescription: 'Enter your email and we will send the next step.',
         }
-      : isAccountView
+      : pathname === 'reset-password'
         ? {
-            eyebrow: 'Account Settings',
-            title: 'Manage identity settings in the same RinkLink visual system.',
-            description: 'Built-in account controls stay visually aligned with the scheduling, attendance, and arena workflows around them.',
+            mastheadTitle: 'Set a new password.',
+            mastheadSubtitle: 'Choose a new password for your RinkLink login and return to the app.',
+            cardEyebrow: 'Choose a new password',
+            cardTitle: 'Set your new password',
+            cardDescription: 'Use a secure password you can rely on for daily access.',
           }
-        : {
-            eyebrow: 'Welcome Back',
-            title: 'Secure sign-in, integrated with the rest of RinkLink.',
-            description: 'Staff, families, and arena users land in the same visual language they see once they enter the app shell.',
-          };
+        : pathname === 'sign-out'
+          ? {
+              mastheadTitle: 'Sign out of RinkLink.',
+              mastheadSubtitle: 'End this session safely.',
+              cardEyebrow: 'Sign out',
+              cardTitle: 'Confirm sign out',
+              cardDescription: 'You can sign back in whenever you need to.',
+            }
+          : pathname === 'callback'
+            ? {
+                mastheadTitle: 'RinkLink is getting your session ready.',
+                mastheadSubtitle: 'Completing your authentication flow now.',
+                cardEyebrow: 'Signing you in',
+                cardTitle: 'Finishing sign-in',
+                cardDescription: 'This should only take a moment.',
+              }
+            : {
+                mastheadTitle: 'Welcome back to RinkLink.',
+                mastheadSubtitle: 'Sign in to get back to today’s schedule, availability updates, booking work, and access requests.',
+                cardEyebrow: 'Welcome back',
+                cardTitle: 'Sign in to RinkLink',
+                cardDescription: 'Pick up where your team left off.',
+              };
+
+  const featureItems = isSignUp
+    ? [
+        {
+          title: 'Team schedules',
+          copy: 'Games, practices, confirmations, and venue details stay aligned.',
+        },
+        {
+          title: 'Family coordination',
+          copy: 'Parents, players, and staff work from the same account system.',
+        },
+        {
+          title: 'Arena operations',
+          copy: 'Availability, bookings, and logistics live alongside team workflow.',
+        },
+      ]
+    : isForgotPassword || isResetPassword
+      ? [
+          {
+            title: 'Use your account email',
+            copy: 'Password recovery only works for the email already attached to your RinkLink login.',
+          },
+          {
+            title: 'Watch your inbox',
+            copy: 'The reset link lands in email, so you can securely choose a new password there.',
+          },
+          {
+            title: 'Back to work quickly',
+            copy: 'Once your password is updated, you can return straight to sign in and continue.',
+          },
+        ]
+      : [
+          {
+            title: 'Today’s schedule',
+            copy: 'Games, practices, and rink details are ready where you left them.',
+          },
+          {
+            title: 'Availability updates',
+            copy: 'Review player, family, and staff responses without digging through messages.',
+          },
+          {
+            title: 'Access and invites',
+            copy: 'Handle approvals, requests, and account changes from the same workspace.',
+          },
+        ];
 
   const authViewClassNames = {
-    base: 'rinklink-auth-card',
+    base: cn('rinklink-auth-card', isSignUp && 'rinklink-auth-card--signup'),
     header: 'rinklink-auth-header',
     title: 'rinklink-auth-title',
     description: 'rinklink-auth-description',
@@ -70,98 +141,92 @@ export default function AuthPage() {
     },
   } as const;
 
-  const accountViewClassNames = {
-    base: 'rinklink-auth-account-base',
-    cards: 'rinklink-auth-account-cards',
-    sidebar: {
-      base: 'rinklink-auth-account-sidebar',
-      button: 'rinklink-auth-account-button',
-      buttonActive: 'rinklink-auth-account-button-active',
-    },
-    card: {
-      base: 'rinklink-auth-settings-card',
-      header: 'rinklink-auth-settings-header',
-      title: 'rinklink-auth-settings-title',
-      description: 'rinklink-auth-settings-description',
-      content: 'rinklink-auth-settings-content',
-      footer: 'rinklink-auth-settings-footer',
-      label: 'rinklink-auth-label',
-      input: 'rinklink-auth-input',
-      error: 'rinklink-auth-error',
-      button: 'rinklink-auth-button',
-      primaryButton: 'rinklink-auth-primary-button',
-      secondaryButton: 'rinklink-auth-secondary-button',
-      outlineButton: 'rinklink-auth-outline-button',
-      destructiveButton: 'rinklink-auth-destructive-button',
-    },
-  } as const;
+  const customRecoveryFooter = (
+    <RouterLink to="/auth/sign-in" className="rinklink-auth-footer-link inline-flex items-center gap-1.5">
+      <ArrowLeft className="h-3.5 w-3.5" />
+      <span>Back to sign in</span>
+    </RouterLink>
+  );
+
+  const recoveryCard = (form: ReactNode) => (
+    <div className="rinklink-auth-card">
+      <div className="rinklink-auth-header">
+        <div className="space-y-2">
+          <div className="rinklink-auth-card-eyebrow">{pageMeta.cardEyebrow}</div>
+          <div className="rinklink-auth-card-title">{pageMeta.cardTitle}</div>
+          {pageMeta.cardDescription ? (
+            <div className="rinklink-auth-card-copy">{pageMeta.cardDescription}</div>
+          ) : null}
+        </div>
+      </div>
+      <div className="rinklink-auth-content">{form}</div>
+      <div className="rinklink-auth-footer rinklink-auth-footer--back">{customRecoveryFooter}</div>
+    </div>
+  );
 
   return (
-    <main className="rinklink-auth-shell">
+    <main className="rinklink-auth-shell rinklink-auth-page">
       <div className="rinklink-auth-layout">
         <section className="rinklink-auth-hero">
-          <div className="rinklink-auth-hero-badge">RinkLink Identity</div>
-          <div className="rinklink-auth-hero-copy">
-            <div className="rinklink-auth-hero-eyebrow">{spotlight.eyebrow}</div>
-            <h1 className="rinklink-auth-hero-title">{spotlight.title}</h1>
-            <p className="rinklink-auth-hero-description">{spotlight.description}</p>
+          <div className="rinklink-auth-brand">
+            <img src="/favicon.svg" alt="RinkLink logo" className="h-11 w-11 shrink-0" />
+            <div className="min-w-0">
+              <div className="font-display text-2xl font-bold tracking-tight text-slate-950 dark:text-slate-50">
+                RinkLink
+              </div>
+              <div className="text-sm text-slate-600 dark:text-slate-300">
+                Schedules, access, and rink operations in sync.
+              </div>
+            </div>
           </div>
 
-          <div className="rinklink-auth-hero-grid">
-            <article className="rinklink-auth-hero-card">
-              <div className="rinklink-auth-hero-icon">
-                <CalendarRange className="h-4 w-4" />
+          <div className="space-y-3">
+            <h1 className="rinklink-auth-hero-title">{pageMeta.mastheadTitle}</h1>
+            <p className="rinklink-auth-hero-subtitle">{pageMeta.mastheadSubtitle}</p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            {featureItems.map((item) => (
+              <div key={item.title} className="rinklink-auth-feature">
+                <div className="rinklink-auth-feature-title">{item.title}</div>
+                <div className="rinklink-auth-feature-copy">{item.copy}</div>
               </div>
-              <div>
-                <div className="rinklink-auth-hero-card-title">Scheduling Context</div>
-                <p className="rinklink-auth-hero-card-copy">
-                  Team schedules, arena operations, and booking workflows share one visual system.
-                </p>
-              </div>
-            </article>
-            <article className="rinklink-auth-hero-card">
-              <div className="rinklink-auth-hero-icon">
-                <Users className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="rinklink-auth-hero-card-title">Family-Aware Access</div>
-                <p className="rinklink-auth-hero-card-copy">
-                  Parent and player account flows remain first-class without breaking staff operations.
-                </p>
-              </div>
-            </article>
-            <article className="rinklink-auth-hero-card">
-              <div className="rinklink-auth-hero-icon">
-                <ShieldCheck className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="rinklink-auth-hero-card-title">Role-Scoped Security</div>
-                <p className="rinklink-auth-hero-card-copy">
-                  Identity screens now visually belong to the same product as the authorization model behind them.
-                </p>
-              </div>
-            </article>
+            ))}
           </div>
         </section>
 
-        <section className="rinklink-auth-panel">
-          <div className={isAccountView ? 'w-full max-w-5xl' : 'w-full max-w-md'}>
-            {isAccountView ? (
-              <div className="rinklink-auth-card rinklink-auth-card--wide">
-                <div className="rinklink-auth-header">
-                  <div className="rinklink-auth-title">Account</div>
-                  <div className="rinklink-auth-description">
-                    Update your profile, login methods, and account security without leaving the RinkLink shell.
-                  </div>
-                </div>
-                <div className="rinklink-auth-content">
-                  <AccountView pathname={pathname} classNames={accountViewClassNames} />
-                </div>
-              </div>
-            ) : (
-              <AuthView pathname={pathname} classNames={authViewClassNames} />
-            )}
-          </div>
+        <section className={cn('rinklink-auth-panel max-w-xl', isSignUp && 'max-w-2xl')}>
+          {isForgotPassword
+            ? recoveryCard(
+                <ForgotPasswordForm
+                  classNames={authViewClassNames.form}
+                  localization={{}}
+                />,
+              )
+            : isResetPassword
+              ? recoveryCard(
+                  <ResetPasswordForm
+                    classNames={authViewClassNames.form}
+                    localization={{}}
+                  />,
+                )
+              : (
+                <AuthView
+                  pathname={pathname}
+                  classNames={authViewClassNames}
+                  cardHeader={(
+                    <div className={cn('space-y-2', isSignUp && 'rinklink-auth-card-header--signup')}>
+                      <div className="rinklink-auth-card-eyebrow">{pageMeta.cardEyebrow}</div>
+                      <div className={cn('rinklink-auth-card-title', isSignUp && 'rinklink-auth-card-title--signup')}>
+                        {pageMeta.cardTitle}
+                      </div>
+                      {pageMeta.cardDescription ? (
+                        <div className="rinklink-auth-card-copy">{pageMeta.cardDescription}</div>
+                      ) : null}
+                    </div>
+                  )}
+                />
+              )}
         </section>
       </div>
     </main>
