@@ -251,6 +251,22 @@
     - association-admin team switching stays within the owned association
     - arena-ops users now see only `Dashboard` and `Arenas` in navigation
     - arena-ops dashboard loads the assigned-arena summary and links correctly into the operational arena detail view
+- Completed the arena-admin browser validation pass:
+  - created and accepted a real `arena_admin` invite from the platform-admin access page
+  - confirmed the arena-admin shell keeps the arena-only dashboard variant while exposing the additional `Access` admin surface expected for arena administration
+  - verified the post-accept dashboard and arena detail workflow still operate correctly with the stronger arena role
+- Completed the final local verification pass:
+  - ran the full backend auth regression suite
+  - rebuilt the frontend production bundle
+  - rebuilt the Better Auth service
+  - reran the destructive local auth bootstrap path to restore a clean active platform-admin demo environment
+  - reran the fresh-user local auth smoke path to confirm signup, verification, JWT exchange, and `/api/me` still work end to end after the role-shell fixes
+- Validation:
+  - `backend/.venv/bin/pytest backend/tests -q` passed (`11 passed`)
+  - `npm run build` succeeded in `frontend/`
+  - `npm run build` succeeded in `auth-service/`
+  - `./scripts/local-auth-demo-bootstrap.sh` succeeded and restored a seeded active platform-admin user
+  - `./scripts/local-auth-smoke.sh final-smoke-1774843078@example.com` succeeded and returned a pending app user payload from `/api/me`
 
 ## Planned Commit Sequence
 
