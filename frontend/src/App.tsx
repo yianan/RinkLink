@@ -320,6 +320,30 @@ function AppContent() {
   const appLoading = teamsLoading || seasonsLoading;
   const pendingApproval = runtimeAuthEnabled && isAuthenticated && !!me && !me.user.is_platform_admin && me.user.status !== 'active';
 
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    const updateHeight = () => {
+      setHeaderHeight(header.getBoundingClientRect().height);
+    };
+
+    updateHeight();
+
+    const observer = new ResizeObserver(() => updateHeight());
+    observer.observe(header);
+    window.addEventListener('resize', updateHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, []);
+
   if (runtimeAuthEnabled && authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
@@ -390,30 +414,6 @@ function AppContent() {
       </div>
     );
   }
-
-  useEffect(() => {
-    setMobileNavOpen(false);
-  }, [location.pathname]);
-
-  useEffect(() => {
-    const header = headerRef.current;
-    if (!header) return;
-
-    const updateHeight = () => {
-      setHeaderHeight(header.getBoundingClientRect().height);
-    };
-
-    updateHeight();
-
-    const observer = new ResizeObserver(() => updateHeight());
-    observer.observe(header);
-    window.addEventListener('resize', updateHeight);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', updateHeight);
-    };
-  }, []);
 
   return (
     <DialogPrimitive.Root open={mobileNavOpen} onOpenChange={setMobileNavOpen}>

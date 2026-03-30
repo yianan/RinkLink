@@ -122,13 +122,34 @@ The script does all of the following against the local stack:
 
 The first authenticated `/api/me` response should create an `app_users` row automatically and return a `pending` user profile until that user is granted memberships or activated.
 
-### Seed Demo Data
+### Bootstrap a local admin and demo data
+
+Because `/api/seed` now requires an authenticated active user, the easiest local/browser setup path is:
 
 ```bash
-curl -X POST http://localhost:8000/api/seed
+./scripts/local-auth-demo-bootstrap.sh
 ```
 
-Or use `Reset Demo Data` from the dashboard.
+The bootstrap script:
+
+- signs up or signs in a local Better Auth user
+- verifies the email when it just created the account
+- exchanges the Better Auth session for a FastAPI JWT
+- ensures the matching `app_users` row exists
+- promotes that user to `active` + `platform_admin`
+- calls `POST /api/seed`
+
+This gives you a repeatable local admin account plus requestable demo data for pending-user and access-review browser testing.
+
+### Seed Demo Data Manually
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer <fastapi-jwt>" \
+  http://localhost:8000/api/seed
+```
+
+Or use `Reset Demo Data` from the dashboard as an authenticated active admin.
 
 ## Current Migration Lineage
 

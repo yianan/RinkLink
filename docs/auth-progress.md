@@ -184,10 +184,20 @@
   - frontend auth now defaults to enabled in Vite development when `VITE_AUTH_ENABLED` is unset, which keeps local browser runs aligned with the auth rollout plan
   - season and team bootstrap now wait for an authenticated active app user before calling protected APIs, which removes early `401` churn on the Better Auth sign-in screen
   - Playwright verification now lands cleanly on `/auth/sign-in` with no frontend console errors after the auth-context bootstrap fixes
+- Added a local auth demo bootstrap path:
+  - new `scripts/local-auth-demo-bootstrap.sh` creates or signs in a bootstrap user, verifies email, promotes that user to `active` + `platform_admin`, and seeds demo data
+  - the bootstrap script now restores the promoted app user after seeding because the current demo reseed rebuilds the app tables destructively
+  - README now documents authenticated seeding correctly instead of implying `POST /api/seed` is anonymous
+  - this gives local browser testing a repeatable way to populate requestable teams, arenas, and players before validating pending-user and access-review flows
+- Completed the first real browser-level auth workflow pass:
+  - fixed a hook-order crash in `AppContent` that appeared when moving from pending/unauthenticated routes into the authenticated admin shell
+  - used Playwright to verify pending-user sign-in, request submission, admin review, approval, and post-approval sign-in back into the main app
+  - restricted the dashboard demo-seed controls to platform-admin or auth-disabled contexts so normal team users no longer see a dev-only reset action
 - Validation:
   - `backend/.venv/bin/pytest tests/test_auth_context.py tests/test_access_requests.py -q` passed (`9 passed`)
+  - `./scripts/local-auth-demo-bootstrap.sh` succeeded and left a seeded active platform-admin user
   - `npm run build` succeeded in `frontend/`
-  - Playwright browser check reached `http://localhost:5173/auth/sign-in` with no console errors
+  - Playwright browser checks reached the sign-in, pending, access-review, and approved-user app flows with no console errors after the fixes
 
 ## Planned Commit Sequence
 

@@ -114,6 +114,7 @@ export default function HomePage() {
   const canManageSchedule = !!me?.capabilities.includes('team.manage_schedule');
   const canManageProposals = !!me?.capabilities.includes('team.manage_proposals');
   const canViewPrivateRoster = !!me?.capabilities.includes('team.view_private');
+  const canSeedDemoData = !me || me.user.is_platform_admin;
   const familyMode = !canManageSchedule && !canManageProposals && !canViewPrivateRoster && (me?.linked_players.length || 0) > 0;
   const linkedPlayersForActiveTeam = (me?.linked_players || []).filter((player) => player.team_id === activeTeam?.id);
 
@@ -231,7 +232,7 @@ export default function HomePage() {
               ? 'Use the team switcher in the header to load a team workspace.'
               : 'Seed the demo dataset to restore the sample associations, teams, arenas, and events.'}
           </div>
-          {teams.length === 0 ? (
+          {teams.length === 0 && canSeedDemoData ? (
             <div className="mt-5">
               <Button type="button" disabled={seedLoading} onClick={resetDemoData}>
                 <RotateCcw className="h-4 w-4" />
@@ -270,7 +271,7 @@ export default function HomePage() {
             : 'All Seasons'
         }
         actions={(
-          !familyMode ? (
+          !familyMode && canSeedDemoData ? (
             <Button type="button" variant="outline" disabled={seedLoading} onClick={resetDemoData}>
               <RotateCcw className="h-4 w-4" />
               {seedLoading ? 'Seeding…' : 'Reset Demo Data'}
