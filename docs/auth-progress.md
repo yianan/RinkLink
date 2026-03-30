@@ -109,6 +109,13 @@
   - capability-based navigation filtering so the frontend no longer shows the same nav to every persona
 - Validation:
   - `npm run build` succeeded after adding the access management page and capability-based nav filtering
+- Expanded the access management page into the first full admin workflow:
+  - invite creation form for association, team, arena, guardian, and player link invites
+  - role selection for role-bearing invite targets
+  - team-scoped player lookup for guardian/player invites
+  - invite creation now lives in-app instead of requiring direct API usage
+- Validation:
+  - `npm run build` succeeded after the access-page invite creation workflow was added
 
 ## Planned Commit Sequence
 
@@ -160,6 +167,9 @@
    - managed invites list
    - review queue UI
    - capability-aware nav filtering
+11. Invite creation UI:
+   - association/team/arena invites
+   - guardian/player-link invites
 
 ## Notes
 
