@@ -164,6 +164,12 @@
   - `backend/.venv/bin/python -c "from app.main import app; print('ok')"` succeeded after wiring the new router surface
   - `npm run build` succeeded in `frontend/`
   - `./scripts/local-auth-smoke.sh` still completes end-to-end after the pending-page changes
+- Tightened the admin access surface to match caller capabilities:
+  - the Access page no longer assumes every access manager can load every association or arena resource
+  - invite target types are now filtered by actual capabilities, so team-scoped admins only see team/family invite flows they can manage
+  - conditional resource loading avoids `403` failures on the Access page for non-platform/non-association admins
+- Validation:
+  - `npm run build` succeeded in `frontend/` after the capability-scoped Access page update
 
 ## Planned Commit Sequence
 

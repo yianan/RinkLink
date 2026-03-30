@@ -80,6 +80,21 @@ export default function AccessPage() {
 
   const manageAccess = useMemo(() => canManageAccess(me?.capabilities || []), [me?.capabilities]);
   const teams = useMemo<AccessibleTeam[]>(() => me?.accessible_teams || [], [me?.accessible_teams]);
+  const capabilities = me?.capabilities || [];
+  const canInviteAssociations = capabilities.includes('platform.manage') || capabilities.includes('association.manage');
+  const canInviteTeams = canInviteAssociations || capabilities.includes('team.manage_staff');
+  const canInviteArenas = capabilities.includes('platform.manage') || capabilities.includes('arena.manage');
+  const canInviteFamilyLinks = canInviteAssociations || capabilities.includes('team.manage_roster');
+  const availableTargetTypes = useMemo<(typeof TARGET_TYPES)[number][]>(() => {
+    const next: (typeof TARGET_TYPES)[number][] = [];
+    if (canInviteAssociations) next.push('association');
+    if (canInviteTeams) next.push('team');
+    if (canInviteArenas) next.push('arena');
+    if (canInviteFamilyLinks) {
+      next.push('guardian_link', 'player_link');
+    }
+    return next;
+  }, [canInviteArenas, canInviteAssociations, canInviteFamilyLinks, canInviteTeams]);
 
   const resourceOptions = useMemo(() => {
     if (inviteTargetType === 'association') {
@@ -133,8 +148,8 @@ export default function AccessPage() {
 
   const loadResources = async () => {
     const [nextAssociations, nextArenas] = await Promise.all([
-      api.getAssociations(),
-      api.getArenas(),
+      canInviteAssociations ? api.getAssociations() : Promise.resolve([]),
+      canInviteArenas ? api.getArenas() : Promise.resolve([]),
     ]);
     setAssociations(nextAssociations);
     setArenas(nextArenas);
@@ -155,7 +170,16 @@ export default function AccessPage() {
   useEffect(() => {
     if (!manageAccess) return;
     void load();
-  }, [manageAccess]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [canInviteArenas, canInviteAssociations, manageAccess]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (availableTargetTypes.length === 0) {
+      return;
+    }
+    if (!availableTargetTypes.includes(inviteTargetType)) {
+      setInviteTargetType(availableTargetTypes[0]);
+    }
+  }, [availableTargetTypes, inviteTargetType]);
 
   useEffect(() => {
     if (roleOptions.length === 0) {
@@ -361,8 +385,11 @@ export default function AccessPage() {
             <Select
               value={inviteTargetType}
               onChange={(event) => setInviteTargetType(event.target.value as (typeof TARGET_TYPES)[number])}
+              disabled={availableTargetTypes.length === 0}
             >
-              {TARGET_TYPES.map((targetType) => (
+              {availableTargetTypes.length === 0 ? (
+                <option value="">No invite targets available</option>
+              ) : availableTargetTypes.map((targetType) => (
                 <option key={targetType} value={targetType}>
                   {targetTypeLabel(targetType)}
                 </option>
@@ -438,7 +465,7 @@ export default function AccessPage() {
         )}
 
         <div className="mt-5 flex flex-wrap gap-3">
-          <Button type="button" onClick={() => void createInvite()} disabled={busyKey !== null || loading}>
+          <Button type="button" onClick={() => void createInvite()} disabled={busyKey !== null || loading || availableTargetTypes.length === 0}>
             <MailPlus className="h-4 w-4" />
             Create invite
           </Button>
