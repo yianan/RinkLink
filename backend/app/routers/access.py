@@ -495,6 +495,43 @@ def list_access_requests(
     return visible_requests
 
 
+@router.get("/access-targets", response_model=list[AccessTargetOut])
+def list_access_targets(
+    target_type: str = Query(pattern="^(association|team|arena|guardian_link|player_link)$"),
+    team_id: str | None = Query(default=None),
+    context: AuthorizationContext = Depends(current_authorization_context),
+    db: Session = Depends(get_db),
+):
+    del context  # Authenticated session required; target lookup is intentionally lightweight for pending users too.
+
+    if target_type == "association":
+        associations = db.query(Association).order_by(Association.name.asc()).all()
+        return [_build_target_summary("association", association) for association in associations]
+
+    if target_type == "team":
+        teams = db.query(Team).order_by(Team.name.asc()).all()
+        return [_build_target_summary("team", team) for team in teams]
+
+    if target_type == "arena":
+        arenas = db.query(Arena).order_by(Arena.name.asc()).all()
+        return [_build_target_summary("arena", arena) for arena in arenas]
+
+    if not team_id:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="team_id is required for player link lookups")
+
+    team = db.get(Team, team_id)
+    if team is None:
+        raise _not_found("Team not found")
+
+    players = (
+        db.query(Player)
+        .filter(Player.team_id == team_id)
+        .order_by(Player.last_name.asc(), Player.first_name.asc())
+        .all()
+    )
+    return [_build_target_summary(target_type, player) for player in players]
+
+
 @router.post("/access-requests", response_model=AccessRequestOut, status_code=status.HTTP_201_CREATED)
 def create_access_request(
     payload: AccessRequestCreate,

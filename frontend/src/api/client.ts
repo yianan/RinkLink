@@ -77,6 +77,8 @@ export const api = {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').AccessRequest[]>(`/access-requests${qs}`);
   },
+  getAccessTargets: (params: Record<string, string>) =>
+    request<import('../types').AccessTarget[]>(`/access-targets?${new URLSearchParams(params).toString()}`),
   createAccessRequest: (data: { target_type: string; target_id: string; notes?: string | null }) =>
     request<import('../types').AccessRequest>('/access-requests', { method: 'POST', body: JSON.stringify(data) }),
   approveAccessRequest: (requestId: string, role?: string | null) =>

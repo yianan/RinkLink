@@ -5,9 +5,35 @@ import { api } from '../api/client';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { Select } from '../components/ui/Select';
+import { Textarea } from '../components/ui/Textarea';
 import { authClient } from '../lib/auth-client';
-import type { AccessRequest, Invite } from '../types';
+import type { AccessRequest, AccessTarget, Invite } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+
+const REQUEST_TARGET_TYPES = [
+  { value: 'team', label: 'Team staff access' },
+  { value: 'association', label: 'Association access' },
+  { value: 'arena', label: 'Arena staff access' },
+  { value: 'guardian_link', label: 'Parent or guardian link' },
+  { value: 'player_link', label: 'Player self link' },
+] as const;
+
+function requestTargetHelp(targetType: string) {
+  switch (targetType) {
+    case 'association':
+      return 'Request association-level administration access.';
+    case 'arena':
+      return 'Request arena administration or operations access.';
+    case 'guardian_link':
+      return 'Request parent or guardian access for a rostered player.';
+    case 'player_link':
+      return 'Request player self access for a rostered player.';
+    default:
+      return 'Request team staff access for a rostered team.';
+  }
+}
 
 function statusVariant(status: string) {
   switch (status) {
@@ -29,11 +55,20 @@ function statusVariant(status: string) {
 export default function PendingApprovalPage() {
   const navigate = useNavigate();
   const { isAuthenticated, me, refreshProfile } = useAuth();
+  const pushToast = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [requests, setRequests] = useState<AccessRequest[]>([]);
+  const [requestTargetType, setRequestTargetType] = useState<(typeof REQUEST_TARGET_TYPES)[number]['value']>('team');
+  const [requestableTeams, setRequestableTeams] = useState<AccessTarget[]>([]);
+  const [requestOptions, setRequestOptions] = useState<AccessTarget[]>([]);
+  const [requestTeamId, setRequestTeamId] = useState('');
+  const [requestTargetId, setRequestTargetId] = useState('');
+  const [requestNotes, setRequestNotes] = useState('');
+  const [requestOptionsLoading, setRequestOptionsLoading] = useState(false);
+  const [requestLookupError, setRequestLookupError] = useState<string | null>(null);
 
   const openInvites = useMemo(
     () => invites.filter((invite) => invite.status === 'pending'),
@@ -62,6 +97,76 @@ export default function PendingApprovalPage() {
     void loadPendingData();
   }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    api.getAccessTargets({ target_type: 'team' })
+      .then((targets) => {
+        if (cancelled) return;
+        setRequestableTeams(targets);
+      })
+      .catch((nextError) => {
+        if (cancelled) return;
+        setRequestLookupError(nextError instanceof Error ? nextError.message : String(nextError));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if ((requestTargetType === 'guardian_link' || requestTargetType === 'player_link') && !requestTeamId && requestableTeams.length > 0) {
+      setRequestTeamId(requestableTeams[0].id);
+    }
+  }, [requestTargetType, requestTeamId, requestableTeams]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+
+    const params: Record<string, string> = { target_type: requestTargetType };
+    if (requestTargetType === 'guardian_link' || requestTargetType === 'player_link') {
+      if (!requestTeamId) {
+        setRequestOptions([]);
+        setRequestTargetId('');
+        return;
+      }
+      params.team_id = requestTeamId;
+    }
+
+    setRequestOptionsLoading(true);
+    setRequestLookupError(null);
+    api.getAccessTargets(params)
+      .then((targets) => {
+        if (cancelled) return;
+        setRequestOptions(targets);
+      })
+      .catch((nextError) => {
+        if (cancelled) return;
+        setRequestOptions([]);
+        setRequestLookupError(nextError instanceof Error ? nextError.message : String(nextError));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setRequestOptionsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, requestTargetType, requestTeamId]);
+
+  useEffect(() => {
+    if (requestOptions.length === 0) {
+      setRequestTargetId('');
+      return;
+    }
+    if (!requestOptions.some((target) => target.id === requestTargetId)) {
+      setRequestTargetId(requestOptions[0].id);
+    }
+  }, [requestOptions, requestTargetId]);
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -88,6 +193,44 @@ export default function PendingApprovalPage() {
       if (me?.user.status === 'active') {
         navigate('/');
       }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitAccessRequest = async () => {
+    if (!requestTargetId) {
+      pushToast({
+        title: 'Select a resource first',
+        description: 'Choose the team, association, arena, or player you want access to.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const created = await api.createAccessRequest({
+        target_type: requestTargetType,
+        target_id: requestTargetId,
+        notes: requestNotes.trim() || null,
+      });
+      setRequests((current) => {
+        const withoutDuplicate = current.filter((request) => request.id !== created.id);
+        return [created, ...withoutDuplicate];
+      });
+      setRequestNotes('');
+      pushToast({
+        title: 'Access request submitted',
+        description: created.target.name,
+        variant: 'success',
+      });
+    } catch (nextError) {
+      pushToast({
+        title: 'Unable to submit access request',
+        description: nextError instanceof Error ? nextError.message : String(nextError),
+        variant: 'error',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -181,6 +324,75 @@ export default function PendingApprovalPage() {
         <div className="space-y-6">
           <Card className="p-6">
             <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              Request Access
+            </h2>
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Access type
+                </label>
+                <Select value={requestTargetType} onChange={(event) => setRequestTargetType(event.target.value as (typeof REQUEST_TARGET_TYPES)[number]['value'])} className="mt-2">
+                  {REQUEST_TARGET_TYPES.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </Select>
+                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  {requestTargetHelp(requestTargetType)}
+                </div>
+              </div>
+
+              {(requestTargetType === 'guardian_link' || requestTargetType === 'player_link') ? (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    Team
+                  </label>
+                  <Select value={requestTeamId} onChange={(event) => setRequestTeamId(event.target.value)} className="mt-2">
+                    {requestableTeams.map((team) => (
+                      <option key={team.id} value={team.id}>{team.name}{team.context ? ` · ${team.context}` : ''}</option>
+                    ))}
+                  </Select>
+                </div>
+              ) : null}
+
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Resource
+                </label>
+                <Select value={requestTargetId} onChange={(event) => setRequestTargetId(event.target.value)} className="mt-2" disabled={requestOptionsLoading || requestOptions.length === 0}>
+                  {requestOptions.length === 0 ? (
+                    <option value="">{requestOptionsLoading ? 'Loading options…' : 'No requestable targets available'}</option>
+                  ) : (
+                    requestOptions.map((target) => (
+                      <option key={target.id} value={target.id}>{target.name}{target.context ? ` · ${target.context}` : ''}</option>
+                    ))
+                  )}
+                </Select>
+                {requestLookupError ? (
+                  <div className="mt-2 text-xs text-rose-600 dark:text-rose-300">{requestLookupError}</div>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Notes for the reviewer
+                </label>
+                <Textarea
+                  className="mt-2"
+                  rows={4}
+                  value={requestNotes}
+                  onChange={(event) => setRequestNotes(event.target.value)}
+                  placeholder="Include any context that will help the admin approve the request."
+                />
+              </div>
+
+              <Button type="button" variant="outline" onClick={() => void submitAccessRequest()} disabled={submitting || requestOptionsLoading || !requestTargetId}>
+                {submitting ? 'Submitting…' : 'Submit access request'}
+              </Button>
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
               Your Access Requests
             </h2>
             <div className="mt-4 space-y-3">
@@ -220,7 +432,7 @@ export default function PendingApprovalPage() {
             </h2>
             <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
               <p>Use an invite when possible. It creates the exact team, association, arena, parent, or player link intended for this email.</p>
-              <p>Access requests are implemented on the backend now; the reviewer workflows will be surfaced in-app as the next admin slice.</p>
+              <p>If you are waiting on access, you can submit a request here and the appropriate reviewer will see it in the admin access queue.</p>
             </div>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button type="button" variant="outline" onClick={() => void refreshAll()} disabled={submitting}>

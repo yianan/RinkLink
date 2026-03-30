@@ -155,6 +155,15 @@
   - `npm run build` succeeds in `auth-service/`
   - `backend/.venv/bin/python -m compileall app` succeeds
   - `./scripts/local-auth-smoke.sh` reaches `GET /api/me` and returns a `pending` app user
+- Added the first pending-user self-service access request slice:
+  - new lightweight `GET /api/access-targets` endpoint returns requestable associations, teams, arenas, and player-link targets for authenticated pending users
+  - pending approval page now includes an in-app request form for team, association, arena, guardian-link, and player-link requests
+  - pending approval messaging now reflects the live reviewer queue instead of pointing to future admin work
+- Validation:
+  - `backend/.venv/bin/python -m compileall app` succeeded after adding the access-target lookup endpoint
+  - `backend/.venv/bin/python -c "from app.main import app; print('ok')"` succeeded after wiring the new router surface
+  - `npm run build` succeeded in `frontend/`
+  - `./scripts/local-auth-smoke.sh` still completes end-to-end after the pending-page changes
 
 ## Planned Commit Sequence
 
