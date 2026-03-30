@@ -197,8 +197,11 @@
   - used a team-scoped access manager to create a guardian-link invite for a seeded player, then verified wrong-account recovery, correct-account invite acceptance, and the post-accept family dashboard flow
   - tightened `AppNav` badge fetching so family users do not call proposal or schedule-confirmation endpoints they are not authorized to read
   - confirmed the accepted parent session lands on the family-safe shell with only the expected navigation and no console errors after a clean reload
+- Added backend regression coverage for the family invite path:
+  - guardian-link invite acceptance is now covered directly in `backend/tests/test_access_requests.py`
+  - the test asserts that the invited user is activated and a `player_guardianships` row is created for the linked player
 - Validation:
-  - `backend/.venv/bin/pytest tests/test_auth_context.py tests/test_access_requests.py -q` passed (`9 passed`)
+  - `backend/.venv/bin/pytest backend/tests/test_auth_context.py backend/tests/test_access_requests.py -q` passed (`10 passed`)
   - `./scripts/local-auth-demo-bootstrap.sh` succeeded and left a seeded active platform-admin user
   - `npm run build` succeeded in `frontend/`
   - Playwright browser checks reached the sign-in, pending, access-review, approved-user, wrong-account invite, and accepted-parent family flows with no console errors after the fixes

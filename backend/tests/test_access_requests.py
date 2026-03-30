@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth.context import build_authorization_context
-from app.models import AccessRequest, AppUser, Arena, Association, Invite, Player, Season, Team, TeamMembership
+from app.models import AccessRequest, AppUser, Arena, Association, Invite, Player, PlayerGuardianship, Season, Team, TeamMembership
 from app.routers.access import accept_invite, create_access_request, list_access_targets
 from app.schemas import AccessRequestCreate
 
@@ -186,3 +186,45 @@ def test_accept_invite_rejects_wrong_email(db: Session) -> None:
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "This invite is for a different email address"
+
+
+def test_accept_guardian_invite_creates_player_guardianship(db: Session) -> None:
+    association = make_association(db, "Guardian Association")
+    team = make_team(db, association, "Guardian Team")
+    season = make_season(db)
+    player = Player(
+        team_id=team.id,
+        season_id=season.id,
+        first_name="Taylor",
+        last_name="Goalie",
+        jersey_number=31,
+        position="G",
+    )
+    db.add(player)
+    pending_user = make_user(db, "guardian@example.com", status="pending")
+    db.flush()
+    db.add(
+        Invite(
+            token="guardian-token",
+            email="guardian@example.com",
+            target_type="guardian_link",
+            target_id=player.id,
+            role=None,
+            invited_by_user_id=pending_user.id,
+            status="pending",
+            expires_at=date.max,
+        )
+    )
+    db.commit()
+
+    context = build_authorization_context(db, pending_user)
+    accepted = accept_invite(token="guardian-token", context=context, db=db)
+
+    db.refresh(pending_user)
+    assert accepted.status == "accepted"
+    assert pending_user.status == "active"
+    guardianship = db.query(PlayerGuardianship).filter(
+        PlayerGuardianship.user_id == pending_user.id,
+        PlayerGuardianship.player_id == player.id,
+    ).one()
+    assert guardianship.relationship_type == "guardian"
