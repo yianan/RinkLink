@@ -1,16 +1,30 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { Check, ChevronDown, LogOut } from 'lucide-react';
 
 import { api } from '../api/client';
+import PageHeader from '../components/PageHeader';
+import TeamLogo from '../components/TeamLogo';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
-import { authClient } from '../lib/auth-client';
-import type { AccessRequest, AccessTarget, Invite, PublicEvent, PublicSeason, PublicTeam, StandingsEntry } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { authClient } from '../lib/auth-client';
+import { cn } from '../lib/cn';
+import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
+import { accentActionClass, focusRingClass, listRowButtonClass, toolbarSelectClass } from '../lib/uiClasses';
+import type {
+  AccessRequest,
+  AccessTarget,
+  Invite,
+  PublicEvent,
+  PublicSeason,
+  PublicTeam,
+  StandingsEntry,
+} from '../types';
 
 const REQUEST_TARGET_TYPES = [
   { value: 'team', label: 'Team staff access' },
@@ -20,18 +34,20 @@ const REQUEST_TARGET_TYPES = [
   { value: 'player_link', label: 'Player self link' },
 ] as const;
 
+const PENDING_SCROLL_KEY = 'rinklink.pending.scrollY';
+
 function requestTargetHelp(targetType: string) {
   switch (targetType) {
     case 'association':
-      return 'Request association-level administration access.';
+      return 'Request access to an association you help manage.';
     case 'arena':
-      return 'Request arena administration or operations access.';
+      return 'Request access to an arena you work with.';
     case 'guardian_link':
-      return 'Request parent or guardian access for a rostered player.';
+      return 'Request parent or guardian access for a player.';
     case 'player_link':
-      return 'Request player self access for a rostered player.';
+      return 'Request player self access for a player account.';
     default:
-      return 'Request team staff access for a rostered team.';
+      return 'Request staff access for a team.';
   }
 }
 
@@ -68,6 +84,8 @@ export default function PendingApprovalPage() {
   const navigate = useNavigate();
   const { isAuthenticated, me, refreshProfile } = useAuth();
   const pushToast = useToast();
+  const browseTeamPickerRef = useRef<HTMLDivElement | null>(null);
+  const restoreScrollTimeoutRef = useRef<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +105,7 @@ export default function PendingApprovalPage() {
   const [browseStandings, setBrowseStandings] = useState<StandingsEntry[]>([]);
   const [browseSeasonId, setBrowseSeasonId] = useState('');
   const [browseTeamId, setBrowseTeamId] = useState('');
+  const [browseTeamPickerOpen, setBrowseTeamPickerOpen] = useState(false);
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseError, setBrowseError] = useState<string | null>(null);
 
@@ -99,9 +118,19 @@ export default function PendingApprovalPage() {
     [browseTeamId, browseTeams],
   );
 
-  const loadPendingData = async () => {
-    setLoading(true);
-    setError(null);
+  const restorePendingScroll = () => {
+    const saved = window.sessionStorage.getItem(PENDING_SCROLL_KEY);
+    if (!saved) return;
+    const nextScrollY = Number(saved);
+    if (Number.isNaN(nextScrollY)) return;
+    window.scrollTo({ top: nextScrollY, behavior: 'auto' });
+  };
+
+  const loadPendingData = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const [nextInvites, nextRequests] = await Promise.all([
         api.getInvites({ direction: 'received' }),
@@ -112,7 +141,9 @@ export default function PendingApprovalPage() {
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -120,6 +151,90 @@ export default function PendingApprovalPage() {
     if (!isAuthenticated) return;
     void loadPendingData();
   }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isAuthenticated || me?.user.status === 'active') return;
+
+    const syncPendingState = async () => {
+      await refreshProfile({ silent: true });
+      await loadPendingData({ silent: true });
+    };
+
+    const intervalId = window.setInterval(() => {
+      void syncPendingState();
+    }, 30_000);
+
+    const onWindowFocus = () => {
+      void syncPendingState();
+    };
+
+    window.addEventListener('focus', onWindowFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onWindowFocus);
+    };
+  }, [isAuthenticated, me?.user.status, refreshProfile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const savePendingScroll = () => {
+      window.sessionStorage.setItem(PENDING_SCROLL_KEY, String(window.scrollY));
+    };
+
+    const restoreAfterFrame = () => {
+      restorePendingScroll();
+      if (restoreScrollTimeoutRef.current !== null) {
+        window.clearTimeout(restoreScrollTimeoutRef.current);
+      }
+      restoreScrollTimeoutRef.current = window.setTimeout(() => {
+        restorePendingScroll();
+      }, 120);
+    };
+
+    restoreAfterFrame();
+    window.addEventListener('scroll', savePendingScroll, { passive: true });
+
+    return () => {
+      savePendingScroll();
+      window.removeEventListener('scroll', savePendingScroll);
+      if (restoreScrollTimeoutRef.current !== null) {
+        window.clearTimeout(restoreScrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    const frameId = window.requestAnimationFrame(() => {
+      restorePendingScroll();
+    });
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [loading]);
+
+  useEffect(() => {
+    if (!browseTeamPickerOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!browseTeamPickerRef.current?.contains(event.target as Node)) {
+        setBrowseTeamPickerOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setBrowseTeamPickerOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [browseTeamPickerOpen]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -301,19 +416,6 @@ export default function PendingApprovalPage() {
     }
   };
 
-  const refreshAll = async () => {
-    setSubmitting(true);
-    try {
-      await refreshProfile();
-      await loadPendingData();
-      if (me?.user.status === 'active') {
-        navigate('/');
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const submitAccessRequest = async () => {
     if (!requestTargetId) {
       pushToast({
@@ -353,61 +455,53 @@ export default function PendingApprovalPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-4 py-8 sm:px-6">
-      <div className="w-full space-y-6">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
-          <Card className="p-8 sm:p-10">
-          <div className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
-            Access Pending
-          </div>
-          <h1 className="mt-5 font-display text-3xl font-bold tracking-tight text-slate-950 dark:text-slate-50">
-            Your account is signed in, but app access still needs to be granted.
-          </h1>
-          <p className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Generic sign-in is handled already, but the team, association, arena, parent, and player access for this app is granted
-            through invites or admin approval. If you were invited, you can accept it below.
-          </p>
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <PageHeader
+        title="Waiting for access"
+        subtitle={(
+          <>
+            You&apos;re signed in as <span className="font-medium text-slate-900 dark:text-slate-100">{me?.user.email || 'Unknown user'}</span>.
+            An administrator still needs to approve access to the right team, association, arena, or family link.
+          </>
+        )}
+        actions={(
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            disabled={submitting}
+            className={cn('inline-flex items-center gap-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60', accentActionClass)}
+          >
+            <LogOut className="h-4 w-4" />
+            {submitting ? 'Signing out…' : 'Sign out'}
+          </button>
+        )}
+      />
 
-          <div className="mt-6 rounded-2xl border border-slate-200/80 bg-slate-50/90 px-4 py-4 text-sm dark:border-slate-800 dark:bg-slate-900/70">
-            <div className="font-medium text-slate-900 dark:text-slate-100">Signed in as</div>
-            <div className="mt-1 text-slate-600 dark:text-slate-300">{me?.user.email || 'Unknown user'}</div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Badge variant={statusVariant(me?.user.status || 'pending')}>Status: {me?.user.status || 'pending'}</Badge>
-              <Badge variant="outline">Open invites: {openInvites.length}</Badge>
-              <Badge variant="outline">Requests submitted: {requests.length}</Badge>
-            </div>
-          </div>
+      {error ? (
+        <Card className="border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200">
+          {error}
+        </Card>
+      ) : null}
 
-          <div className="mt-8 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Invitations For This Email
-                </h2>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  These are app-specific access grants. Accepting one activates the matching team, arena, parent, or player link.
-                </p>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
+        <div className="space-y-6">
+          {openInvites.length > 0 ? (
+            <Card className="p-7 sm:p-8">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">You already have access waiting</h2>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                    If someone already invited this email, accept that invite here. It will activate the correct access immediately.
+                  </p>
+                </div>
+                <Badge variant="outline">{openInvites.length} invite{openInvites.length === 1 ? '' : 's'}</Badge>
               </div>
-            </div>
 
-            {loading ? (
-              <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                Loading invites and request history…
-              </div>
-            ) : error ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-6 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200">
-                {error}
-              </div>
-            ) : openInvites.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                No open invites were found for this email yet.
-              </div>
-            ) : (
-              <div className="space-y-3">
+              <div className="mt-5 space-y-3">
                 {openInvites.map((invite) => (
                   <div
                     key={invite.id}
-                    className="rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/40"
+                    className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-5 py-5 dark:border-slate-800 dark:bg-slate-900/50"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="space-y-1">
@@ -428,22 +522,27 @@ export default function PendingApprovalPage() {
                     </div>
                     <div className="mt-4">
                       <Button type="button" variant="outline" onClick={() => navigate(`/invite/${invite.token}`)}>
-                        Review Invite
+                        Review invite
                       </Button>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-          </Card>
+            </Card>
+          ) : null}
 
-          <div className="space-y-6">
-            <Card className="p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-              Request Access
-            </h2>
-            <div className="mt-4 space-y-4">
+          <Card className="p-7 sm:p-8">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Request access</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  Choose what you need and send it to the right administrator for approval.
+                </p>
+              </div>
+              <Badge variant={statusVariant(me?.user.status || 'pending')}>{me?.user.status || 'pending'}</Badge>
+            </div>
+
+            <div className="mt-5 space-y-4">
               <div>
                 <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                   Access type
@@ -491,39 +590,55 @@ export default function PendingApprovalPage() {
 
               <div>
                 <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Notes for the reviewer
+                  Notes
                 </label>
                 <Textarea
                   className="mt-2"
                   rows={4}
                   value={requestNotes}
                   onChange={(event) => setRequestNotes(event.target.value)}
-                  placeholder="Include any context that will help the admin approve the request."
+                  placeholder="Add any context that will help the admin approve your request."
                 />
               </div>
 
-              <Button type="button" variant="outline" onClick={() => void submitAccessRequest()} disabled={submitting || requestOptionsLoading || !requestTargetId}>
-                {submitting ? 'Submitting…' : 'Submit access request'}
+              <Button type="button" onClick={() => void submitAccessRequest()} disabled={submitting || requestOptionsLoading || !requestTargetId}>
+                {submitting ? 'Submitting…' : 'Submit request'}
               </Button>
             </div>
-            </Card>
+          </Card>
+        </div>
 
-            <Card className="p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-              Your Access Requests
-            </h2>
+        <div className="space-y-6">
+          <Card className="p-7 sm:p-8">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Your account</h2>
+            <div className="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/90 px-4 py-4 text-sm dark:border-slate-800 dark:bg-slate-900/70">
+              <div className="font-medium text-slate-900 dark:text-slate-100">Signed in as</div>
+              <div className="mt-1 text-slate-600 dark:text-slate-300">{me?.user.email || 'Unknown user'}</div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Badge variant={statusVariant(me?.user.status || 'pending')}>Status: {me?.user.status || 'pending'}</Badge>
+                <Badge variant="outline">Requests: {requests.length}</Badge>
+                {openInvites.length > 0 ? <Badge variant="outline">Invites: {openInvites.length}</Badge> : null}
+              </div>
+            </div>
+            <div className="mt-4 text-sm text-slate-600 dark:text-slate-300">
+              We&apos;ll pick up approval automatically as soon as your access changes.
+            </div>
+          </Card>
+
+          <Card className="p-7 sm:p-8">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Your requests</h2>
             <div className="mt-4 space-y-3">
               {loading ? (
                 <div className="text-sm text-slate-500 dark:text-slate-400">Loading request history…</div>
               ) : requests.length === 0 ? (
                 <div className="text-sm text-slate-500 dark:text-slate-400">
-                  No access requests submitted yet. If you expected access, ask the relevant administrator to send an invite.
+                  You haven&apos;t submitted any access requests yet.
                 </div>
               ) : (
                 requests.map((request) => (
                   <div
                     key={request.id}
-                    className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/50"
+                    className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-5 py-5 dark:border-slate-800 dark:bg-slate-900/50"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -541,184 +656,297 @@ export default function PendingApprovalPage() {
                 ))
               )}
             </div>
-            </Card>
+          </Card>
+        </div>
+      </div>
 
-            <Card className="p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-              Next Steps
+      <Card className="p-7 sm:p-9">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              While you wait
+            </div>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-50">
+              Here are a few things you can still do.
             </h2>
-            <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              <p>Use an invite when possible. It creates the exact team, association, arena, parent, or player link intended for this email.</p>
-              <p>If you are waiting on access, you can submit a request here and the appropriate reviewer will see it in the admin access queue.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+              You can still look at team schedules and standings while an admin reviews your access. Private roster and admin details will appear after approval.
+            </p>
+          </div>
+          <div className="grid min-w-[16rem] gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                Season
+              </label>
+              <Select className="mt-2" value={browseSeasonId} onChange={(event) => setBrowseSeasonId(event.target.value)} disabled={browseSeasons.length === 0}>
+                {browseSeasons.map((season) => (
+                  <option key={season.id} value={season.id}>{season.name}</option>
+                ))}
+              </Select>
             </div>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Button type="button" variant="outline" onClick={() => void refreshAll()} disabled={submitting}>
-                {submitting ? 'Refreshing…' : 'Refresh status'}
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => void signOut()} disabled={submitting}>
-                {submitting ? 'Signing out…' : 'Sign out'}
-              </Button>
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                Team
+              </label>
+              <div ref={browseTeamPickerRef} className="relative mt-2">
+                <button
+                  type="button"
+                  disabled={browseTeams.length === 0}
+                  aria-expanded={browseTeamPickerOpen}
+                  aria-haspopup="listbox"
+                  onClick={() => setBrowseTeamPickerOpen((current) => !current)}
+                  className={cn(
+                    `flex min-h-11 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-sm text-slate-900 transition sm:min-h-10 dark:text-slate-100 ${focusRingClass}`,
+                    toolbarSelectClass,
+                    'hover:bg-slate-100/80 dark:hover:bg-slate-800/80 dark:hover:ring-slate-600/80 disabled:cursor-not-allowed disabled:opacity-70',
+                  )}
+                >
+                  <TeamLogo
+                    name={selectedBrowseTeam?.name || 'Team'}
+                    logoUrl={selectedBrowseTeam?.logo_url || null}
+                    className="h-8 w-8 shrink-0 rounded-lg"
+                    initialsClassName="text-[11px]"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate">{selectedBrowseTeam?.name || (browseTeams.length > 0 ? 'Select a team…' : 'No teams available')}</div>
+                    {selectedBrowseTeam ? (
+                      <div className="truncate text-xs text-slate-500 dark:text-slate-400">
+                        {[selectedBrowseTeam.association_name, selectedBrowseTeam.age_group, selectedBrowseTeam.level].filter(Boolean).join(' • ')}
+                      </div>
+                    ) : null}
+                  </div>
+                  <ChevronDown className={cn('h-4 w-4 shrink-0 text-slate-500 transition-transform dark:text-slate-400', browseTeamPickerOpen && 'rotate-180')} />
+                </button>
+
+                {browseTeamPickerOpen ? (
+                  <div
+                    role="listbox"
+                    aria-label="Browse team"
+                    className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-xl border border-[color:var(--app-border-subtle)] bg-[var(--app-surface-strong)] shadow-xl ring-1 ring-slate-200/70 dark:ring-slate-700/60"
+                  >
+                    <div className="max-h-80 overflow-y-auto p-1.5">
+                      {browseTeams.map((team) => {
+                        const selected = team.id === browseTeamId;
+                        return (
+                          <button
+                            key={team.id}
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            onClick={() => {
+                              setBrowseTeamId(team.id);
+                              setBrowseTeamPickerOpen(false);
+                            }}
+                            className={cn(
+                              `flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition ${focusRingClass}`,
+                              selected
+                                ? 'bg-[color:color-mix(in_srgb,var(--app-accent-link)_12%,white)] text-slate-950 dark:bg-[color:color-mix(in_srgb,var(--app-accent-link)_18%,transparent)] dark:text-slate-50'
+                                : 'text-slate-800 hover:bg-slate-100/80 hover:text-slate-950 dark:text-slate-200 dark:hover:bg-slate-800/90 dark:hover:text-slate-50',
+                            )}
+                          >
+                            <TeamLogo
+                              name={team.name}
+                              logoUrl={team.logo_url}
+                              className="h-9 w-9 shrink-0 rounded-lg"
+                              initialsClassName="text-[11px]"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-medium">{team.name}</div>
+                              <div className="truncate text-xs text-slate-500 dark:text-slate-400">
+                                {[team.association_name, team.age_group, team.level].filter(Boolean).join(' • ')}
+                              </div>
+                            </div>
+                            {selected ? <Check className="h-4 w-4 shrink-0 text-[color:var(--app-accent-link)]" /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
-            <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">
-              Need a new invite? Share the signed-in email above with the appropriate administrator.
-            </div>
-            </Card>
           </div>
         </div>
 
-        <Card className="p-6 sm:p-8">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                Published Browse
-              </div>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-50">
-                Teams, schedule, and standings stay available while you wait.
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                This browse mode is limited to published information only. Private roster, locker room, and admin-only details remain hidden until an admin grants access.
-              </p>
-            </div>
-            <div className="grid min-w-[16rem] gap-3 sm:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Season
-                </label>
-                <Select className="mt-2" value={browseSeasonId} onChange={(event) => setBrowseSeasonId(event.target.value)} disabled={browseSeasons.length === 0}>
-                  {browseSeasons.map((season) => (
-                    <option key={season.id} value={season.id}>{season.name}</option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Team
-                </label>
-                <Select className="mt-2" value={browseTeamId} onChange={(event) => setBrowseTeamId(event.target.value)} disabled={browseTeams.length === 0}>
-                  {browseTeams.map((team) => (
-                    <option key={team.id} value={team.id}>{team.name} · {team.age_group} · {team.level}</option>
-                  ))}
-                </Select>
-              </div>
-            </div>
+        {browseError ? (
+          <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200">
+            {browseError}
           </div>
+        ) : null}
 
-          {browseError ? (
-            <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200">
-              {browseError}
-            </div>
-          ) : null}
-
-          {selectedBrowseTeam ? (
-            <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
-              <div className="space-y-6">
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-5 dark:border-slate-800 dark:bg-slate-900/50">
-                  <div className="flex flex-wrap items-center gap-4">
-                    {selectedBrowseTeam.logo_url ? (
-                      <img src={selectedBrowseTeam.logo_url} alt={`${selectedBrowseTeam.name} logo`} className="h-14 w-14 rounded-xl object-cover ring-1 ring-slate-200/80 dark:ring-slate-700/70" />
-                    ) : (
-                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-200 text-sm font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                        {selectedBrowseTeam.name.slice(0, 2).toUpperCase()}
-                      </div>
-                    )}
-                    <div>
-                      <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{selectedBrowseTeam.name}</div>
-                      <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                        {selectedBrowseTeam.association_name} · {selectedBrowseTeam.age_group} · {selectedBrowseTeam.level}
-                      </div>
-                      <div className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                        Record {selectedBrowseTeam.wins}-{selectedBrowseTeam.losses}-{selectedBrowseTeam.ties}
-                      </div>
+        {selectedBrowseTeam ? (
+          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-6 dark:border-slate-800 dark:bg-slate-900/50">
+                <div className="flex flex-wrap items-center gap-4">
+                  <TeamLogo
+                    name={selectedBrowseTeam.name}
+                    logoUrl={selectedBrowseTeam.logo_url}
+                    className="h-14 w-14 rounded-xl"
+                    initialsClassName="text-sm"
+                  />
+                  <div>
+                    <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{selectedBrowseTeam.name}</div>
+                    <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                      {selectedBrowseTeam.association_name} · {selectedBrowseTeam.age_group} · {selectedBrowseTeam.level}
                     </div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                    Published Schedule
-                  </div>
-                  <div className="mt-3 space-y-3">
-                    {browseLoading && browseEvents.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                        Loading published schedule…
-                      </div>
-                    ) : browseEvents.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                        No published events are available for this team yet.
-                      </div>
-                    ) : (
-                      browseEvents.map((event) => (
-                        <div key={event.id} className="rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/40">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                {event.home_team_name || 'Home'}{event.away_team_name ? ` vs ${event.away_team_name}` : ''}
-                              </div>
-                              <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">{formatEventWhen(event)}</div>
-                            </div>
-                            <Badge variant={statusVariant(event.status)}>{event.status}</Badge>
-                          </div>
-                          <div className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                            {[event.competition_name, event.division_name, event.location_label || event.arena_name].filter(Boolean).join(' · ')}
-                          </div>
-                        </div>
-                      ))
-                    )}
+                    <div className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      Record {selectedBrowseTeam.wins}-{selectedBrowseTeam.losses}-{selectedBrowseTeam.ties}
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div>
                 <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Published Standings
+                  Schedule
                 </div>
-                <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800">
-                  {browseLoading && browseStandings.length === 0 ? (
+                <Card className="mt-3 overflow-hidden p-0">
+                  {browseLoading && browseEvents.length === 0 ? (
                     <div className="px-4 py-6 text-sm text-slate-500 dark:text-slate-400">
-                      Loading standings…
+                      Loading schedule…
                     </div>
-                  ) : browseStandings.length === 0 ? (
+                  ) : browseEvents.length === 0 ? (
                     <div className="px-4 py-6 text-sm text-slate-500 dark:text-slate-400">
-                      No published standings are available for this grouping yet.
+                      No schedule is available for this team yet.
                     </div>
                   ) : (
-                    <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-                      <thead className="bg-slate-50/90 dark:bg-slate-900/70">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Team</th>
-                          <th className="px-3 py-3 text-right font-semibold text-slate-600 dark:text-slate-300">Pts</th>
-                          <th className="px-3 py-3 text-right font-semibold text-slate-600 dark:text-slate-300">W</th>
-                          <th className="px-3 py-3 text-right font-semibold text-slate-600 dark:text-slate-300">L</th>
-                          <th className="px-3 py-3 text-right font-semibold text-slate-600 dark:text-slate-300">T</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200/80 bg-white/70 dark:divide-slate-800 dark:bg-slate-950/40">
-                        {browseStandings.map((entry) => (
-                          <tr key={entry.team_id} className={entry.team_id === selectedBrowseTeam.id ? 'bg-cyan-50/70 dark:bg-cyan-950/20' : ''}>
-                            <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{entry.team_name}</td>
-                            <td className="px-3 py-3 text-right text-slate-700 dark:text-slate-200">{entry.points}</td>
-                            <td className="px-3 py-3 text-right text-slate-700 dark:text-slate-200">{entry.wins}</td>
-                            <td className="px-3 py-3 text-right text-slate-700 dark:text-slate-200">{entry.losses}</td>
-                            <td className="px-3 py-3 text-right text-slate-700 dark:text-slate-200">{entry.ties}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {browseEvents.map((event) => (
+                        <div key={event.id} className={cn(listRowButtonClass, 'cursor-default px-4 py-4')}>
+                          <div className="flex items-start gap-3">
+                            <div className="flex shrink-0 items-center gap-2">
+                              <TeamLogo name={event.home_team_name || 'Home'} logoUrl={event.home_team_logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+                              {event.away_team_name ? (
+                                <TeamLogo name={event.away_team_name} logoUrl={event.away_team_logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+                              ) : null}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                  {event.home_team_name || 'Home'}{event.away_team_name ? ` vs ${event.away_team_name}` : ''}
+                                </div>
+                                {event.competition_short_name ? <Badge variant="outline">{event.competition_short_name}</Badge> : null}
+                                <Badge variant={getGameStatusVariant({ status: event.status, home_weekly_confirmed: false, away_weekly_confirmed: false })}>
+                                  {getGameStatusLabel({ status: event.status, home_weekly_confirmed: false, away_weekly_confirmed: false })}
+                                </Badge>
+                              </div>
+                              <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">{formatEventWhen(event)}</div>
+                              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                {[event.competition_name, event.division_name, event.location_label || event.arena_name].filter(Boolean).join(' · ')}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </div>
+                </Card>
               </div>
             </div>
-          ) : browseLoading ? (
-            <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-              Loading published browse data…
+
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                Standings
+              </div>
+              <div className="mt-3">
+                {browseLoading && browseStandings.length === 0 ? (
+                  <Card className="px-4 py-6 text-sm text-slate-500 dark:text-slate-400">
+                    Loading standings…
+                  </Card>
+                ) : browseStandings.length === 0 ? (
+                  <Card className="px-4 py-6 text-sm text-slate-500 dark:text-slate-400">
+                    No standings are available for this group yet.
+                  </Card>
+                ) : (
+                  <>
+                    <div className="space-y-2 md:hidden">
+                      {browseStandings.map((entry, index) => (
+                        <Card
+                          key={entry.team_id}
+                          className={cn('p-4', entry.team_id === selectedBrowseTeam.id && 'ring-1 ring-[color:var(--app-accent-link)]/20')}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <TeamLogo name={entry.team_name} logoUrl={entry.logo_url} className="h-11 w-11 rounded-xl" initialsClassName="text-sm" />
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg font-bold text-slate-400 dark:text-slate-500">#{index + 1}</span>
+                                  <span className="font-medium text-slate-900 dark:text-slate-100">{entry.team_name}</span>
+                                </div>
+                                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{entry.association_name || '—'}</div>
+                              </div>
+                            </div>
+                            <Badge variant="info">{entry.points} pts</Badge>
+                          </div>
+                          <div className="mt-2 flex gap-4 text-sm text-slate-700 dark:text-slate-300">
+                            <span>GP: {entry.games_played}</span>
+                            <span>W: {entry.wins}</span>
+                            <span>L: {entry.losses}</span>
+                            <span>T: {entry.ties}</span>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+
+                    <Card className="hidden overflow-hidden md:block">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
+                            <tr>
+                              <th className="w-12 px-4 py-3">#</th>
+                              <th className="px-4 py-3">Team</th>
+                              <th className="px-4 py-3">Association</th>
+                              <th className="px-4 py-3 text-center">GP</th>
+                              <th className="px-4 py-3 text-center">W</th>
+                              <th className="px-4 py-3 text-center">L</th>
+                              <th className="px-4 py-3 text-center">T</th>
+                              <th className="px-4 py-3 text-center">Pts</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
+                            {browseStandings.map((entry, index) => (
+                              <tr
+                                key={entry.team_id}
+                                className={cn(
+                                  'align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40',
+                                  entry.team_id === selectedBrowseTeam.id && 'bg-cyan-50/70 dark:bg-cyan-950/20',
+                                )}
+                              >
+                                <td className="px-4 py-3 font-bold text-slate-400 dark:text-slate-500">{index + 1}</td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-3">
+                                    <TeamLogo name={entry.team_name} logoUrl={entry.logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+                                    <div className="font-medium text-slate-900 dark:text-slate-100">{entry.team_name}</div>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{entry.association_name || '—'}</td>
+                                <td className="px-4 py-3 text-center text-slate-700 dark:text-slate-300">{entry.games_played}</td>
+                                <td className="px-4 py-3 text-center text-slate-700 dark:text-slate-300">{entry.wins}</td>
+                                <td className="px-4 py-3 text-center text-slate-700 dark:text-slate-300">{entry.losses}</td>
+                                <td className="px-4 py-3 text-center text-slate-700 dark:text-slate-300">{entry.ties}</td>
+                                <td className="px-4 py-3 text-center font-semibold text-slate-900 dark:text-slate-100">{entry.points}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+                  </>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-              No published teams are available yet.
-            </div>
-          )}
-        </Card>
-      </div>
+          </div>
+        ) : browseLoading ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            Loading teams, schedule, and standings…
+          </div>
+        ) : (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            No teams are available here yet.
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

@@ -11,6 +11,9 @@ export const authEnabled = authFlag === undefined
   : authFlag === 'true';
 export const authClient = createAuthClient({
   baseURL: authOrigin,
+  sessionOptions: {
+    refetchOnWindowFocus: false,
+  },
 });
 
 let cachedApiToken: string | null = null;

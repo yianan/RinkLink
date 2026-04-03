@@ -149,7 +149,7 @@ export default function AccessPage() {
   const loadQueues = async () => {
     const [nextInvites, nextRequests] = await Promise.all([
       api.getInvites({ direction: 'managed', status: 'pending' }),
-      familyOnlyMode ? Promise.resolve([]) : api.getAccessRequests({ scope: 'review', status: 'pending' }),
+      api.getAccessRequests({ scope: 'review', status: 'pending' }),
     ]);
     setInvites(nextInvites);
     setRequests(nextRequests);
@@ -359,7 +359,7 @@ export default function AccessPage() {
       <PageHeader
         title={familyOnlyMode ? 'Family Links' : 'Access'}
         subtitle={familyOnlyMode
-          ? 'Create and manage parent/guardian and player account links for the teams you administer.'
+          ? 'Create invites and review parent, guardian, and player link requests for the teams you administer.'
           : 'Create app-level invites, review pending access requests, and manage the onboarding queue for the resources you administer.'}
         actions={(
           <Button type="button" variant="outline" onClick={() => void load()} disabled={loading || !!busyKey}>
@@ -496,13 +496,16 @@ export default function AccessPage() {
       </Card>
 
       <div className={`grid gap-6 ${familyOnlyMode ? '' : 'xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]'}`}>
-        {!familyOnlyMode ? (
-          <Card className="p-6">
+        <Card className="p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Review Queue</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {familyOnlyMode ? 'Family Review Queue' : 'Review Queue'}
+                </h2>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  These requests are waiting for approval on teams, associations, arenas, or family/player links that you manage.
+                  {familyOnlyMode
+                    ? 'These requests are waiting for approval on parent, guardian, and player links for teams you manage.'
+                    : 'These requests are waiting for approval on teams, associations, arenas, or family/player links that you manage.'}
                 </p>
               </div>
               <Badge variant="outline">{filteredRequests.length} open</Badge>
@@ -519,71 +522,70 @@ export default function AccessPage() {
                 </div>
               ) : (
                 filteredRequests.map((request) => {
-                const requestRoleOptions = roleOptionsForTarget(request.target.type);
-                const selectedRole = requestRoles[request.id] ?? requestRoleOptions[0] ?? '';
+                  const requestRoleOptions = roleOptionsForTarget(request.target.type);
+                  const selectedRole = requestRoles[request.id] ?? requestRoleOptions[0] ?? '';
 
-                return (
-                  <div
-                    key={request.id}
-                    className="rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4 dark:border-slate-800 dark:bg-slate-900/60"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{request.target.name}</div>
-                        {request.target.context ? (
-                          <div className="text-sm text-slate-600 dark:text-slate-300">{request.target.context}</div>
-                        ) : null}
-                        <div className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                          {targetTypeLabel(request.target.type)}
+                  return (
+                    <div
+                      key={request.id}
+                      className="rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4 dark:border-slate-800 dark:bg-slate-900/60"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{request.target.name}</div>
+                          {request.target.context ? (
+                            <div className="text-sm text-slate-600 dark:text-slate-300">{request.target.context}</div>
+                          ) : null}
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                            {targetTypeLabel(request.target.type)}
+                          </div>
                         </div>
+                        <Badge variant={statusVariant(request.status)}>{request.status}</Badge>
                       </div>
-                      <Badge variant={statusVariant(request.status)}>{request.status}</Badge>
-                    </div>
 
-                    <div className="mt-4 text-sm text-slate-600 dark:text-slate-300">
-                      Requested by <span className="font-medium text-slate-900 dark:text-slate-100">{request.user_email || 'Unknown user'}</span>
-                    </div>
-                    {request.notes ? (
-                      <div className="mt-2 rounded-xl border border-slate-200/80 bg-white/80 px-3 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
-                        {request.notes}
+                      <div className="mt-4 text-sm text-slate-600 dark:text-slate-300">
+                        Requested by <span className="font-medium text-slate-900 dark:text-slate-100">{request.user_email || 'Unknown user'}</span>
                       </div>
-                    ) : null}
+                      {request.notes ? (
+                        <div className="mt-2 rounded-xl border border-slate-200/80 bg-white/80 px-3 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
+                          {request.notes}
+                        </div>
+                      ) : null}
 
-                    {requestRoleOptions.length > 0 ? (
-                      <div className="mt-4">
-                        <label className="mb-1 block text-xs font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                          Grant role
-                        </label>
-                        <Select
-                          value={selectedRole}
-                          onChange={(event) => setRequestRoles((current) => ({ ...current, [request.id]: event.target.value }))}
-                        >
-                          {requestRoleOptions.map((role) => (
-                            <option key={role} value={role}>
-                              {roleLabel(role)}
-                            </option>
-                          ))}
-                        </Select>
+                      {requestRoleOptions.length > 0 ? (
+                        <div className="mt-4">
+                          <label className="mb-1 block text-xs font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                            Grant role
+                          </label>
+                          <Select
+                            value={selectedRole}
+                            onChange={(event) => setRequestRoles((current) => ({ ...current, [request.id]: event.target.value }))}
+                          >
+                            {requestRoleOptions.map((role) => (
+                              <option key={role} value={role}>
+                                {roleLabel(role)}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
+                      ) : null}
+
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <Button type="button" onClick={() => void approveRequest(request)} disabled={busyKey !== null}>
+                          <UserCheck className="h-4 w-4" />
+                          Approve
+                        </Button>
+                        <Button type="button" variant="ghost" onClick={() => void rejectRequest(request)} disabled={busyKey !== null}>
+                          <XCircle className="h-4 w-4" />
+                          Reject
+                        </Button>
                       </div>
-                    ) : null}
-
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <Button type="button" onClick={() => void approveRequest(request)} disabled={busyKey !== null}>
-                        <UserCheck className="h-4 w-4" />
-                        Approve
-                      </Button>
-                      <Button type="button" variant="ghost" onClick={() => void rejectRequest(request)} disabled={busyKey !== null}>
-                        <XCircle className="h-4 w-4" />
-                        Reject
-                      </Button>
                     </div>
-                  </div>
-                );
+                  );
                 })
               )}
             </div>
-          </Card>
-        ) : null}
+        </Card>
 
         <Card className="p-6">
           <div className="flex items-start justify-between gap-3">

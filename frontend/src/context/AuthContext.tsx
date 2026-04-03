@@ -10,7 +10,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   me: MeResponse | null;
   error: string | null;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: (options?: { silent?: boolean }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -45,7 +45,7 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
-  const refreshProfile = async () => {
+  const loadProfile = async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!session) {
       clearApiAccessToken();
       setMe(null);
@@ -53,7 +53,9 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    setProfileLoading(true);
+    if (!silent) {
+      setProfileLoading(true);
+    }
     try {
       const data = await api.getMe();
       setMe(data);
@@ -62,12 +64,14 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
       setMe(null);
       setProfileError(String(error));
     } finally {
-      setProfileLoading(false);
+      if (!silent) {
+        setProfileLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    refreshProfile();
+    void loadProfile();
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -78,9 +82,13 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!session,
         me,
         error: profileError ?? sessionError?.message ?? null,
-        refreshProfile: async () => {
+        refreshProfile: async (options) => {
+          if (options?.silent) {
+            await loadProfile({ silent: true });
+            return;
+          }
           await refetch();
-          await refreshProfile();
+          await loadProfile();
         },
       }}
     >
