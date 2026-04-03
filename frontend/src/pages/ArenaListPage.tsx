@@ -148,7 +148,7 @@ export default function ArenaListPage() {
         )}
       />
 
-      <div className="grid max-w-6xl gap-3 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {arenas.map((arena) => {
           const cityStateZip = [arena.city, arena.state, arena.zip_code].filter(Boolean).join(' ');
           const locationLabel = [arena.name, arena.address, cityStateZip].filter(Boolean).join(', ');
@@ -159,11 +159,11 @@ export default function ArenaListPage() {
           return (
             <Card key={arena.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
                   <TeamLogo name={arena.name} logoUrl={arena.logo_url} className="h-12 w-12 rounded-2xl" initialsClassName="text-sm" />
                   <button
                     type="button"
-                    className={`group min-w-0 rounded-lg text-left ${focusRingClass}`}
+                    className={`group min-w-0 flex-1 rounded-lg text-left ${focusRingClass}`}
                     onClick={() => navigate(`/arenas/${arena.id}`)}
                   >
                     <div className={`text-base font-semibold text-slate-900 dark:text-slate-100 ${interactiveTitleClass}`}>
@@ -174,7 +174,7 @@ export default function ArenaListPage() {
                     </div>
                   </button>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
                   {directionsUrl ? (
                     <Button
                       type="button"
