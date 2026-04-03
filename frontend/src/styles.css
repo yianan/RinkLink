@@ -546,17 +546,11 @@ html.dark {
     color: var(--color-slate-500);
   }
 
-  .rinklink-auth-footer-link {
+  .rinklink-auth-footer-link,
+  .rinklink-auth-forgot-link {
     color: var(--color-slate-600) !important;
     text-decoration: none !important;
     font-weight: 600;
-    transition: color 160ms ease;
-  }
-
-  .rinklink-auth-forgot-link {
-    color: var(--color-slate-500) !important;
-    text-decoration: none !important;
-    font-weight: 500;
     transition: color 160ms ease;
   }
 
@@ -1184,12 +1178,9 @@ html.dark {
     box-shadow: none !important;
   }
 
-  html.dark .rinklink-auth-footer-link {
-    color: var(--color-slate-300) !important;
-  }
-
+  html.dark .rinklink-auth-footer-link,
   html.dark .rinklink-auth-forgot-link {
-    color: var(--color-slate-400) !important;
+    color: var(--color-slate-300) !important;
   }
 
   html.dark .rinklink-auth-footer-link:hover,
@@ -1228,6 +1219,7 @@ html.dark {
     background-color: transparent !important;
     box-shadow: none !important;
     color: inherit !important;
+    text-decoration: none !important;
   }
 
   html.dark .rinklink-settings-page [data-slot="dropdown-menu-content"],
