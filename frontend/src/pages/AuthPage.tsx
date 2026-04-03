@@ -178,6 +178,22 @@ function PasswordField({
   );
 }
 
+function getAuthErrorDetails(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const errorCode = typeof error === 'object' && error !== null && 'error' in error
+    ? (error as { error?: { code?: string } }).error?.code
+    : undefined;
+  const status = typeof error === 'object' && error !== null && 'status' in error
+    ? (error as { status?: number }).status
+    : undefined;
+
+  return {
+    message,
+    errorCode,
+    status,
+  };
+}
+
 function SignInCard() {
   const navigate = useNavigate();
   const pushToast = useToast();
@@ -213,10 +229,7 @@ function SignInCard() {
 
       window.location.assign(buildAuthCallbackUrl('/'));
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const errorCode = typeof error === 'object' && error !== null && 'error' in error
-        ? (error as { error?: { code?: string } }).error?.code
-        : undefined;
+      const { message, errorCode, status } = getAuthErrorDetails(error);
 
       if (errorCode === 'EMAIL_NOT_VERIFIED') {
         pushToast({
@@ -228,10 +241,17 @@ function SignInCard() {
         return;
       }
 
+      const normalizedCode = errorCode?.toUpperCase();
+      const invalidCredentials = status === 401
+        || message.trim().toLowerCase() === 'unauthorized'
+        || normalizedCode === 'INVALID_CREDENTIALS'
+        || normalizedCode === 'INVALID_EMAIL_OR_PASSWORD'
+        || normalizedCode === 'CREDENTIALS_SIGN_IN_FAILED';
+
       setPassword('');
       pushToast({
         title: 'Unable to sign in',
-        description: message,
+        description: invalidCredentials ? 'Username and password combination not valid.' : message,
         variant: 'error',
       });
     } finally {
@@ -253,7 +273,10 @@ function SignInCard() {
         </div>
       )}
     >
-      <div className="rinklink-auth-form">
+      <form className="rinklink-auth-form" onSubmit={(event) => {
+        event.preventDefault();
+        void signIn();
+      }}>
         <div className="rinklink-auth-field">
           <label className="rinklink-auth-label" htmlFor="sign-in-email">Email</label>
           <Input
@@ -284,10 +307,10 @@ function SignInCard() {
           </RouterLink>
         </div>
 
-        <Button type="button" className="rinklink-auth-primary-button" onClick={() => void signIn()} disabled={busy}>
+        <Button type="submit" className="rinklink-auth-primary-button" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </Button>
-      </div>
+      </form>
     </AuthCard>
   );
 }
@@ -376,7 +399,10 @@ function SignUpCard() {
         </RouterLink>
       )}
     >
-      <div className="rinklink-auth-form">
+      <form className="rinklink-auth-form" onSubmit={(event) => {
+        event.preventDefault();
+        void signUp();
+      }}>
         <div className="rinklink-auth-field">
           <label className="rinklink-auth-label" htmlFor="sign-up-name">Full name</label>
           <Input
@@ -386,6 +412,7 @@ function SignUpCard() {
             onChange={(event) => setName(event.target.value)}
             autoComplete="name"
             placeholder="Your name"
+            disabled={busy}
           />
         </div>
 
@@ -399,6 +426,7 @@ function SignUpCard() {
             autoComplete="email"
             placeholder="you@example.com"
             type="email"
+            disabled={busy}
           />
         </div>
 
@@ -422,10 +450,10 @@ function SignUpCard() {
           disabled={busy}
         />
 
-        <Button type="button" className="rinklink-auth-primary-button" onClick={() => void signUp()} disabled={busy}>
+        <Button type="submit" className="rinklink-auth-primary-button" disabled={busy}>
           {busy ? 'Creating account…' : 'Create account'}
         </Button>
-      </div>
+      </form>
     </AuthCard>
   );
 }
