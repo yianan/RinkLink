@@ -8,7 +8,7 @@ import { Card } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { authClient } from '../lib/auth-client';
-import type { AccessRequest, AccessTarget, Invite } from '../types';
+import type { AccessRequest, AccessTarget, Invite, PublicEvent, PublicSeason, PublicTeam, StandingsEntry } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
@@ -52,6 +52,18 @@ function statusVariant(status: string) {
   }
 }
 
+function formatEventWhen(event: PublicEvent) {
+  const dateLabel = new Date(`${event.date}T00:00:00`).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    weekday: 'short',
+  });
+  const timeLabel = event.start_time
+    ? new Date(`${event.date}T${event.start_time}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : 'Time TBD';
+  return `${dateLabel} · ${timeLabel}`;
+}
+
 export default function PendingApprovalPage() {
   const navigate = useNavigate();
   const { isAuthenticated, me, refreshProfile } = useAuth();
@@ -69,10 +81,22 @@ export default function PendingApprovalPage() {
   const [requestNotes, setRequestNotes] = useState('');
   const [requestOptionsLoading, setRequestOptionsLoading] = useState(false);
   const [requestLookupError, setRequestLookupError] = useState<string | null>(null);
+  const [browseSeasons, setBrowseSeasons] = useState<PublicSeason[]>([]);
+  const [browseTeams, setBrowseTeams] = useState<PublicTeam[]>([]);
+  const [browseEvents, setBrowseEvents] = useState<PublicEvent[]>([]);
+  const [browseStandings, setBrowseStandings] = useState<StandingsEntry[]>([]);
+  const [browseSeasonId, setBrowseSeasonId] = useState('');
+  const [browseTeamId, setBrowseTeamId] = useState('');
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [browseError, setBrowseError] = useState<string | null>(null);
 
   const openInvites = useMemo(
     () => invites.filter((invite) => invite.status === 'pending'),
     [invites],
+  );
+  const selectedBrowseTeam = useMemo(
+    () => browseTeams.find((team) => team.id === browseTeamId) || null,
+    [browseTeamId, browseTeams],
   );
 
   const loadPendingData = async () => {
@@ -158,6 +182,98 @@ export default function PendingApprovalPage() {
   }, [isAuthenticated, requestTargetType, requestTeamId]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    setBrowseLoading(true);
+    setBrowseError(null);
+    api.getBrowseSeasons()
+      .then((seasons) => {
+        if (cancelled) return;
+        setBrowseSeasons(seasons);
+        const preferredSeason = seasons.find((season) => season.is_active) || seasons[0];
+        if (preferredSeason) {
+          setBrowseSeasonId((current) => (current && seasons.some((season) => season.id === current) ? current : preferredSeason.id));
+        }
+      })
+      .catch((nextError) => {
+        if (cancelled) return;
+        setBrowseError(nextError instanceof Error ? nextError.message : String(nextError));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBrowseLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !browseSeasonId) return;
+    let cancelled = false;
+    setBrowseLoading(true);
+    setBrowseError(null);
+    api.getBrowseTeams({ season_id: browseSeasonId })
+      .then((teams) => {
+        if (cancelled) return;
+        setBrowseTeams(teams);
+        setBrowseTeamId((current) => (current && teams.some((team) => team.id === current) ? current : teams[0]?.id || ''));
+      })
+      .catch((nextError) => {
+        if (cancelled) return;
+        setBrowseTeams([]);
+        setBrowseTeamId('');
+        setBrowseError(nextError instanceof Error ? nextError.message : String(nextError));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBrowseLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [browseSeasonId, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !browseSeasonId || !selectedBrowseTeam) return;
+    let cancelled = false;
+    setBrowseLoading(true);
+    setBrowseError(null);
+    Promise.all([
+      api.getBrowseTeamEvents(selectedBrowseTeam.id, { season_id: browseSeasonId }),
+      api.getBrowseStandings(browseSeasonId, {
+        association_id: selectedBrowseTeam.association_id,
+        age_group: selectedBrowseTeam.age_group,
+        level: selectedBrowseTeam.level,
+      }),
+    ])
+      .then(([events, standings]) => {
+        if (cancelled) return;
+        setBrowseEvents(events);
+        setBrowseStandings(standings);
+      })
+      .catch((nextError) => {
+        if (cancelled) return;
+        setBrowseEvents([]);
+        setBrowseStandings([]);
+        setBrowseError(nextError instanceof Error ? nextError.message : String(nextError));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBrowseLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [browseSeasonId, isAuthenticated, selectedBrowseTeam]);
+
+  useEffect(() => {
     if (requestOptions.length === 0) {
       setRequestTargetId('');
       return;
@@ -238,8 +354,9 @@ export default function PendingApprovalPage() {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-4 py-8 sm:px-6">
-      <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
-        <Card className="p-8 sm:p-10">
+      <div className="w-full space-y-6">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
+          <Card className="p-8 sm:p-10">
           <div className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
             Access Pending
           </div>
@@ -319,10 +436,10 @@ export default function PendingApprovalPage() {
               </div>
             )}
           </div>
-        </Card>
+          </Card>
 
-        <div className="space-y-6">
-          <Card className="p-6">
+          <div className="space-y-6">
+            <Card className="p-6">
             <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
               Request Access
             </h2>
@@ -389,9 +506,9 @@ export default function PendingApprovalPage() {
                 {submitting ? 'Submitting…' : 'Submit access request'}
               </Button>
             </div>
-          </Card>
+            </Card>
 
-          <Card className="p-6">
+            <Card className="p-6">
             <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
               Your Access Requests
             </h2>
@@ -424,9 +541,9 @@ export default function PendingApprovalPage() {
                 ))
               )}
             </div>
-          </Card>
+            </Card>
 
-          <Card className="p-6">
+            <Card className="p-6">
             <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
               Next Steps
             </h2>
@@ -445,8 +562,162 @@ export default function PendingApprovalPage() {
             <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">
               Need a new invite? Share the signed-in email above with the appropriate administrator.
             </div>
-          </Card>
+            </Card>
+          </div>
         </div>
+
+        <Card className="p-6 sm:p-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                Published Browse
+              </div>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-50">
+                Teams, schedule, and standings stay available while you wait.
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                This browse mode is limited to published information only. Private roster, locker room, and admin-only details remain hidden until an admin grants access.
+              </p>
+            </div>
+            <div className="grid min-w-[16rem] gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Season
+                </label>
+                <Select className="mt-2" value={browseSeasonId} onChange={(event) => setBrowseSeasonId(event.target.value)} disabled={browseSeasons.length === 0}>
+                  {browseSeasons.map((season) => (
+                    <option key={season.id} value={season.id}>{season.name}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Team
+                </label>
+                <Select className="mt-2" value={browseTeamId} onChange={(event) => setBrowseTeamId(event.target.value)} disabled={browseTeams.length === 0}>
+                  {browseTeams.map((team) => (
+                    <option key={team.id} value={team.id}>{team.name} · {team.age_group} · {team.level}</option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {browseError ? (
+            <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200">
+              {browseError}
+            </div>
+          ) : null}
+
+          {selectedBrowseTeam ? (
+            <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-5 dark:border-slate-800 dark:bg-slate-900/50">
+                  <div className="flex flex-wrap items-center gap-4">
+                    {selectedBrowseTeam.logo_url ? (
+                      <img src={selectedBrowseTeam.logo_url} alt={`${selectedBrowseTeam.name} logo`} className="h-14 w-14 rounded-xl object-cover ring-1 ring-slate-200/80 dark:ring-slate-700/70" />
+                    ) : (
+                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-200 text-sm font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        {selectedBrowseTeam.name.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{selectedBrowseTeam.name}</div>
+                      <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                        {selectedBrowseTeam.association_name} · {selectedBrowseTeam.age_group} · {selectedBrowseTeam.level}
+                      </div>
+                      <div className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                        Record {selectedBrowseTeam.wins}-{selectedBrowseTeam.losses}-{selectedBrowseTeam.ties}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    Published Schedule
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    {browseLoading && browseEvents.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                        Loading published schedule…
+                      </div>
+                    ) : browseEvents.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                        No published events are available for this team yet.
+                      </div>
+                    ) : (
+                      browseEvents.map((event) => (
+                        <div key={event.id} className="rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/40">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                {event.home_team_name || 'Home'}{event.away_team_name ? ` vs ${event.away_team_name}` : ''}
+                              </div>
+                              <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">{formatEventWhen(event)}</div>
+                            </div>
+                            <Badge variant={statusVariant(event.status)}>{event.status}</Badge>
+                          </div>
+                          <div className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                            {[event.competition_name, event.division_name, event.location_label || event.arena_name].filter(Boolean).join(' · ')}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Published Standings
+                </div>
+                <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800">
+                  {browseLoading && browseStandings.length === 0 ? (
+                    <div className="px-4 py-6 text-sm text-slate-500 dark:text-slate-400">
+                      Loading standings…
+                    </div>
+                  ) : browseStandings.length === 0 ? (
+                    <div className="px-4 py-6 text-sm text-slate-500 dark:text-slate-400">
+                      No published standings are available for this grouping yet.
+                    </div>
+                  ) : (
+                    <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                      <thead className="bg-slate-50/90 dark:bg-slate-900/70">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Team</th>
+                          <th className="px-3 py-3 text-right font-semibold text-slate-600 dark:text-slate-300">Pts</th>
+                          <th className="px-3 py-3 text-right font-semibold text-slate-600 dark:text-slate-300">W</th>
+                          <th className="px-3 py-3 text-right font-semibold text-slate-600 dark:text-slate-300">L</th>
+                          <th className="px-3 py-3 text-right font-semibold text-slate-600 dark:text-slate-300">T</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200/80 bg-white/70 dark:divide-slate-800 dark:bg-slate-950/40">
+                        {browseStandings.map((entry) => (
+                          <tr key={entry.team_id} className={entry.team_id === selectedBrowseTeam.id ? 'bg-cyan-50/70 dark:bg-cyan-950/20' : ''}>
+                            <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{entry.team_name}</td>
+                            <td className="px-3 py-3 text-right text-slate-700 dark:text-slate-200">{entry.points}</td>
+                            <td className="px-3 py-3 text-right text-slate-700 dark:text-slate-200">{entry.wins}</td>
+                            <td className="px-3 py-3 text-right text-slate-700 dark:text-slate-200">{entry.losses}</td>
+                            <td className="px-3 py-3 text-right text-slate-700 dark:text-slate-200">{entry.ties}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : browseLoading ? (
+            <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              Loading published browse data…
+            </div>
+          ) : (
+            <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              No published teams are available yet.
+            </div>
+          )}
+        </Card>
       </div>
     </div>
   );

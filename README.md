@@ -37,6 +37,7 @@ This starts:
 - Postgres on `localhost:5432`
 - Better Auth service on `http://localhost:3000`
 - FastAPI backend on `http://localhost:8000`
+- Mailpit SMTP/web UI on `http://localhost:8025`
 
 Then run the frontend separately:
 
@@ -115,10 +116,12 @@ Once `postgres`, `auth-service`, and `backend` are running, you can verify the a
 The script does all of the following against the local stack:
 
 - sign up a new Better Auth user
-- read the verification URL from `auth-service` logs
+- read the verification URL from Mailpit
 - verify the email and capture the Better Auth session cookie
 - exchange that session for a FastAPI audience JWT
 - call `GET /api/me`
+
+With the default Docker Compose stack, verification and invite emails are delivered to Mailpit instead of being logged to stdout.
 
 The first authenticated `/api/me` response should create an `app_users` row automatically and return a `pending` user profile until that user is granted memberships or activated.
 
@@ -133,7 +136,7 @@ Because `/api/seed` now requires an authenticated active user, the easiest local
 The bootstrap script:
 
 - signs up or signs in a local Better Auth user
-- verifies the email when it just created the account
+- verifies the email when it just created the account by reading the verification message from Mailpit
 - exchanges the Better Auth session for a FastAPI JWT
 - ensures the matching `app_users` row exists
 - promotes that user to `active` + `platform_admin`

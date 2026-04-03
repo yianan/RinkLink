@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 AUTH_BASE="${AUTH_BASE:-http://localhost:3000}"
 API_BASE="${API_BASE:-http://localhost:8000}"
+MAILPIT_BASE="${MAILPIT_BASE:-http://localhost:8025}"
 ORIGIN="${ORIGIN:-http://localhost:5173}"
 PASSWORD="${PASSWORD:-Password123!}"
 EMAIL="${1:-local-smoke-$(date +%s)@example.com}"
@@ -26,27 +27,27 @@ if [[ "${signup_status}" != "200" ]]; then
   exit 1
 fi
 
-echo "==> locating verification URL in auth-service logs"
+echo "==> locating verification URL in Mailpit"
 verify_url=""
 for _ in {1..10}; do
   verify_url="$(
-    RINKLINK_SMOKE_EMAIL="${EMAIL}" RINKLINK_ROOT_DIR="${ROOT_DIR}" python3 <<'PY'
+    RINKLINK_SMOKE_EMAIL="${EMAIL}" MAILPIT_BASE="${MAILPIT_BASE}" python3 <<'PY'
 import os
 import re
-import subprocess
+import urllib.parse
+import urllib.request
 
 email = os.environ["RINKLINK_SMOKE_EMAIL"]
-root_dir = os.environ["RINKLINK_ROOT_DIR"]
-result = subprocess.run(
-    ["docker", "compose", "logs", "--tail=200", "--no-color", "auth-service"],
-    cwd=root_dir,
-    capture_output=True,
-    text=True,
-    check=False,
-)
-pattern = re.compile(rf"Verify email for {re.escape(email)}: (http://\S+)")
-urls = [m.group(1) for line in result.stdout.splitlines() for m in [pattern.search(line)] if m]
-print(urls[-1] if urls else "")
+mailpit_base = os.environ["MAILPIT_BASE"].rstrip("/")
+query = urllib.parse.quote(f"to:{email}")
+try:
+    with urllib.request.urlopen(f"{mailpit_base}/view/latest.txt?query={query}", timeout=5) as response:
+        body = response.read().decode()
+except Exception:
+    body = ""
+pattern = re.compile(r"https?://\S+")
+urls = pattern.findall(body)
+print(urls[0] if urls else "")
 PY
   )"
   if [[ -n "${verify_url}" ]]; then
@@ -56,7 +57,7 @@ PY
 done
 
 if [[ -z "${verify_url}" ]]; then
-  echo "verification URL was not found in auth-service logs" >&2
+  echo "verification URL was not found in Mailpit" >&2
   exit 1
 fi
 

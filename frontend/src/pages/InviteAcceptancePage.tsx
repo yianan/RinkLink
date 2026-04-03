@@ -6,10 +6,9 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { authClient, clearApiAccessToken } from '../lib/auth-client';
+import { setAuthReturnTo } from '../lib/auth-routing';
 import { useAuth } from '../context/AuthContext';
 import type { Invite } from '../types';
-
-const RETURN_TO_KEY = 'rinklink.returnTo';
 
 function statusVariant(status: string) {
   switch (status) {
@@ -88,11 +87,21 @@ export default function InviteAcceptancePage() {
             <Button
               type="button"
               onClick={() => {
-                window.sessionStorage.setItem(RETURN_TO_KEY, `/invite/${token}`);
+                setAuthReturnTo(`/invite/${token}`);
                 navigate('/auth/sign-in');
               }}
             >
               Sign in
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setAuthReturnTo(`/invite/${token}`);
+                navigate('/auth/sign-up');
+              }}
+            >
+              Create account
             </Button>
           </div>
         </Card>
@@ -117,7 +126,7 @@ export default function InviteAcceptancePage() {
   const signOutAndSwitchAccount = async () => {
     clearApiAccessToken();
     await authClient.signOut();
-    window.sessionStorage.setItem(RETURN_TO_KEY, `/invite/${token}`);
+    setAuthReturnTo(`/invite/${token}`);
     window.location.href = '/auth/sign-in';
   };
 

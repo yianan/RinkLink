@@ -152,6 +152,49 @@ export interface Competition {
   divisions: CompetitionDivision[];
 }
 
+export interface PublicSeason {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  game_count: number;
+}
+
+export interface PublicTeam {
+  id: string;
+  association_id: string;
+  association_name: string | null;
+  name: string;
+  age_group: string;
+  level: string;
+  logo_url: string | null;
+  wins: number;
+  losses: number;
+  ties: number;
+}
+
+export interface PublicEvent {
+  id: string;
+  event_type: string;
+  status: string;
+  date: string;
+  start_time: string | null;
+  end_time: string | null;
+  home_team_id: string;
+  away_team_id: string | null;
+  home_team_name: string | null;
+  away_team_name: string | null;
+  home_team_logo_url: string | null;
+  away_team_logo_url: string | null;
+  arena_name: string | null;
+  arena_rink_name: string | null;
+  location_label: string | null;
+  competition_name: string | null;
+  competition_short_name: string | null;
+  division_name: string | null;
+}
+
 export interface Team {
   id: string;
   association_id: string;

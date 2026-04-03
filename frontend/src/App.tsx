@@ -40,6 +40,7 @@ import { Skeleton } from './components/ui/Skeleton';
 import { Button } from './components/ui/Button';
 import { Tooltip } from './components/ui/Tooltip';
 import { authClient, authEnabled, clearApiAccessToken } from './lib/auth-client';
+import { consumeAuthReturnTo } from './lib/auth-routing';
 import type { MeResponse } from './types';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -90,20 +91,6 @@ function RouteFallback() {
 function LegacyEventRedirect() {
   const { eventId = '' } = useParams();
   return <Navigate to={`/schedule/${eventId}`} replace />;
-}
-
-const AUTH_RETURN_TO_KEY = 'rinklink.returnTo';
-
-function consumeAuthReturnTo() {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  const returnTo = window.sessionStorage.getItem(AUTH_RETURN_TO_KEY);
-  if (!returnTo) {
-    return null;
-  }
-  window.sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
-  return returnTo;
 }
 
 function AuthRedirectRoute() {

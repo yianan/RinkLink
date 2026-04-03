@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -41,8 +42,11 @@ from ..schemas import (
     InviteCreate,
     InviteOut,
 )
+from ..services.email import send_invite_email
+from ..config import settings
 
 router = APIRouter(tags=["auth"])
+logger = logging.getLogger(__name__)
 
 ASSOCIATION_ROLES = {"association_admin"}
 TEAM_ROLES = {"team_admin", "manager", "scheduler", "coach"}
@@ -410,6 +414,20 @@ def create_invite(
     )
     db.commit()
     db.refresh(invite)
+    try:
+        send_invite_email(
+            invite_email=invite.email,
+            invite_link=f"{settings.frontend_url.rstrip('/')}/invite/{invite.token}",
+            target_name=_build_target_summary(invite.target_type, target).name,
+            target_type=invite.target_type,
+            role=invite.role,
+            inviter_email=context.user.email,
+            expires_at=_as_utc(invite.expires_at),
+        )
+    except Exception:
+        # Invite creation remains authoritative even if delivery fails.
+        # Admins can still copy the generated link from the UI.
+        logger.exception("Failed to send invite email for invite %s", invite.id)
     return _invite_out(db, invite)
 
 

@@ -22,6 +22,8 @@ services:
     container_name: rinklink-backend
     working_dir: /workspace/backend
     depends_on:
+      mailpit:
+        condition: service_started
       postgres:
         condition: service_healthy
     env_file:
@@ -30,12 +32,19 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/rinklink
       MEDIA_ROOT: /workspace/backend/media
       CORS_ORIGINS: http://localhost:5173
+      FRONTEND_URL: http://localhost:5173
       APP_ENV: development
       AUTH_ENABLED: "true"
       AUTH_BYPASS_DEV_ONLY: "false"
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       AUTH_ISSUER: http://localhost:3000
       AUTH_AUDIENCE: http://localhost:8000
+      EMAIL_FROM_NAME: RinkLink
+      EMAIL_FROM_ADDRESS: no-reply@rinklink.local
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_STARTTLS: "false"
+      SMTP_USE_SSL: "false"
     command: >
       sh -c "pip install --no-cache-dir -r requirements.txt &&
       alembic upgrade head &&
@@ -50,6 +59,8 @@ services:
     container_name: rinklink-auth-service
     working_dir: /workspace/auth-service
     depends_on:
+      mailpit:
+        condition: service_started
       postgres:
         condition: service_healthy
     env_file:
@@ -61,6 +72,12 @@ services:
       API_AUDIENCE: http://localhost:8000
       APP_ENV: development
       BETTER_AUTH_SECRET: local-dev-secret-change-this-to-a-long-random-value
+      EMAIL_FROM_NAME: RinkLink
+      EMAIL_FROM_ADDRESS: no-reply@rinklink.local
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_STARTTLS: "false"
+      SMTP_USE_SSL: "false"
     command: >
       sh -c "npm install &&
       npm run dev"
@@ -68,6 +85,13 @@ services:
       - "3000:3000"
     volumes:
       - ./auth-service:/workspace/auth-service
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: rinklink-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
 
 volumes:
   postgres-data:

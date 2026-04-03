@@ -59,6 +59,19 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
 
 export const api = {
   getMe: () => request<import('../types').MeResponse>('/me'),
+  getBrowseSeasons: () => request<import('../types').PublicSeason[]>('/browse/seasons'),
+  getBrowseTeams: (params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return request<import('../types').PublicTeam[]>(`/browse/teams${qs}`);
+  },
+  getBrowseTeamEvents: (teamId: string, params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return request<import('../types').PublicEvent[]>(`/browse/teams/${teamId}/events${qs}`);
+  },
+  getBrowseStandings: (seasonId: string, params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return request<import('../types').StandingsEntry[]>(`/browse/seasons/${seasonId}/standings${qs}`);
+  },
   getInvites: (params?: Record<string, string>) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').Invite[]>(`/invites${qs}`);

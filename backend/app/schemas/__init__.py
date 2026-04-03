@@ -64,6 +64,7 @@ from .auth import (
     AccessRequestDecision,
     AccessRequestOut,
 )
+from .public import PublicEventOut, PublicSeasonOut, PublicTeamOut
 
 __all__ = [
     "AssociationCreate", "AssociationUpdate", "AssociationOut",
@@ -93,4 +94,5 @@ __all__ = [
     "LinkedPlayerOut", "AccessibleTeamOut", "MeOut",
     "AccessTargetOut", "InviteCreate", "InviteOut",
     "AccessRequestCreate", "AccessRequestDecision", "AccessRequestOut",
+    "PublicSeasonOut", "PublicTeamOut", "PublicEventOut",
 ]

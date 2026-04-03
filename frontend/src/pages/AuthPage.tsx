@@ -1,22 +1,319 @@
 import { AuthView, ForgotPasswordForm, ResetPasswordForm } from '@daveyplate/better-auth-ui';
-import { ArrowLeft } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { Link as RouterLink, Navigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
+import { Link as RouterLink, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { authClient } from '../lib/auth-client';
+import { buildAuthCallbackUrl } from '../lib/auth-routing';
 import { cn } from '../lib/cn';
+import { useToast } from '../context/ToastContext';
 
 const allowedPathnames = new Set([
   'sign-in',
   'sign-up',
+  'check-email',
   'forgot-password',
   'reset-password',
   'sign-out',
   'callback',
 ]);
 
+function AuthCard({
+  children,
+  description,
+  eyebrow,
+  footer,
+  title,
+}: {
+  children: ReactNode;
+  description?: ReactNode;
+  eyebrow: string;
+  footer?: ReactNode;
+  title: string;
+}) {
+  return (
+    <div className="rinklink-auth-card">
+      <div className="rinklink-auth-header">
+        <div className="space-y-2">
+          <div className="rinklink-auth-card-eyebrow">{eyebrow}</div>
+          <div className="rinklink-auth-card-title">{title}</div>
+          {description ? (
+            <div className="rinklink-auth-card-copy">{description}</div>
+          ) : null}
+        </div>
+      </div>
+      <div className="rinklink-auth-content">{children}</div>
+      {footer ? <div className="rinklink-auth-footer">{footer}</div> : null}
+    </div>
+  );
+}
+
+function CheckEmailCard() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const pushToast = useToast();
+  const [busy, setBusy] = useState(false);
+  const email = searchParams.get('email') || '';
+
+  const resendVerification = async () => {
+    if (!email) {
+      pushToast({
+        title: 'Email required',
+        description: 'Return to sign up so we know which email address to verify.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await (authClient.sendVerificationEmail as (payload: Record<string, unknown>) => Promise<unknown>)({
+        email,
+        callbackURL: buildAuthCallbackUrl('/pending'),
+        fetchOptions: { throw: true },
+      });
+      pushToast({
+        title: 'Verification email resent',
+        description: email,
+        variant: 'success',
+      });
+    } catch (error) {
+      pushToast({
+        title: 'Unable to resend verification email',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'error',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AuthCard
+      eyebrow="Check your email"
+      title="Finish verifying your email"
+      description={email ? `We sent a verification link to ${email}. Use it to finish creating your RinkLink account.` : 'Open your inbox and use the verification link to finish creating your RinkLink account.'}
+      footer={(
+        <div className="flex flex-wrap items-center gap-3">
+          <RouterLink to="/auth/sign-in" className="rinklink-auth-footer-link inline-flex items-center gap-1.5">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to sign in</span>
+          </RouterLink>
+          <Button type="button" variant="ghost" onClick={() => navigate('/auth/sign-up')}>
+            Change email
+          </Button>
+        </div>
+      )}
+    >
+      <div className="space-y-5 text-sm text-slate-600 dark:text-slate-300">
+        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/50">
+          <div className="font-medium text-slate-900 dark:text-slate-100">What happens next</div>
+          <div className="mt-2">
+            After verification, RinkLink will sign you in automatically and route you to the right next step:
+            pending onboarding if you have no grants yet, or directly into the app if you already have access.
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <Button type="button" onClick={() => void resendVerification()} disabled={busy || !email}>
+            {busy ? 'Resending…' : 'Resend verification email'}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => navigate('/auth/sign-in')}>
+            I already verified
+          </Button>
+        </div>
+      </div>
+    </AuthCard>
+  );
+}
+
+function PasswordField({
+  autoComplete,
+  id,
+  label,
+  onChange,
+  placeholder,
+  value,
+}: {
+  autoComplete: string;
+  id: string;
+  label: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  value: string;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="rinklink-auth-field">
+      <label className="rinklink-auth-label" htmlFor={id}>{label}</label>
+      <div className="rinklink-auth-password-field">
+        <Input
+          id={id}
+          className="rinklink-auth-input rinklink-auth-input--password"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          type={visible ? 'text' : 'password'}
+        />
+        <button
+          type="button"
+          className="rinklink-auth-password-toggle"
+          onClick={() => setVisible((current) => !current)}
+          aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          aria-pressed={visible}
+        >
+          {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          <span>{visible ? 'Hide' : 'Show'}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SignUpCard() {
+  const navigate = useNavigate();
+  const pushToast = useToast();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const signUp = async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedName = name.trim();
+
+    if (!trimmedName || !trimmedEmail || !password) {
+      pushToast({
+        title: 'Complete all fields',
+        description: 'Name, email, password, and confirmation are required.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    if (password.length < 8) {
+      pushToast({
+        title: 'Password too short',
+        description: 'Use at least 8 characters.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      pushToast({
+        title: 'Passwords do not match',
+        description: 'Re-enter the same password in both fields.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const payload = await (authClient.signUp.email as unknown as (body: Record<string, unknown>) => Promise<Record<string, unknown>>)({
+        name: trimmedName,
+        email: trimmedEmail,
+        password,
+        callbackURL: buildAuthCallbackUrl('/pending'),
+        fetchOptions: { throw: true },
+      });
+
+      if (payload && 'token' in payload && payload.token) {
+        navigate('/');
+        return;
+      }
+
+      pushToast({
+        title: 'Check your email',
+        description: trimmedEmail,
+        variant: 'success',
+      });
+      navigate(`/auth/check-email?email=${encodeURIComponent(trimmedEmail)}`);
+    } catch (error) {
+      pushToast({
+        title: 'Unable to create account',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'error',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AuthCard
+      eyebrow="Create account"
+      title="Create your RinkLink account"
+      description="Self-signup creates your identity first. You can verify your email, review invites, browse published team information, and request app access after that."
+      footer={(
+        <RouterLink to="/auth/sign-in" className="rinklink-auth-footer-link inline-flex items-center gap-1.5">
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Back to sign in</span>
+        </RouterLink>
+      )}
+    >
+      <div className="rinklink-auth-form">
+        <div className="rinklink-auth-field">
+          <label className="rinklink-auth-label" htmlFor="sign-up-name">Full name</label>
+          <Input
+            id="sign-up-name"
+            className="rinklink-auth-input"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            autoComplete="name"
+            placeholder="Your name"
+          />
+        </div>
+
+        <div className="rinklink-auth-field">
+          <label className="rinklink-auth-label" htmlFor="sign-up-email">Email</label>
+          <Input
+            id="sign-up-email"
+            className="rinklink-auth-input"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            autoComplete="email"
+            placeholder="you@example.com"
+            type="email"
+          />
+        </div>
+
+        <PasswordField
+          id="sign-up-password"
+          label="Password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+          placeholder="At least 8 characters"
+        />
+
+        <PasswordField
+          id="sign-up-confirm-password"
+          label="Confirm password"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          autoComplete="new-password"
+          placeholder="Repeat your password"
+        />
+
+        <Button type="button" className="rinklink-auth-primary-button" onClick={() => void signUp()} disabled={busy}>
+          {busy ? 'Creating account…' : 'Create account'}
+        </Button>
+      </div>
+    </AuthCard>
+  );
+}
+
 export default function AuthPage() {
   const { pathname = 'sign-in' } = useParams();
   const isSignUp = pathname === 'sign-up';
+  const isCheckEmail = pathname === 'check-email';
   const isForgotPassword = pathname === 'forgot-password';
   const isResetPassword = pathname === 'reset-password';
 
@@ -25,66 +322,74 @@ export default function AuthPage() {
   }
 
   const pageMeta = pathname === 'sign-up'
-      ? {
+    ? {
         mastheadTitle: 'Join the teams, families, and arenas already running on RinkLink.',
-        mastheadSubtitle: 'Create your account to manage schedules, availability, invites, and team operations in one place.',
+        mastheadSubtitle: 'Create your account, verify your email, then review invites or request the exact access you need.',
         cardEyebrow: 'Create account',
         cardTitle: 'Create your RinkLink account',
         cardDescription: null,
       }
-    : pathname === 'forgot-password'
+    : pathname === 'check-email'
       ? {
-          mastheadTitle: 'Reset your password.',
-          mastheadSubtitle: 'Use the email on your RinkLink account and we will send you a secure reset link.',
-          cardEyebrow: 'Reset password',
-          cardTitle: 'Recover your account',
-          cardDescription: 'Enter your email and we will send the next step.',
+          mastheadTitle: 'Check your inbox.',
+          mastheadSubtitle: 'Verification completes the identity step, then RinkLink routes you into pending onboarding or your granted workspace.',
+          cardEyebrow: 'Check your email',
+          cardTitle: 'Finish verifying your email',
+          cardDescription: null,
         }
-      : pathname === 'reset-password'
+      : pathname === 'forgot-password'
         ? {
-            mastheadTitle: 'Set a new password.',
-            mastheadSubtitle: 'Choose a new password for your RinkLink login and return to the app.',
-            cardEyebrow: 'Choose a new password',
-            cardTitle: 'Set your new password',
-            cardDescription: 'Use a secure password you can rely on for daily access.',
+            mastheadTitle: 'Reset your password.',
+            mastheadSubtitle: 'Use the email on your RinkLink account and we will send you a secure reset link.',
+            cardEyebrow: 'Reset password',
+            cardTitle: 'Recover your account',
+            cardDescription: 'Enter your email and we will send the next step.',
           }
-        : pathname === 'sign-out'
+        : pathname === 'reset-password'
           ? {
-              mastheadTitle: 'Sign out of RinkLink.',
-              mastheadSubtitle: 'End this session safely.',
-              cardEyebrow: 'Sign out',
-              cardTitle: 'Confirm sign out',
-              cardDescription: 'You can sign back in whenever you need to.',
+              mastheadTitle: 'Set a new password.',
+              mastheadSubtitle: 'Choose a new password for your RinkLink login and return to the app.',
+              cardEyebrow: 'Choose a new password',
+              cardTitle: 'Set your new password',
+              cardDescription: 'Use a secure password you can rely on for daily access.',
             }
-          : pathname === 'callback'
+          : pathname === 'sign-out'
             ? {
-                mastheadTitle: 'RinkLink is getting your session ready.',
-                mastheadSubtitle: 'Completing your authentication flow now.',
-                cardEyebrow: 'Signing you in',
-                cardTitle: 'Finishing sign-in',
-                cardDescription: 'This should only take a moment.',
+                mastheadTitle: 'Sign out of RinkLink.',
+                mastheadSubtitle: 'End this session safely.',
+                cardEyebrow: 'Sign out',
+                cardTitle: 'Confirm sign out',
+                cardDescription: 'You can sign back in whenever you need to.',
               }
-            : {
-                mastheadTitle: 'Welcome back to RinkLink.',
-                mastheadSubtitle: 'Sign in to get back to today’s schedule, availability updates, booking work, and access requests.',
-                cardEyebrow: 'Welcome back',
-                cardTitle: 'Sign in to RinkLink',
-                cardDescription: 'Pick up where your team left off.',
-              };
+            : pathname === 'callback'
+              ? {
+                  mastheadTitle: 'RinkLink is getting your session ready.',
+                  mastheadSubtitle: 'Completing your authentication flow now.',
+                  cardEyebrow: 'Signing you in',
+                  cardTitle: 'Finishing sign-in',
+                  cardDescription: 'This should only take a moment.',
+                }
+              : {
+                  mastheadTitle: 'Welcome back to RinkLink.',
+                  mastheadSubtitle: 'Sign in to get back to today’s schedule, availability updates, booking work, and access requests.',
+                  cardEyebrow: 'Welcome back',
+                  cardTitle: 'Sign in to RinkLink',
+                  cardDescription: 'Pick up where your team left off.',
+                };
 
-  const featureItems = isSignUp
+  const featureItems = isSignUp || isCheckEmail
     ? [
         {
-          title: 'Team schedules',
-          copy: 'Games, practices, confirmations, and venue details stay aligned.',
+          title: 'Scoped access',
+          copy: 'Identity comes first. Resource rights are still granted by the right admin for the right team, arena, or family link.',
         },
         {
-          title: 'Family coordination',
-          copy: 'Parents, players, and staff work from the same account system.',
+          title: 'Invite ready',
+          copy: 'Invite links can take a brand-new user through signup, email verification, and exact grant acceptance.',
         },
         {
-          title: 'Arena operations',
-          copy: 'Availability, bookings, and logistics live alongside team workflow.',
+          title: 'Pending browse',
+          copy: 'Verified users can still browse published teams, schedules, and standings while waiting on approval.',
         },
       ]
     : isForgotPassword || isResetPassword
@@ -196,37 +501,41 @@ export default function AuthPage() {
         </section>
 
         <section className={cn('rinklink-auth-panel max-w-xl', isSignUp && 'max-w-2xl')}>
-          {isForgotPassword
-            ? recoveryCard(
-                <ForgotPasswordForm
-                  classNames={authViewClassNames.form}
-                  localization={{}}
-                />,
-              )
-            : isResetPassword
-              ? recoveryCard(
-                  <ResetPasswordForm
-                    classNames={authViewClassNames.form}
-                    localization={{}}
-                  />,
-                )
-              : (
-                <AuthView
-                  pathname={pathname}
-                  classNames={authViewClassNames}
-                  cardHeader={(
-                    <div className={cn('space-y-2', isSignUp && 'rinklink-auth-card-header--signup')}>
-                      <div className="rinklink-auth-card-eyebrow">{pageMeta.cardEyebrow}</div>
-                      <div className={cn('rinklink-auth-card-title', isSignUp && 'rinklink-auth-card-title--signup')}>
-                        {pageMeta.cardTitle}
-                      </div>
-                      {pageMeta.cardDescription ? (
-                        <div className="rinklink-auth-card-copy">{pageMeta.cardDescription}</div>
-                      ) : null}
-                    </div>
+          {isSignUp
+            ? <SignUpCard />
+            : isCheckEmail
+              ? <CheckEmailCard />
+              : isForgotPassword
+                ? recoveryCard(
+                    <ForgotPasswordForm
+                      classNames={authViewClassNames.form}
+                      localization={{}}
+                    />,
+                  )
+                : isResetPassword
+                  ? recoveryCard(
+                      <ResetPasswordForm
+                        classNames={authViewClassNames.form}
+                        localization={{}}
+                      />,
+                    )
+                  : (
+                    <AuthView
+                      pathname={pathname}
+                      classNames={authViewClassNames}
+                      cardHeader={(
+                        <div className={cn('space-y-2', isSignUp && 'rinklink-auth-card-header--signup')}>
+                          <div className="rinklink-auth-card-eyebrow">{pageMeta.cardEyebrow}</div>
+                          <div className={cn('rinklink-auth-card-title', isSignUp && 'rinklink-auth-card-title--signup')}>
+                            {pageMeta.cardTitle}
+                          </div>
+                          {pageMeta.cardDescription ? (
+                            <div className="rinklink-auth-card-copy">{pageMeta.cardDescription}</div>
+                          ) : null}
+                        </div>
+                      )}
+                    />
                   )}
-                />
-              )}
         </section>
       </div>
     </main>

@@ -4,6 +4,8 @@ import { betterAuth } from "better-auth";
 import { jwt } from "better-auth/plugins";
 import { Pool } from "pg";
 
+import { sendResetPasswordEmail, sendVerificationEmail } from "./email.js";
+
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
@@ -88,8 +90,7 @@ export const auth = betterAuth({
     minPasswordLength: 8,
     maxPasswordLength: 128,
     sendResetPassword: async ({ user, url }) => {
-      // TODO: Replace with production email provider (SendGrid, SES, etc.)
-      console.info(`[auth-service] Reset password requested for ${user.email}: ${url}`);
+      await sendResetPasswordEmail(user.email, url);
     },
   },
   emailVerification: {
@@ -97,8 +98,7 @@ export const auth = betterAuth({
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
-      // TODO: Replace with production email provider (SendGrid, SES, etc.)
-      console.info(`[auth-service] Verify email for ${user.email}: ${url}`);
+      await sendVerificationEmail(user.email, url);
     },
   },
   socialProviders: socialProviderConfig(),

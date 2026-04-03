@@ -7,9 +7,9 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth.context import build_authorization_context
-from app.models import AccessRequest, AppUser, Arena, Association, Invite, Player, PlayerGuardianship, Season, Team, TeamMembership
-from app.routers.access import accept_invite, create_access_request, list_access_targets
-from app.schemas import AccessRequestCreate
+from app.models import AccessRequest, AppUser, Arena, Association, AssociationMembership, Invite, Player, PlayerGuardianship, Season, Team, TeamMembership
+from app.routers.access import accept_invite, create_access_request, create_invite, list_access_targets
+from app.schemas import AccessRequestCreate, InviteCreate
 
 
 def make_association(db: Session, name: str) -> Association:
@@ -228,3 +228,51 @@ def test_accept_guardian_invite_creates_player_guardianship(db: Session) -> None
         PlayerGuardianship.player_id == player.id,
     ).one()
     assert guardianship.relationship_type == "guardian"
+
+
+def test_team_manager_cannot_create_team_staff_invite(db: Session) -> None:
+    association = make_association(db, "Manager Scope Association")
+    team = make_team(db, association, "Manager Scope Team")
+    manager = make_user(db, "manager-scope@example.com", status="active")
+    db.add(TeamMembership(user_id=manager.id, team_id=team.id, role="manager"))
+    db.commit()
+
+    context = build_authorization_context(db, manager)
+
+    with pytest.raises(HTTPException) as exc_info:
+        create_invite(
+            payload=InviteCreate(
+                email="coach@example.com",
+                target_type="team",
+                target_id=team.id,
+                role="coach",
+            ),
+            context=context,
+            db=db,
+        )
+
+    assert exc_info.value.status_code == 403
+
+
+def test_association_admin_cannot_create_arena_invite_outside_scope(db: Session) -> None:
+    association = make_association(db, "Assoc Scope")
+    arena = make_arena(db, "Arena Scope")
+    association_admin = make_user(db, "assoc-scope@example.com", status="active")
+    db.add(AssociationMembership(user_id=association_admin.id, association_id=association.id, role="association_admin"))
+    db.commit()
+
+    context = build_authorization_context(db, association_admin)
+
+    with pytest.raises(HTTPException) as exc_info:
+        create_invite(
+            payload=InviteCreate(
+                email="arena@example.com",
+                target_type="arena",
+                target_id=arena.id,
+                role="arena_ops",
+            ),
+            context=context,
+            db=db,
+        )
+
+    assert exc_info.value.status_code == 403

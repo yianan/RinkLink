@@ -160,19 +160,19 @@ html.dark {
     flex-direction: column;
     width: 100%;
     max-width: 72rem;
-    gap: 1.75rem;
-    padding: 1.5rem 1rem 2.5rem;
+    gap: 1.5rem;
+    padding: 1.25rem 1rem 2rem;
   }
 
   .rinklink-auth-hero {
     display: grid;
-    gap: 1.25rem;
+    gap: 1rem;
     border-radius: 1.75rem;
     border: 1px solid var(--app-border-subtle);
     background:
       linear-gradient(135deg, color-mix(in srgb, var(--app-accent-link) 4%, white), rgba(255, 255, 255, 0.9)),
       var(--app-surface);
-    padding: 1.5rem;
+    padding: 1.25rem;
     box-shadow: var(--shadow-soft);
   }
 
@@ -185,7 +185,7 @@ html.dark {
   .rinklink-auth-hero-title {
     max-width: 14ch;
     font-family: var(--font-display);
-    font-size: clamp(2rem, 4vw, 3.3rem);
+    font-size: clamp(1.85rem, 3.5vw, 2.9rem);
     line-height: 0.98;
     font-weight: 800;
     letter-spacing: -0.05em;
@@ -194,8 +194,8 @@ html.dark {
 
   .rinklink-auth-hero-subtitle {
     max-width: 56rem;
-    font-size: 1rem;
-    line-height: 1.65;
+    font-size: 0.95rem;
+    line-height: 1.55;
     color: var(--color-slate-600);
   }
 
@@ -203,19 +203,19 @@ html.dark {
     border-radius: 1.1rem;
     border: 1px solid rgba(148, 163, 184, 0.18);
     background: rgba(255, 255, 255, 0.72);
-    padding: 1rem 1rem 1.05rem;
+    padding: 0.85rem 0.9rem 0.95rem;
   }
 
   .rinklink-auth-feature-title {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 700;
     color: var(--color-slate-900);
   }
 
   .rinklink-auth-feature-copy {
-    margin-top: 0.35rem;
-    font-size: 0.875rem;
-    line-height: 1.55;
+    margin-top: 0.25rem;
+    font-size: 0.825rem;
+    line-height: 1.45;
     color: var(--color-slate-600);
   }
 
@@ -248,30 +248,30 @@ html.dark {
   }
 
   .rinklink-auth-page [data-slot="card-header"] {
-    padding: 1.5rem 1.5rem 0.25rem !important;
-    gap: 0.35rem !important;
+    padding: 1.25rem 1.25rem 0.2rem !important;
+    gap: 0.25rem !important;
   }
 
   .rinklink-auth-page [data-slot="card-title"] {
     font-family: var(--font-display) !important;
-    font-size: 1.5rem !important;
+    font-size: 1.35rem !important;
     line-height: 1.15 !important;
     letter-spacing: -0.025em !important;
     color: var(--color-slate-950) !important;
   }
 
   .rinklink-auth-page [data-slot="card-description"] {
-    font-size: 0.95rem !important;
-    line-height: 1.55 !important;
+    font-size: 0.9rem !important;
+    line-height: 1.45 !important;
     color: var(--color-slate-600) !important;
   }
 
   .rinklink-auth-page [data-slot="card-content"] {
-    padding: 0.75rem 1.5rem 1rem !important;
+    padding: 0.65rem 1.25rem 0.9rem !important;
   }
 
   .rinklink-auth-page [data-slot="card-footer"] {
-    padding: 0 1.5rem 1.5rem !important;
+    padding: 0 1.25rem 1.25rem !important;
     background: transparent !important;
     border-top: 0 !important;
     color: var(--color-slate-500) !important;
@@ -290,7 +290,7 @@ html.dark {
   .rinklink-auth-page [data-slot="input"],
   .rinklink-auth-page [data-slot="textarea"],
   .rinklink-auth-page [data-slot="select-trigger"] {
-    min-height: 2.75rem !important;
+    min-height: 2.625rem !important;
     border-radius: 0.875rem !important;
     border-color: var(--app-border-subtle) !important;
     background: var(--app-surface-strong) !important;
@@ -306,7 +306,7 @@ html.dark {
 
   .rinklink-auth-page [data-slot="button"] {
     border-radius: 0.875rem !important;
-    min-height: 2.5rem !important;
+    min-height: 2.375rem !important;
     font-weight: 600 !important;
     box-shadow: none !important;
     transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease !important;
@@ -327,15 +327,20 @@ html.dark {
     background: transparent !important;
     background-color: transparent !important;
     color: var(--color-slate-500) !important;
-    border-radius: 0 !important;
+    border: 0 !important;
+    border-radius: 0.5rem !important;
+    min-height: auto !important;
+    padding: 0.25rem !important;
+    box-shadow: none !important;
+    transition: color 160ms ease !important;
   }
 
   .rinklink-auth-page .relative > [data-slot="button"].absolute:hover,
   .rinklink-auth-page .relative > [data-slot="button"].absolute:focus-visible {
     background: transparent !important;
     background-color: transparent !important;
-    color: var(--color-slate-500) !important;
-    box-shadow: none !important;
+    color: var(--app-accent-link-hover) !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18) !important;
   }
 
   .rinklink-auth-page [data-slot="separator"],
@@ -468,6 +473,26 @@ html.dark {
     color: var(--app-accent-link-hover) !important;
   }
 
+  .rinklink-settings-page .relative > [data-slot="button"].absolute {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: var(--color-slate-500) !important;
+    border: 0 !important;
+    border-radius: 0.5rem !important;
+    min-height: auto !important;
+    padding: 0.25rem !important;
+    box-shadow: none !important;
+    transition: color 160ms ease !important;
+  }
+
+  .rinklink-settings-page .relative > [data-slot="button"].absolute:hover,
+  .rinklink-settings-page .relative > [data-slot="button"].absolute:focus-visible {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: var(--app-accent-link-hover) !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18) !important;
+  }
+
   .rinklink-settings-page [data-slot="separator"],
   .rinklink-settings-page [data-slot="field-separator"] {
     background: rgba(148, 163, 184, 0.18) !important;
@@ -519,30 +544,30 @@ html.dark {
   }
 
   .rinklink-auth-header {
-    padding: 1.5rem 1.5rem 0.5rem;
+    padding: 1.25rem 1.25rem 0.4rem;
   }
 
   .rinklink-auth-title {
     font-family: var(--font-display);
-    font-size: 1.5rem;
+    font-size: 1.35rem;
     line-height: 1.15;
     letter-spacing: -0.025em;
     color: var(--color-slate-950);
   }
 
   .rinklink-auth-description {
-    margin-top: 0.35rem;
-    font-size: 0.95rem;
+    margin-top: 0.25rem;
+    font-size: 0.9rem;
     color: var(--color-slate-600);
-    line-height: 1.55;
+    line-height: 1.45;
   }
 
   .rinklink-auth-content {
-    padding: 0.875rem 1.5rem 1.5rem;
+    padding: 0.7rem 1.25rem 1.1rem;
   }
 
   .rinklink-auth-footer {
-    padding: 0 1.5rem 1.5rem;
+    padding: 0 1.25rem 1.25rem;
     color: var(--color-slate-500);
   }
 
@@ -619,7 +644,16 @@ html.dark {
   }
 
   .rinklink-auth-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.875rem;
+    align-items: start;
+  }
+
+  .rinklink-auth-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
   }
 
   .rinklink-auth-label {
@@ -631,7 +665,8 @@ html.dark {
   }
 
   .rinklink-auth-input {
-    min-height: 2.75rem !important;
+    width: 100%;
+    min-height: 2.625rem !important;
     border-radius: 0.875rem !important;
     border-color: var(--app-border-subtle) !important;
     background: var(--app-surface-strong) !important;
@@ -650,14 +685,54 @@ html.dark {
     box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18) !important;
   }
 
+  .rinklink-auth-password-field {
+    position: relative;
+  }
+
+  .rinklink-auth-input--password {
+    padding-right: 5.75rem !important;
+  }
+
+  .rinklink-auth-password-toggle {
+    position: absolute;
+    right: 0.625rem;
+    top: 50%;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transform: translateY(-50%);
+    border: 0;
+    background: transparent;
+    padding: 0.25rem;
+    color: var(--color-slate-500);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 160ms ease;
+  }
+
+  .rinklink-auth-password-toggle:hover {
+    color: var(--app-accent-link-hover);
+  }
+
+  .rinklink-auth-password-toggle:focus-visible {
+    outline: none;
+    border-radius: 0.5rem;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+    color: var(--app-accent-link-hover);
+  }
+
   .rinklink-auth-button {
     border-radius: 0.875rem !important;
-    min-height: 2.5rem !important;
+    min-height: 2.375rem !important;
     font-weight: 600 !important;
     box-shadow: none !important;
   }
 
   .rinklink-auth-primary-button {
+    width: 100%;
+    justify-content: center;
     background: linear-gradient(90deg, rgb(8 145 178), rgb(2 132 199), rgb(109 40 217)) !important;
     border: 0 !important;
     color: white !important;
@@ -1170,12 +1245,27 @@ html.dark {
   }
 
   html.dark .rinklink-auth-page .relative > [data-slot="button"].absolute,
+  html.dark .rinklink-settings-page .relative > [data-slot="button"].absolute,
   html.dark .rinklink-auth-page .relative > [data-slot="button"].absolute:hover,
-  html.dark .rinklink-auth-page .relative > [data-slot="button"].absolute:focus-visible {
+  html.dark .rinklink-settings-page .relative > [data-slot="button"].absolute:hover,
+  html.dark .rinklink-auth-page .relative > [data-slot="button"].absolute:focus-visible,
+  html.dark .rinklink-settings-page .relative > [data-slot="button"].absolute:focus-visible {
     background: transparent !important;
     background-color: transparent !important;
     color: var(--color-slate-400) !important;
-    box-shadow: none !important;
+  }
+
+  html.dark .rinklink-auth-page .relative > [data-slot="button"].absolute:hover,
+  html.dark .rinklink-settings-page .relative > [data-slot="button"].absolute:hover,
+  html.dark .rinklink-auth-page .relative > [data-slot="button"].absolute:focus-visible,
+  html.dark .rinklink-settings-page .relative > [data-slot="button"].absolute:focus-visible,
+  html.dark .rinklink-auth-password-toggle:hover,
+  html.dark .rinklink-auth-password-toggle:focus-visible {
+    color: rgba(103, 232, 249, 1) !important;
+  }
+
+  html.dark .rinklink-auth-password-toggle {
+    color: var(--color-slate-400);
   }
 
   html.dark .rinklink-auth-footer-link,
@@ -1320,15 +1410,16 @@ html.dark {
 
     .rinklink-auth-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(26rem, 34rem);
-      align-items: start;
-      gap: 2rem;
-      padding: 2rem 1rem 2.75rem;
+      grid-template-columns: minmax(0, 1.1fr) minmax(24rem, 31rem);
+      align-items: stretch;
+      gap: 1.5rem;
+      padding: 1.25rem 1rem 1.75rem;
     }
 
     .rinklink-auth-hero {
+      min-height: 100%;
       position: sticky;
-      top: 2rem;
+      top: 1.25rem;
     }
 
     .rinklink-auth-account-base {
