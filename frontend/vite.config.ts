@@ -14,11 +14,18 @@ export default defineConfig({
           if (id.includes('node_modules/react/') || id.includes('node_modules/scheduler/')) {
             return 'react'
           }
-          if (id.includes('node_modules/@radix-ui/')) {
-            return 'radix'
-          }
           if (id.includes('node_modules/lucide-react')) {
             return 'icons'
+          }
+          if (
+            id.includes('node_modules/@daveyplate/') ||
+            id.includes('node_modules/better-auth') ||
+            id.includes('node_modules/react-hook-form') ||
+            id.includes('node_modules/@hookform/') ||
+            id.includes('node_modules/zod') ||
+            id.includes('node_modules/sonner')
+          ) {
+            return 'auth'
           }
           if (id.includes('node_modules')) {
             return 'vendor'

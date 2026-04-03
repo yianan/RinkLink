@@ -131,6 +131,7 @@ function CheckEmailCard() {
 
 function PasswordField({
   autoComplete,
+  disabled,
   id,
   label,
   onChange,
@@ -138,6 +139,7 @@ function PasswordField({
   value,
 }: {
   autoComplete: string;
+  disabled?: boolean;
   id: string;
   label: string;
   onChange: (value: string) => void;
@@ -156,6 +158,7 @@ function PasswordField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           autoComplete={autoComplete}
+          disabled={disabled}
           placeholder={placeholder}
           type={visible ? 'text' : 'password'}
         />
@@ -165,12 +168,127 @@ function PasswordField({
           onClick={() => setVisible((current) => !current)}
           aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
           aria-pressed={visible}
+          disabled={disabled}
         >
           {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           <span>{visible ? 'Hide' : 'Show'}</span>
         </button>
       </div>
     </div>
+  );
+}
+
+function SignInCard() {
+  const navigate = useNavigate();
+  const pushToast = useToast();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const signIn = async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedEmail || !password) {
+      pushToast({
+        title: 'Complete all fields',
+        description: 'Email and password are required.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const response = await (authClient.signIn.email as unknown as (body: Record<string, unknown>) => Promise<Record<string, unknown>>)({
+        email: trimmedEmail,
+        password,
+        callbackURL: buildAuthCallbackUrl('/'),
+        fetchOptions: { throw: true },
+      });
+
+      if (response && 'twoFactorRedirect' in response && typeof response.twoFactorRedirect === 'string' && response.twoFactorRedirect) {
+        window.location.assign(response.twoFactorRedirect);
+        return;
+      }
+
+      window.location.assign(buildAuthCallbackUrl('/'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const errorCode = typeof error === 'object' && error !== null && 'error' in error
+        ? (error as { error?: { code?: string } }).error?.code
+        : undefined;
+
+      if (errorCode === 'EMAIL_NOT_VERIFIED') {
+        pushToast({
+          title: 'Verify your email first',
+          description: trimmedEmail,
+          variant: 'warning',
+        });
+        navigate(`/auth/check-email?email=${encodeURIComponent(trimmedEmail)}`);
+        return;
+      }
+
+      setPassword('');
+      pushToast({
+        title: 'Unable to sign in',
+        description: message,
+        variant: 'error',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AuthCard
+      eyebrow="Welcome back"
+      title="Sign in to RinkLink"
+      description="Pick up where your team left off."
+      footer={(
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-slate-500 dark:text-slate-400">Need an account?</span>
+          <RouterLink to="/auth/sign-up" className="rinklink-auth-footer-link">
+            Create account
+          </RouterLink>
+        </div>
+      )}
+    >
+      <div className="rinklink-auth-form">
+        <div className="rinklink-auth-field">
+          <label className="rinklink-auth-label" htmlFor="sign-in-email">Email</label>
+          <Input
+            id="sign-in-email"
+            className="rinklink-auth-input"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            autoComplete="email"
+            placeholder="you@example.com"
+            type="email"
+            disabled={busy}
+          />
+        </div>
+
+        <PasswordField
+          id="sign-in-password"
+          label="Password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="current-password"
+          placeholder="Your password"
+          disabled={busy}
+        />
+
+        <div className="flex items-center justify-end">
+          <RouterLink to="/auth/forgot-password" className="rinklink-auth-forgot-link text-sm">
+            Forgot password?
+          </RouterLink>
+        </div>
+
+        <Button type="button" className="rinklink-auth-primary-button" onClick={() => void signIn()} disabled={busy}>
+          {busy ? 'Signing in…' : 'Sign in'}
+        </Button>
+      </div>
+    </AuthCard>
   );
 }
 
@@ -291,6 +409,7 @@ function SignUpCard() {
           onChange={setPassword}
           autoComplete="new-password"
           placeholder="At least 8 characters"
+          disabled={busy}
         />
 
         <PasswordField
@@ -300,6 +419,7 @@ function SignUpCard() {
           onChange={setConfirmPassword}
           autoComplete="new-password"
           placeholder="Repeat your password"
+          disabled={busy}
         />
 
         <Button type="button" className="rinklink-auth-primary-button" onClick={() => void signUp()} disabled={busy}>
@@ -505,6 +625,8 @@ export default function AuthPage() {
             ? <SignUpCard />
             : isCheckEmail
               ? <CheckEmailCard />
+              : pathname === 'sign-in'
+                ? <SignInCard />
               : isForgotPassword
                 ? recoveryCard(
                     <ForgotPasswordForm
