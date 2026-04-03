@@ -28,6 +28,7 @@ import PageHeader from '../components/PageHeader';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
 import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
 import { formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time';
+import { mapsQueryUrl } from '../lib/maps';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { accentSelectorPillActiveClass, chromeIconButtonClass, destructiveIconButtonClass, selectorPillClass, selectorPillIdleClass, tableActionButtonClass } from '../lib/uiClasses';
@@ -60,13 +61,6 @@ function formatDateLabel(d: string) {
 
 function formatLocalDateISO(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function mapsQueryUrl(query: string) {
-  const url = new URL('https://www.google.com/maps/search/');
-  url.searchParams.set('api', '1');
-  url.searchParams.set('query', query);
-  return url.toString();
 }
 
 function blockNonIntegerNumberKeys(event: React.KeyboardEvent<HTMLInputElement>) {
