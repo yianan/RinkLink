@@ -18,7 +18,6 @@ import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
 import EmptyState from '../components/EmptyState';
 import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
-import TeamLogo from '../components/TeamLogo';
 import { Select } from '../components/ui/Select';
 import {
   addDays,
@@ -353,12 +352,19 @@ export default function AvailabilityPage() {
         title="Availability"
         subtitle="Manage open home and away windows for matchup planning."
         actions={(
-          <>
+          <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-            <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((current) => !current)} />
+            <FilterPanelTrigger
+              count={activeFilterBadges.length}
+              open={filtersOpen}
+              onClick={() => setFiltersOpen((current) => !current)}
+              label={<><span className="sm:hidden">Filter</span><span className="hidden sm:inline">Filters</span></>}
+              openLabel={<><span className="sm:hidden">Hide</span><span className="hidden sm:inline">Hide Filters</span></>}
+              className="px-2.5 sm:px-3"
+            />
             <Button type="button" onClick={() => {
               setEditingWindowId(null);
               setForm({ date: '', start_time: '', end_time: '', availability_type: 'home', notes: '' });
@@ -366,9 +372,10 @@ export default function AvailabilityPage() {
             }}
             >
               <CalendarPlus2 className="h-4 w-4" />
-              Add Availability
+              <span className="sm:hidden">Add</span>
+              <span className="hidden sm:inline">Add Availability</span>
             </Button>
-          </>
+          </div>
         )}
       />
       <FilterPanel
@@ -396,10 +403,42 @@ export default function AvailabilityPage() {
 
       <SegmentedTabs
         items={[
-          { label: 'Upcoming Dates', value: 'upcoming' as const },
-          { label: 'Past Dates', value: 'past' as const },
-          { label: 'Season Calendar', value: 'calendar' as const },
-          { label: 'Upload CSV', value: 'upload' as const },
+          {
+            label: (
+              <>
+                <span className="sm:hidden">Upcoming</span>
+                <span className="hidden sm:inline">Upcoming Dates</span>
+              </>
+            ),
+            value: 'upcoming' as const,
+          },
+          {
+            label: (
+              <>
+                <span className="sm:hidden">Past</span>
+                <span className="hidden sm:inline">Past Dates</span>
+              </>
+            ),
+            value: 'past' as const,
+          },
+          {
+            label: (
+              <>
+                <span className="sm:hidden">Calendar</span>
+                <span className="hidden sm:inline">Season Calendar</span>
+              </>
+            ),
+            value: 'calendar' as const,
+          },
+          {
+            label: (
+              <>
+                <span className="sm:hidden">Upload</span>
+                <span className="hidden sm:inline">Upload CSV</span>
+              </>
+            ),
+            value: 'upload' as const,
+          },
         ]}
         value={tab}
         onChange={handleTabChange}
@@ -431,18 +470,18 @@ export default function AvailabilityPage() {
                       {window.status === 'open' || window.blocked ? (
                         <>
                           {!window.blocked ? (
-                            <Button type="button" size="sm" onClick={() => navigate(`/search?availability=${window.id}&from=availability&tab=${tab}&month=${monthKeyForDate(window.date)}&date=${window.date}`)} className="justify-center">
+                            <Button type="button" size="sm" onClick={() => navigate(`/search?availability=${window.id}&from=availability&tab=${tab}&month=${monthKeyForDate(window.date)}&date=${window.date}`)} className="w-full justify-center">
                               <Search className="h-3.5 w-3.5" />
                               Find Opponents
                             </Button>
                           ) : null}
                           {!window.event_id ? (
-                            <Button type="button" size="sm" variant="outline" onClick={() => openEditAvailability(window)} className="justify-center">
+                            <Button type="button" size="sm" variant="outline" onClick={() => openEditAvailability(window)} className="w-full justify-center">
                               <Pencil className="h-3.5 w-3.5" />
                               Edit
                             </Button>
                           ) : null}
-                          <Button type="button" size="sm" variant="outline" onClick={() => toggleBlocked(window)} className="justify-center">
+                          <Button type="button" size="sm" variant="outline" onClick={() => toggleBlocked(window)} className="w-full justify-center">
                             <Ban className="h-3.5 w-3.5" />
                             {window.blocked ? 'Unblock' : 'Block'}
                           </Button>
@@ -459,18 +498,16 @@ export default function AvailabilityPage() {
                               backLabel: 'Back to Availability',
                             },
                           })}
-                          className="justify-center"
+                          className="w-full justify-center"
                         >
                           <Eye className="h-3.5 w-3.5" />
                           Open Event
                         </Button>
                       ) : null}
-                      <div className="col-span-2 flex justify-center">
-                        <Button type="button" size="sm" variant="destructive" onClick={() => removeAvailability(window.id)} className="w-full max-w-[10.75rem] justify-center">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Delete
-                        </Button>
-                      </div>
+                      <Button type="button" size="sm" variant="destructive" onClick={() => removeAvailability(window.id)} className="w-full justify-center">
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </Button>
                     </div>
                   </div>
                 </div>

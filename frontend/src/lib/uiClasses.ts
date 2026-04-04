@@ -35,10 +35,10 @@ export const chromeIconButtonClass =
   `h-9 w-9 bg-slate-900/5 text-slate-700 ring-1 ring-slate-200/70 transition-colors hover:bg-[color:color-mix(in_srgb,var(--app-accent-link)_8%,white)] hover:text-[color:var(--app-accent-link-hover)] dark:bg-white/10 dark:text-white dark:ring-white/15 dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-link)_18%,transparent)] dark:hover:text-[color:var(--app-accent-link)] ${focusRingClass}`;
 
 export const segmentedControlClass =
-  'inline-flex flex-wrap rounded-xl border border-[color:var(--app-border-subtle)] bg-[var(--app-surface)] p-1 shadow-sm backdrop-blur-[1px]';
+  'flex max-w-full flex-nowrap overflow-x-auto rounded-xl border border-[color:var(--app-border-subtle)] bg-[var(--app-surface)] p-1 shadow-sm backdrop-blur-[1px]';
 
 export const segmentedControlItemClass =
-  `rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 transition-all hover:text-[color:var(--app-accent-link-hover)] data-[state=on]:bg-[var(--app-surface-strong)] data-[state=on]:text-[color:var(--app-accent-link-hover)] data-[state=on]:shadow-sm data-[state=on]:ring-1 data-[state=on]:ring-[color:var(--app-border-subtle)] dark:text-slate-400 dark:hover:text-[color:var(--app-accent-link)] dark:data-[state=on]:text-[color:var(--app-accent-link)] ${focusRingClass}`;
+  `shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 transition-all hover:text-[color:var(--app-accent-link-hover)] data-[state=on]:bg-[var(--app-surface-strong)] data-[state=on]:text-[color:var(--app-accent-link-hover)] data-[state=on]:shadow-sm data-[state=on]:ring-1 data-[state=on]:ring-[color:var(--app-border-subtle)] dark:text-slate-400 dark:hover:text-[color:var(--app-accent-link)] dark:data-[state=on]:text-[color:var(--app-accent-link)] ${focusRingClass}`;
 
 export const listRowButtonClass =
   `group w-full rounded-xl text-left transition hover:bg-slate-50/70 dark:hover:bg-slate-900/40 ${focusRingClass}`;
