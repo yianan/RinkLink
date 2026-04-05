@@ -4,78 +4,6 @@ import { api } from '../api/client';
 import type { MeResponse } from '../types';
 import { authClient, authEnabled, clearApiAccessToken } from '../lib/auth-client';
 
-const PROFILE_CACHE_KEY = 'rinklink.authProfile';
-const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
-
-type SessionLike = {
-  user?: {
-    id?: string;
-    email?: string;
-  };
-} | null;
-
-type CachedProfile = {
-  authId: string | null;
-  email: string | null;
-  savedAt: number;
-  me: MeResponse;
-};
-
-function readCachedProfile(session: SessionLike): MeResponse | null {
-  if (typeof window === 'undefined' || !session?.user) {
-    return null;
-  }
-
-  try {
-    const raw = window.sessionStorage.getItem(PROFILE_CACHE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as CachedProfile;
-    if (!parsed?.me || typeof parsed.savedAt !== 'number') {
-      return null;
-    }
-    if (Date.now() - parsed.savedAt > PROFILE_CACHE_TTL_MS) {
-      window.sessionStorage.removeItem(PROFILE_CACHE_KEY);
-      return null;
-    }
-
-    const sessionUserId = session.user.id ?? null;
-    const sessionEmail = session.user.email?.toLowerCase() ?? null;
-    if (parsed.authId && sessionUserId && parsed.authId !== sessionUserId) {
-      return null;
-    }
-    if (parsed.email && sessionEmail && parsed.email !== sessionEmail) {
-      return null;
-    }
-    return parsed.me;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedProfile(me: MeResponse) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  const payload: CachedProfile = {
-    authId: me.user.auth_id,
-    email: me.user.email.toLowerCase(),
-    savedAt: Date.now(),
-    me,
-  };
-  window.sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(payload));
-}
-
-function clearCachedProfile() {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  window.sessionStorage.removeItem(PROFILE_CACHE_KEY);
-}
-
 interface AuthContextValue {
   authEnabled: boolean;
   loading: boolean;
@@ -120,7 +48,6 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!session) {
       clearApiAccessToken();
-      clearCachedProfile();
       setMe(null);
       setProfileError(null);
       return;
@@ -133,12 +60,9 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
       const data = await api.getMe();
       setMe(data);
       setProfileError(null);
-      writeCachedProfile(data);
     } catch (error) {
+      setMe(null);
       setProfileError(String(error));
-      if (!silent) {
-        setMe(null);
-      }
     } finally {
       if (!silent) {
         setProfileLoading(false);
@@ -147,19 +71,6 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (!session) {
-      void loadProfile();
-      return;
-    }
-
-    const cachedProfile = readCachedProfile(session as SessionLike);
-    if (cachedProfile) {
-      setMe(cachedProfile);
-      setProfileError(null);
-      void loadProfile({ silent: true });
-      return;
-    }
-
     void loadProfile();
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -167,7 +78,7 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         authEnabled: true,
-        loading: isPending || (profileLoading && !me),
+        loading: isPending || profileLoading,
         isAuthenticated: !!session,
         me,
         error: profileError ?? sessionError?.message ?? null,

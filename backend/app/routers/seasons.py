@@ -3,7 +3,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..auth.context import AuthorizationContext, authorization_context
-from ..auth.dependencies import require_active_user
 from ..database import get_db
 from ..models import Association, Event, Season, Team
 from ..schemas.season import SeasonOut, StandingsEntry
@@ -23,7 +22,7 @@ router = APIRouter(tags=["seasons"])
 
 
 @router.get("/seasons", response_model=list[SeasonOut])
-def list_seasons(_: object = Depends(require_active_user), db: Session = Depends(get_db)):
+def list_seasons(_: AuthorizationContext = Depends(authorization_context), db: Session = Depends(get_db)):
     seasons = ensure_standard_seasons(db)
     return [_season_with_game_count(db, season) for season in seasons]
 

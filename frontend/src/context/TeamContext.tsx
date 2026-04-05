@@ -19,16 +19,6 @@ const TeamContext = createContext<TeamContextType>({
   loading: true,
 });
 
-function pickActiveTeam(data: Team[], previousActiveTeam: Team | null): Team | null {
-  const savedTeamId = window.localStorage.getItem('rinklink.activeTeamId');
-  return (
-    (savedTeamId ? data.find((team) => team.id === savedTeamId) : null) ??
-    (previousActiveTeam ? data.find((team) => team.id === previousActiveTeam.id) ?? null : null) ??
-    data[0] ??
-    null
-  );
-}
-
 export function TeamProvider({ children }: { children: ReactNode }) {
   const { authEnabled, isAuthenticated, loading: authLoading, me } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
@@ -61,12 +51,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     updated_at: '',
   }));
 
-  const applyTeams = (nextTeams: Team[]) => {
-    setTeams(nextTeams);
-    setActiveTeam((previousActiveTeam) => pickActiveTeam(nextTeams, previousActiveTeam));
-  };
-
-  const refreshTeams = async ({ silent = false }: { silent?: boolean } = {}) => {
+  const refreshTeams = async () => {
     if (!appAccessReady) {
       setTeams([]);
       setActiveTeam(null);
@@ -74,26 +59,36 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (!silent) {
-      setLoading(true);
-    }
+    setLoading(true);
     try {
       let data = await api.getTeams();
       if (data.length === 0 && accessibleTeamsFallback.length > 0) {
         data = accessibleTeamsFallback;
       }
-      applyTeams(data);
+      setTeams(data);
+      const savedTeamId = window.localStorage.getItem('rinklink.activeTeamId');
+      const nextActiveTeam =
+        (savedTeamId ? data.find((team) => team.id === savedTeamId) : null) ??
+        (activeTeam ? data.find((team) => team.id === activeTeam.id) ?? null : null) ??
+        data[0] ??
+        null;
+      setActiveTeam(nextActiveTeam);
     } catch {
       if (accessibleTeamsFallback.length > 0) {
-        applyTeams(accessibleTeamsFallback);
+        setTeams(accessibleTeamsFallback);
+        const savedTeamId = window.localStorage.getItem('rinklink.activeTeamId');
+        const nextActiveTeam =
+          (savedTeamId ? accessibleTeamsFallback.find((team) => team.id === savedTeamId) : null) ??
+          (activeTeam ? accessibleTeamsFallback.find((team) => team.id === activeTeam.id) ?? null : null) ??
+          accessibleTeamsFallback[0] ??
+          null;
+        setActiveTeam(nextActiveTeam);
       } else {
         setTeams([]);
         setActiveTeam(null);
       }
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 
@@ -101,15 +96,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     if (authLoading) {
       return;
     }
-
-    if (appAccessReady && accessibleTeamsFallback.length > 0) {
-      applyTeams(accessibleTeamsFallback);
-      setLoading(false);
-      void refreshTeams({ silent: true });
-      return;
-    }
-
-    void refreshTeams();
+    refreshTeams();
   }, [appAccessReady, authLoading, me?.accessible_teams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
