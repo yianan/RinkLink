@@ -6,21 +6,58 @@ from datetime import datetime
 from email.message import EmailMessage
 from email.utils import formataddr
 
+import httpx
+
 from ..config import settings
 
 logger = logging.getLogger(__name__)
 
 
 def email_enabled() -> bool:
-    return bool(settings.smtp_host and settings.email_from_address)
+    has_transport = bool(settings.brevo_api_key or settings.smtp_host)
+    return bool(has_transport and settings.email_from_address)
 
 
-def send_email(*, to_email: str, subject: str, text_body: str, html_body: str | None = None) -> bool:
-    if not email_enabled():
-        logger.warning("SMTP delivery is not configured; skipping email to %s with subject %s", to_email, subject)
-        logger.info(text_body)
-        return False
+def _send_via_brevo_api(
+    *,
+    to_email: str,
+    subject: str,
+    text_body: str,
+    html_body: str | None = None,
+) -> bool:
+    payload = {
+        "sender": {
+            "email": settings.email_from_address,
+            "name": settings.email_from_name,
+        },
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "textContent": text_body,
+    }
+    if html_body:
+        payload["htmlContent"] = html_body
 
+    response = httpx.post(
+        settings.brevo_api_url,
+        headers={
+            "accept": "application/json",
+            "api-key": settings.brevo_api_key or "",
+            "content-type": "application/json",
+        },
+        json=payload,
+        timeout=20.0,
+    )
+    response.raise_for_status()
+    return True
+
+
+def _send_via_smtp(
+    *,
+    to_email: str,
+    subject: str,
+    text_body: str,
+    html_body: str | None = None,
+) -> bool:
     message = EmailMessage()
     message["From"] = formataddr((settings.email_from_name, settings.email_from_address or ""))
     message["To"] = to_email
@@ -37,6 +74,28 @@ def send_email(*, to_email: str, subject: str, text_body: str, html_body: str | 
             client.login(settings.smtp_username, settings.smtp_password or "")
         client.send_message(message)
     return True
+
+
+def send_email(*, to_email: str, subject: str, text_body: str, html_body: str | None = None) -> bool:
+    if not email_enabled():
+        logger.warning("Email delivery is not configured; skipping email to %s with subject %s", to_email, subject)
+        logger.info(text_body)
+        return False
+
+    if settings.brevo_api_key:
+        return _send_via_brevo_api(
+            to_email=to_email,
+            subject=subject,
+            text_body=text_body,
+            html_body=html_body,
+        )
+
+    return _send_via_smtp(
+        to_email=to_email,
+        subject=subject,
+        text_body=text_body,
+        html_body=html_body,
+    )
 
 
 def send_invite_email(

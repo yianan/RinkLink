@@ -5,9 +5,12 @@ import nodemailer from "nodemailer";
 import { resolvePublicAppUrl } from "./config.js";
 
 type EmailConfig = {
+  brevoApiKey?: string;
+  brevoApiUrl: string;
   from: string;
   frontendUrl: string;
   host: string;
+  mode: "brevo-api" | "smtp";
   port: number;
   secure: boolean;
   startTls: boolean;
@@ -25,11 +28,13 @@ type MailPayload = {
 let transportPromise: Promise<nodemailer.Transporter> | null = null;
 
 function loadConfig(): EmailConfig | null {
+  const brevoApiKey = process.env.BREVO_API_KEY?.trim();
+  const brevoApiUrl = process.env.BREVO_API_URL?.trim() || "https://api.brevo.com/v3/smtp/email";
   const host = process.env.SMTP_HOST?.trim();
   const fromEmail = process.env.EMAIL_FROM_ADDRESS?.trim();
   const frontendUrl = resolvePublicAppUrl();
 
-  if (!host || !fromEmail || !frontendUrl) {
+  if ((!brevoApiKey && !host) || !fromEmail || !frontendUrl) {
     return null;
   }
 
@@ -41,9 +46,12 @@ function loadConfig(): EmailConfig | null {
     : !["0", "false", "no", "off"].includes((process.env.SMTP_STARTTLS || "true").trim().toLowerCase());
 
   return {
+    brevoApiKey: brevoApiKey || undefined,
+    brevoApiUrl,
     from: `${fromName} <${fromEmail}>`,
     frontendUrl: frontendUrl.replace(/\/+$/, ""),
-    host,
+    host: host || "",
+    mode: brevoApiKey ? "brevo-api" : "smtp",
     port,
     secure,
     startTls,
@@ -80,6 +88,31 @@ async function sendMail(kind: string, payload: MailPayload): Promise<void> {
   const config = loadConfig();
   if (!config) {
     logFallback(kind, payload.to, payload.subject, payload.text);
+    return;
+  }
+
+  if (config.mode === "brevo-api") {
+    const response = await fetch(config.brevoApiUrl, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "api-key": config.brevoApiKey || "",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: {
+          email: process.env.EMAIL_FROM_ADDRESS?.trim(),
+          name: process.env.EMAIL_FROM_NAME?.trim() || "RinkLink",
+        },
+        to: [{ email: payload.to }],
+        subject: payload.subject,
+        textContent: payload.text,
+        htmlContent: payload.html,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Brevo API request failed with ${response.status}: ${await response.text()}`);
+    }
     return;
   }
 

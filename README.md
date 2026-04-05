@@ -240,8 +240,7 @@ Current cloud shape:
 |---|---|---|
 | `DATABASE_URL` | Neon Postgres connection URL | Primary application database |
 | `EMAIL_FROM_ADDRESS` | `no-reply@example.com` | Verified Brevo sender address |
-| `SMTP_USERNAME` | `your-brevo-smtp-login` | Brevo SMTP username |
-| `SMTP_PASSWORD` | `your-brevo-smtp-key` | Brevo SMTP key |
+| `BREVO_API_KEY` | `xkeysib-...` | Brevo API key for transactional email |
 
 ### Branch dev sandbox on Render
 
@@ -253,6 +252,7 @@ This branch now supports a separate Render-hosted development sandbox while `mai
 - The branch app should run with `APP_ENV=development` so the dashboard `Reset Demo Data` button continues to work against the branch database.
 - The hosted reset path is intentionally destructive for this sandbox, but it restores the triggering platform admin so the browser can reload back into a working session.
 - Demo logos and uploaded logos are both stored in Postgres, so the branch sandbox does not require a Render disk.
+- Email delivery prefers the Brevo HTTP API, which keeps this setup compatible with Render free web services where SMTP ports are blocked.
 
 The included `render.yaml` provisions:
 
@@ -288,7 +288,7 @@ That command:
 
 1. Create or choose a Neon Postgres database or branch dedicated to this Render sandbox.
 2. Set `DATABASE_URL` in Render to the Neon connection URL.
-3. Set the Brevo SMTP credentials and verified sender values in Render.
+3. Set the Brevo API key and verified sender values in Render.
 4. Deploy the single Docker web service.
 
 ```bash
@@ -313,6 +313,9 @@ That means:
 - `DATABASE_URL` is normalized to a psycopg-backed Postgres URL when needed
 - both auth and app schemas live in Neon
 - logo assets are loaded from Postgres, not from container disk
+- email can be sent through Brevo without SMTP access
+
+If you are on a free Render service, run the initial bootstrap command locally against the same Neon `DATABASE_URL` after the first admin signs in once. Render shell access is not available on free instances.
 
 ### Existing local SQLite does not migrate to cloud automatically
 

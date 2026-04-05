@@ -19,6 +19,8 @@ class Settings(BaseModel):
     auth_audience: str | None
     email_from_name: str
     email_from_address: str | None
+    brevo_api_key: str | None
+    brevo_api_url: str
     smtp_host: str | None
     smtp_port: int
     smtp_username: str | None
@@ -95,6 +97,11 @@ def _load() -> Settings:
     auth_audience = _normalize_http_url(os.getenv("AUTH_AUDIENCE")) or render_external_url
     email_from_name = os.getenv("EMAIL_FROM_NAME", "RinkLink").strip() or "RinkLink"
     email_from_address = (os.getenv("EMAIL_FROM_ADDRESS") or "").strip() or None
+    brevo_api_key = (os.getenv("BREVO_API_KEY") or "").strip() or None
+    brevo_api_url = (
+        _normalize_http_url(os.getenv("BREVO_API_URL"))
+        or "https://api.brevo.com/v3/smtp/email"
+    )
     smtp_host = (os.getenv("SMTP_HOST") or "").strip() or None
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_username = (os.getenv("SMTP_USERNAME") or "").strip() or None
@@ -116,6 +123,8 @@ def _load() -> Settings:
         auth_audience=auth_audience,
         email_from_name=email_from_name,
         email_from_address=email_from_address,
+        brevo_api_key=brevo_api_key,
+        brevo_api_url=brevo_api_url,
         smtp_host=smtp_host,
         smtp_port=smtp_port,
         smtp_username=smtp_username,

@@ -22,17 +22,7 @@ services:
         value: RinkLink
       - key: EMAIL_FROM_ADDRESS
         sync: false
-      - key: SMTP_HOST
-        value: smtp-relay.brevo.com
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_USERNAME
+      - key: BREVO_API_KEY
         sync: false
-      - key: SMTP_PASSWORD
-        sync: false
-      - key: SMTP_STARTTLS
-        value: "true"
-      - key: SMTP_USE_SSL
-        value: "false"
       - key: BETTER_AUTH_SECRET
         generateValue: true
