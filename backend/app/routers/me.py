@@ -15,8 +15,7 @@ from ..schemas import (
 router = APIRouter(tags=["auth"])
 
 
-@router.get("/me", response_model=MeOut)
-def get_me(context=Depends(current_authorization_context), db: Session = Depends(get_db)):
+def build_me_out(context, db: Session) -> MeOut:
     accessible_team_ids = set(context.team_ids)
     if context.association_memberships:
         accessible_team_ids.update(
@@ -88,3 +87,8 @@ def get_me(context=Depends(current_authorization_context), db: Session = Depends
             for team in accessible_teams
         ],
     )
+
+
+@router.get("/me", response_model=MeOut)
+def get_me(context=Depends(current_authorization_context), db: Session = Depends(get_db)):
+    return build_me_out(context, db)

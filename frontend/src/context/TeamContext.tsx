@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { Team } from '../types';
 import { api } from '../api/client';
 import { useAuth } from './AuthContext';
+import { readCachedTeams, writeCachedTeams } from '../lib/bootstrap-cache';
 
 interface TeamContextType {
   teams: Team[];
@@ -82,6 +83,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       if (data.length === 0 && accessibleTeamsFallback.length > 0) {
         data = accessibleTeamsFallback;
       }
+      writeCachedTeams({ user: { id: me?.user.auth_id, email: me?.user.email } }, data);
       applyTeams(data);
     } catch {
       if (accessibleTeamsFallback.length > 0) {
@@ -103,7 +105,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     }
 
     if (appAccessReady && accessibleTeamsFallback.length > 0) {
-      applyTeams(accessibleTeamsFallback);
+      const cachedTeams = readCachedTeams({ user: { id: me?.user.auth_id, email: me?.user.email } });
+      applyTeams(cachedTeams.length > 0 ? cachedTeams : accessibleTeamsFallback);
       setLoading(false);
       void refreshTeams({ silent: true });
       return;
