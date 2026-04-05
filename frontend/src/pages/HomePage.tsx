@@ -125,124 +125,37 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!activeTeam) return;
-    let cancelled = false;
 
-    setAvailability([]);
-    setEvents([]);
-    setProposals([]);
-    setBookingRequests([]);
-    setRecord(null);
-    setCompetitionRecord(null);
-    setPrimaryMembership(null);
+    Promise.all([
+      canViewAvailabilitySummary ? api.getAvailability(activeTeam.id) : Promise.resolve([]),
+      api.getEvents(activeTeam.id, { date_from: todayStr }),
+      canViewProposalSummary ? api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }) : Promise.resolve([]),
+      canViewIceRequestSummary ? api.getTeamIceBookingRequests(activeTeam.id, { status: 'requested' }) : Promise.resolve([]),
+      familyMode || !effectiveSeason ? Promise.resolve([]) : api.getStandings(effectiveSeason.id),
+      familyMode || !effectiveSeason ? Promise.resolve([]) : api.getTeamCompetitionMemberships(activeTeam.id, { season_id: effectiveSeason.id }),
+    ]).then(async ([availabilityData, eventData, proposalData, requestData, standings, memberships]) => {
+      setAvailability(availabilityData);
+      setEvents(eventData);
+      setProposals(proposalData);
+      setBookingRequests(requestData);
+      setRecord(standings.find((entry) => entry.team_id === activeTeam.id) || null);
 
-    if (canViewAvailabilitySummary) {
-      api.getAvailability(activeTeam.id)
-        .then((availabilityData) => {
-          if (!cancelled) {
-            setAvailability(availabilityData);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setAvailability([]);
-          }
-        });
-    }
+      const primary = memberships.find((membership) => membership.is_primary) ?? memberships[0] ?? null;
+      setPrimaryMembership(primary);
 
-    api.getEvents(activeTeam.id, { date_from: todayStr })
-      .then((eventData) => {
-        if (!cancelled) {
-          setEvents(eventData);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setEvents([]);
-        }
-      });
+      const standingsMembership =
+        memberships.find((membership) => membership.is_primary && membership.standings_enabled)
+        ?? memberships.find((membership) => membership.standings_enabled)
+        ?? null;
 
-    if (canViewProposalSummary) {
-      api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' })
-        .then((proposalData) => {
-          if (!cancelled) {
-            setProposals(proposalData);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setProposals([]);
-          }
-        });
-    }
+      if (familyMode || !standingsMembership) {
+        setCompetitionRecord(null);
+        return;
+      }
 
-    if (canViewIceRequestSummary) {
-      api.getTeamIceBookingRequests(activeTeam.id, { status: 'requested' })
-        .then((requestData) => {
-          if (!cancelled) {
-            setBookingRequests(requestData);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setBookingRequests([]);
-          }
-        });
-    }
-
-    if (!familyMode && effectiveSeason) {
-      api.getStandings(effectiveSeason.id)
-        .then((standings) => {
-          if (!cancelled) {
-            setRecord(standings.find((entry) => entry.team_id === activeTeam.id) || null);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setRecord(null);
-          }
-        });
-
-      api.getTeamCompetitionMemberships(activeTeam.id, { season_id: effectiveSeason.id })
-        .then(async (memberships) => {
-          if (cancelled) {
-            return;
-          }
-
-          const primary = memberships.find((membership) => membership.is_primary) ?? memberships[0] ?? null;
-          setPrimaryMembership(primary);
-
-          const standingsMembership =
-            memberships.find((membership) => membership.is_primary && membership.standings_enabled)
-            ?? memberships.find((membership) => membership.standings_enabled)
-            ?? null;
-
-          if (!standingsMembership) {
-            setCompetitionRecord(null);
-            return;
-          }
-
-          try {
-            const divisionStandings = await api.getCompetitionDivisionStandings(standingsMembership.competition_division_id);
-            if (!cancelled) {
-              setCompetitionRecord(divisionStandings.find((entry) => entry.team_id === activeTeam.id) || null);
-            }
-          } catch {
-            if (!cancelled) {
-              setCompetitionRecord(null);
-            }
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setPrimaryMembership(null);
-            setCompetitionRecord(null);
-          }
-        });
-    }
-
-    return () => {
-      cancelled = true;
-    };
+      const divisionStandings = await api.getCompetitionDivisionStandings(standingsMembership.competition_division_id);
+      setCompetitionRecord(divisionStandings.find((entry) => entry.team_id === activeTeam.id) || null);
+    });
   }, [activeTeam, canViewAvailabilitySummary, canViewIceRequestSummary, canViewProposalSummary, effectiveSeason, familyMode, todayStr]);
 
   useEffect(() => {

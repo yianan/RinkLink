@@ -126,44 +126,14 @@ export default function EventsPage() {
 
   useEffect(() => {
     if (!activeTeam) return;
-    let cancelled = false;
-
-    setScoreEdits({});
-
-    api.getEvents(activeTeam.id)
-      .then((eventData) => {
-        if (!cancelled) {
-          setEvents(eventData);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setEvents([]);
-        }
-      });
-
-    if (!canManageRequests) {
-      setBookingRequests([]);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    api.getTeamIceBookingRequests(activeTeam.id)
-      .then((requestData) => {
-        if (!cancelled) {
-          setBookingRequests(requestData);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setBookingRequests([]);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    Promise.all([
+      api.getEvents(activeTeam.id),
+      canManageRequests ? api.getTeamIceBookingRequests(activeTeam.id) : Promise.resolve([]),
+    ]).then(([eventData, requestData]) => {
+      setEvents(eventData);
+      setBookingRequests(requestData);
+      setScoreEdits({});
+    });
   }, [activeTeam?.id, canManageRequests]);
 
   useEffect(() => {
