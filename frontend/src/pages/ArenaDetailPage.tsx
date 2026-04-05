@@ -684,6 +684,7 @@ export default function ArenaDetailPage() {
   const directionsUrl = arenaLocationLabel ? mapsQueryUrl(arenaLocationLabel) : null;
   const restaurantsUrl = arenaLocationLabel ? mapsQueryUrl(`restaurants near ${arenaLocationLabel}`) : null;
   const thingsUrl = arenaLocationLabel ? mapsQueryUrl(`things to do near ${arenaLocationLabel}`) : null;
+  const slotActionButtonClass = 'min-w-[12rem] justify-center whitespace-nowrap';
 
   const focusIceSlots = () => {
     iceSlotsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1180,166 +1181,168 @@ export default function ArenaDetailPage() {
                 const slotRequest = slot.active_booking_request_id ? bookingRequestsById.get(slot.active_booking_request_id) : undefined;
                 const slotEvent = slot.booked_event_id ? arenaEventsById.get(slot.booked_event_id) : undefined;
                 return (
-                <div
-                  key={slot.id}
-                  className="grid gap-3 rounded-xl border border-slate-200 px-3 py-3 text-sm dark:border-slate-800 md:grid-cols-[minmax(0,1fr)_7.75rem_8.5rem] md:items-start lg:grid-cols-[minmax(0,1fr)_7.75rem_8.5rem_19rem]"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-slate-900 dark:text-slate-100">
-                      {formatShortDate(slot.date)} • {formatTimeHHMM(slot.start_time) || slot.start_time}
-                      {slot.end_time ? `-${formatTimeHHMM(slot.end_time) || slot.end_time}` : ''}
-                    </div>
-                    {bookedSlotLabel(slot) ? (
-                      <div className="mt-1 whitespace-nowrap text-slate-600 dark:text-slate-400">{bookedSlotLabel(slot)}</div>
-                    ) : null}
-                    {slot.notes ? (
-                      <div className="mt-1 text-slate-500 dark:text-slate-400">{slot.notes}</div>
-                    ) : null}
-                    {slot.active_booking_request_team_name && slot.status === 'held' ? (
-                      <div className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-                        Requested by {slot.active_booking_request_team_name}
-                      </div>
-                    ) : null}
-                    {slot.active_proposal_id && slot.status === 'held' ? (
-                      <div className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-                        Reserved for proposal: {slot.active_proposal_away_team_name
-                          ? `${slot.active_proposal_home_team_name} vs ${slot.active_proposal_away_team_name}`
-                          : slot.active_proposal_home_team_name}
-                      </div>
-                    ) : null}
-                  </div>
-                  <Badge
-                    variant={slotStatusVariant(slot.status)}
-                    className="inline-flex h-7 items-center justify-center whitespace-nowrap md:w-[7.75rem]"
+                  <div
+                    key={slot.id}
+                    className="rounded-xl border border-slate-200 px-4 py-4 text-sm transition dark:border-slate-800"
                   >
-                    {slot.status === 'held' ? getHeldSlotLabel(slot) : formatSlotStatus(slot.status)}
-                  </Badge>
-                  <Badge
-                    variant={slot.pricing_mode === 'call_for_pricing' ? 'warning' : 'outline'}
-                    className="inline-flex h-7 items-center justify-center whitespace-nowrap md:w-[8.5rem]"
-                  >
-                    {formatPriceLabel(slot.pricing_mode, slot.price_amount_cents, slot.currency)}
-                  </Badge>
-                  {slot.status === 'available' && slotEditable ? (
-                    <div className="flex items-center justify-start gap-2 md:col-span-3 lg:col-span-1 lg:justify-end">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="whitespace-nowrap"
-                        onClick={() => openEditSlot(slot)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        className="whitespace-nowrap"
-                        onClick={() => deleteIceSlot(slot)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete
-                      </Button>
-                    </div>
-                  ) : slot.active_proposal_id && slot.status === 'held' && slotEditable ? (
-                    <div className="flex items-center justify-start md:col-span-3 lg:col-span-1 lg:justify-end">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        className="whitespace-nowrap"
-                        onClick={() => openCancelSlot({
-                          ice_slot_id: slot.id,
-                          title: slot.active_proposal_away_team_name
-                            ? `${slot.active_proposal_home_team_name} vs ${slot.active_proposal_away_team_name}`
-                            : slot.active_proposal_home_team_name || 'Reserved proposal',
-                          arena_rink_name: slot.arena_rink_name,
-                          date: slot.date,
-                          start_time: slot.start_time,
-                          description: 'This cancels the reserved proposal slot and removes it from the live rink schedule.',
-                        })}
-                      >
-                        <XCircle className="h-3.5 w-3.5" />
-                        Cancel Slot
-                      </Button>
-                    </div>
-                  ) : slot.active_booking_request_id && slot.status === 'held' && bookingEditable ? (
-                    <div className="flex items-center justify-start md:col-span-3 lg:col-span-1 lg:justify-end">
-                      <Button type="button" size="sm" variant="ghost" className="whitespace-nowrap" onClick={() => focusSlotManagement(slot)}>
-                        Review
-                      </Button>
-                    </div>
-                  ) : slot.status === 'booked' && slot.date >= todayIso && bookingEditable ? (
-                    <div className="flex items-center justify-start gap-2 md:col-span-3 lg:col-span-1 lg:justify-end">
-                      {slotRequest ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="whitespace-nowrap"
-                          onClick={() => openBookedSlotLockerRooms({
-                            ice_slot_id: slot.id,
-                            arena_rink_id: slot.arena_rink_id,
-                            title: bookedSlotTitleFromRequest(slotRequest),
-                            arena_rink_name: slot.arena_rink_name,
-                            date: slot.date,
-                            start_time: slot.start_time,
-                            event_type: slotRequest.event_type as Event['event_type'],
-                            away_team_id: slotRequest.away_team_id,
-                            home_locker_room_id: slotRequest.home_locker_room_id || '',
-                            away_locker_room_id: slotRequest.away_locker_room_id || '',
-                          })}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Edit Locker Rooms
-                        </Button>
-                      ) : slotEvent ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="whitespace-nowrap"
-                          onClick={() => openBookedSlotLockerRooms({
-                            ice_slot_id: slot.id,
-                            arena_rink_id: slot.arena_rink_id,
-                            title: bookedSlotTitleFromEvent(slotEvent),
-                            arena_rink_name: slot.arena_rink_name,
-                            date: slot.date,
-                            start_time: slot.start_time,
-                            event_type: slotEvent.event_type,
-                            away_team_id: slotEvent.away_team_id,
-                            home_locker_room_id: slotEvent.home_locker_room_id || '',
-                            away_locker_room_id: slotEvent.away_locker_room_id || '',
-                          })}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Edit Locker Rooms
-                        </Button>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="min-w-0 text-sm font-medium text-slate-900 dark:text-slate-100">
+                            {formatShortDate(slot.date)} • {formatTimeHHMM(slot.start_time) || slot.start_time}
+                            {slot.end_time ? `-${formatTimeHHMM(slot.end_time) || slot.end_time}` : ''}
+                          </div>
+                          <Badge
+                            variant={slotStatusVariant(slot.status)}
+                            className="inline-flex h-7 items-center justify-center whitespace-nowrap"
+                          >
+                            {slot.status === 'held' ? getHeldSlotLabel(slot) : formatSlotStatus(slot.status)}
+                          </Badge>
+                          <Badge
+                            variant={slot.pricing_mode === 'call_for_pricing' ? 'warning' : 'outline'}
+                            className="inline-flex h-7 items-center justify-center whitespace-nowrap"
+                          >
+                            {formatPriceLabel(slot.pricing_mode, slot.price_amount_cents, slot.currency)}
+                          </Badge>
+                        </div>
+                        {bookedSlotLabel(slot) ? (
+                          <div className="mt-1 text-slate-600 dark:text-slate-400">{bookedSlotLabel(slot)}</div>
+                        ) : null}
+                        {slot.notes ? (
+                          <div className="mt-1 text-slate-500 dark:text-slate-400">{slot.notes}</div>
+                        ) : null}
+                        {slot.active_booking_request_team_name && slot.status === 'held' ? (
+                          <div className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                            Requested by {slot.active_booking_request_team_name}
+                          </div>
+                        ) : null}
+                        {slot.active_proposal_id && slot.status === 'held' ? (
+                          <div className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                            Reserved for proposal: {slot.active_proposal_away_team_name
+                              ? `${slot.active_proposal_home_team_name} vs ${slot.active_proposal_away_team_name}`
+                              : slot.active_proposal_home_team_name}
+                          </div>
+                        ) : null}
+                      </div>
+                      {slot.status === 'available' && slotEditable ? (
+                        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className={slotActionButtonClass}
+                            onClick={() => openEditSlot(slot)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit Slot
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            className={slotActionButtonClass}
+                            onClick={() => deleteIceSlot(slot)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        </div>
+                      ) : slot.active_proposal_id && slot.status === 'held' && slotEditable ? (
+                        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            className={slotActionButtonClass}
+                            onClick={() => openCancelSlot({
+                              ice_slot_id: slot.id,
+                              title: slot.active_proposal_away_team_name
+                                ? `${slot.active_proposal_home_team_name} vs ${slot.active_proposal_away_team_name}`
+                                : slot.active_proposal_home_team_name || 'Reserved proposal',
+                              arena_rink_name: slot.arena_rink_name,
+                              date: slot.date,
+                              start_time: slot.start_time,
+                              description: 'This cancels the reserved proposal slot and removes it from the live rink schedule.',
+                            })}
+                          >
+                            <XCircle className="h-3.5 w-3.5" />
+                            Cancel Slot
+                          </Button>
+                        </div>
+                      ) : slot.active_booking_request_id && slot.status === 'held' && bookingEditable ? (
+                        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                          <Button type="button" size="sm" variant="ghost" className={slotActionButtonClass} onClick={() => focusSlotManagement(slot)}>
+                            Review
+                          </Button>
+                        </div>
+                      ) : slot.status === 'booked' && slot.date >= todayIso && bookingEditable ? (
+                        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                          {slotRequest ? (
+                            <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className={slotActionButtonClass}
+                            onClick={() => openBookedSlotLockerRooms({
+                              ice_slot_id: slot.id,
+                                arena_rink_id: slot.arena_rink_id,
+                                title: bookedSlotTitleFromRequest(slotRequest),
+                                arena_rink_name: slot.arena_rink_name,
+                                date: slot.date,
+                                start_time: slot.start_time,
+                                event_type: slotRequest.event_type as Event['event_type'],
+                                away_team_id: slotRequest.away_team_id,
+                                home_locker_room_id: slotRequest.home_locker_room_id || '',
+                                away_locker_room_id: slotRequest.away_locker_room_id || '',
+                              })}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit Locker Rooms
+                            </Button>
+                          ) : slotEvent ? (
+                            <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className={slotActionButtonClass}
+                            onClick={() => openBookedSlotLockerRooms({
+                              ice_slot_id: slot.id,
+                                arena_rink_id: slot.arena_rink_id,
+                                title: bookedSlotTitleFromEvent(slotEvent),
+                                arena_rink_name: slot.arena_rink_name,
+                                date: slot.date,
+                                start_time: slot.start_time,
+                                event_type: slotEvent.event_type,
+                                away_team_id: slotEvent.away_team_id,
+                                home_locker_room_id: slotEvent.home_locker_room_id || '',
+                                away_locker_room_id: slotEvent.away_locker_room_id || '',
+                              })}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit Locker Rooms
+                            </Button>
+                          ) : null}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            className={slotActionButtonClass}
+                            onClick={() => openCancelSlot({
+                              ice_slot_id: slot.id,
+                              title: bookedSlotLabel(slot) || 'Booked slot',
+                              arena_rink_name: slot.arena_rink_name,
+                              date: slot.date,
+                              start_time: slot.start_time,
+                              description: 'This cancels the booked slot and updates the linked team booking records.',
+                            })}
+                          >
+                            <XCircle className="h-3.5 w-3.5" />
+                            Cancel Slot
+                          </Button>
+                        </div>
                       ) : null}
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        className="whitespace-nowrap"
-                        onClick={() => openCancelSlot({
-                          ice_slot_id: slot.id,
-                          title: bookedSlotLabel(slot) || 'Booked slot',
-                          arena_rink_name: slot.arena_rink_name,
-                          date: slot.date,
-                          start_time: slot.start_time,
-                          description: 'This cancels the booked slot and updates the linked team booking records.',
-                        })}
-                      >
-                        <XCircle className="h-3.5 w-3.5" />
-                        Cancel Slot
-                      </Button>
                     </div>
-                  ) : (
-                    <div className="hidden lg:block" />
-                  )}
-                </div>
+                  </div>
               )})}
               {iceSlots.length === 0 ? (
                 <div className="text-sm text-slate-600 dark:text-slate-400">No ice slots configured for this rink.</div>

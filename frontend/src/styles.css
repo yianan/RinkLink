@@ -990,6 +990,14 @@ html.dark {
     color: rgba(190, 24, 93, 1) !important;
   }
 
+  .rinklink-settings-button-destructive:hover,
+  .rinklink-settings-button-destructive:focus-visible {
+    border-color: rgba(225, 29, 72, 0.3) !important;
+    background: rgba(255, 228, 230, 0.98) !important;
+    color: rgba(159, 18, 57, 1) !important;
+    box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.08), 0 10px 22px rgba(136, 19, 55, 0.1) !important;
+  }
+
   .rinklink-settings-password-field {
     position: relative;
   }
@@ -1456,6 +1464,14 @@ html.dark {
     border-color: rgba(225, 29, 72, 0.3) !important;
     background: rgba(76, 5, 25, 0.5) !important;
     color: rgba(254, 205, 211, 1) !important;
+  }
+
+  html.dark .rinklink-settings-button-destructive:hover,
+  html.dark .rinklink-settings-button-destructive:focus-visible {
+    border-color: rgba(244, 63, 94, 0.38) !important;
+    background: rgba(136, 19, 55, 0.72) !important;
+    color: rgba(255, 228, 230, 1) !important;
+    box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.14), 0 12px 24px rgba(0, 0, 0, 0.24) !important;
   }
 
   html.dark .rinklink-settings-page [data-slot="button"][type="submit"].rinklink-settings-button,

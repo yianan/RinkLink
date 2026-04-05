@@ -21,7 +21,7 @@ const variants: Record<ButtonVariant, string> = {
   ghost:
     'text-slate-700 hover:bg-[color:color-mix(in_srgb,var(--app-accent-link)_6%,white)] hover:text-[color:var(--app-accent-link-hover)] disabled:text-[color:var(--app-disabled-text)] dark:text-slate-200 dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-link)_10%,transparent)] dark:hover:text-[color:var(--app-accent-link)]',
   destructive:
-    'bg-rose-600 text-white shadow-soft hover:bg-rose-700 hover:shadow-md disabled:border disabled:border-rose-200/70 disabled:bg-[color:color-mix(in_srgb,var(--app-disabled-surface)_84%,rgb(251_191_191))] disabled:text-rose-700 dark:bg-rose-500 dark:hover:bg-rose-400 dark:disabled:text-rose-200',
+    'bg-rose-600 text-white shadow-soft ring-1 ring-transparent hover:bg-rose-700 hover:ring-rose-300/35 hover:shadow-md disabled:border disabled:border-rose-200/70 disabled:bg-[color:color-mix(in_srgb,var(--app-disabled-surface)_84%,rgb(251_191_191))] disabled:text-rose-700 dark:bg-rose-500 dark:hover:bg-rose-600 dark:hover:ring-rose-400/30 dark:disabled:text-rose-200',
 };
 
 const sizes: Record<ButtonSize, string> = {
