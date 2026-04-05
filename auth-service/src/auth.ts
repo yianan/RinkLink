@@ -4,7 +4,12 @@ import { betterAuth } from "better-auth";
 import { jwt } from "better-auth/plugins";
 import { Pool } from "pg";
 
-import { resolveApiAudience, resolveBetterAuthUrl, resolvePublicAppUrl } from "./config.js";
+import {
+  resolveApiAudience,
+  resolveBetterAuthUrl,
+  resolvePublicAppUrl,
+  resolveTrustedOrigins,
+} from "./config.js";
 import { sendResetPasswordEmail, sendVerificationEmail } from "./email.js";
 
 const databaseUrl = process.env.AUTH_DATABASE_URL || process.env.DATABASE_URL;
@@ -20,6 +25,7 @@ if (!baseURL) {
 }
 
 const frontendUrl = resolvePublicAppUrl();
+const trustedOrigins = resolveTrustedOrigins();
 
 if (!frontendUrl) {
   throw new Error("FRONTEND_URL is required for auth-service");
@@ -66,7 +72,7 @@ export const auth = betterAuth({
   appName: "RinkLink",
   baseURL,
   database: pool,
-  trustedOrigins: [frontendUrl, "https://appleid.apple.com"],
+  trustedOrigins: [...trustedOrigins, "https://appleid.apple.com"],
   rateLimit: {
     enabled: true,
     window: 60,
