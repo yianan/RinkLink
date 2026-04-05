@@ -48,4 +48,9 @@ cleanup() {
 
 trap cleanup INT TERM EXIT
 
-wait -n "$AUTH_PID" "$API_PID"
+while kill -0 "$AUTH_PID" 2>/dev/null && kill -0 "$API_PID" 2>/dev/null; do
+  sleep 1
+done
+
+wait "$AUTH_PID" || true
+wait "$API_PID" || true
