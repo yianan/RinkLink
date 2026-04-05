@@ -66,16 +66,6 @@ def _scoped_teams_query(db: Session, context: AuthorizationContext):
     return db.query(Team).filter(False)
 
 
-def list_scoped_teams_out(
-    context: AuthorizationContext,
-    db: Session,
-    season_id: str | None = None,
-) -> list[TeamOut]:
-    teams = _scoped_teams_query(db, context).order_by(Team.name).all()
-    memberships_by_team = memberships_for_teams(db, [team.id for team in teams], season_id)
-    return [_enrich(team, db, memberships_by_team) for team in teams]
-
-
 @router.get("/teams", response_model=list[TeamOut])
 def list_teams(
     association_id: str | None = Query(None),

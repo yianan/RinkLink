@@ -2,7 +2,14 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { Season } from '../types';
 import { api } from '../api/client';
 import { useAuth } from './AuthContext';
-import { readCachedSeasons, writeCachedSeasons } from '../lib/bootstrap-cache';
+
+const SEASON_CACHE_KEY = 'rinklink.seasons';
+const SEASON_CACHE_TTL_MS = 15 * 60 * 1000;
+
+type CachedSeasons = {
+  savedAt: number;
+  seasons: Season[];
+};
 
 interface SeasonContextType {
   seasons: Season[];
@@ -19,6 +26,42 @@ const SeasonContext = createContext<SeasonContextType>({
   refreshSeasons: async () => {},
   loading: true,
 });
+
+function readCachedSeasons(): Season[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(SEASON_CACHE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as CachedSeasons;
+    if (!Array.isArray(parsed?.seasons) || typeof parsed.savedAt !== 'number') {
+      return [];
+    }
+    if (Date.now() - parsed.savedAt > SEASON_CACHE_TTL_MS) {
+      window.localStorage.removeItem(SEASON_CACHE_KEY);
+      return [];
+    }
+    return parsed.seasons;
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedSeasons(seasons: Season[]) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const payload: CachedSeasons = {
+    savedAt: Date.now(),
+    seasons,
+  };
+  window.localStorage.setItem(SEASON_CACHE_KEY, JSON.stringify(payload));
+}
 
 function pickActiveSeason(data: Season[], previousActiveSeason: Season | null): Season | null {
   const savedSeasonId = window.localStorage.getItem('rinklink.activeSeasonId');

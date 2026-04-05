@@ -3,14 +3,9 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { api } from '../api/client';
 import type { MeResponse } from '../types';
 import { authClient, authEnabled, clearApiAccessToken } from '../lib/auth-client';
-import {
-  clearCachedProfile,
-  clearCachedTeams,
-  readCachedProfile,
-  writeCachedProfile,
-  writeCachedSeasons,
-  writeCachedTeams,
-} from '../lib/bootstrap-cache';
+
+const PROFILE_CACHE_KEY = 'rinklink.authProfile';
+const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
 
 type SessionLike = {
   user?: {
@@ -18,6 +13,68 @@ type SessionLike = {
     email?: string;
   };
 } | null;
+
+type CachedProfile = {
+  authId: string | null;
+  email: string | null;
+  savedAt: number;
+  me: MeResponse;
+};
+
+function readCachedProfile(session: SessionLike): MeResponse | null {
+  if (typeof window === 'undefined' || !session?.user) {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as CachedProfile;
+    if (!parsed?.me || typeof parsed.savedAt !== 'number') {
+      return null;
+    }
+    if (Date.now() - parsed.savedAt > PROFILE_CACHE_TTL_MS) {
+      window.sessionStorage.removeItem(PROFILE_CACHE_KEY);
+      return null;
+    }
+
+    const sessionUserId = session.user.id ?? null;
+    const sessionEmail = session.user.email?.toLowerCase() ?? null;
+    if (parsed.authId && sessionUserId && parsed.authId !== sessionUserId) {
+      return null;
+    }
+    if (parsed.email && sessionEmail && parsed.email !== sessionEmail) {
+      return null;
+    }
+    return parsed.me;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedProfile(me: MeResponse) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const payload: CachedProfile = {
+    authId: me.user.auth_id,
+    email: me.user.email.toLowerCase(),
+    savedAt: Date.now(),
+    me,
+  };
+  window.sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(payload));
+}
+
+function clearCachedProfile() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.sessionStorage.removeItem(PROFILE_CACHE_KEY);
+}
 
 interface AuthContextValue {
   authEnabled: boolean;
@@ -64,7 +121,6 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
     if (!session) {
       clearApiAccessToken();
       clearCachedProfile();
-      clearCachedTeams();
       setMe(null);
       setProfileError(null);
       return;
@@ -74,12 +130,10 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
       setProfileLoading(true);
     }
     try {
-      const data = await api.getBootstrap();
-      writeCachedProfile(data.me);
-      writeCachedTeams(session as SessionLike, data.teams);
-      writeCachedSeasons(data.seasons);
-      setMe(data.me);
+      const data = await api.getMe();
+      setMe(data);
       setProfileError(null);
+      writeCachedProfile(data);
     } catch (error) {
       setProfileError(String(error));
       if (!silent) {

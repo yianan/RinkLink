@@ -65,12 +65,6 @@ export interface MeResponse {
   accessible_teams: AccessibleTeam[];
 }
 
-export interface BootstrapResponse {
-  me: MeResponse;
-  teams: Team[];
-  seasons: Season[];
-}
-
 export interface AccessTarget {
   type: string;
   id: string;

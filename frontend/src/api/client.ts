@@ -58,7 +58,6 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
 }
 
 export const api = {
-  getBootstrap: () => request<import('../types').BootstrapResponse>('/bootstrap'),
   getMe: () => request<import('../types').MeResponse>('/me'),
   getBrowseSeasons: () => request<import('../types').PublicSeason[]>('/browse/seasons'),
   getBrowseTeams: (params?: Record<string, string>) => {

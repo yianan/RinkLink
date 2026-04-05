@@ -65,7 +65,6 @@ from .auth import (
     AccessRequestOut,
 )
 from .public import PublicEventOut, PublicSeasonOut, PublicTeamOut
-from .bootstrap import BootstrapOut
 
 __all__ = [
     "AssociationCreate", "AssociationUpdate", "AssociationOut",
@@ -96,5 +95,4 @@ __all__ = [
     "AccessTargetOut", "InviteCreate", "InviteOut",
     "AccessRequestCreate", "AccessRequestDecision", "AccessRequestOut",
     "PublicSeasonOut", "PublicTeamOut", "PublicEventOut",
-    "BootstrapOut",
 ]

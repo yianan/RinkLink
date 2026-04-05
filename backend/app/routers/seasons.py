@@ -22,14 +22,10 @@ def _season_with_game_count(db: Session, season: Season) -> dict:
 router = APIRouter(tags=["seasons"])
 
 
-def list_seasons_out(db: Session) -> list[dict]:
-    seasons = ensure_standard_seasons(db)
-    return [_season_with_game_count(db, season) for season in seasons]
-
-
 @router.get("/seasons", response_model=list[SeasonOut])
 def list_seasons(_: object = Depends(require_active_user), db: Session = Depends(get_db)):
-    return list_seasons_out(db)
+    seasons = ensure_standard_seasons(db)
+    return [_season_with_game_count(db, season) for season in seasons]
 
 
 @router.get("/seasons/{id}", response_model=SeasonOut)
