@@ -1,7 +1,8 @@
-import { AccountSettingsCards, SecuritySettingsCards } from '@daveyplate/better-auth-ui';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
+import AccountSettingsCards from '../components/settings/AccountSettingsCards';
+import SecuritySettingsCards from '../components/settings/SecuritySettingsCards';
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
 

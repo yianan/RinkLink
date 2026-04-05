@@ -192,26 +192,6 @@ export default function EventsPage() {
     return values.sort((left, right) => left.localeCompare(right)).map((arenaName) => ({ value: arenaName, label: arenaName }));
   }, [effectiveSeason, events]);
 
-  if (!activeTeam) {
-    return <Alert variant="info">Select a team to view events.</Alert>;
-  }
-
-  const seasonEvents = events.filter((event) => !effectiveSeason || (event.date >= effectiveSeason.start_date && event.date <= effectiveSeason.end_date));
-  const filtered = seasonEvents.filter((event) => {
-    if (visibleTab === 'upcoming') return event.date >= todayStr;
-    if (visibleTab === 'past') return event.date < todayStr;
-    if (visibleTab === 'requests') return false;
-    return true;
-  }).filter((event) => (
-    (selectedEventTypes.length === 0 || selectedEventTypes.includes(event.event_type))
-    && (selectedStatuses.length === 0 || selectedStatuses.includes(event.status))
-    && (selectedArenaNames.length === 0 || (event.arena_name && selectedArenaNames.includes(event.arena_name)))
-  ));
-  const filteredRequests = bookingRequests.filter((request) => {
-    if (visibleTab !== 'requests') return false;
-    return true;
-  });
-
   const activeFilterBadges = useMemo(() => {
     const labelsFor = (options: FilterOption[], selectedValues: string[]) =>
       options.filter((option) => selectedValues.includes(option.value)).map((option) => option.label);
@@ -231,6 +211,26 @@ export default function EventsPage() {
   const getEventScoreEdit = (event: Event) => ({
     home: scoreEdits[event.id]?.home ?? (event.home_score != null ? String(event.home_score) : '0'),
     away: scoreEdits[event.id]?.away ?? (event.away_score != null ? String(event.away_score) : '0'),
+  });
+
+  if (!activeTeam) {
+    return <Alert variant="info">Select a team to view events.</Alert>;
+  }
+
+  const seasonEvents = events.filter((event) => !effectiveSeason || (event.date >= effectiveSeason.start_date && event.date <= effectiveSeason.end_date));
+  const filtered = seasonEvents.filter((event) => {
+    if (visibleTab === 'upcoming') return event.date >= todayStr;
+    if (visibleTab === 'past') return event.date < todayStr;
+    if (visibleTab === 'requests') return false;
+    return true;
+  }).filter((event) => (
+    (selectedEventTypes.length === 0 || selectedEventTypes.includes(event.event_type))
+    && (selectedStatuses.length === 0 || selectedStatuses.includes(event.status))
+    && (selectedArenaNames.length === 0 || (event.arena_name && selectedArenaNames.includes(event.arena_name)))
+  ));
+  const filteredRequests = bookingRequests.filter((request) => {
+    if (visibleTab !== 'requests') return false;
+    return true;
   });
 
   const saveBookingRequest = async () => {

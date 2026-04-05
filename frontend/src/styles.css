@@ -922,8 +922,16 @@ html.dark {
 
   .rinklink-settings-button {
     border-radius: 0.875rem !important;
+    min-height: 2.5rem !important;
+    padding-inline: 1rem !important;
     font-weight: 600 !important;
     box-shadow: none !important;
+    transition:
+      background-color 160ms ease,
+      background-image 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      box-shadow 160ms ease !important;
   }
 
   .rinklink-settings-button-primary {
@@ -931,6 +939,36 @@ html.dark {
     color: white !important;
     border: 0 !important;
     box-shadow: 0 10px 24px rgba(8, 47, 73, 0.18) !important;
+  }
+
+  .rinklink-settings-page [data-slot="button"][type="submit"].rinklink-settings-button,
+  .rinklink-settings-page [data-slot="button"].rinklink-settings-button-primary,
+  .rinklink-settings-page .rinklink-settings-button-primary {
+    background: linear-gradient(90deg, rgb(8 145 178), rgb(2 132 199), rgb(109 40 217)) !important;
+    color: white !important;
+    border: 0 !important;
+    box-shadow: 0 10px 24px rgba(8, 47, 73, 0.18) !important;
+  }
+
+  .rinklink-settings-page [data-slot="button"][type="submit"].rinklink-settings-button:disabled,
+  .rinklink-settings-page [data-slot="button"].rinklink-settings-button-primary:disabled,
+  .rinklink-settings-page .rinklink-settings-button-primary:disabled {
+    opacity: 1 !important;
+    border: 1px solid var(--app-border-subtle) !important;
+    background: var(--app-disabled-surface) !important;
+    color: var(--app-disabled-text) !important;
+    box-shadow: none !important;
+  }
+
+  .rinklink-settings-page [data-slot="button"][type="submit"].rinklink-settings-button:hover,
+  .rinklink-settings-page [data-slot="button"][type="submit"].rinklink-settings-button:focus-visible,
+  .rinklink-settings-page [data-slot="button"].rinklink-settings-button-primary:hover,
+  .rinklink-settings-page [data-slot="button"].rinklink-settings-button-primary:focus-visible,
+  .rinklink-settings-page .rinklink-settings-button-primary:hover,
+  .rinklink-settings-page .rinklink-settings-button-primary:focus-visible {
+    background: linear-gradient(90deg, rgb(6 182 212), rgb(14 165 233), rgb(124 58 237)) !important;
+    color: white !important;
+    box-shadow: 0 12px 28px rgba(8, 47, 73, 0.22) !important;
   }
 
   .rinklink-settings-button-outline,
@@ -950,6 +988,49 @@ html.dark {
     border-color: rgba(244, 63, 94, 0.24) !important;
     background: rgba(255, 241, 242, 0.92) !important;
     color: rgba(190, 24, 93, 1) !important;
+  }
+
+  .rinklink-settings-password-field {
+    position: relative;
+  }
+
+  .rinklink-settings-password-input {
+    padding-right: 5.75rem !important;
+  }
+
+  .rinklink-settings-password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.625rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transform: translateY(-50%);
+    border: 0;
+    background: transparent;
+    padding: 0.25rem;
+    color: var(--color-slate-500);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 160ms ease;
+  }
+
+  .rinklink-settings-password-toggle:hover {
+    color: var(--app-accent-link-hover);
+  }
+
+  .rinklink-settings-password-toggle:focus-visible {
+    outline: none;
+    border-radius: 0.5rem;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+    color: var(--app-accent-link-hover);
+  }
+
+  .rinklink-settings-password-toggle:disabled {
+    cursor: not-allowed;
+    color: var(--app-disabled-text);
   }
 
   .rinklink-settings-instructions {
@@ -1375,6 +1456,42 @@ html.dark {
     border-color: rgba(225, 29, 72, 0.3) !important;
     background: rgba(76, 5, 25, 0.5) !important;
     color: rgba(254, 205, 211, 1) !important;
+  }
+
+  html.dark .rinklink-settings-page [data-slot="button"][type="submit"].rinklink-settings-button,
+  html.dark .rinklink-settings-page [data-slot="button"].rinklink-settings-button-primary,
+  html.dark .rinklink-settings-page .rinklink-settings-button-primary {
+    color: rgb(2 6 23) !important;
+    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.22), 0 12px 30px rgba(34, 211, 238, 0.15) !important;
+  }
+
+  html.dark .rinklink-settings-page [data-slot="button"][type="submit"].rinklink-settings-button:disabled,
+  html.dark .rinklink-settings-page [data-slot="button"].rinklink-settings-button-primary:disabled,
+  html.dark .rinklink-settings-page .rinklink-settings-button-primary:disabled {
+    opacity: 1 !important;
+    border: 1px solid rgba(51, 65, 85, 0.56) !important;
+    background: rgba(15, 23, 42, 0.92) !important;
+    color: var(--app-disabled-text) !important;
+    box-shadow: none !important;
+  }
+
+  html.dark .rinklink-settings-page [data-slot="button"][type="submit"].rinklink-settings-button:hover,
+  html.dark .rinklink-settings-page [data-slot="button"][type="submit"].rinklink-settings-button:focus-visible,
+  html.dark .rinklink-settings-page [data-slot="button"].rinklink-settings-button-primary:hover,
+  html.dark .rinklink-settings-page [data-slot="button"].rinklink-settings-button-primary:focus-visible,
+  html.dark .rinklink-settings-page .rinklink-settings-button-primary:hover,
+  html.dark .rinklink-settings-page .rinklink-settings-button-primary:focus-visible {
+    color: rgb(2 6 23) !important;
+    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.3), 0 12px 30px rgba(34, 211, 238, 0.2) !important;
+  }
+
+  html.dark .rinklink-settings-password-toggle {
+    color: var(--color-slate-400);
+  }
+
+  html.dark .rinklink-settings-password-toggle:hover,
+  html.dark .rinklink-settings-password-toggle:focus-visible {
+    color: rgba(103, 232, 249, 1);
   }
 
   html.dark .rinklink-settings-cell {

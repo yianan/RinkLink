@@ -122,6 +122,18 @@ export default function ProposalsPage() {
     api.getAvailableIceSlots(rescheduleForm.arena_rink_id, rescheduleForm.proposed_date).then(setSlots).catch(() => setSlots([]));
   }, [rescheduleForm.arena_rink_id, rescheduleForm.proposed_date]);
 
+  const sortedProposals = useMemo(() => {
+    const next = proposals.slice();
+    if (tab === 'history') {
+      return next.sort((left, right) =>
+        `${right.responded_at || right.updated_at}`.localeCompare(`${left.responded_at || left.updated_at}`),
+      );
+    }
+    return next.sort((left, right) =>
+      `${left.proposed_date}${left.proposed_start_time || ''}`.localeCompare(`${right.proposed_date}${right.proposed_start_time || ''}`),
+    );
+  }, [proposals, tab]);
+
   if (!activeTeam) {
     return <Alert variant="info">Select a team to review proposals.</Alert>;
   }
@@ -188,18 +200,6 @@ export default function ProposalsPage() {
     pushToast({ variant: 'success', title: 'Reschedule request sent' });
     load();
   };
-
-  const sortedProposals = useMemo(() => {
-    const next = proposals.slice();
-    if (tab === 'history') {
-      return next.sort((left, right) =>
-        `${right.responded_at || right.updated_at}`.localeCompare(`${left.responded_at || left.updated_at}`),
-      );
-    }
-    return next.sort((left, right) =>
-      `${left.proposed_date}${left.proposed_start_time || ''}`.localeCompare(`${right.proposed_date}${right.proposed_start_time || ''}`),
-    );
-  }, [proposals, tab]);
 
   return (
     <div className="space-y-4">

@@ -50,14 +50,6 @@ export default function ArenaListPage() {
     load();
   }, []);
 
-  if (!arenaVisible) {
-    return <Card className="p-6 text-sm text-slate-600 dark:text-slate-400">You do not have access to the arena directory.</Card>;
-  }
-
-  const setField = (key: keyof typeof emptyForm, value: string) => {
-    setForm((current) => ({ ...current, [key]: value }));
-  };
-
   useEffect(() => {
     if (!arenaLogoFile) {
       setArenaLogoPreviewUrl(removeArenaLogo ? null : (editArena?.logo_url ?? null));
@@ -67,6 +59,14 @@ export default function ArenaListPage() {
     setArenaLogoPreviewUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [arenaLogoFile, editArena?.logo_url, removeArenaLogo]);
+
+  if (!arenaVisible) {
+    return <Card className="p-6 text-sm text-slate-600 dark:text-slate-400">You do not have access to the arena directory.</Card>;
+  }
+
+  const setField = (key: keyof typeof emptyForm, value: string) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
 
   const openCreate = () => {
     setEditArena(null);

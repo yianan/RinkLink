@@ -188,13 +188,6 @@ export default function AvailabilityPage() {
 
   useEffect(() => load(), [activeTeam?.id, effectiveSeason?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!activeTeam) {
-    return <Alert variant="info">Select a team to manage availability.</Alert>;
-  }
-  if (!scheduleEditable) {
-    return <Alert variant="error">You do not have permission to manage availability for this team.</Alert>;
-  }
-
   const sortedAvailability = [...availability].sort((left, right) => {
     const dateCompare = left.date.localeCompare(right.date);
     if (dateCompare !== 0) return dateCompare;
@@ -283,6 +276,13 @@ export default function AvailabilityPage() {
 
     return months;
   }, [effectiveSeason]);
+
+  if (!activeTeam) {
+    return <Alert variant="info">Select a team to manage availability.</Alert>;
+  }
+  if (!scheduleEditable) {
+    return <Alert variant="error">You do not have permission to manage availability for this team.</Alert>;
+  }
 
   const saveAvailability = async () => {
     if (availabilityTimeError) {
