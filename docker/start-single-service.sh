@@ -33,7 +33,7 @@ export PUBLIC_APP_URL AUTH_INTERNAL_BASE_URL AUTH_SERVICE_PORT AUTH_DATABASE_URL
 
 cd /app/auth-service
 node dist/ensure-auth-schema.js
-npm run auth:migrate:yes
+npm run auth:migrate:compiled:yes
 PORT="$AUTH_SERVICE_PORT" node dist/index.js &
 AUTH_PID=$!
 
