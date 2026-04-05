@@ -8,7 +8,7 @@ import { auth } from "./auth.js";
 import { resolvePublicAppUrl } from "./config.js";
 
 const app = new Hono();
-const port = Number(process.env.PORT || 3000);
+const port = Number(process.env.AUTH_SERVICE_PORT || process.env.PORT || 3000);
 const frontendUrl = resolvePublicAppUrl();
 
 function authProxyRequest(request: Request, pathname: string): Request {
