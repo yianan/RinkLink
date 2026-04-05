@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, DateTime
+from sqlalchemy import String, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -18,8 +18,10 @@ class Association(Base):
     city: Mapped[str] = mapped_column(String(100), default="")
     state: Mapped[str] = mapped_column(String(2), default="")
     zip_code: Mapped[str] = mapped_column(String(10), default="")
+    logo_asset_id: Mapped[str | None] = mapped_column(ForeignKey("media_assets.id", ondelete="SET NULL"), nullable=True)
     logo_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     teams = relationship("Team", back_populates="association", cascade="all, delete-orphan")
+    logo_asset = relationship("MediaAsset", foreign_keys=[logo_asset_id])

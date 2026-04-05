@@ -13,6 +13,7 @@ from .arena import Arena, ArenaRink, LockerRoom, IceSlot
 from .season import Season, TeamSeasonRecord
 from .competition import Competition, CompetitionDivision, TeamCompetitionMembership
 from .team_season_venue_assignment import TeamSeasonVenueAssignment
+from .media_asset import MediaAsset
 from .auth import (
     AppUser,
     AssociationMembership,
@@ -50,6 +51,7 @@ __all__ = [
     "CompetitionDivision",
     "TeamCompetitionMembership",
     "TeamSeasonVenueAssignment",
+    "MediaAsset",
     "AppUser",
     "AssociationMembership",
     "TeamMembership",

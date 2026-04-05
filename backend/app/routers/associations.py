@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ..auth.context import AuthorizationContext, authorization_context, ensure_association_access, ensure_capability
@@ -7,7 +6,7 @@ from ..database import get_db
 from ..models import Association
 from ..schemas import AssociationCreate, AssociationUpdate, AssociationOut
 from ..services.association_logos import (
-    association_logo_file_path,
+    association_logo_response,
     association_logo_url,
     delete_association_logo_if_unused,
     save_association_logo_upload,
@@ -18,13 +17,13 @@ router = APIRouter(tags=["associations"])
 
 def _association_out(association: Association) -> AssociationOut:
     out = AssociationOut.model_validate(association)
-    out.logo_url = association_logo_url(association.logo_path)
+    out.logo_url = association_logo_url(association.logo_asset_id, association.logo_path)
     return out
 
 
 @router.get("/association-logos/{filename}", include_in_schema=False)
-def get_association_logo(filename: str):
-    return FileResponse(association_logo_file_path(filename))
+def get_association_logo(filename: str, db: Session = Depends(get_db)):
+    return association_logo_response(db, filename)
 
 
 @router.get("/associations", response_model=list[AssociationOut])
@@ -95,11 +94,12 @@ async def upload_association_logo(
     if not assoc:
         raise HTTPException(404, "Association not found")
     ensure_association_access(context, assoc.id, "association.manage")
-    previous_logo_path = assoc.logo_path
-    assoc.logo_path = await save_association_logo_upload(id, file)
+    previous_logo_asset_id = assoc.logo_asset_id
+    assoc.logo_asset_id = await save_association_logo_upload(db, id, file)
+    assoc.logo_path = None
     db.commit()
     db.refresh(assoc)
-    delete_association_logo_if_unused(db, previous_logo_path, ignore_association_id=assoc.id)
+    delete_association_logo_if_unused(db, previous_logo_asset_id, ignore_association_id=assoc.id)
     return _association_out(assoc)
 
 
@@ -113,11 +113,12 @@ def delete_association_logo(
     if not assoc:
         raise HTTPException(404, "Association not found")
     ensure_association_access(context, assoc.id, "association.manage")
-    previous_logo_path = assoc.logo_path
+    previous_logo_asset_id = assoc.logo_asset_id
+    assoc.logo_asset_id = None
     assoc.logo_path = None
     db.commit()
     db.refresh(assoc)
-    delete_association_logo_if_unused(db, previous_logo_path, ignore_association_id=assoc.id)
+    delete_association_logo_if_unused(db, previous_logo_asset_id, ignore_association_id=assoc.id)
     return _association_out(assoc)
 
 

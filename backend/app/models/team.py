@@ -20,6 +20,7 @@ class Team(Base):
     manager_name: Mapped[str] = mapped_column(String(200), default="")
     manager_email: Mapped[str] = mapped_column(String(200), default="")
     manager_phone: Mapped[str] = mapped_column(String(30), default="")
+    logo_asset_id: Mapped[str | None] = mapped_column(ForeignKey("media_assets.id", ondelete="SET NULL"), nullable=True)
     logo_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     myhockey_ranking: Mapped[int | None] = mapped_column(Integer, nullable=True)
     wins: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
@@ -29,4 +30,5 @@ class Team(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     association = relationship("Association", back_populates="teams")
+    logo_asset = relationship("MediaAsset", foreign_keys=[logo_asset_id])
     competition_memberships = relationship("TeamCompetitionMembership", back_populates="team", cascade="all, delete-orphan", foreign_keys="[TeamCompetitionMembership.team_id]")

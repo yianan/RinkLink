@@ -1,0 +1,38 @@
+services:
+  - type: web
+    runtime: docker
+    name: rinklink-branch-app
+    branch: codex/auth-foundation
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_ENV
+        value: development
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTH_ENABLED
+        value: "true"
+      - key: AUTH_BYPASS_DEV_ONLY
+        value: "false"
+      - key: AUTH_INTERNAL_BASE_URL
+        value: http://127.0.0.1:3000
+      - key: AUTH_DATABASE_SCHEMA
+        value: auth
+      - key: EMAIL_FROM_NAME
+        value: RinkLink
+      - key: EMAIL_FROM_ADDRESS
+        sync: false
+      - key: SMTP_HOST
+        value: smtp-relay.brevo.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_STARTTLS
+        value: "true"
+      - key: SMTP_USE_SSL
+        value: "false"
+      - key: BETTER_AUTH_SECRET
+        generateValue: true

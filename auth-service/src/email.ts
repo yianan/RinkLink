@@ -2,6 +2,8 @@ import "dotenv/config";
 
 import nodemailer from "nodemailer";
 
+import { resolvePublicAppUrl } from "./config.js";
+
 type EmailConfig = {
   from: string;
   frontendUrl: string;
@@ -25,7 +27,7 @@ let transportPromise: Promise<nodemailer.Transporter> | null = null;
 function loadConfig(): EmailConfig | null {
   const host = process.env.SMTP_HOST?.trim();
   const fromEmail = process.env.EMAIL_FROM_ADDRESS?.trim();
-  const frontendUrl = process.env.FRONTEND_URL?.trim();
+  const frontendUrl = resolvePublicAppUrl();
 
   if (!host || !fromEmail || !frontendUrl) {
     return null;
@@ -97,7 +99,7 @@ function appFooter(frontendUrl: string): string {
 
 export async function sendVerificationEmail(to: string, verificationUrl: string): Promise<void> {
   const config = loadConfig();
-  const frontendUrl = config?.frontendUrl || (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/+$/, "");
+  const frontendUrl = config?.frontendUrl || resolvePublicAppUrl();
   const subject = "Verify your RinkLink email";
   const text = [
     "Welcome to RinkLink.",
@@ -136,7 +138,7 @@ export async function sendVerificationEmail(to: string, verificationUrl: string)
 
 export async function sendResetPasswordEmail(to: string, resetUrl: string): Promise<void> {
   const config = loadConfig();
-  const frontendUrl = config?.frontendUrl || (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/+$/, "");
+  const frontendUrl = config?.frontendUrl || resolvePublicAppUrl();
   const subject = "Reset your RinkLink password";
   const text = [
     "A password reset was requested for your RinkLink account.",

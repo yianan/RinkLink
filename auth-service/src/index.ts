@@ -5,10 +5,11 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 import { auth } from "./auth.js";
+import { resolvePublicAppUrl } from "./config.js";
 
 const app = new Hono();
 const port = Number(process.env.PORT || 3000);
-const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+const frontendUrl = resolvePublicAppUrl();
 
 function authProxyRequest(request: Request, pathname: string): Request {
   const url = new URL(request.url);

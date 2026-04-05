@@ -1,65 +1,51 @@
 from __future__ import annotations
 
-from pathlib import Path
-import uuid
-
-from fastapi import HTTPException, UploadFile
+from fastapi import UploadFile
 from sqlalchemy.orm import Session
+from starlette.responses import Response
 
-from ..models import Arena
-from .media_paths import ensure_upload_media_dir, is_upload_media_path, media_file_path, upload_media_dir
+from ..models import Arena, MediaAsset
+from .logo_assets import create_media_asset, media_asset_response, media_asset_url, read_logo_upload
 
-ARENA_LOGO_KIND = "arena-logos"
-ALLOWED_ARENA_LOGO_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".svg"}
-MAX_ARENA_LOGO_BYTES = 4 * 1024 * 1024
-
-
-def ensure_arena_logo_dir() -> None:
-    ensure_upload_media_dir(ARENA_LOGO_KIND)
+ARENA_LOGO_KIND = "arena-logo"
+ARENA_LOGO_ROUTE = "arena-logos"
+LEGACY_ARENA_LOGO_KIND = "arena-logos"
 
 
-def arena_logo_url(logo_path: str | None) -> str | None:
-    if not logo_path:
-        return None
-    return f"/api/arena-logos/{Path(logo_path).name}"
+def arena_logo_url(logo_asset_id: str | None, logo_path: str | None = None) -> str | None:
+    return media_asset_url(ARENA_LOGO_ROUTE, logo_asset_id, logo_path)
 
 
-def arena_logo_file_path(logo_path: str) -> Path:
-    filename = Path(logo_path).name
-    if filename != logo_path:
-        raise HTTPException(404, "Logo not found")
-    ensure_arena_logo_dir()
-    try:
-        file_path = media_file_path(ARENA_LOGO_KIND, filename)
-    except FileNotFoundError:
-        raise HTTPException(404, "Logo not found")
-    return file_path
+def arena_logo_response(db: Session, asset_ref: str) -> Response:
+    return media_asset_response(
+        db,
+        asset_ref=asset_ref,
+        kind=ARENA_LOGO_KIND,
+        legacy_kind=LEGACY_ARENA_LOGO_KIND,
+    )
 
 
-async def save_arena_logo_upload(arena_id: str, file: UploadFile) -> str:
-    ensure_arena_logo_dir()
-    suffix = Path(file.filename or "").suffix.lower()
-    if suffix not in ALLOWED_ARENA_LOGO_SUFFIXES:
-        raise HTTPException(400, "Logo must be a PNG, JPG, WEBP, or SVG file")
-    payload = await file.read()
-    if not payload:
-        raise HTTPException(400, "Uploaded logo is empty")
-    if len(payload) > MAX_ARENA_LOGO_BYTES:
-        raise HTTPException(400, "Logo must be 4 MB or smaller")
-    filename = f"arena-{arena_id}-{uuid.uuid4().hex}{suffix}"
-    file_path = upload_media_dir(ARENA_LOGO_KIND) / filename
-    file_path.write_bytes(payload)
-    return filename
+async def save_arena_logo_upload(db: Session, arena_id: str, file: UploadFile) -> str:
+    filename, payload, content_type = await read_logo_upload(file)
+    asset = create_media_asset(
+        db,
+        kind=ARENA_LOGO_KIND,
+        filename=f"arena-{arena_id}-{filename}",
+        payload=payload,
+        content_type=content_type,
+    )
+    return asset.id
 
 
-def delete_arena_logo_if_unused(db: Session, logo_path: str | None, *, ignore_arena_id: str | None = None) -> None:
-    if not logo_path:
+def delete_arena_logo_if_unused(db: Session, logo_asset_id: str | None, *, ignore_arena_id: str | None = None) -> None:
+    if not logo_asset_id:
         return
-    query = db.query(Arena).filter(Arena.logo_path == logo_path)
+    query = db.query(Arena).filter(Arena.logo_asset_id == logo_asset_id)
     if ignore_arena_id:
         query = query.filter(Arena.id != ignore_arena_id)
     if query.first():
         return
-    file_path = upload_media_dir(ARENA_LOGO_KIND) / Path(logo_path).name
-    if file_path.exists() and is_upload_media_path(ARENA_LOGO_KIND, file_path):
-        file_path.unlink()
+    asset = db.get(MediaAsset, logo_asset_id)
+    if asset is not None:
+        db.delete(asset)
+        db.commit()

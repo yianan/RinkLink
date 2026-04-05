@@ -4,27 +4,28 @@ import { betterAuth } from "better-auth";
 import { jwt } from "better-auth/plugins";
 import { Pool } from "pg";
 
+import { resolveApiAudience, resolveBetterAuthUrl, resolvePublicAppUrl } from "./config.js";
 import { sendResetPasswordEmail, sendVerificationEmail } from "./email.js";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.AUTH_DATABASE_URL || process.env.DATABASE_URL;
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required for auth-service");
 }
 
-const baseURL = process.env.BETTER_AUTH_URL;
+const baseURL = resolveBetterAuthUrl();
 
 if (!baseURL) {
   throw new Error("BETTER_AUTH_URL is required for auth-service");
 }
 
-const frontendUrl = process.env.FRONTEND_URL;
+const frontendUrl = resolvePublicAppUrl();
 
 if (!frontendUrl) {
   throw new Error("FRONTEND_URL is required for auth-service");
 }
 
-const apiAudience = process.env.API_AUDIENCE;
+const apiAudience = resolveApiAudience();
 
 if (!apiAudience) {
   throw new Error("API_AUDIENCE is required for auth-service");

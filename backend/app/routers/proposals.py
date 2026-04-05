@@ -68,7 +68,10 @@ def _proposal_out(proposal: Proposal, db: Session) -> ProposalOut:
     out.home_team_association = proposal.home_team.association.name if proposal.home_team and proposal.home_team.association else None
     out.away_team_association = proposal.away_team.association.name if proposal.away_team and proposal.away_team.association else None
     out.arena_name = proposal.arena.name if proposal.arena else None
-    out.arena_logo_url = arena_logo_url(proposal.arena.logo_path if proposal.arena else None)
+    out.arena_logo_url = arena_logo_url(
+        proposal.arena.logo_asset_id if proposal.arena else None,
+        proposal.arena.logo_path if proposal.arena else None,
+    )
     out.arena_rink_name = proposal.arena_rink.name if proposal.arena_rink else None
     out.home_locker_room_name = proposal.home_locker_room.name if proposal.home_locker_room else None
     out.away_locker_room_name = proposal.away_locker_room.name if proposal.away_locker_room else None

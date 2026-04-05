@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from datetime import date, time, timedelta
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..database import Base
 from ..models import (
+    AppUser,
     Arena,
     ArenaRink,
     Association,
@@ -32,12 +34,32 @@ from ..models import (
     TeamSeasonVenueAssignment,
     ZipCode,
 )
+from ..services.logo_assets import create_bundled_media_asset
 from ..services.records import recompute_team_records
 from ..services.season_utils import canonical_season_bounds, canonical_season_name
 
 
 def _id() -> str:
     return str(uuid.uuid4())
+
+
+@dataclass(slots=True)
+class PreservedAppUser:
+    auth_id: str
+    email: str
+    display_name: str | None
+    is_platform_admin: bool = True
+    status: str = "active"
+
+
+def preserve_app_user(user: AppUser) -> PreservedAppUser:
+    return PreservedAppUser(
+        auth_id=user.auth_id,
+        email=user.email,
+        display_name=user.display_name,
+        is_platform_admin=user.is_platform_admin,
+        status=user.status,
+    )
 
 
 def _current_alembic_head() -> str:
@@ -72,6 +94,33 @@ def _drop_all_tables(db: Session) -> None:
                 conn.exec_driver_sql(f'DROP TABLE IF EXISTS "{table_name}"')
         if bind.dialect.name == "sqlite":
             conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+
+
+def _restore_preserved_users(db: Session, preserved_users: list[PreservedAppUser]) -> None:
+    if not preserved_users:
+        return
+
+    for preserved_user in preserved_users:
+        db.add(
+            AppUser(
+                auth_id=preserved_user.auth_id,
+                email=preserved_user.email,
+                display_name=preserved_user.display_name,
+                status=preserved_user.status,
+                is_platform_admin=preserved_user.is_platform_admin,
+            )
+        )
+    db.commit()
+
+
+def _seed_demo_logo_asset(db: Session, *, kind: str, bundled_kind: str, filename: str) -> str:
+    asset = create_bundled_media_asset(
+        db,
+        kind=kind,
+        bundled_kind=bundled_kind,
+        filename=filename,
+    )
+    return asset.id
 
 
 def seed_zip_codes(db: Session):
@@ -149,8 +198,14 @@ def _assert_seed_booking_request_links(db: Session, booking_requests: list[IceBo
                 raise RuntimeError(f"Seed booking request {request.id} does not match its accepted event slot")
 
 
-def seed_demo_data(db: Session):
+def seed_demo_data(
+    db: Session,
+    *,
+    preserved_users: list[PreservedAppUser] | None = None,
+):
+    preserved_users = preserved_users or []
     db.rollback()
+    db.expunge_all()
     _drop_all_tables(db)
     bind = db.get_bind()
     Base.metadata.create_all(bind=bind)
@@ -169,29 +224,45 @@ def seed_demo_data(db: Session):
     )
     db.add(season)
 
+    association_logo_assets = {
+        "northshore": _seed_demo_logo_asset(db, kind="association-logo", bundled_kind="association-logos", filename="northshore-club-demo.svg"),
+        "mission": _seed_demo_logo_asset(db, kind="association-logo", bundled_kind="association-logos", filename="mission-club-official.png"),
+        "team_illinois": _seed_demo_logo_asset(db, kind="association-logo", bundled_kind="association-logos", filename="team-illinois-club-official.png"),
+    }
+    team_logo_assets = {
+        "northshore": _seed_demo_logo_asset(db, kind="team-logo", bundled_kind="team-logos", filename="northshore-demo.svg"),
+        "mission": _seed_demo_logo_asset(db, kind="team-logo", bundled_kind="team-logos", filename="mission-official.png"),
+        "team_illinois": _seed_demo_logo_asset(db, kind="team-logo", bundled_kind="team-logos", filename="team-illinois-official.png"),
+    }
+    arena_logo_assets = {
+        "centennial": _seed_demo_logo_asset(db, kind="arena-logo", bundled_kind="arena-logos", filename="centennial-demo.svg"),
+        "edge": _seed_demo_logo_asset(db, kind="arena-logo", bundled_kind="arena-logos", filename="edge-demo.svg"),
+        "fox": _seed_demo_logo_asset(db, kind="arena-logo", bundled_kind="arena-logos", filename="foxvalley-demo.svg"),
+    }
+
     associations = [
-        Association(id=_id(), name="Northshore Youth Hockey", address="1215 Wilmette Ave", city="Wilmette", state="IL", zip_code="60091", logo_path="northshore-club-demo.svg"),
-        Association(id=_id(), name="Chicago Mission", address="900 W Devon Ave", city="Bensenville", state="IL", zip_code="60106", logo_path="mission-club-official.png"),
-        Association(id=_id(), name="Team Illinois", address="710 Western Ave", city="Geneva", state="IL", zip_code="60134", logo_path="team-illinois-club-official.png"),
+        Association(id=_id(), name="Northshore Youth Hockey", address="1215 Wilmette Ave", city="Wilmette", state="IL", zip_code="60091", logo_asset_id=association_logo_assets["northshore"]),
+        Association(id=_id(), name="Chicago Mission", address="900 W Devon Ave", city="Bensenville", state="IL", zip_code="60106", logo_asset_id=association_logo_assets["mission"]),
+        Association(id=_id(), name="Team Illinois", address="710 Western Ave", city="Geneva", state="IL", zip_code="60134", logo_asset_id=association_logo_assets["team_illinois"]),
     ]
     db.add_all(associations)
     db.flush()
 
     teams = [
-        Team(id=_id(), association_id=associations[0].id, name="Northshore 14U AA", age_group="14U", level="AA", manager_name="Mike Johnson", manager_email="mike@northshore.org", manager_phone="847-555-0101", logo_path="northshore-demo.svg", myhockey_ranking=15),
-        Team(id=_id(), association_id=associations[0].id, name="Northshore 12U A", age_group="12U", level="A", manager_name="Sarah Chen", manager_email="sarah@northshore.org", manager_phone="847-555-0102", logo_path="northshore-demo.svg", myhockey_ranking=25),
-        Team(id=_id(), association_id=associations[1].id, name="Mission 14U AA", age_group="14U", level="AA", manager_name="Tom Williams", manager_email="tom@mission.org", manager_phone="630-555-0201", logo_path="mission-official.png", myhockey_ranking=8),
-        Team(id=_id(), association_id=associations[1].id, name="Mission 12U A", age_group="12U", level="A", manager_name="Lisa Park", manager_email="lisa@mission.org", manager_phone="630-555-0202", logo_path="mission-official.png", myhockey_ranking=12),
-        Team(id=_id(), association_id=associations[2].id, name="Team IL 14U AA", age_group="14U", level="AA", manager_name="Dave Brown", manager_email="dave@teamil.org", manager_phone="630-555-0301", logo_path="team-illinois-official.png", myhockey_ranking=20),
-        Team(id=_id(), association_id=associations[2].id, name="Team IL 12U A", age_group="12U", level="A", manager_name="Amy White", manager_email="amy@teamil.org", manager_phone="630-555-0302", logo_path="team-illinois-official.png", myhockey_ranking=30),
+        Team(id=_id(), association_id=associations[0].id, name="Northshore 14U AA", age_group="14U", level="AA", manager_name="Mike Johnson", manager_email="mike@northshore.org", manager_phone="847-555-0101", logo_asset_id=team_logo_assets["northshore"], myhockey_ranking=15),
+        Team(id=_id(), association_id=associations[0].id, name="Northshore 12U A", age_group="12U", level="A", manager_name="Sarah Chen", manager_email="sarah@northshore.org", manager_phone="847-555-0102", logo_asset_id=team_logo_assets["northshore"], myhockey_ranking=25),
+        Team(id=_id(), association_id=associations[1].id, name="Mission 14U AA", age_group="14U", level="AA", manager_name="Tom Williams", manager_email="tom@mission.org", manager_phone="630-555-0201", logo_asset_id=team_logo_assets["mission"], myhockey_ranking=8),
+        Team(id=_id(), association_id=associations[1].id, name="Mission 12U A", age_group="12U", level="A", manager_name="Lisa Park", manager_email="lisa@mission.org", manager_phone="630-555-0202", logo_asset_id=team_logo_assets["mission"], myhockey_ranking=12),
+        Team(id=_id(), association_id=associations[2].id, name="Team IL 14U AA", age_group="14U", level="AA", manager_name="Dave Brown", manager_email="dave@teamil.org", manager_phone="630-555-0301", logo_asset_id=team_logo_assets["team_illinois"], myhockey_ranking=20),
+        Team(id=_id(), association_id=associations[2].id, name="Team IL 12U A", age_group="12U", level="A", manager_name="Amy White", manager_email="amy@teamil.org", manager_phone="630-555-0302", logo_asset_id=team_logo_assets["team_illinois"], myhockey_ranking=30),
     ]
     db.add_all(teams)
     db.flush()
 
     arenas = [
-        Arena(id=_id(), name="Centennial Ice Arena", address="2300 Old Glenview Rd", city="Wilmette", state="IL", zip_code="60091", phone="847-555-1100", contact_email="ops@centennialice.com", logo_path="centennial-demo.svg", website="https://centennial.example.com"),
-        Arena(id=_id(), name="Edge Ice Center", address="4500 Devon Ave", city="Bensenville", state="IL", zip_code="60106", phone="630-555-1200", contact_email="ops@edgeice.com", logo_path="edge-demo.svg", website="https://edge.example.com"),
-        Arena(id=_id(), name="Fox Valley Ice House", address="710 Western Ave", city="Geneva", state="IL", zip_code="60134", phone="630-555-1300", contact_email="ops@foxvalleyice.com", logo_path="foxvalley-demo.svg", website="https://foxvalley.example.com"),
+        Arena(id=_id(), name="Centennial Ice Arena", address="2300 Old Glenview Rd", city="Wilmette", state="IL", zip_code="60091", phone="847-555-1100", contact_email="ops@centennialice.com", logo_asset_id=arena_logo_assets["centennial"], website="https://centennial.example.com"),
+        Arena(id=_id(), name="Edge Ice Center", address="4500 Devon Ave", city="Bensenville", state="IL", zip_code="60106", phone="630-555-1200", contact_email="ops@edgeice.com", logo_asset_id=arena_logo_assets["edge"], website="https://edge.example.com"),
+        Arena(id=_id(), name="Fox Valley Ice House", address="710 Western Ave", city="Geneva", state="IL", zip_code="60134", phone="630-555-1300", contact_email="ops@foxvalleyice.com", logo_asset_id=arena_logo_assets["fox"], website="https://foxvalley.example.com"),
     ]
     db.add_all(arenas)
     db.flush()
@@ -925,6 +996,8 @@ def seed_demo_data(db: Session):
         recompute_team_records(db, team.id)
     db.commit()
 
+    _restore_preserved_users(db, preserved_users)
+
     return {
         "associations": len(associations),
         "teams": len(teams),
@@ -938,4 +1011,5 @@ def seed_demo_data(db: Session):
         "proposals": 2,
         "booking_requests": len(booking_requests),
         "notifications": len(notifications),
+        "preserved_users": len(preserved_users),
     }

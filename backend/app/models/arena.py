@@ -20,6 +20,7 @@ class Arena(Base):
     zip_code: Mapped[str] = mapped_column(String(10), default="")
     phone: Mapped[str] = mapped_column(String(30), default="")
     contact_email: Mapped[str] = mapped_column(String(200), default="")
+    logo_asset_id: Mapped[str | None] = mapped_column(ForeignKey("media_assets.id", ondelete="SET NULL"), nullable=True)
     logo_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     website: Mapped[str | None] = mapped_column(String(500), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -31,6 +32,7 @@ class Arena(Base):
     )
 
     rinks = relationship("ArenaRink", back_populates="arena", cascade="all, delete-orphan")
+    logo_asset = relationship("MediaAsset", foreign_keys=[logo_asset_id])
 
 
 class ArenaRink(Base):

@@ -33,7 +33,7 @@ def enrich_event(event: Event, db: Session) -> EventOut:
     out.home_association_name = home_assoc.name if home_assoc else None
     out.away_association_name = away_assoc.name if away_assoc else None
     out.arena_name = arena.name if arena else None
-    out.arena_logo_url = arena_logo_url(arena.logo_path if arena else None)
+    out.arena_logo_url = arena_logo_url(arena.logo_asset_id if arena else None, arena.logo_path if arena else None)
     out.arena_rink_name = arena_rink.name if arena_rink else None
     out.home_locker_room_name = home_locker.name if home_locker else None
     out.away_locker_room_name = away_locker.name if away_locker else None

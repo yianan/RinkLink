@@ -42,7 +42,10 @@ def _request_out(request_row: IceBookingRequest, db: Session) -> IceBookingReque
     out.away_team_logo_url = effective_team_logo_url(away_team, away_assoc)
     out.away_association_name = away_assoc.name if away_assoc else None
     out.arena_name = arena.name if arena else None
-    out.arena_logo_url = arena_logo_url(arena.logo_path if arena else None)
+    out.arena_logo_url = arena_logo_url(
+        arena.logo_asset_id if arena else None,
+        arena.logo_path if arena else None,
+    )
     out.arena_rink_name = rink.name if rink else None
     out.home_locker_room_name = request_row.home_locker_room.name if request_row.home_locker_room else None
     out.away_locker_room_name = request_row.away_locker_room.name if request_row.away_locker_room else None

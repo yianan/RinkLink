@@ -69,7 +69,7 @@ uvicorn app.main:app --reload --port 8000
 Defaults:
 
 - `DATABASE_URL`: `postgresql://postgres:postgres@localhost:5432/rinklink`
-- `MEDIA_ROOT`: `backend/media`
+- `MEDIA_ROOT`: `backend/media` (legacy fallback only; new logo uploads are stored in Postgres)
 - `CORS_ORIGINS`: `http://localhost:5173,http://localhost:5174`
 - `AUTH_ENABLED`: `true`
 - `AUTH_JWKS_URL`: `http://localhost:3000/.well-known/jwks.json`
@@ -229,53 +229,90 @@ If you containerize the backend, the start command should continue to do this be
 
 Current cloud shape:
 
-1. Frontend on Render
+1. One Render web service built from this repo
 2. PostgreSQL on Neon
-3. Backend deployed from this repo and pointed at Neon via `DATABASE_URL`
-4. Persistent media storage for uploaded logos via `MEDIA_ROOT`
+3. Better Auth running inside the same container on loopback
+4. Uploaded and seeded logos stored in Postgres instead of on a Render disk
 
 ### Required environment
 
 | Variable | Example | Purpose |
 |---|---|---|
 | `DATABASE_URL` | Neon Postgres connection URL | Primary application database |
-| `MEDIA_ROOT` | `/var/data/rinklink-media` | Persistent storage for uploaded logos |
-| `CORS_ORIGINS` | `https://your-frontend.onrender.com` | Browser origins allowed to call the API |
+| `EMAIL_FROM_ADDRESS` | `no-reply@example.com` | Verified Brevo sender address |
+| `SMTP_USERNAME` | `your-brevo-smtp-login` | Brevo SMTP username |
+| `SMTP_PASSWORD` | `your-brevo-smtp-key` | Brevo SMTP key |
 
-### Why `MEDIA_ROOT` matters
+### Branch dev sandbox on Render
 
-Bundled demo logos ship in the repository, but uploaded team / arena / association logos must not live on the container filesystem. Containers are replaceable; persistent disks are not.
+This branch now supports a separate Render-hosted development sandbox while `main` stays live.
 
-Use a Render disk mount and point `MEDIA_ROOT` at that mount path.
+- The public app service stays the only browser-visible URL.
+- The Better Auth service runs inside the same container on `127.0.0.1:3000` and is proxied through the app at `/api/auth/*`.
+- Neon remains the database for both the app schema and the Better Auth `auth` schema.
+- The branch app should run with `APP_ENV=development` so the dashboard `Reset Demo Data` button continues to work against the branch database.
+- The hosted reset path is intentionally destructive for this sandbox, but it restores the triggering platform admin so the browser can reload back into a working session.
+- Demo logos and uploaded logos are both stored in Postgres, so the branch sandbox does not require a Render disk.
+
+The included `render.yaml` provisions:
+
+- a single public Docker app service from the repo root
+- env placeholders for Neon and Brevo secrets
+
+Render-specific notes:
+
+- the backend derives its public origin defaults from `RENDER_EXTERNAL_URL`
+- the backend proxies Better Auth through `AUTH_INTERNAL_BASE_URL`, which defaults to `http://127.0.0.1:3000` in the single-service container
+- the startup script derives `AUTH_DATABASE_URL` from `DATABASE_URL` by adding `search_path=auth`
+- the Docker build sets `VITE_AUTH_ENABLED=true` for the hosted frontend build
+
+### Initial branch bootstrap
+
+After the branch service is deployed:
+
+1. Sign up and verify the intended admin through the branch app URL.
+2. Sign in once through the app so `/api/me` creates the matching `app_users` row.
+3. Run a one-off command against the app service:
+
+```bash
+python -m app.seed.bootstrap_demo --admin-email you@example.com
+```
+
+That command:
+
+- resets the branch database to the existing demo dataset
+- restores the specified user as `active` + `platform_admin`
+- leaves future `Reset Demo Data` actions available from the frontend for that branch sandbox
 
 ### First cloud deploy
 
-1. Create a Neon Postgres database.
-2. Provision persistent filesystem storage for uploaded media wherever the backend runs.
-3. Set:
-   - `DATABASE_URL` to the Neon connection URL
-   - `MEDIA_ROOT` to the mounted media path
-   - `CORS_ORIGINS` to the Render frontend URL
-4. Deploy the backend service.
+1. Create or choose a Neon Postgres database or branch dedicated to this Render sandbox.
+2. Set `DATABASE_URL` in Render to the Neon connection URL.
+3. Set the Brevo SMTP credentials and verified sender values in Render.
+4. Deploy the single Docker web service.
 
 ```bash
 alembic upgrade head
 ```
 
-If your backend is running on Render, the existing Docker start command already does this automatically during boot:
+If the app is running on Render, the combined container startup already does all of the following automatically:
 
 ```bash
-alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+node dist/ensure-auth-schema.js
+npm run auth:migrate:yes
+alembic upgrade head
+uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
 ```
 
-That is the same core mechanism as before:
+That means:
 
 - Render rebuilds on push
-- the backend container starts
-- startup runs `alembic upgrade head`
-- Alembic reads `DATABASE_URL`
+- the single container starts both auth-service and FastAPI
+- Better Auth ensures the `auth` schema and applies its migrations
+- Alembic applies the app migrations
 - `DATABASE_URL` is normalized to a psycopg-backed Postgres URL when needed
-- migrations apply to Neon instead of local SQLite
+- both auth and app schemas live in Neon
+- logo assets are loaded from Postgres, not from container disk
 
 ### Existing local SQLite does not migrate to cloud automatically
 

@@ -1,7 +1,6 @@
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ..auth.context import (
@@ -32,7 +31,7 @@ from ..schemas import (
     TeamSeasonVenueAssignmentOut,
 )
 from ..services.arena_logos import (
-    arena_logo_file_path,
+    arena_logo_response,
     arena_logo_url,
     delete_arena_logo_if_unused,
     save_arena_logo_upload,
@@ -162,14 +161,14 @@ def _arena_id_for_slot(db: Session, slot: IceSlot) -> str:
 
 def _arena_out(arena: Arena, db: Session) -> ArenaOut:
     out = ArenaOut.model_validate(arena)
-    out.logo_url = arena_logo_url(arena.logo_path)
+    out.logo_url = arena_logo_url(arena.logo_asset_id, arena.logo_path)
     out.rink_count = db.query(ArenaRink).filter(ArenaRink.arena_id == arena.id).count()
     return out
 
 
 @router.get("/arena-logos/{filename}", include_in_schema=False)
-def get_arena_logo(filename: str):
-    return FileResponse(arena_logo_file_path(filename))
+def get_arena_logo(filename: str, db: Session = Depends(get_db)):
+    return arena_logo_response(db, filename)
 
 
 def _arena_rink_out(arena_rink: ArenaRink, db: Session) -> ArenaRinkOut:
@@ -300,11 +299,12 @@ async def upload_arena_logo(
 ):
     arena = _require_arena(db, arena_id)
     ensure_arena_access(context, arena_id, "arena.manage")
-    previous_logo_path = arena.logo_path
-    arena.logo_path = await save_arena_logo_upload(arena_id, file)
+    previous_logo_asset_id = arena.logo_asset_id
+    arena.logo_asset_id = await save_arena_logo_upload(db, arena_id, file)
+    arena.logo_path = None
     db.commit()
     db.refresh(arena)
-    delete_arena_logo_if_unused(db, previous_logo_path, ignore_arena_id=arena.id)
+    delete_arena_logo_if_unused(db, previous_logo_asset_id, ignore_arena_id=arena.id)
     return _arena_out(arena, db)
 
 
@@ -316,11 +316,12 @@ def delete_arena_logo(
 ):
     arena = _require_arena(db, arena_id)
     ensure_arena_access(context, arena_id, "arena.manage")
-    previous_logo_path = arena.logo_path
+    previous_logo_asset_id = arena.logo_asset_id
+    arena.logo_asset_id = None
     arena.logo_path = None
     db.commit()
     db.refresh(arena)
-    delete_arena_logo_if_unused(db, previous_logo_path, ignore_arena_id=arena.id)
+    delete_arena_logo_if_unused(db, previous_logo_asset_id, ignore_arena_id=arena.id)
     return _arena_out(arena, db)
 
 

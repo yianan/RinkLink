@@ -1,16 +1,16 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urljoin
 
-from fastapi import FastAPI
+import httpx
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
+from starlette.responses import Response
 
 from .config import settings
 from .database import engine  # noqa: F401 — imported to ensure engine is initialised
 from .auth.runtime import assert_auth_runtime_safe
-from .services.arena_logos import ensure_arena_logo_dir
-from .services.association_logos import ensure_association_logo_dir
-from .services.team_logos import ensure_team_logo_dir
 
 
 @asynccontextmanager
@@ -18,9 +18,6 @@ async def lifespan(app: FastAPI):
     from . import models  # noqa: F401
 
     assert_auth_runtime_safe()
-    ensure_team_logo_dir()
-    ensure_arena_logo_dir()
-    ensure_association_logo_dir()
     yield
 
 
@@ -39,6 +36,63 @@ app.add_middleware(
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+_UPSTREAM_HEADER_EXCLUDES = {
+    "connection",
+    "content-length",
+    "host",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade",
+}
+
+
+async def _proxy_auth_request(request: Request, upstream_path: str) -> Response:
+    if not settings.auth_internal_base_url:
+        raise HTTPException(status_code=503, detail="Auth proxy is not configured")
+
+    upstream_url = urljoin(f"{settings.auth_internal_base_url}/", upstream_path.lstrip("/"))
+    if request.url.query:
+        upstream_url = f"{upstream_url}?{request.url.query}"
+
+    headers = {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() not in _UPSTREAM_HEADER_EXCLUDES
+    }
+
+    async with httpx.AsyncClient(follow_redirects=False, timeout=30.0) as client:
+        upstream_response = await client.request(
+            method=request.method,
+            url=upstream_url,
+            headers=headers,
+            content=await request.body(),
+        )
+
+    response = Response(
+        content=upstream_response.content,
+        status_code=upstream_response.status_code,
+    )
+    for key, value in upstream_response.headers.multi_items():
+        if key.lower() in _UPSTREAM_HEADER_EXCLUDES:
+            continue
+        response.raw_headers.append((key.encode("latin-1"), value.encode("latin-1")))
+    return response
+
+
+@app.api_route("/api/auth/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"], include_in_schema=False)
+async def auth_proxy(path: str, request: Request) -> Response:
+    return await _proxy_auth_request(request, f"/api/auth/{path}")
+
+
+@app.api_route("/.well-known/jwks.json", methods=["GET", "HEAD"], include_in_schema=False)
+async def auth_jwks_proxy(request: Request) -> Response:
+    return await _proxy_auth_request(request, "/.well-known/jwks.json")
 
 
 # Routers imported after app creation to avoid circular imports

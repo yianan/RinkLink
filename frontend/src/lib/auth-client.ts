@@ -1,6 +1,9 @@
 import { createAuthClient } from 'better-auth/react';
 
-const authOrigin = (import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
+const defaultAuthOrigin = import.meta.env.DEV
+  ? 'http://localhost:3000'
+  : window.location.origin;
+const authOrigin = (import.meta.env.VITE_AUTH_BASE_URL || defaultAuthOrigin).replace(/\/+$/, '');
 const authApiBaseUrl = `${authOrigin}/api/auth`;
 const tokenRefreshSkewMs = 30_000;
 

@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ..auth.context import AuthorizationContext, authorization_context, ensure_association_access, ensure_team_access
@@ -14,7 +13,7 @@ from ..schemas import (
     TeamUpdate,
 )
 from ..services.competitions import memberships_for_teams
-from ..services.team_logos import delete_logo_if_unused, effective_team_logo_url, save_team_logo_upload, team_logo_file_path
+from ..services.team_logos import delete_logo_if_unused, effective_team_logo_url, save_team_logo_upload, team_logo_response
 
 router = APIRouter(tags=["teams"])
 
@@ -31,8 +30,8 @@ def _enrich(team: Team, db: Session, memberships_by_team: dict[str, list] | None
 
 
 @router.get("/team-logos/{filename}", include_in_schema=False)
-def get_team_logo(filename: str):
-    return FileResponse(team_logo_file_path(filename))
+def get_team_logo(filename: str, db: Session = Depends(get_db)):
+    return team_logo_response(db, filename)
 
 
 def _venue_assignment_out(assignment: TeamSeasonVenueAssignment) -> TeamSeasonVenueAssignmentOut:
@@ -148,11 +147,12 @@ async def upload_team_logo(
     if not team:
         raise HTTPException(404, "Team not found")
     ensure_team_access(context, team, "team.manage")
-    previous_logo_path = team.logo_path
-    team.logo_path = await save_team_logo_upload(id, file)
+    previous_logo_asset_id = team.logo_asset_id
+    team.logo_asset_id = await save_team_logo_upload(db, id, file)
+    team.logo_path = None
     db.commit()
     db.refresh(team)
-    delete_logo_if_unused(db, previous_logo_path, ignore_team_id=team.id)
+    delete_logo_if_unused(db, previous_logo_asset_id, ignore_team_id=team.id)
     return _enrich(team, db, {})
 
 
@@ -166,11 +166,12 @@ def delete_team_logo(
     if not team:
         raise HTTPException(404, "Team not found")
     ensure_team_access(context, team, "team.manage")
-    previous_logo_path = team.logo_path
+    previous_logo_asset_id = team.logo_asset_id
+    team.logo_asset_id = None
     team.logo_path = None
     db.commit()
     db.refresh(team)
-    delete_logo_if_unused(db, previous_logo_path, ignore_team_id=team.id)
+    delete_logo_if_unused(db, previous_logo_asset_id, ignore_team_id=team.id)
     return _enrich(team, db, {})
 
 
