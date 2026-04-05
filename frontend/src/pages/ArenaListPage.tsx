@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Save, Trash2, Warehouse, X } from 'lucide-react';
+import { MapPin, Navigation, Pencil, Save, Trash2, UtensilsCrossed, Warehouse, X } from 'lucide-react';
 import { api } from '../api/client';
 import { Arena } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +11,7 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
+import { mapsQueryUrl } from '../lib/maps';
 import { canManageArena, canViewArenas } from '../lib/permissions';
 import { accentLinkClass, destructiveIconButtonClass, focusRingClass, interactiveTitleClass, tableActionButtonClass } from '../lib/uiClasses';
 import TeamLogo from '../components/TeamLogo';
@@ -156,69 +157,118 @@ export default function ArenaListPage() {
         ) : undefined}
       />
 
-      <div className="grid max-w-6xl gap-3 md:grid-cols-2 2xl:grid-cols-3">
-        {arenas.map((arena) => (
-          <Card key={arena.id} className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <TeamLogo name={arena.name} logoUrl={arena.logo_url} className="h-12 w-12 rounded-2xl" initialsClassName="text-sm" />
-                <button
-                  type="button"
-                  className={`group min-w-0 rounded-lg text-left ${focusRingClass}`}
-                  onClick={() => navigate(`/arenas/${arena.id}`)}
-                >
-                  <div className={`text-base font-semibold text-slate-900 dark:text-slate-100 ${interactiveTitleClass}`}>
-                    {arena.name}
-                  </div>
-                  <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    {[arena.city, arena.state].filter(Boolean).join(', ')}
-                  </div>
-                </button>
+      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+        {arenas.map((arena) => {
+          const cityStateZip = [arena.city, arena.state, arena.zip_code].filter(Boolean).join(' ');
+          const locationLabel = [arena.name, arena.address, cityStateZip].filter(Boolean).join(', ');
+          const directionsUrl = locationLabel ? mapsQueryUrl(locationLabel) : null;
+          const restaurantsUrl = locationLabel ? mapsQueryUrl(`restaurants near ${locationLabel}`) : null;
+          const thingsUrl = locationLabel ? mapsQueryUrl(`things to do near ${locationLabel}`) : null;
+
+          return (
+            <Card key={arena.id} className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <TeamLogo name={arena.name} logoUrl={arena.logo_url} className="h-12 w-12 rounded-2xl" initialsClassName="text-sm" />
+                  <button
+                    type="button"
+                    className={`group min-w-0 flex-1 rounded-lg text-left ${focusRingClass}`}
+                    onClick={() => navigate(`/arenas/${arena.id}`)}
+                  >
+                    <div className={`text-base font-semibold text-slate-900 dark:text-slate-100 ${interactiveTitleClass}`}>
+                      {arena.name}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                      {[arena.city, arena.state].filter(Boolean).join(', ')}
+                    </div>
+                  </button>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                  {directionsUrl ? (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className={tableActionButtonClass}
+                      onClick={() => window.open(directionsUrl, '_blank', 'noopener,noreferrer')}
+                      aria-label="Open directions"
+                      title="Directions"
+                    >
+                      <Navigation className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+                    </Button>
+                  ) : null}
+                  {restaurantsUrl ? (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className={tableActionButtonClass}
+                      onClick={() => window.open(restaurantsUrl, '_blank', 'noopener,noreferrer')}
+                      aria-label="Open restaurants nearby"
+                      title="Restaurants Nearby"
+                    >
+                      <UtensilsCrossed className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+                    </Button>
+                  ) : null}
+                  {thingsUrl ? (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className={tableActionButtonClass}
+                      onClick={() => window.open(thingsUrl, '_blank', 'noopener,noreferrer')}
+                      aria-label="Open things to do nearby"
+                      title="Things To Do Nearby"
+                    >
+                      <MapPin className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+                    </Button>
+                  ) : null}
+                  {arenaEditable ? (
+                    <>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className={tableActionButtonClass}
+                        onClick={() => openEdit(arena)}
+                        aria-label="Edit arena"
+                        title="Edit arena"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
+                        onClick={() => deleteArena(arena)}
+                        aria-label="Delete arena"
+                        title="Delete arena"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
               </div>
-              {arenaEditable ? (
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className={tableActionButtonClass}
-                    onClick={() => openEdit(arena)}
-                    aria-label="Edit arena"
-                    title="Edit arena"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
-                    onClick={() => deleteArena(arena)}
-                    aria-label="Delete arena"
-                    title="Delete arena"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-            <div className="mt-3 space-y-1.5 text-sm text-slate-600 dark:text-slate-400">
-              <div className="line-clamp-2">{arena.address}</div>
-              <div>{arena.rink_count} rink{arena.rink_count === 1 ? '' : 's'}</div>
-              {arena.phone ? <div>{arena.phone}</div> : null}
-              {arena.contact_email ? (
-                <div className="truncate">
-                  <a
-                    href={`mailto:${arena.contact_email}`}
-                    className={accentLinkClass}
-                  >
-                    {arena.contact_email}
-                  </a>
-                </div>
-              ) : null}
-            </div>
-          </Card>
-        ))}
+              <div className="mt-3 space-y-1.5 text-sm text-slate-600 dark:text-slate-400">
+                <div className="line-clamp-2">{arena.address}</div>
+                <div>{arena.rink_count} rink{arena.rink_count === 1 ? '' : 's'}</div>
+                {arena.phone ? <div>{arena.phone}</div> : null}
+                {arena.contact_email ? (
+                  <div className="truncate">
+                    <a
+                      href={`mailto:${arena.contact_email}`}
+                      className={accentLinkClass}
+                    >
+                      {arena.contact_email}
+                    </a>
+                  </div>
+                ) : null}
+              </div>
+            </Card>
+          );
+        })}
 
         {arenas.length === 0 ? (
           <Card className="p-6 text-sm text-slate-600 dark:text-slate-400">

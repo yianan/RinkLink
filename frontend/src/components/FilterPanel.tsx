@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { cn } from '../lib/cn';
 import { SlidersHorizontal } from 'lucide-react';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
@@ -9,6 +10,9 @@ type FilterPanelTriggerProps = {
   count: number;
   open?: boolean;
   onClick?: () => void;
+  label?: ReactNode;
+  openLabel?: ReactNode;
+  className?: string;
 };
 
 type FilterPanelProps = {
@@ -20,11 +24,18 @@ type FilterPanelProps = {
   description: string;
 };
 
-export function FilterPanelTrigger({ count, open = false, onClick }: FilterPanelTriggerProps) {
+export function FilterPanelTrigger({
+  count,
+  open = false,
+  onClick,
+  label = 'Filters',
+  openLabel = 'Hide Filters',
+  className,
+}: FilterPanelTriggerProps) {
   return (
-    <Button type="button" variant="outline" size="sm" className={filterButtonClass} onClick={onClick}>
+    <Button type="button" variant="outline" size="sm" className={cn(filterButtonClass, className)} onClick={onClick}>
       <SlidersHorizontal className="h-4 w-4" />
-      {open ? 'Hide Filters' : 'Filters'}
+      {open ? openLabel : label}
       {!open && count > 0 ? ` (${count})` : ''}
     </Button>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { CalendarPlus2, Check, ChevronLeft, DoorOpen, FileUp, Pencil, Plus, Save, Trash2, X, XCircle } from 'lucide-react';
+import { CalendarPlus2, Check, ChevronLeft, DoorOpen, FileUp, MapPin, Navigation, Pencil, Plus, Save, Trash2, UtensilsCrossed, X, XCircle } from 'lucide-react';
 import { api } from '../api/client';
 import { Arena, ArenaRink, Event, IceBookingRequest, IceSlot, LockerRoom } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -17,10 +17,11 @@ import SegmentedTabs from '../components/SegmentedTabs';
 import IceSlotCsvUploader from '../components/IceSlotCsvUploader';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
+import { mapsQueryUrl } from '../lib/maps';
 import { formatShortDate, formatTimeHHMM, hasInvalidTimeRange } from '../lib/time';
 import { cn } from '../lib/cn';
 import { canManageArena, canManageArenaBookingRequests, canManageArenaSlots, canViewArenas } from '../lib/permissions';
-import { accentSelectorPillActiveClass, destructiveIconButtonClass, selectorPillClass, selectorPillIdleClass, tableActionButtonClass } from '../lib/uiClasses';
+import { accentLinkClass, accentSelectorPillActiveClass, chromeIconButtonClass, destructiveIconButtonClass, selectorPillClass, selectorPillIdleClass, tableActionButtonClass } from '../lib/uiClasses';
 import TeamLogo from '../components/TeamLogo';
 import { getCompetitionLabel } from '../lib/competition';
 
@@ -677,6 +678,12 @@ export default function ArenaDetailPage() {
   };
   const openSlotCount = iceSlots.filter((slot) => slot.status === 'available').length;
   const visibleRequests = requestTab === 'pending' ? pendingRequests : historyRequests;
+  const cityStateZip = [arena.city, arena.state, arena.zip_code].filter(Boolean).join(' ');
+  const arenaAddressLabel = [arena.address, cityStateZip].filter(Boolean).join(' • ');
+  const arenaLocationLabel = [arena.name, arena.address, cityStateZip].filter(Boolean).join(', ');
+  const directionsUrl = arenaLocationLabel ? mapsQueryUrl(arenaLocationLabel) : null;
+  const restaurantsUrl = arenaLocationLabel ? mapsQueryUrl(`restaurants near ${arenaLocationLabel}`) : null;
+  const thingsUrl = arenaLocationLabel ? mapsQueryUrl(`things to do near ${arenaLocationLabel}`) : null;
 
   const focusIceSlots = () => {
     iceSlotsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -967,7 +974,7 @@ export default function ArenaDetailPage() {
     <div className="space-y-4">
       <PageHeader
         title={arena.name}
-        subtitle={`${arena.address} • ${[arena.city, arena.state, arena.zip_code].filter(Boolean).join(', ')}`}
+        subtitle={arenaAddressLabel || 'Manage rinks, locker rooms, and ice slots.'}
         actions={(
           <>
             <Button type="button" variant="ghost" onClick={() => navigate('/arenas')}>
@@ -991,17 +998,49 @@ export default function ArenaDetailPage() {
       />
 
       <Card className="p-4">
-        <div className="flex items-start gap-4">
-          <TeamLogo name={arena.name} logoUrl={arena.logo_url} className="h-16 w-16 rounded-2xl" initialsClassName="text-lg" />
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{arena.name}</div>
-            <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              {[arena.address, [arena.city, arena.state, arena.zip_code].filter(Boolean).join(', ')].filter(Boolean).join(' • ')}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-4">
+            <TeamLogo name={arena.name} logoUrl={arena.logo_url} className="h-16 w-16 rounded-2xl" initialsClassName="text-lg" />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{arena.name}</div>
+              {arenaAddressLabel ? (
+                <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  {arenaAddressLabel}
+                </div>
+              ) : null}
+              {arena.contact_email ? (
+                <div className="mt-1 truncate text-sm">
+                  <a href={`mailto:${arena.contact_email}`} className={accentLinkClass}>
+                    {arena.contact_email}
+                  </a>
+                </div>
+              ) : null}
+              {arena.website ? (
+                <div className="mt-1 truncate text-sm">
+                  <a href={arena.website} target="_blank" rel="noopener noreferrer" className={accentLinkClass}>
+                    {arena.website}
+                  </a>
+                </div>
+              ) : null}
             </div>
-            {arena.contact_email ? (
-              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">{arena.contact_email}</div>
-            ) : null}
           </div>
+          {directionsUrl ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="ghost" size="icon" className={chromeIconButtonClass} onClick={() => window.open(directionsUrl, '_blank', 'noopener,noreferrer')} aria-label="Open directions" title="Directions">
+                <Navigation className="h-4 w-4" />
+              </Button>
+              {restaurantsUrl ? (
+                <Button type="button" variant="ghost" size="icon" className={chromeIconButtonClass} onClick={() => window.open(restaurantsUrl, '_blank', 'noopener,noreferrer')} aria-label="Open restaurants nearby" title="Restaurants Nearby">
+                  <UtensilsCrossed className="h-4 w-4" />
+                </Button>
+              ) : null}
+              {thingsUrl ? (
+                <Button type="button" variant="ghost" size="icon" className={chromeIconButtonClass} onClick={() => window.open(thingsUrl, '_blank', 'noopener,noreferrer')} aria-label="Open things to do nearby" title="Things To Do Nearby">
+                  <MapPin className="h-4 w-4" />
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </Card>
 

@@ -277,17 +277,25 @@ export default function EventsPage() {
         title="Schedule"
         subtitle={canManageRequests ? 'Scheduled events and open-ice requests live together here.' : 'Upcoming and past team events for your selected team.'}
         actions={(
-          <>
+          <div className="flex flex-wrap justify-end gap-2">
             {visibleTab !== 'requests' ? (
-              <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((current) => !current)} />
+              <FilterPanelTrigger
+                count={activeFilterBadges.length}
+                open={filtersOpen}
+                onClick={() => setFiltersOpen((current) => !current)}
+                label={<><span className="sm:hidden">Filter</span><span className="hidden sm:inline">Filters</span></>}
+                openLabel={<><span className="sm:hidden">Hide</span><span className="hidden sm:inline">Hide Filters</span></>}
+                className="px-2.5 sm:px-3"
+              />
             ) : null}
             {canManageSchedule ? (
               <Button type="button" onClick={() => setOpen(true)}>
                 <CalendarPlus2 className="h-4 w-4" />
-                Schedule Event
+                <span className="sm:hidden">Schedule</span>
+                <span className="hidden sm:inline">Schedule Event</span>
               </Button>
             ) : null}
-          </>
+          </div>
         )}
       />
 
@@ -296,7 +304,15 @@ export default function EventsPage() {
           { label: 'Upcoming', value: 'upcoming' as const },
           { label: 'Past', value: 'past' as const },
           { label: 'All', value: 'all' as const },
-          ...(canManageRequests ? [{ label: 'Ice Requests', value: 'requests' as const }] : []),
+          ...(canManageRequests ? [{
+            label: (
+              <>
+                <span className="sm:hidden">Requests</span>
+                <span className="hidden sm:inline">Ice Requests</span>
+              </>
+            ),
+            value: 'requests' as const,
+          }] : []),
         ]}
         value={visibleTab}
         onChange={handleTabChange}
@@ -342,13 +358,13 @@ export default function EventsPage() {
                                 backLabel: 'Back to Ice Requests',
                               },
                             })}
-                            className={`truncate text-left text-sm font-semibold ${accentActionClass}`}
+                            className={`basis-full text-left text-sm font-semibold sm:basis-auto ${accentActionClass}`}
                             title="Open Event"
                           >
                             <span className={interactiveTitleClass}>{bookingRequestTitle(request)}</span>
                           </button>
                         ) : (
-                          <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{bookingRequestTitle(request)}</div>
+                          <div className="basis-full text-sm font-semibold text-slate-900 dark:text-slate-100 sm:basis-auto">{bookingRequestTitle(request)}</div>
                         )}
                         <Badge variant={request.final_price_amount_cents != null || request.pricing_mode === 'fixed_price' ? 'outline' : 'warning'}>
                           {formatPriceLabel(request.final_price_amount_cents != null ? 'fixed_price' : request.pricing_mode, request.final_price_amount_cents ?? request.price_amount_cents, request.final_currency || request.currency)}
@@ -358,9 +374,9 @@ export default function EventsPage() {
                           {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                         </Badge>
                       </div>
-                      <div className="mt-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                      <div className="mt-2 flex items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
                         <TeamLogo name={request.arena_name || 'Arena'} logoUrl={request.arena_logo_url} className="h-6 w-6 rounded-lg" initialsClassName="text-[9px]" />
-                        <span className="truncate">
+                        <span className="min-w-0 break-words">
                           {request.ice_slot_date ? formatShortDate(request.ice_slot_date) : 'Date TBD'}
                           {request.ice_slot_start_time ? ` • ${formatTimeHHMM(request.ice_slot_start_time) || request.ice_slot_start_time}` : ''}
                           {request.location_label ? ` • ${request.location_label}` : ''}
@@ -384,9 +400,9 @@ export default function EventsPage() {
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col items-start justify-center gap-2 lg:items-end">
+                <div className="flex items-stretch justify-stretch border-t border-slate-200/80 pt-3 dark:border-slate-800/80 lg:items-center lg:justify-end lg:border-t-0 lg:pt-0">
                   {(request.status === 'requested' || request.status === 'accepted') ? (
-                    <Button type="button" size="sm" variant="destructive" onClick={async () => {
+                    <Button type="button" size="sm" variant="destructive" className="w-full lg:w-auto" onClick={async () => {
                       const updated = await api.cancelTeamIceBookingRequest(activeTeam.id, request.id);
                       setBookingRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
                       if (request.event_id) {
@@ -447,9 +463,9 @@ export default function EventsPage() {
                           <Badge variant="outline">{event.home_score ?? 0}-{event.away_score ?? 0}</Badge>
                         ) : null}
                       </div>
-                      <div className="mt-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                      <div className="mt-2 flex items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
                         <TeamLogo name={event.arena_name || 'Arena'} logoUrl={event.arena_logo_url} className="h-6 w-6 rounded-lg" initialsClassName="text-[9px]" />
-                        <span className="truncate">
+                        <span className="min-w-0 break-words">
                           {formatShortDate(event.date)}
                           {event.start_time ? ` • ${formatTimeHHMM(event.start_time) || event.start_time}` : ''}
                           {event.location_label ? ` • ${event.location_label}` : ''}
