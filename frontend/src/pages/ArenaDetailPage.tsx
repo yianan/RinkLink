@@ -673,6 +673,7 @@ export default function ArenaDetailPage() {
   const directionsUrl = arenaLocationLabel ? mapsQueryUrl(arenaLocationLabel) : null;
   const restaurantsUrl = arenaLocationLabel ? mapsQueryUrl(`restaurants near ${arenaLocationLabel}`) : null;
   const thingsUrl = arenaLocationLabel ? mapsQueryUrl(`things to do near ${arenaLocationLabel}`) : null;
+  const slotActionButtonClass = 'min-w-[12rem] justify-center whitespace-nowrap';
 
   const focusIceSlots = () => {
     iceSlotsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1187,35 +1188,41 @@ export default function ArenaDetailPage() {
                       </div>
                     ) : null}
                   </div>
-                  <Badge
-                    variant={slotStatusVariant(slot.status)}
-                    className="inline-flex h-7 items-center justify-center whitespace-nowrap md:w-[7.75rem]"
-                  >
-                    {slot.status === 'held' ? getHeldSlotLabel(slot) : formatSlotStatus(slot.status)}
-                  </Badge>
-                  <Badge
-                    variant={slot.pricing_mode === 'call_for_pricing' ? 'warning' : 'outline'}
-                    className="inline-flex h-7 items-center justify-center whitespace-nowrap md:w-[8.5rem]"
-                  >
-                    {formatPriceLabel(slot.pricing_mode, slot.price_amount_cents, slot.currency)}
-                  </Badge>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant={slotStatusVariant(slot.status)}
+                          className="inline-flex h-7 items-center justify-center whitespace-nowrap"
+                        >
+                          {slot.status === 'held' ? getHeldSlotLabel(slot) : formatSlotStatus(slot.status)}
+                        </Badge>
+                        <Badge
+                          variant={slot.pricing_mode === 'call_for_pricing' ? 'warning' : 'outline'}
+                          className="inline-flex h-7 items-center justify-center whitespace-nowrap"
+                        >
+                          {formatPriceLabel(slot.pricing_mode, slot.price_amount_cents, slot.currency)}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
                   {slot.status === 'available' ? (
-                    <div className="flex items-center justify-start gap-2 md:col-span-3 lg:col-span-1 lg:justify-end">
+                    <div className="flex flex-wrap items-center gap-2 md:col-span-3 lg:justify-end">
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="whitespace-nowrap"
+                        className={slotActionButtonClass}
                         onClick={() => openEditSlot(slot)}
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                        Edit
+                        Edit Slot
                       </Button>
                       <Button
                         type="button"
                         size="sm"
                         variant="destructive"
-                        className="whitespace-nowrap"
+                        className={slotActionButtonClass}
                         onClick={() => deleteIceSlot(slot)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -1223,12 +1230,12 @@ export default function ArenaDetailPage() {
                       </Button>
                     </div>
                   ) : slot.active_proposal_id && slot.status === 'held' ? (
-                    <div className="flex items-center justify-start md:col-span-3 lg:col-span-1 lg:justify-end">
+                    <div className="flex flex-wrap items-center gap-2 md:col-span-3 lg:justify-end">
                       <Button
                         type="button"
                         size="sm"
                         variant="destructive"
-                        className="whitespace-nowrap"
+                        className={slotActionButtonClass}
                         onClick={() => openCancelSlot({
                           ice_slot_id: slot.id,
                           title: slot.active_proposal_away_team_name
@@ -1245,19 +1252,19 @@ export default function ArenaDetailPage() {
                       </Button>
                     </div>
                   ) : slot.active_booking_request_id && slot.status === 'held' ? (
-                    <div className="flex items-center justify-start md:col-span-3 lg:col-span-1 lg:justify-end">
-                      <Button type="button" size="sm" variant="ghost" className="whitespace-nowrap" onClick={() => focusSlotManagement(slot)}>
+                    <div className="flex flex-wrap items-center gap-2 md:col-span-3 lg:justify-end">
+                      <Button type="button" size="sm" variant="ghost" className={slotActionButtonClass} onClick={() => focusSlotManagement(slot)}>
                         Review
                       </Button>
                     </div>
                   ) : slot.status === 'booked' && slot.date >= todayIso ? (
-                    <div className="flex items-center justify-start gap-2 md:col-span-3 lg:col-span-1 lg:justify-end">
+                    <div className="flex flex-wrap items-center gap-2 md:col-span-3 lg:justify-end">
                       {slotRequest ? (
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
-                          className="whitespace-nowrap"
+                          className={slotActionButtonClass}
                           onClick={() => openBookedSlotLockerRooms({
                             ice_slot_id: slot.id,
                             arena_rink_id: slot.arena_rink_id,
@@ -1279,7 +1286,7 @@ export default function ArenaDetailPage() {
                           type="button"
                           size="sm"
                           variant="outline"
-                          className="whitespace-nowrap"
+                          className={slotActionButtonClass}
                           onClick={() => openBookedSlotLockerRooms({
                             ice_slot_id: slot.id,
                             arena_rink_id: slot.arena_rink_id,
@@ -1301,7 +1308,7 @@ export default function ArenaDetailPage() {
                         type="button"
                         size="sm"
                         variant="destructive"
-                        className="whitespace-nowrap"
+                        className={slotActionButtonClass}
                         onClick={() => openCancelSlot({
                           ice_slot_id: slot.id,
                           title: bookedSlotLabel(slot) || 'Booked slot',
