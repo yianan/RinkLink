@@ -54,17 +54,23 @@ _UPSTREAM_HEADER_EXCLUDES = {
 }
 
 _AUTH_PROXY_ALLOWED_PREFIXES = (
+    "account-info",
     "callback/",
     "change-email",
     "change-password",
     "delete-user",
+    "delete-user/",
     "error",
     "forget-password",
     "get-session",
+    "get-access-token",
     "link-social",
+    "list-accounts",
     "list-sessions",
     "list-user-accounts",
     "ok",
+    "passkey/",
+    "request-password-reset",
     "refresh-token",
     "reset-password",
     "revoke-other-sessions",
