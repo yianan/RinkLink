@@ -1,7 +1,9 @@
 services:
   - type: web
     runtime: docker
-    name: rinklink-app
+    plan: free
+    name: rinklink-branch-app
+    branch: codex/auth-foundation
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
