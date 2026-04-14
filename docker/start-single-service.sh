@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 set -eu
 
+if [ -z "${DATABASE_URL:-}" ] && [ -n "${DATABASE_URL_BASE:-}" ]; then
+  DATABASE_URL="${DATABASE_URL_BASE}"
+  export DATABASE_URL
+fi
+
 derive_auth_database_url() {
   node -e '
     const raw = (process.env.DATABASE_URL || "").trim();

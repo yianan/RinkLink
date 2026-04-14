@@ -240,6 +240,7 @@ Current cloud shape:
 | Variable | Example | Purpose |
 |---|---|---|
 | `DATABASE_URL` | Neon Postgres connection URL | Primary application database |
+| `DATABASE_URL_BASE` | Neon Postgres connection URL | Backward-compatible fallback if the Render service still uses the older env name |
 | `BETTER_AUTH_SECRET` | generated random 32+ char secret | Better Auth signing/encryption secret |
 | `API_AUDIENCE` | `rinklink-api` | JWT audience issued by auth-service |
 | `AUTH_AUDIENCE` | `rinklink-api` | JWT audience expected by FastAPI |
@@ -295,10 +296,11 @@ That command:
 
 1. Create or choose a Neon Postgres database or branch dedicated to this Render service.
 2. Set `DATABASE_URL` in Render to the Neon connection URL.
-3. Set the Brevo API key and verified sender values in Render.
-4. Keep `API_AUDIENCE` and `AUTH_AUDIENCE` set to `rinklink-api`.
-5. Keep `AUTH_REQUIRE_MFA_FOR_PRIVILEGED=false` until you intentionally roll out MFA.
-6. Deploy the single Docker web service.
+3. If the existing Render service still uses the older `DATABASE_URL_BASE` name, that now works too, but `DATABASE_URL` is the preferred canonical variable.
+4. Set the Brevo API key and verified sender values in Render.
+5. Keep `API_AUDIENCE` and `AUTH_AUDIENCE` set to `rinklink-api`.
+6. Keep `AUTH_REQUIRE_MFA_FOR_PRIVILEGED=false` until you intentionally roll out MFA.
+7. Deploy the single Docker web service.
 
 ```bash
 alembic upgrade head
