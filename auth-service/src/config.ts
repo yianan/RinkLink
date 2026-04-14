@@ -47,7 +47,19 @@ export function resolveBetterAuthUrl(): string {
 }
 
 export function resolveApiAudience(): string | null {
-  return normalizeUrl(process.env.API_AUDIENCE)
-    || normalizeUrl(process.env.PUBLIC_APP_URL)
-    || normalizeUrl(process.env.RENDER_EXTERNAL_URL);
+  return process.env.API_AUDIENCE?.trim() || null;
+}
+
+export function requireBetterAuthSecret(): string {
+  const secret = process.env.BETTER_AUTH_SECRET?.trim() || "";
+  const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
+  const appEnv = process.env.APP_ENV?.trim().toLowerCase();
+
+  if (!secret) {
+    throw new Error("BETTER_AUTH_SECRET is required for auth-service");
+  }
+  if ((nodeEnv === "production" || appEnv === "production") && secret.length < 32) {
+    throw new Error("BETTER_AUTH_SECRET must be at least 32 characters in production");
+  }
+  return secret;
 }

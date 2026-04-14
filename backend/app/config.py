@@ -13,6 +13,7 @@ class Settings(BaseModel):
     frontend_url: str
     auth_enabled: bool
     auth_bypass_dev_only: bool
+    auth_require_mfa_for_privileged: bool
     auth_internal_base_url: str | None
     auth_jwks_url: str | None
     auth_issuer: str | None
@@ -45,6 +46,13 @@ def _normalize_http_url(value: str | None) -> str | None:
     if "://" not in stripped:
         stripped = f"http://{stripped}"
     return stripped
+
+
+def _normalize_scalar(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
 
 
 def _origin_from_url(value: str | None) -> str | None:
@@ -83,8 +91,9 @@ def _load() -> Settings:
         or render_external_url
         or (cors[0] if cors else "http://localhost:5173")
     )
-    auth_enabled = _load_bool("AUTH_ENABLED", False)
+    auth_enabled = _load_bool("AUTH_ENABLED", app_env != "development")
     auth_bypass_dev_only = _load_bool("AUTH_BYPASS_DEV_ONLY", False)
+    auth_require_mfa_for_privileged = _load_bool("AUTH_REQUIRE_MFA_FOR_PRIVILEGED", False)
     auth_internal_base_url = (
         _normalize_http_url(os.getenv("AUTH_INTERNAL_BASE_URL"))
         or _origin_from_url(os.getenv("AUTH_JWKS_URL"))
@@ -94,7 +103,11 @@ def _load() -> Settings:
         or (f"{auth_internal_base_url}/.well-known/jwks.json" if auth_internal_base_url else None)
     )
     auth_issuer = _normalize_http_url(os.getenv("AUTH_ISSUER")) or render_external_url
-    auth_audience = _normalize_http_url(os.getenv("AUTH_AUDIENCE")) or render_external_url
+    auth_audience = _normalize_scalar(os.getenv("AUTH_AUDIENCE"))
+    if app_env != "development" and auth_jwks_url:
+        parsed_jwks_url = urlparse(auth_jwks_url)
+        if parsed_jwks_url.scheme != "https":
+            raise RuntimeError("AUTH_JWKS_URL must use https outside development")
     email_from_name = os.getenv("EMAIL_FROM_NAME", "RinkLink").strip() or "RinkLink"
     email_from_address = (os.getenv("EMAIL_FROM_ADDRESS") or "").strip() or None
     brevo_api_key = (os.getenv("BREVO_API_KEY") or "").strip() or None
@@ -117,6 +130,7 @@ def _load() -> Settings:
         frontend_url=frontend_url,
         auth_enabled=auth_enabled,
         auth_bypass_dev_only=auth_bypass_dev_only,
+        auth_require_mfa_for_privileged=auth_require_mfa_for_privileged,
         auth_internal_base_url=auth_internal_base_url,
         auth_jwks_url=auth_jwks_url,
         auth_issuer=auth_issuer,

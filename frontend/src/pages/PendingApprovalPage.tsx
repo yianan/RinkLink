@@ -8,6 +8,7 @@ import TeamLogo from '../components/TeamLogo';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { useAuth } from '../context/AuthContext';
@@ -96,6 +97,8 @@ export default function PendingApprovalPage() {
   const [requestOptions, setRequestOptions] = useState<AccessTarget[]>([]);
   const [requestTeamId, setRequestTeamId] = useState('');
   const [requestTargetId, setRequestTargetId] = useState('');
+  const [requestTeamQuery, setRequestTeamQuery] = useState('');
+  const [requestSearch, setRequestSearch] = useState('');
   const [requestNotes, setRequestNotes] = useState('');
   const [requestOptionsLoading, setRequestOptionsLoading] = useState(false);
   const [requestLookupError, setRequestLookupError] = useState<string | null>(null);
@@ -112,6 +115,10 @@ export default function PendingApprovalPage() {
   const openInvites = useMemo(
     () => invites.filter((invite) => invite.status === 'pending'),
     [invites],
+  );
+  const hasPendingTeamLookupRequest = useMemo(
+    () => requests.some((request) => request.status === 'pending' && request.target.type === 'team' && request.target.id === requestTeamId),
+    [requestTeamId, requests],
   );
   const selectedBrowseTeam = useMemo(
     () => browseTeams.find((team) => team.id === browseTeamId) || null,
@@ -238,8 +245,14 @@ export default function PendingApprovalPage() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    if (requestTeamQuery.trim().length < 2) {
+      setRequestableTeams([]);
+      setRequestTeamId('');
+      setRequestLookupError(null);
+      return;
+    }
     let cancelled = false;
-    api.getAccessTargets({ target_type: 'team' })
+    api.getAccessTargets({ target_type: 'team', q: requestTeamQuery.trim() })
       .then((targets) => {
         if (cancelled) return;
         setRequestableTeams(targets);
@@ -251,7 +264,7 @@ export default function PendingApprovalPage() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, requestTeamQuery]);
 
   useEffect(() => {
     if ((requestTargetType === 'guardian_link' || requestTargetType === 'player_link') && !requestTeamId && requestableTeams.length > 0) {
@@ -261,13 +274,27 @@ export default function PendingApprovalPage() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    if (requestSearch.trim().length < 2) {
+      setRequestOptions([]);
+      setRequestTargetId('');
+      setRequestOptionsLoading(false);
+      setRequestLookupError(null);
+      return;
+    }
     let cancelled = false;
 
-    const params: Record<string, string> = { target_type: requestTargetType };
+    const params: Record<string, string> = { target_type: requestTargetType, q: requestSearch.trim() };
     if (requestTargetType === 'guardian_link' || requestTargetType === 'player_link') {
       if (!requestTeamId) {
         setRequestOptions([]);
         setRequestTargetId('');
+        return;
+      }
+      if (!hasPendingTeamLookupRequest) {
+        setRequestOptions([]);
+        setRequestTargetId('');
+        setRequestOptionsLoading(false);
+        setRequestLookupError('Submit a pending team access request for this team before searching for players.');
         return;
       }
       params.team_id = requestTeamId;
@@ -294,7 +321,7 @@ export default function PendingApprovalPage() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, requestTargetType, requestTeamId]);
+  }, [hasPendingTeamLookupRequest, isAuthenticated, requestSearch, requestTargetType, requestTeamId]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -560,17 +587,40 @@ export default function PendingApprovalPage() {
               {(requestTargetType === 'guardian_link' || requestTargetType === 'player_link') ? (
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    Search teams
+                  </label>
+                  <Input
+                    className="mt-2"
+                    value={requestTeamQuery}
+                    onChange={(event) => setRequestTeamQuery(event.target.value)}
+                    placeholder="Type at least 2 characters"
+                  />
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                     Team
                   </label>
-                  <Select value={requestTeamId} onChange={(event) => setRequestTeamId(event.target.value)} className="mt-2">
+                  <Select value={requestTeamId} onChange={(event) => setRequestTeamId(event.target.value)} className="mt-2" disabled={requestableTeams.length === 0}>
                     {requestableTeams.map((team) => (
                       <option key={team.id} value={team.id}>{team.name}{team.context ? ` · ${team.context}` : ''}</option>
                     ))}
                   </Select>
+                  {!hasPendingTeamLookupRequest && requestTeamId ? (
+                    <div className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                      Submit a pending team access request for this team first. Player search stays locked until that request exists.
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
               <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Search
+                </label>
+                <Input
+                  className="mt-2"
+                  value={requestSearch}
+                  onChange={(event) => setRequestSearch(event.target.value)}
+                  placeholder="Type at least 2 characters"
+                />
                 <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                   Resource
                 </label>

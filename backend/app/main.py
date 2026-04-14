@@ -23,14 +23,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="RinkLink", version="0.1.0", lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_options: dict[str, object] = {
+    "allow_origins": settings.cors_origins,
+    "allow_credentials": True,
+    "allow_methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    "allow_headers": ["Authorization", "Content-Type", "Accept"],
+}
+if settings.app_env == "development":
+    cors_options["allow_origin_regex"] = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
+app.add_middleware(CORSMiddleware, **cors_options)
 
 
 @app.get("/api/health")
@@ -51,10 +53,55 @@ _UPSTREAM_HEADER_EXCLUDES = {
     "upgrade",
 }
 
+_AUTH_PROXY_ALLOWED_PREFIXES = (
+    "callback/",
+    "change-email",
+    "change-password",
+    "delete-user",
+    "error",
+    "forget-password",
+    "get-session",
+    "link-social",
+    "list-sessions",
+    "list-user-accounts",
+    "ok",
+    "refresh-token",
+    "reset-password",
+    "revoke-other-sessions",
+    "revoke-session",
+    "revoke-sessions",
+    "send-verification-email",
+    "set-password",
+    "sign-in/",
+    "sign-out",
+    "sign-up/",
+    "token",
+    "two-factor/",
+    "unlink-account",
+    "update-user",
+    "verify-email",
+)
+
+
+def _is_allowed_auth_proxy_path(path: str) -> bool:
+    normalized = path.strip().lstrip("/")
+    if not normalized or ".." in normalized:
+        return False
+    return any(
+        normalized == prefix.rstrip("/") or normalized.startswith(prefix)
+        for prefix in _AUTH_PROXY_ALLOWED_PREFIXES
+    )
+
 
 async def _proxy_auth_request(request: Request, upstream_path: str) -> Response:
     if not settings.auth_internal_base_url:
         raise HTTPException(status_code=503, detail="Auth proxy is not configured")
+
+    normalized_path = upstream_path.lstrip("/")
+    if normalized_path.startswith("api/auth/"):
+        proxied_path = normalized_path.removeprefix("api/auth/")
+        if not _is_allowed_auth_proxy_path(proxied_path):
+            raise HTTPException(status_code=404, detail="Auth route not found")
 
     upstream_url = urljoin(f"{settings.auth_internal_base_url}/", upstream_path.lstrip("/"))
     if request.url.query:
@@ -82,6 +129,9 @@ async def _proxy_auth_request(request: Request, upstream_path: str) -> Response:
         if key.lower() in _UPSTREAM_HEADER_EXCLUDES:
             continue
         response.raw_headers.append((key.encode("latin-1"), value.encode("latin-1")))
+    if normalized_path == "api/auth/token":
+        response.headers["Cache-Control"] = "no-store, private"
+        response.headers["Pragma"] = "no-cache"
     return response
 
 

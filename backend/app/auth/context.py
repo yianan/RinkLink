@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..database import get_db
 from ..models import (
     AppUser,
@@ -19,6 +20,13 @@ from ..models import (
 )
 from .capabilities import ALL_CAPABILITIES, effective_capabilities
 from .dependencies import current_user, require_active_user
+
+PRIVILEGED_CAPABILITIES = {
+    "platform.manage",
+    "association.manage",
+    "team.manage_staff",
+    "arena.manage",
+}
 
 
 @dataclass(slots=True)
@@ -36,6 +44,7 @@ class AuthorizationContext:
     guardian_player_ids: set[str]
     player_ids: set[str]
     linked_team_ids: set[str]
+    token_claims: dict | None = None
 
 
 def build_authorization_context(db: Session, user: AppUser) -> AuthorizationContext:
@@ -101,21 +110,34 @@ def build_authorization_context(db: Session, user: AppUser) -> AuthorizationCont
         guardian_player_ids=guardian_player_ids,
         player_ids=player_ids,
         linked_team_ids=linked_team_ids,
+        token_claims=getattr(user, "_token_claims", None),
     )
+
+
+def _enforce_privileged_mfa(context: AuthorizationContext) -> AuthorizationContext:
+    if settings.auth_bypass_dev_only or not settings.auth_require_mfa_for_privileged:
+        return context
+    requires_mfa = context.user.is_platform_admin or bool(PRIVILEGED_CAPABILITIES & context.capabilities)
+    if requires_mfa and not bool((context.token_claims or {}).get("mfa_verified")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Two-factor authentication is required for this account",
+        )
+    return context
 
 
 def authorization_context(
     user: AppUser = Depends(require_active_user),
     db: Session = Depends(get_db),
 ) -> AuthorizationContext:
-    return build_authorization_context(db, user)
+    return _enforce_privileged_mfa(build_authorization_context(db, user))
 
 
 def current_authorization_context(
     user: AppUser = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> AuthorizationContext:
-    return build_authorization_context(db, user)
+    return _enforce_privileged_mfa(build_authorization_context(db, user))
 
 
 def can_access_association(context: AuthorizationContext, association_id: str, capability: str) -> bool:

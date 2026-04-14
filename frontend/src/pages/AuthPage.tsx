@@ -17,6 +17,7 @@ const allowedPathnames = new Set([
   'forgot-password',
   'reset-password',
   'sign-out',
+  'two-factor',
   'callback',
 ]);
 
@@ -222,8 +223,8 @@ function SignInCard() {
         fetchOptions: { throw: true },
       });
 
-      if (response && 'twoFactorRedirect' in response && typeof response.twoFactorRedirect === 'string' && response.twoFactorRedirect) {
-        window.location.assign(response.twoFactorRedirect);
+      if (response && 'twoFactorRedirect' in response && response.twoFactorRedirect) {
+        window.location.assign('/auth/two-factor');
         return;
       }
 
@@ -337,10 +338,10 @@ function SignUpCard() {
       return;
     }
 
-    if (password.length < 8) {
+    if (password.length < 12) {
       pushToast({
         title: 'Password too short',
-        description: 'Use at least 8 characters.',
+        description: 'Use at least 12 characters.',
         variant: 'warning',
       });
       return;
@@ -436,7 +437,7 @@ function SignUpCard() {
           value={password}
           onChange={setPassword}
           autoComplete="new-password"
-          placeholder="At least 8 characters"
+          placeholder="At least 12 characters"
           disabled={busy}
         />
 
@@ -458,12 +459,128 @@ function SignUpCard() {
   );
 }
 
+function TwoFactorSignInCard() {
+  const pushToast = useToast();
+  const [code, setCode] = useState('');
+  const [backupCode, setBackupCode] = useState('');
+  const [method, setMethod] = useState<'totp' | 'backup'>('totp');
+  const [trustDevice, setTrustDevice] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const verify = async () => {
+    const value = method === 'totp' ? code.trim() : backupCode.trim();
+    if (!value) {
+      pushToast({
+        title: 'Security code required',
+        description: method === 'totp' ? 'Enter your authenticator code.' : 'Enter one of your backup codes.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setBusy(true);
+    try {
+      if (method === 'totp') {
+        await (authClient.twoFactor.verifyTotp as unknown as (body: Record<string, unknown>) => Promise<unknown>)({
+          code: value,
+          trustDevice,
+          fetchOptions: { throw: true },
+        });
+      } else {
+        await (authClient.twoFactor.verifyBackupCode as unknown as (body: Record<string, unknown>) => Promise<unknown>)({
+          code: value,
+          trustDevice,
+          fetchOptions: { throw: true },
+        });
+      }
+      window.location.assign(buildAuthCallbackUrl('/'));
+    } catch (error) {
+      pushToast({
+        title: 'Unable to verify security code',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'error',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AuthCard
+      eyebrow="Two-factor check"
+      title="Verify your sign-in"
+      description="Enter the code from your authenticator app or use a saved backup code to finish signing in."
+      footer={(
+        <RouterLink to="/auth/sign-in" className="rinklink-auth-footer-link inline-flex items-center gap-1.5">
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Back to sign in</span>
+        </RouterLink>
+      )}
+    >
+      <form className="rinklink-auth-form" onSubmit={(event) => {
+        event.preventDefault();
+        void verify();
+      }}>
+        <div className="rinklink-auth-field">
+          <label className="rinklink-auth-label" htmlFor="two-factor-method">Verification method</label>
+          <select
+            id="two-factor-method"
+            className="rinklink-auth-input"
+            value={method}
+            onChange={(event) => setMethod(event.target.value as 'totp' | 'backup')}
+            disabled={busy}
+          >
+            <option value="totp">Authenticator app</option>
+            <option value="backup">Backup code</option>
+          </select>
+        </div>
+
+        <div className="rinklink-auth-field">
+          <label className="rinklink-auth-label" htmlFor="two-factor-code">
+            {method === 'totp' ? 'Authenticator code' : 'Backup code'}
+          </label>
+          <Input
+            id="two-factor-code"
+            className="rinklink-auth-input"
+            value={method === 'totp' ? code : backupCode}
+            onChange={(event) => {
+              if (method === 'totp') {
+                setCode(event.target.value);
+              } else {
+                setBackupCode(event.target.value);
+              }
+            }}
+            autoComplete="one-time-code"
+            placeholder={method === 'totp' ? '123456' : 'backup-code'}
+            disabled={busy}
+          />
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={trustDevice}
+            onChange={(event) => setTrustDevice(event.target.checked)}
+            disabled={busy}
+          />
+          <span>Trust this device for 30 days</span>
+        </label>
+
+        <Button type="submit" className="rinklink-auth-primary-button" disabled={busy}>
+          {busy ? 'Verifying…' : 'Verify and continue'}
+        </Button>
+      </form>
+    </AuthCard>
+  );
+}
+
 export default function AuthPage() {
   const { pathname = 'sign-in' } = useParams();
   const isSignUp = pathname === 'sign-up';
   const isCheckEmail = pathname === 'check-email';
   const isForgotPassword = pathname === 'forgot-password';
   const isResetPassword = pathname === 'reset-password';
+  const isTwoFactor = pathname === 'two-factor';
 
   if (!allowedPathnames.has(pathname)) {
     return <Navigate to="/auth/sign-in" replace />;
@@ -493,7 +610,7 @@ export default function AuthPage() {
             cardTitle: 'Recover your account',
             cardDescription: 'Enter your email and we will send the next step.',
           }
-        : pathname === 'reset-password'
+      : pathname === 'reset-password'
           ? {
               mastheadTitle: 'Set a new password.',
               mastheadSubtitle: 'Choose a new password for your RinkLink login and return to the app.',
@@ -501,6 +618,14 @@ export default function AuthPage() {
               cardTitle: 'Set your new password',
               cardDescription: 'Use a secure password you can rely on for daily access.',
             }
+          : pathname === 'two-factor'
+            ? {
+                mastheadTitle: 'Finish your sign-in securely.',
+                mastheadSubtitle: 'Privileged RinkLink access requires a second factor before the backend will honor management capabilities.',
+                cardEyebrow: 'Two-factor check',
+                cardTitle: 'Verify your sign-in',
+                cardDescription: 'Use your authenticator app or one of your backup codes.',
+              }
           : pathname === 'sign-out'
             ? {
                 mastheadTitle: 'Sign out of RinkLink.',
@@ -555,6 +680,21 @@ export default function AuthPage() {
             copy: 'Once your password is updated, you can return straight to sign in and continue.',
           },
         ]
+      : isTwoFactor
+        ? [
+            {
+              title: 'Management is gated',
+              copy: 'Admin, staff-management, and arena-management access stays locked until second-factor verification succeeds.',
+            },
+            {
+              title: 'Authenticator first',
+              copy: 'Use the code from the authenticator app you enrolled in settings, or fall back to a saved backup code.',
+            },
+            {
+              title: 'Trusted devices',
+              copy: 'You can trust the current device for a limited window to reduce repeat prompts.',
+            },
+          ]
       : [
           {
             title: 'Today’s schedule',
@@ -655,6 +795,8 @@ export default function AuthPage() {
               ? <CheckEmailCard />
               : pathname === 'sign-in'
                 ? <SignInCard />
+              : isTwoFactor
+                ? <TwoFactorSignInCard />
               : isForgotPassword
                 ? recoveryCard(
                     <ForgotPasswordForm

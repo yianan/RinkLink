@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -15,9 +16,13 @@ from .jwt import decode_access_token
 from .runtime import assert_auth_runtime_safe
 
 bearer_scheme = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 
 def _synthetic_admin() -> AppUser:
+    assert_auth_runtime_safe()
+    if settings.app_env != "development":
+        raise RuntimeError("Synthetic auth users may only be created in development")
     return AppUser(
         id=f"dev-{uuid.uuid4()}",
         auth_id="dev-admin",
@@ -33,7 +38,9 @@ def _synthetic_admin() -> AppUser:
 
 def _upsert_user_from_claims(db: Session, claims: dict) -> AppUser:
     auth_id = str(claims["sub"])
-    email = claims.get("email") or f"{auth_id}@unknown.local"
+    email = claims.get("email")
+    if claims.get("email_verified") is not True or not email:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Verified email is required")
     display_name = claims.get("name")
 
     user = db.query(AppUser).filter(AppUser.auth_id == auth_id).first()
@@ -52,8 +59,7 @@ def _upsert_user_from_claims(db: Session, claims: dict) -> AppUser:
 
     changed = False
     if user.email != email:
-        user.email = email
-        changed = True
+        logger.warning("Ignoring auth email change for user %s from %s to %s", user.id, user.email, email)
     if display_name and user.display_name != display_name:
         user.display_name = display_name
         changed = True
@@ -83,6 +89,7 @@ def current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token") from exc
 
     user = _upsert_user_from_claims(db, claims)
+    setattr(user, "_token_claims", claims)
     token_issued_at = claims.get("iat")
     if user.revoked_at and token_issued_at:
         revoked_at = int(user.revoked_at.replace(tzinfo=timezone.utc).timestamp())

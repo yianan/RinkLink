@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from datetime import date
 
+import pytest
+from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.auth.capabilities import effective_capabilities
-from app.auth.context import build_authorization_context, can_access_any_event_team, can_access_arena, can_access_team
+from app.auth.context import authorization_context, build_authorization_context, can_access_any_event_team, can_access_arena, can_access_team
+from app.auth.runtime import assert_auth_runtime_safe
+from app.auth.dependencies import current_user
+from app.auth import dependencies as auth_dependencies
 from app.models import (
     AppUser,
     Arena,
@@ -199,3 +205,88 @@ def test_team_and_arena_memberships_do_not_bleed_across_resource_types(db: Sessi
     assert can_access_arena(staff_context, arena.id, "arena.view") is False
     assert can_access_arena(arena_context, arena.id, "arena.manage_booking_requests") is True
     assert can_access_team(arena_context, team, "team.view_private") is False
+
+
+def test_current_user_rejects_unverified_email_claims(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(auth_dependencies, "assert_auth_runtime_safe", lambda: None)
+    monkeypatch.setattr(auth_dependencies.settings, "auth_enabled", True)
+    monkeypatch.setattr(
+        auth_dependencies,
+        "decode_access_token",
+        lambda token: {"sub": "auth-unverified", "email": "user@example.com", "email_verified": False, "iat": 1},
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        current_user(
+            credentials=HTTPAuthorizationCredentials(scheme="Bearer", credentials="token"),
+            db=db,
+        )
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Verified email is required"
+
+
+def test_current_user_keeps_existing_email_on_claim_mismatch(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    user = AppUser(auth_id="auth-mismatch", email="original@example.com", status="active")
+    db.add(user)
+    db.commit()
+
+    monkeypatch.setattr(auth_dependencies, "assert_auth_runtime_safe", lambda: None)
+    monkeypatch.setattr(auth_dependencies.settings, "auth_enabled", True)
+    monkeypatch.setattr(
+        auth_dependencies,
+        "decode_access_token",
+        lambda token: {"sub": "auth-mismatch", "email": "changed@example.com", "email_verified": True, "iat": 1},
+    )
+
+    resolved_user = current_user(
+        credentials=HTTPAuthorizationCredentials(scheme="Bearer", credentials="token"),
+        db=db,
+    )
+
+    assert resolved_user.email == "original@example.com"
+
+
+def test_privileged_authorization_requires_mfa_claim(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    association = make_association(db, "MFA Assoc")
+    team = make_team(db, association, "MFA Team")
+    manager = make_user(db, "manager@example.com")
+    db.add(TeamMembership(user_id=manager.id, team_id=team.id, role="team_admin"))
+    db.commit()
+    monkeypatch.setattr(auth_dependencies.settings, "auth_require_mfa_for_privileged", True)
+
+    with pytest.raises(HTTPException) as exc_info:
+        authorization_context(user=manager, db=db)
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Two-factor authentication is required for this account"
+
+    setattr(manager, "_token_claims", {"mfa_verified": True})
+    context = authorization_context(user=manager, db=db)
+    assert "team.manage_staff" in context.capabilities
+
+
+def test_privileged_authorization_allows_access_when_mfa_rollout_disabled(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    association = make_association(db, "No MFA Assoc")
+    team = make_team(db, association, "No MFA Team")
+    manager = make_user(db, "no-mfa-manager@example.com")
+    db.add(TeamMembership(user_id=manager.id, team_id=team.id, role="team_admin"))
+    db.commit()
+    monkeypatch.setattr(auth_dependencies.settings, "auth_require_mfa_for_privileged", False)
+
+    context = authorization_context(user=manager, db=db)
+
+    assert "team.manage_staff" in context.capabilities
+
+
+def test_runtime_rejects_auth_disabled_outside_development(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(auth_dependencies.settings, "app_env", "production")
+    monkeypatch.setattr(auth_dependencies.settings, "auth_enabled", False)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        assert_auth_runtime_safe()
+
+    assert "AUTH_ENABLED may only be disabled" in str(exc_info.value)

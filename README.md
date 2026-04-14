@@ -72,9 +72,10 @@ Defaults:
 - `MEDIA_ROOT`: `backend/media` (legacy fallback only; new logo uploads are stored in Postgres)
 - `CORS_ORIGINS`: `http://localhost:5173,http://localhost:5174`
 - `AUTH_ENABLED`: `true`
+- `AUTH_REQUIRE_MFA_FOR_PRIVILEGED`: `false`
 - `AUTH_JWKS_URL`: `http://localhost:3000/.well-known/jwks.json`
 - `AUTH_ISSUER`: `http://localhost:3000`
-- `AUTH_AUDIENCE`: `http://localhost:8000`
+- `AUTH_AUDIENCE`: `rinklink-api`
 
 Important:
 
@@ -239,24 +240,28 @@ Current cloud shape:
 | Variable | Example | Purpose |
 |---|---|---|
 | `DATABASE_URL` | Neon Postgres connection URL | Primary application database |
+| `BETTER_AUTH_SECRET` | generated random 32+ char secret | Better Auth signing/encryption secret |
+| `API_AUDIENCE` | `rinklink-api` | JWT audience issued by auth-service |
+| `AUTH_AUDIENCE` | `rinklink-api` | JWT audience expected by FastAPI |
 | `EMAIL_FROM_ADDRESS` | `no-reply@example.com` | Verified Brevo sender address |
 | `BREVO_API_KEY` | `xkeysib-...` | Brevo API key for transactional email |
 
-### Branch dev sandbox on Render
+### Render + Neon deployment
 
-This branch now supports a separate Render-hosted development sandbox while `main` stays live.
+The current hosted shape is:
 
 - The public app service stays the only browser-visible URL.
 - The Better Auth service runs inside the same container on `127.0.0.1:3000` and is proxied through the app at `/api/auth/*`.
 - Neon remains the database for both the app schema and the Better Auth `auth` schema.
-- The branch app should run with `APP_ENV=development` so the dashboard `Reset Demo Data` button continues to work against the branch database.
-- The hosted reset path is intentionally destructive for this sandbox, but it restores the triggering platform admin so the browser can reload back into a working session.
+- Render should run with `APP_ENV=production`.
+- Privileged MFA enforcement is currently disabled by default via `AUTH_REQUIRE_MFA_FOR_PRIVILEGED=false`. The code path remains available for a later rollout.
 - Demo logos and uploaded logos are both stored in Postgres, so the branch sandbox does not require a Render disk.
 - Email delivery prefers the Brevo HTTP API, which keeps this setup compatible with Render free web services where SMTP ports are blocked.
 
 The included `render.yaml` provisions:
 
 - a single public Docker app service from the repo root
+- the required auth audience defaults
 - env placeholders for Neon and Brevo secrets
 
 Render-specific notes:
@@ -264,11 +269,13 @@ Render-specific notes:
 - the backend derives its public origin defaults from `RENDER_EXTERNAL_URL`
 - the backend proxies Better Auth through `AUTH_INTERNAL_BASE_URL`, which defaults to `http://127.0.0.1:3000` in the single-service container
 - the startup script derives `AUTH_DATABASE_URL` from `DATABASE_URL` by adding `search_path=auth`
+- the startup script defaults both `API_AUDIENCE` and `AUTH_AUDIENCE` to `rinklink-api`
+- the startup script defaults `AUTH_JWKS_URL` to the public app URL (`https://.../.well-known/jwks.json`), which satisfies the production HTTPS requirement while the backend still proxies auth traffic to loopback internally
 - the Docker build sets `VITE_AUTH_ENABLED=true` for the hosted frontend build
 
-### Initial branch bootstrap
+### Initial hosted bootstrap
 
-After the branch service is deployed:
+After the service is deployed:
 
 1. Sign up and verify the intended admin through the branch app URL.
 2. Sign in once through the app so `/api/me` creates the matching `app_users` row.
@@ -280,16 +287,18 @@ python -m app.seed.bootstrap_demo --admin-email you@example.com
 
 That command:
 
-- resets the branch database to the existing demo dataset
+- resets the database to the existing demo dataset
 - restores the specified user as `active` + `platform_admin`
-- leaves future `Reset Demo Data` actions available from the frontend for that branch sandbox
+- leaves future `Reset Demo Data` actions available from the frontend when `APP_ENV=development`
 
 ### First cloud deploy
 
-1. Create or choose a Neon Postgres database or branch dedicated to this Render sandbox.
+1. Create or choose a Neon Postgres database or branch dedicated to this Render service.
 2. Set `DATABASE_URL` in Render to the Neon connection URL.
 3. Set the Brevo API key and verified sender values in Render.
-4. Deploy the single Docker web service.
+4. Keep `API_AUDIENCE` and `AUTH_AUDIENCE` set to `rinklink-api`.
+5. Keep `AUTH_REQUIRE_MFA_FOR_PRIVILEGED=false` until you intentionally roll out MFA.
+6. Deploy the single Docker web service.
 
 ```bash
 alembic upgrade head
@@ -314,6 +323,7 @@ That means:
 - both auth and app schemas live in Neon
 - logo assets are loaded from Postgres, not from container disk
 - email can be sent through Brevo without SMTP access
+- privileged MFA remains opt-in code only until `AUTH_REQUIRE_MFA_FOR_PRIVILEGED=true`
 
 If you are on a free Render service, run the initial bootstrap command locally against the same Neon `DATABASE_URL` after the first admin signs in once. Render shell access is not available on free instances.
 

@@ -6,6 +6,9 @@ from ..config import settings
 
 
 def assert_auth_runtime_safe() -> None:
+    if settings.app_env != "development" and not settings.auth_enabled:
+        raise RuntimeError("AUTH_ENABLED may only be disabled when APP_ENV=development")
+
     if settings.auth_bypass_dev_only:
         if settings.app_env != "development":
             raise RuntimeError("AUTH_BYPASS_DEV_ONLY may only be enabled when APP_ENV=development")

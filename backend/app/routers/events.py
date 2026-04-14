@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from ..auth.context import (
@@ -11,6 +11,7 @@ from ..auth.context import (
     ensure_event_team_access,
     ensure_team_access,
 )
+from ..auth.rate_limit import RateLimitRule, enforce_rate_limit
 from ..database import get_db
 from ..models import Arena, ArenaRink, AvailabilityWindow, Event, IceBookingRequest, IceSlot, LockerRoom, Team
 from ..schemas import (
@@ -35,6 +36,7 @@ from ..services.locker_rooms import assign_locker_rooms, event_has_started, noti
 from ..services.records import is_recordable_event, recompute_team_records
 
 router = APIRouter(tags=["events"])
+ATTENDANCE_MUTATION_RATE_LIMIT = RateLimitRule(limit=60, window_seconds=60)
 
 
 def _compose_booking_response_message(
@@ -231,7 +233,14 @@ def update_event_attendance(
     body: BulkEventAttendanceUpdate,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
+    enforce_rate_limit(
+        request,
+        user_id=context.user.id,
+        route_key="attendance.update",
+        rule=ATTENDANCE_MUTATION_RATE_LIMIT,
+    )
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")

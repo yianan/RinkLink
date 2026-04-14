@@ -36,9 +36,10 @@ services:
       APP_ENV: development
       AUTH_ENABLED: "true"
       AUTH_BYPASS_DEV_ONLY: "false"
+      AUTH_REQUIRE_MFA_FOR_PRIVILEGED: "false"
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       AUTH_ISSUER: http://localhost:3000
-      AUTH_AUDIENCE: http://localhost:8000
+      AUTH_AUDIENCE: rinklink-api
       EMAIL_FROM_NAME: RinkLink
       EMAIL_FROM_ADDRESS: no-reply@rinklink.local
       SMTP_HOST: mailpit
@@ -70,7 +71,7 @@ services:
       BETTER_AUTH_URL: http://localhost:3000
       FRONTEND_URL: http://localhost:5173
       TRUSTED_ORIGINS: http://localhost:5173,http://localhost:5174
-      API_AUDIENCE: http://localhost:8000
+      API_AUDIENCE: rinklink-api
       APP_ENV: development
       BETTER_AUTH_SECRET: local-dev-secret-change-this-to-a-long-random-value
       EMAIL_FROM_NAME: RinkLink

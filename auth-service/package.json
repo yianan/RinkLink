@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx src/ensure-auth-schema.ts && npm run auth:migrate:yes && tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test src/**/*.test.ts",
     "start": "npm run build && npm run start:compiled",
     "start:compiled": "node dist/ensure-auth-schema.js && npm run auth:migrate:compiled:yes && node dist/index.js",
     "seed": "tsx src/seed.ts",

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from ..auth.context import AuthorizationContext, authorization_context, ensure_event_team_access, ensure_team_access
+from ..auth.rate_limit import RateLimitRule, enforce_rate_limit
 from ..database import get_db
 from ..models import (
     Event,
@@ -26,6 +27,7 @@ from ..schemas.scoresheet import (
 from ..services.event_view import enrich_event
 
 router = APIRouter(tags=["scoresheet"])
+SCORESHEET_MUTATION_RATE_LIMIT = RateLimitRule(limit=60, window_seconds=60)
 
 
 def _require_team_in_event(team_id: str, event: Event):
@@ -77,7 +79,14 @@ def upsert_player_stats(
     body: UpsertPlayerStats,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
+    enforce_rate_limit(
+        request,
+        user_id=context.user.id,
+        route_key="scoresheet.player-stats",
+        rule=SCORESHEET_MUTATION_RATE_LIMIT,
+    )
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
@@ -130,7 +139,14 @@ def create_penalty(
     body: EventPenaltyCreate,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
+    enforce_rate_limit(
+        request,
+        user_id=context.user.id,
+        route_key="scoresheet.penalties.create",
+        rule=SCORESHEET_MUTATION_RATE_LIMIT,
+    )
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
@@ -157,7 +173,14 @@ def delete_penalty(
     id: str,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
+    enforce_rate_limit(
+        request,
+        user_id=context.user.id,
+        route_key="scoresheet.penalties.delete",
+        rule=SCORESHEET_MUTATION_RATE_LIMIT,
+    )
     penalty = db.get(EventPenalty, id)
     if not penalty:
         raise HTTPException(404, "Penalty not found")
@@ -175,7 +198,14 @@ def upsert_goalie_stats(
     body: UpsertGoalieStats,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
+    enforce_rate_limit(
+        request,
+        user_id=context.user.id,
+        route_key="scoresheet.goalie-stats",
+        rule=SCORESHEET_MUTATION_RATE_LIMIT,
+    )
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")
@@ -228,7 +258,14 @@ def sign(
     body: EventSignatureCreate,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
+    enforce_rate_limit(
+        request,
+        user_id=context.user.id,
+        route_key="scoresheet.signatures",
+        rule=SCORESHEET_MUTATION_RATE_LIMIT,
+    )
     event = db.get(Event, event_id)
     if not event:
         raise HTTPException(404, "Event not found")

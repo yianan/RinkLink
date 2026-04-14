@@ -1,4 +1,5 @@
 import { createAuthClient } from 'better-auth/react';
+import { twoFactorClient } from 'better-auth/client/plugins';
 
 const defaultAuthOrigin = import.meta.env.DEV
   ? 'http://localhost:3000'
@@ -14,6 +15,11 @@ export const authEnabled = authFlag === undefined
   : authFlag === 'true';
 export const authClient = createAuthClient({
   baseURL: authOrigin,
+  plugins: [
+    twoFactorClient({
+      twoFactorPage: '/auth/two-factor',
+    }),
+  ],
   sessionOptions: {
     refetchOnWindowFocus: false,
   },

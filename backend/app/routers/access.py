@@ -4,8 +4,8 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from ..auth.context import (
@@ -16,8 +16,10 @@ from ..auth.context import (
     current_authorization_context,
     ensure_association_access,
     ensure_arena_access,
+    ensure_capability,
     ensure_team_access,
 )
+from ..auth.rate_limit import RateLimitRule, enforce_rate_limit
 from ..database import get_db
 from ..models import (
     AccessRequest,
@@ -39,6 +41,7 @@ from ..schemas import (
     AccessRequestDecision,
     AccessRequestOut,
     AccessTargetOut,
+    AppUserOut,
     InviteCreate,
     InviteOut,
 )
@@ -53,6 +56,9 @@ TEAM_ROLES = {"team_admin", "manager", "scheduler", "coach"}
 ARENA_ROLES = {"arena_admin", "arena_ops"}
 RESOURCE_TARGET_TYPES = {"association", "team", "arena", "guardian_link", "player_link"}
 ROLE_BASED_TARGET_TYPES = {"association", "team", "arena"}
+INVITE_ACCEPT_RATE_LIMIT = RateLimitRule(limit=5, window_seconds=300)
+ACCESS_REQUEST_RATE_LIMIT = RateLimitRule(limit=10, window_seconds=300)
+INVITE_CREATE_RATE_LIMIT = RateLimitRule(limit=20, window_seconds=300)
 
 
 def _utcnow() -> datetime:
@@ -89,6 +95,11 @@ def _build_target_summary(target_type: str, target) -> AccessTargetOut:
     if target_type == "player_link":
         context = f"{team_name} · Player access" if team_name else "Player access"
     return AccessTargetOut(type=target_type, id=target.id, name=player_name, context=context)
+
+
+def _masked_player_name(target) -> str:
+    last_initial = f"{target.last_name[:1]}." if getattr(target, "last_name", None) else ""
+    return " ".join(part for part in [target.first_name, last_initial] if part)
 
 
 def _load_target(db: Session, target_type: str, target_id: str):
@@ -166,14 +177,23 @@ def _record_audit(
     action: str,
     resource_type: str,
     resource_id: str,
+    request: Request | None = None,
     details: dict | list | None = None,
 ) -> None:
+    ip_address = None
+    user_agent = None
+    if request is not None:
+        forwarded_for = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        ip_address = forwarded_for or (request.client.host if request.client else None)
+        user_agent = request.headers.get("user-agent")
     db.add(
         AuditLog(
             actor_user_id=actor_user_id,
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
             details_json=details,
         )
     )
@@ -193,7 +213,7 @@ def _apply_target_grant(
     target_type: str,
     target,
     role: str | None,
-) -> None:
+) -> str:
     if target_type == "association":
         membership = (
             db.query(AssociationMembership)
@@ -205,10 +225,14 @@ def _apply_target_grant(
         )
         if membership is None:
             db.add(AssociationMembership(user_id=user.id, association_id=target.id, role=role or "association_admin"))
+            result = "created"
         elif role and membership.role != role:
             membership.role = role
+            result = "updated"
+        else:
+            result = "unchanged"
         _mark_user_active(user)
-        return
+        return result
 
     if target_type == "team":
         membership = (
@@ -218,10 +242,14 @@ def _apply_target_grant(
         )
         if membership is None:
             db.add(TeamMembership(user_id=user.id, team_id=target.id, role=role or "coach"))
+            result = "created"
         elif role and membership.role != role:
             membership.role = role
+            result = "updated"
+        else:
+            result = "unchanged"
         _mark_user_active(user, default_team_id=target.id)
-        return
+        return result
 
     if target_type == "arena":
         membership = (
@@ -231,10 +259,14 @@ def _apply_target_grant(
         )
         if membership is None:
             db.add(ArenaMembership(user_id=user.id, arena_id=target.id, role=role or "arena_ops"))
+            result = "created"
         elif role and membership.role != role:
             membership.role = role
+            result = "updated"
+        else:
+            result = "unchanged"
         _mark_user_active(user)
-        return
+        return result
 
     if target_type == "guardian_link":
         link = (
@@ -244,8 +276,11 @@ def _apply_target_grant(
         )
         if link is None:
             db.add(PlayerGuardianship(user_id=user.id, player_id=target.id, relationship_type="guardian"))
+            result = "created"
+        else:
+            result = "unchanged"
         _mark_user_active(user, default_team_id=target.team_id)
-        return
+        return result
 
     link = (
         db.query(PlayerMembership)
@@ -254,7 +289,11 @@ def _apply_target_grant(
     )
     if link is None:
         db.add(PlayerMembership(user_id=user.id, player_id=target.id))
+        result = "created"
+    else:
+        result = "unchanged"
     _mark_user_active(user, default_team_id=target.team_id)
+    return result
 
 
 def _has_existing_access(db: Session, *, user: AppUser, target_type: str, target) -> bool:
@@ -302,6 +341,59 @@ def _has_existing_access(db: Session, *, user: AppUser, target_type: str, target
     return (
         db.query(PlayerMembership)
         .filter(PlayerMembership.user_id == user.id, PlayerMembership.player_id == target.id)
+        .first()
+        is not None
+    )
+
+
+def _manageable_scope_ids(context: AuthorizationContext, db: Session) -> tuple[set[str], set[str], set[str], set[str]]:
+    association_manage_ids = {
+        membership.association_id
+        for membership in context.association_memberships
+        if membership.role in ASSOCIATION_ROLES
+    }
+    team_manage_staff_ids = {
+        membership.team_id
+        for membership in context.team_memberships
+        if membership.role == "team_admin"
+    }
+    team_manage_roster_ids = {
+        membership.team_id
+        for membership in context.team_memberships
+        if membership.role in {"team_admin", "manager"}
+    }
+    arena_manage_ids = {
+        membership.arena_id
+        for membership in context.arena_memberships
+        if membership.role == "arena_admin"
+    }
+    if association_manage_ids:
+        association_team_ids = {
+            team.id
+            for team in db.query(Team).filter(Team.association_id.in_(association_manage_ids)).all()
+        }
+        team_manage_staff_ids.update(association_team_ids)
+        team_manage_roster_ids.update(association_team_ids)
+    manageable_player_ids = {
+        player.id
+        for player in db.query(Player).filter(Player.team_id.in_(team_manage_roster_ids)).all()
+    } if team_manage_roster_ids else set()
+    return association_manage_ids, team_manage_staff_ids, arena_manage_ids, manageable_player_ids
+
+
+def _build_access_target_search_query(search: str) -> str:
+    return f"%{search.strip()}%"
+
+
+def _has_pending_team_lookup_request(db: Session, *, user_id: str, team_id: str) -> bool:
+    return (
+        db.query(AccessRequest)
+        .filter(
+            AccessRequest.user_id == user_id,
+            AccessRequest.target_type == "team",
+            AccessRequest.target_id == team_id,
+            AccessRequest.status == "pending",
+        )
         .first()
         is not None
     )
@@ -360,13 +452,28 @@ def list_invites(
         invites = query.filter(func.lower(Invite.email) == _normalize_email(context.user.email)).all()
         return [_invite_out(db, invite) for invite in invites]
 
-    invites = query.all()
-    visible_invites: list[InviteOut] = []
-    for invite in invites:
-        target = _load_target(db, invite.target_type, invite.target_id)
-        if invite.invited_by_user_id == context.user.id or _can_manage_target(context, invite.target_type, target):
-            visible_invites.append(_invite_out(db, invite))
-    return visible_invites
+    if context.user.is_platform_admin:
+        invites = query.all()
+        return [_invite_out(db, invite) for invite in invites]
+
+    association_manage_ids, team_manage_ids, arena_manage_ids, manageable_player_ids = _manageable_scope_ids(context, db)
+    filters = [Invite.invited_by_user_id == context.user.id]
+    if association_manage_ids:
+        filters.append(and_(Invite.target_type == "association", Invite.target_id.in_(association_manage_ids)))
+    if team_manage_ids:
+        filters.append(and_(Invite.target_type == "team", Invite.target_id.in_(team_manage_ids)))
+    if arena_manage_ids:
+        filters.append(and_(Invite.target_type == "arena", Invite.target_id.in_(arena_manage_ids)))
+    if manageable_player_ids:
+        filters.append(
+            and_(
+                Invite.target_type.in_(("guardian_link", "player_link")),
+                Invite.target_id.in_(manageable_player_ids),
+            )
+        )
+
+    invites = query.filter(or_(*filters)).all()
+    return [_invite_out(db, invite) for invite in invites]
 
 
 @router.get("/invites/by-token/{token}", response_model=InviteOut)
@@ -388,7 +495,9 @@ def create_invite(
     payload: InviteCreate,
     context: AuthorizationContext = Depends(current_authorization_context),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
+    enforce_rate_limit(request, user_id=context.user.id, route_key="invite.create", rule=INVITE_CREATE_RATE_LIMIT)
     target = _load_target(db, payload.target_type, payload.target_id)
     _validate_role(payload.target_type, payload.role)
     _ensure_manage_target(context, payload.target_type, target)
@@ -410,6 +519,7 @@ def create_invite(
         action="invite.created",
         resource_type=payload.target_type,
         resource_id=payload.target_id,
+        request=request,
         details={"email": invite.email, "role": payload.role},
     )
     db.commit()
@@ -436,7 +546,9 @@ def accept_invite(
     token: str,
     context: AuthorizationContext = Depends(current_authorization_context),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
+    enforce_rate_limit(request, user_id=context.user.id, route_key="invite.accept", rule=INVITE_ACCEPT_RATE_LIMIT)
     invite = db.query(Invite).filter(Invite.token == token).first()
     if invite is None:
         raise _not_found("Invite not found")
@@ -450,7 +562,7 @@ def accept_invite(
         raise HTTPException(status_code=status.HTTP_410_GONE, detail="This invite has expired")
 
     target = _load_target(db, invite.target_type, invite.target_id)
-    _apply_target_grant(db, user=context.user, target_type=invite.target_type, target=target, role=invite.role)
+    grant_result = _apply_target_grant(db, user=context.user, target_type=invite.target_type, target=target, role=invite.role)
     invite.status = "accepted"
     invite.accepted_at = _utcnow()
     _record_audit(
@@ -459,7 +571,17 @@ def accept_invite(
         action="invite.accepted",
         resource_type=invite.target_type,
         resource_id=invite.target_id,
+        request=request,
         details={"invite_id": invite.id, "role": invite.role},
+    )
+    _record_audit(
+        db,
+        actor_user_id=context.user.id,
+        action=f"membership.{grant_result}",
+        resource_type=invite.target_type,
+        resource_id=invite.target_id,
+        request=request,
+        details={"user_id": context.user.id, "source": "invite", "invite_id": invite.id, "role": invite.role},
     )
     db.commit()
     db.refresh(invite)
@@ -472,6 +594,7 @@ def cancel_invite(
     invite_id: str,
     context: AuthorizationContext = Depends(current_authorization_context),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     invite = db.get(Invite, invite_id)
     if invite is None:
@@ -489,6 +612,7 @@ def cancel_invite(
         action="invite.cancelled",
         resource_type=invite.target_type,
         resource_id=invite.target_id,
+        request=request,
         details={"invite_id": invite.id},
     )
     db.commit()
@@ -523,21 +647,40 @@ def list_access_requests(
 def list_access_targets(
     target_type: str = Query(pattern="^(association|team|arena|guardian_link|player_link)$"),
     team_id: str | None = Query(default=None),
+    q: str = Query(min_length=2),
     context: AuthorizationContext = Depends(current_authorization_context),
     db: Session = Depends(get_db),
 ):
-    del context  # Authenticated session required; target lookup is intentionally lightweight for pending users too.
+    search = _build_access_target_search_query(q)
 
     if target_type == "association":
-        associations = db.query(Association).order_by(Association.name.asc()).all()
+        associations = (
+            db.query(Association)
+            .filter(Association.name.ilike(search))
+            .order_by(Association.name.asc())
+            .limit(25)
+            .all()
+        )
         return [_build_target_summary("association", association) for association in associations]
 
     if target_type == "team":
-        teams = db.query(Team).order_by(Team.name.asc()).all()
+        teams = (
+            db.query(Team)
+            .filter(Team.name.ilike(search))
+            .order_by(Team.name.asc())
+            .limit(25)
+            .all()
+        )
         return [_build_target_summary("team", team) for team in teams]
 
     if target_type == "arena":
-        arenas = db.query(Arena).order_by(Arena.name.asc()).all()
+        arenas = (
+            db.query(Arena)
+            .filter(Arena.name.ilike(search))
+            .order_by(Arena.name.asc())
+            .limit(25)
+            .all()
+        )
         return [_build_target_summary("arena", arena) for arena in arenas]
 
     if not team_id:
@@ -546,14 +689,36 @@ def list_access_targets(
     team = db.get(Team, team_id)
     if team is None:
         raise _not_found("Team not found")
+    if not (
+        context.user.is_platform_admin
+        or can_access_team(context, team, "team.manage_roster")
+        or team.id in context.linked_team_ids
+        or _has_pending_team_lookup_request(db, user_id=context.user.id, team_id=team_id)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Submit a pending team access request before searching for players on that team",
+        )
 
     players = (
         db.query(Player)
-        .filter(Player.team_id == team_id)
+        .filter(
+            Player.team_id == team_id,
+            or_(
+                Player.first_name.ilike(search),
+                Player.last_name.ilike(search),
+            ),
+        )
         .order_by(Player.last_name.asc(), Player.first_name.asc())
+        .limit(25)
         .all()
     )
-    return [_build_target_summary(target_type, player) for player in players]
+    masked_targets: list[AccessTargetOut] = []
+    for player in players:
+        summary = _build_target_summary(target_type, player)
+        summary.name = _masked_player_name(player)
+        masked_targets.append(summary)
+    return masked_targets
 
 
 @router.post("/access-requests", response_model=AccessRequestOut, status_code=status.HTTP_201_CREATED)
@@ -561,8 +726,21 @@ def create_access_request(
     payload: AccessRequestCreate,
     context: AuthorizationContext = Depends(current_authorization_context),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
+    enforce_rate_limit(
+        request,
+        user_id=context.user.id,
+        route_key="access-request.create",
+        rule=ACCESS_REQUEST_RATE_LIMIT,
+    )
     target = _load_target(db, payload.target_type, payload.target_id)
+    if payload.target_type in {"guardian_link", "player_link"}:
+        if not _has_pending_team_lookup_request(db, user_id=context.user.id, team_id=target.team_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Submit a pending team access request before requesting a player or guardian link",
+            )
     if _has_existing_access(db, user=context.user, target_type=payload.target_type, target=target):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You already have access to this resource")
 
@@ -593,6 +771,7 @@ def create_access_request(
         action="access_request.created",
         resource_type=payload.target_type,
         resource_id=payload.target_id,
+        request=request,
         details={"access_request_user_id": context.user.id},
     )
     db.commit()
@@ -606,6 +785,7 @@ def approve_access_request(
     payload: AccessRequestDecision,
     context: AuthorizationContext = Depends(current_authorization_context),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     access_request = db.get(AccessRequest, request_id)
     if access_request is None:
@@ -621,7 +801,7 @@ def approve_access_request(
     if user is None:
         raise _not_found("Requested user not found")
 
-    _apply_target_grant(db, user=user, target_type=access_request.target_type, target=target, role=payload.role)
+    grant_result = _apply_target_grant(db, user=user, target_type=access_request.target_type, target=target, role=payload.role)
     access_request.status = "approved"
     access_request.reviewed_by_user_id = context.user.id
     access_request.reviewed_at = _utcnow()
@@ -631,7 +811,17 @@ def approve_access_request(
         action="access_request.approved",
         resource_type=access_request.target_type,
         resource_id=access_request.target_id,
+        request=request,
         details={"access_request_id": access_request.id, "approved_user_id": access_request.user_id, "role": payload.role},
+    )
+    _record_audit(
+        db,
+        actor_user_id=context.user.id,
+        action=f"membership.{grant_result}",
+        resource_type=access_request.target_type,
+        resource_id=access_request.target_id,
+        request=request,
+        details={"user_id": access_request.user_id, "source": "access_request", "access_request_id": access_request.id, "role": payload.role},
     )
     db.commit()
     db.refresh(access_request)
@@ -643,6 +833,7 @@ def reject_access_request(
     request_id: str,
     context: AuthorizationContext = Depends(current_authorization_context),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     access_request = db.get(AccessRequest, request_id)
     if access_request is None:
@@ -662,8 +853,92 @@ def reject_access_request(
         action="access_request.rejected",
         resource_type=access_request.target_type,
         resource_id=access_request.target_id,
+        request=request,
         details={"access_request_id": access_request.id, "rejected_user_id": access_request.user_id},
     )
     db.commit()
     db.refresh(access_request)
     return _access_request_out(db, access_request)
+
+
+@router.delete("/memberships/{kind}/{membership_id}", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_membership(
+    kind: str,
+    membership_id: str,
+    context: AuthorizationContext = Depends(current_authorization_context),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    membership_model = {
+        "association": AssociationMembership,
+        "team": TeamMembership,
+        "arena": ArenaMembership,
+        "guardian": PlayerGuardianship,
+        "player": PlayerMembership,
+    }.get(kind)
+    if membership_model is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unsupported membership kind")
+
+    membership = db.get(membership_model, membership_id)
+    if membership is None:
+        raise _not_found("Membership not found")
+
+    if kind == "association":
+        target_type = "association"
+        target = db.get(Association, membership.association_id)
+    elif kind == "team":
+        target_type = "team"
+        target = db.get(Team, membership.team_id)
+    elif kind == "arena":
+        target_type = "arena"
+        target = db.get(Arena, membership.arena_id)
+    elif kind == "guardian":
+        target_type = "guardian_link"
+        target = db.get(Player, membership.player_id)
+    else:
+        target_type = "player_link"
+        target = db.get(Player, membership.player_id)
+
+    if target is None:
+        raise _not_found("Membership target not found")
+    _ensure_manage_target(context, target_type, target)
+
+    revoked_user_id = membership.user_id
+    db.delete(membership)
+    _record_audit(
+        db,
+        actor_user_id=context.user.id,
+        action="membership.revoked",
+        resource_type=target_type,
+        resource_id=getattr(target, "id"),
+        request=request,
+        details={"membership_id": membership_id, "revoked_user_id": revoked_user_id, "membership_kind": kind},
+    )
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/users/{user_id}/revoke", response_model=AppUserOut)
+def revoke_user(
+    user_id: str,
+    context: AuthorizationContext = Depends(current_authorization_context),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    ensure_capability(context, "platform.manage", detail="You do not have permission to revoke users")
+    user = db.get(AppUser, user_id)
+    if user is None:
+        raise _not_found("User not found")
+    user.revoked_at = _utcnow()
+    _record_audit(
+        db,
+        actor_user_id=context.user.id,
+        action="user.revoked",
+        resource_type="user",
+        resource_id=user.id,
+        request=request,
+        details={"revoked_user_id": user.id, "email": user.email},
+    )
+    db.commit()
+    db.refresh(user)
+    return user

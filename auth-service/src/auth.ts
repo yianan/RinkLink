@@ -1,10 +1,11 @@
 import "dotenv/config";
 
 import { betterAuth } from "better-auth";
-import { jwt } from "better-auth/plugins";
+import { haveIBeenPwned, jwt, twoFactor } from "better-auth/plugins";
 import { Pool } from "pg";
 
 import {
+  requireBetterAuthSecret,
   resolveApiAudience,
   resolveBetterAuthUrl,
   resolvePublicAppUrl,
@@ -26,6 +27,7 @@ if (!baseURL) {
 
 const frontendUrl = resolvePublicAppUrl();
 const trustedOrigins = resolveTrustedOrigins();
+const betterAuthSecret = requireBetterAuthSecret();
 
 if (!frontendUrl) {
   throw new Error("FRONTEND_URL is required for auth-service");
@@ -37,7 +39,7 @@ if (!apiAudience) {
   throw new Error("API_AUDIENCE is required for auth-service");
 }
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: databaseUrl,
 });
 
@@ -71,7 +73,14 @@ function socialProviderConfig() {
 export const auth = betterAuth({
   appName: "RinkLink",
   baseURL,
+  secret: betterAuthSecret,
   database: pool,
+  advanced: {
+    ipAddress: {
+      ipAddressHeaders: ["x-forwarded-for"],
+    },
+    trustedProxyHeaders: true,
+  },
   trustedOrigins: [...trustedOrigins, "https://appleid.apple.com"],
   rateLimit: {
     enabled: true,
@@ -84,17 +93,19 @@ export const auth = betterAuth({
       "/reset-password": { window: 3600, max: 5 },
     },
   },
-  // Better Auth does not support account lockout natively.
-  // Rate limiting on sign-in (5/min) is the primary brute-force defense.
-  // Add a custom lockout hook here if needed in the future.
   account: {
-    accountLinking: { enabled: true },
+    accountLinking: {
+      enabled: true,
+      allowDifferentEmails: false,
+      disableImplicitLinking: false,
+      trustedProviders: [],
+    },
   },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
     autoSignIn: false,
-    minPasswordLength: 8,
+    minPasswordLength: 12,
     maxPasswordLength: 128,
     sendResetPassword: async ({ user, url }) => {
       await sendResetPasswordEmail(user.email, url);
@@ -110,12 +121,22 @@ export const auth = betterAuth({
   },
   socialProviders: socialProviderConfig(),
   plugins: [
+    haveIBeenPwned(),
+    twoFactor({
+      issuer: "RinkLink",
+    }),
     jwt({
       jwks: {
         jwksPath: "/.well-known/jwks.json",
       },
       jwt: {
         audience: [apiAudience],
+        definePayload: ({ user }) => ({
+          email: user.email,
+          email_verified: user.emailVerified,
+          name: user.name,
+          mfa_verified: Boolean((user as { twoFactorEnabled?: boolean }).twoFactorEnabled),
+        }),
       },
     }),
   ],
