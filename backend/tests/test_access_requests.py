@@ -11,7 +11,15 @@ from app.auth.context import build_authorization_context, can_access_team
 from app.auth.dependencies import current_user
 from app.auth import dependencies as auth_dependencies
 from app.models import AccessRequest, AppUser, Arena, Association, AssociationMembership, Invite, Player, PlayerGuardianship, Season, Team, TeamMembership
-from app.routers.access import accept_invite, create_access_request, create_invite, list_access_targets, revoke_membership, revoke_user
+from app.routers.access import (
+    accept_invite,
+    create_access_request,
+    create_invite,
+    list_access_requests,
+    list_access_targets,
+    revoke_membership,
+    revoke_user,
+)
 from app.schemas import AccessRequestCreate, InviteCreate
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -172,6 +180,44 @@ def test_duplicate_access_request_reuses_existing_pending_row(db: Session) -> No
 
     assert first.id == second.id
     assert db.query(AccessRequest).count() == 1
+
+
+def test_player_link_access_request_masks_target_name_for_requester(db: Session) -> None:
+    association = make_association(db, "Masked Association")
+    team = make_team(db, association, "Masked Team")
+    season = make_season(db)
+    player = Player(
+        team_id=team.id,
+        season_id=season.id,
+        first_name="Jordan",
+        last_name="Skater",
+        jersey_number=12,
+        position="F",
+    )
+    pending_user = make_user(db, "masked@example.com")
+    db.add(player)
+    db.add(
+        AccessRequest(
+            user_id=pending_user.id,
+            target_type="team",
+            target_id=team.id,
+            status="pending",
+        )
+    )
+    db.commit()
+
+    context = build_authorization_context(db, pending_user)
+    created = create_access_request(
+        payload=AccessRequestCreate(target_type="player_link", target_id=player.id, notes="Player self access"),
+        context=context,
+        db=db,
+        request=make_request("/api/access-requests"),
+    )
+
+    assert created.target.name == "Jordan S."
+
+    mine = list_access_requests(scope="mine", status_filter=None, context=context, db=db)
+    assert mine[0].target.name == "Jordan S."
 
 
 def test_existing_membership_blocks_redundant_access_request(db: Session) -> None:

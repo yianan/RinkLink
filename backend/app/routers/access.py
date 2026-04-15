@@ -418,7 +418,14 @@ def _invite_out(db: Session, invite: Invite) -> InviteOut:
     )
 
 
-def _access_request_out(db: Session, access_request: AccessRequest) -> AccessRequestOut:
+def _access_request_target_summary(access_request: AccessRequest, target, *, mask_private_target: bool) -> AccessTargetOut:
+    summary = _build_target_summary(access_request.target_type, target)
+    if mask_private_target and access_request.target_type in {"guardian_link", "player_link"}:
+        summary.name = _masked_player_name(target)
+    return summary
+
+
+def _access_request_out(db: Session, access_request: AccessRequest, *, mask_private_target: bool = False) -> AccessRequestOut:
     target = _load_target(db, access_request.target_type, access_request.target_id)
     requester = db.get(AppUser, access_request.user_id)
     reviewer = db.get(AppUser, access_request.reviewed_by_user_id) if access_request.reviewed_by_user_id else None
@@ -433,7 +440,7 @@ def _access_request_out(db: Session, access_request: AccessRequest) -> AccessReq
         user_email=requester.email if requester else None,
         reviewed_by_user_id=access_request.reviewed_by_user_id,
         reviewed_by_email=reviewer.email if reviewer else None,
-        target=_build_target_summary(access_request.target_type, target),
+        target=_access_request_target_summary(access_request, target, mask_private_target=mask_private_target),
     )
 
 
@@ -632,7 +639,7 @@ def list_access_requests(
 
     if scope == "mine":
         requests = query.filter(AccessRequest.user_id == context.user.id).all()
-        return [_access_request_out(db, access_request) for access_request in requests]
+        return [_access_request_out(db, access_request, mask_private_target=True) for access_request in requests]
 
     requests = query.all()
     visible_requests: list[AccessRequestOut] = []
@@ -755,7 +762,7 @@ def create_access_request(
         .first()
     )
     if existing is not None:
-        return _access_request_out(db, existing)
+        return _access_request_out(db, existing, mask_private_target=True)
 
     access_request = AccessRequest(
         user_id=context.user.id,
@@ -776,7 +783,7 @@ def create_access_request(
     )
     db.commit()
     db.refresh(access_request)
-    return _access_request_out(db, access_request)
+    return _access_request_out(db, access_request, mask_private_target=True)
 
 
 @router.post("/access-requests/{request_id}/approve", response_model=AccessRequestOut)
