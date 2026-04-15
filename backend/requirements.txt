@@ -2,7 +2,7 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 sqlalchemy==2.0.44
 pydantic==2.12.5
-python-multipart==0.0.22
+python-multipart==0.0.26
 # psycopg2-binary does not ship wheels for newer Python versions (ex: 3.14).
 # psycopg (v3) provides a binary distribution that works cleanly on 3.14+.
 psycopg[binary]==3.3.3
