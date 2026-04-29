@@ -11,6 +11,8 @@ class AppUserOut(BaseModel):
     email: str
     display_name: str | None = None
     status: str
+    access_state: str
+    auth_state: str
     is_platform_admin: bool
     default_team_id: str | None = None
     revoked_at: dt.datetime | None = None
@@ -100,6 +102,38 @@ class AccessRequestCreate(BaseModel):
 
 class AccessRequestDecision(BaseModel):
     role: str | None = None
+
+
+class UserAccessChange(BaseModel):
+    reason: str | None = Field(default=None, max_length=1000)
+
+
+class UserAccessEntryOut(BaseModel):
+    membership_kind: str
+    membership_id: str
+    target_type: str
+    target_id: str
+    name: str
+    context: str | None = None
+    role: str | None = None
+    relationship_type: str | None = None
+
+
+class UserAuditEntryOut(BaseModel):
+    id: str
+    action: str
+    resource_type: str
+    resource_id: str
+    actor_user_id: str | None = None
+    actor_email: str | None = None
+    details: dict | list | None = None
+    created_at: dt.datetime
+
+
+class UserAccessSummaryOut(BaseModel):
+    user: AppUserOut
+    access_entries: list[UserAccessEntryOut]
+    audit_entries: list[UserAuditEntryOut]
 
 
 class AccessRequestOut(BaseModel):

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Navigation, Pencil, Save, Trash2, UtensilsCrossed, Warehouse, X } from 'lucide-react';
 import { api } from '../api/client';
@@ -39,9 +39,14 @@ export default function ArenaListPage() {
   const [form, setForm] = useState(emptyForm);
   const [arenaLogoFile, setArenaLogoFile] = useState<File | null>(null);
   const [removeArenaLogo, setRemoveArenaLogo] = useState(false);
-  const [arenaLogoPreviewUrl, setArenaLogoPreviewUrl] = useState<string | null>(null);
   const arenaVisible = !authEnabled || canViewArenas(me);
   const arenaEditable = !authEnabled || canManageArena(me);
+  const arenaLogoPreviewUrl = useMemo(() => {
+    if (!arenaLogoFile) {
+      return removeArenaLogo ? null : (editArena?.logo_url ?? null);
+    }
+    return URL.createObjectURL(arenaLogoFile);
+  }, [arenaLogoFile, editArena?.logo_url, removeArenaLogo]);
 
   const load = () => {
     api.getArenas().then(setArenas);
@@ -52,14 +57,9 @@ export default function ArenaListPage() {
   }, []);
 
   useEffect(() => {
-    if (!arenaLogoFile) {
-      setArenaLogoPreviewUrl(removeArenaLogo ? null : (editArena?.logo_url ?? null));
-      return;
-    }
-    const objectUrl = URL.createObjectURL(arenaLogoFile);
-    setArenaLogoPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [arenaLogoFile, editArena?.logo_url, removeArenaLogo]);
+    if (!arenaLogoFile || !arenaLogoPreviewUrl) return;
+    return () => URL.revokeObjectURL(arenaLogoPreviewUrl);
+  }, [arenaLogoFile, arenaLogoPreviewUrl]);
 
   if (!arenaVisible) {
     return <Card className="p-6 text-sm text-slate-600 dark:text-slate-400">You do not have access to the arena directory.</Card>;

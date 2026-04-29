@@ -29,6 +29,8 @@ def _synthetic_admin() -> AppUser:
         email="dev-admin@local.rinklink",
         display_name="Development Admin",
         status="active",
+        access_state="active",
+        auth_state="active",
         is_platform_admin=True,
         revoked_at=None,
         created_at=datetime.now(timezone.utc),
@@ -50,6 +52,8 @@ def _upsert_user_from_claims(db: Session, claims: dict) -> AppUser:
             email=email,
             display_name=display_name,
             status="pending",
+            access_state="active",
+            auth_state="active",
             is_platform_admin=False,
         )
         db.add(user)
@@ -69,7 +73,7 @@ def _upsert_user_from_claims(db: Session, claims: dict) -> AppUser:
     return user
 
 
-def current_user(
+def _resolve_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> AppUser:
@@ -95,6 +99,26 @@ def current_user(
         revoked_at = int(user.revoked_at.replace(tzinfo=timezone.utc).timestamp())
         if revoked_at > int(token_issued_at):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access has been revoked")
+    return user
+
+
+def current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> AppUser:
+    user = _resolve_current_user(credentials=credentials, db=db)
+    if user.auth_state == "disabled":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign-in is disabled")
+    if user.access_state == "disabled":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="App access is disabled")
+    return user
+
+
+def current_me_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> AppUser:
+    user = _resolve_current_user(credentials=credentials, db=db)
     return user
 
 

@@ -19,7 +19,6 @@ import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
 import EmptyState from '../components/EmptyState';
 import { CardListSkeleton, TableSkeleton } from '../components/ui/TableSkeleton';
-import TeamLogo from '../components/TeamLogo';
 import { Select } from '../components/ui/Select';
 import {
   addDays,

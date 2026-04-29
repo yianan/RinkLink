@@ -1,5 +1,5 @@
 import { Image as ImageIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { cn } from '../lib/cn';
 
 function initialsForTeam(name: string) {
@@ -20,11 +20,8 @@ export default function TeamLogo({
   className?: string;
   initialsClassName?: string;
 }) {
-  const [imageFailed, setImageFailed] = useState(false);
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [logoUrl]);
+  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
+  const imageFailed = !!logoUrl && failedLogoUrl === logoUrl;
 
   return (
     <div
@@ -39,10 +36,11 @@ export default function TeamLogo({
     >
       {logoUrl && !imageFailed ? (
         <img
+          key={logoUrl}
           src={logoUrl}
           alt=""
           className="h-full w-full object-contain"
-          onError={() => setImageFailed(true)}
+          onError={() => setFailedLogoUrl(logoUrl)}
         />
       ) : initialsForTeam(name) ? (
         <span className={cn('font-semibold tracking-tight', initialsClassName)}>{initialsForTeam(name)}</span>

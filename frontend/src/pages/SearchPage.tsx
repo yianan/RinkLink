@@ -134,6 +134,7 @@ export default function SearchPage() {
   const availabilityReturnMonth = searchParams.get('month');
   const availabilityReturnDate = searchParams.get('date');
   const cameFromAvailability = searchParams.get('from') === 'availability' || !!searchParams.get('availability');
+  const requestedAvailabilityId = searchParams.get('availability');
 
   const sortedAutoMatches = useMemo(
     () => autoMatches.slice().sort((left, right) => left.date.localeCompare(right.date) || (left.home_start_time || '').localeCompare(right.home_start_time || '')),
@@ -164,12 +165,15 @@ export default function SearchPage() {
       );
       setAvailability(openWindows);
 
-      const requestedId = searchParams.get('availability');
-      if (requestedId && openWindows.some((window) => window.id === requestedId)) {
-        setSelectedAvailabilityId(requestedId);
-      } else if (!openWindows.some((window) => window.id === selectedAvailabilityId)) {
-        setSelectedAvailabilityId(openWindows[0]?.id || '');
-      }
+      setSelectedAvailabilityId((current) => {
+        if (requestedAvailabilityId && openWindows.some((window) => window.id === requestedAvailabilityId)) {
+          return requestedAvailabilityId;
+        }
+        if (openWindows.some((window) => window.id === current)) {
+          return current;
+        }
+        return openWindows[0]?.id || '';
+      });
 
       setAutoMatches(
         autoMatchData.filter((match) =>
@@ -185,7 +189,7 @@ export default function SearchPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTeam?.id, effectiveSeason?.id, searchParams]);
+  }, [activeTeam, effectiveSeason, requestedAvailabilityId]);
 
   useEffect(() => {
     setResults([]);

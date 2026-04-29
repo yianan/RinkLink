@@ -14,6 +14,7 @@ import { Textarea } from '../components/ui/Textarea';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { authClient } from '../lib/auth-client';
+import { getAccessRoleLabel, getAccessTargetTypeLabel } from '../lib/accessLabels';
 import { cn } from '../lib/cn';
 import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
 import { accentActionClass, focusRingClass, listRowButtonClass, toolbarSelectClass } from '../lib/uiClasses';
@@ -28,11 +29,11 @@ import type {
 } from '../types';
 
 const REQUEST_TARGET_TYPES = [
-  { value: 'team', label: 'Team staff access' },
-  { value: 'association', label: 'Association access' },
-  { value: 'arena', label: 'Arena staff access' },
-  { value: 'guardian_link', label: 'Parent or guardian link' },
-  { value: 'player_link', label: 'Player self link' },
+  { value: 'team', label: 'Team Staff Access' },
+  { value: 'association', label: 'Association Access' },
+  { value: 'arena', label: 'Arena Staff Access' },
+  { value: 'guardian_link', label: 'Parent/Guardian Link' },
+  { value: 'player_link', label: 'Player Link' },
 ] as const;
 
 const PENDING_SCROLL_KEY = 'rinklink.pending.scrollY';
@@ -44,9 +45,9 @@ function requestTargetHelp(targetType: string) {
     case 'arena':
       return 'Request access to an arena you work with.';
     case 'guardian_link':
-      return 'Request parent or guardian access for a player.';
+      return 'Request a parent or guardian link for a specific player.';
     case 'player_link':
-      return 'Request player self access for a player account.';
+      return 'Request a self-managed player link for a specific player account.';
     default:
       return 'Request staff access for a team.';
   }
@@ -116,10 +117,6 @@ export default function PendingApprovalPage() {
     () => invites.filter((invite) => invite.status === 'pending'),
     [invites],
   );
-  const hasPendingTeamLookupRequest = useMemo(
-    () => requests.some((request) => request.status === 'pending' && request.target.type === 'team' && request.target.id === requestTeamId),
-    [requestTeamId, requests],
-  );
   const selectedBrowseTeam = useMemo(
     () => browseTeams.find((team) => team.id === browseTeamId) || null,
     [browseTeamId, browseTeams],
@@ -157,7 +154,7 @@ export default function PendingApprovalPage() {
   useEffect(() => {
     if (!isAuthenticated) return;
     void loadPendingData();
-  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated || me?.user.status === 'active') return;
@@ -181,7 +178,7 @@ export default function PendingApprovalPage() {
       window.clearInterval(intervalId);
       window.removeEventListener('focus', onWindowFocus);
     };
-  }, [isAuthenticated, me?.user.status, refreshProfile]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, me?.user.status, refreshProfile]);
 
   useEffect(() => {
     const savePendingScroll = () => {
@@ -290,13 +287,6 @@ export default function PendingApprovalPage() {
         setRequestTargetId('');
         return;
       }
-      if (!hasPendingTeamLookupRequest) {
-        setRequestOptions([]);
-        setRequestTargetId('');
-        setRequestOptionsLoading(false);
-        setRequestLookupError('Submit a pending team access request for this team before searching for players.');
-        return;
-      }
       params.team_id = requestTeamId;
     }
 
@@ -321,7 +311,7 @@ export default function PendingApprovalPage() {
     return () => {
       cancelled = true;
     };
-  }, [hasPendingTeamLookupRequest, isAuthenticated, requestSearch, requestTargetType, requestTeamId]);
+  }, [isAuthenticated, requestSearch, requestTargetType, requestTeamId]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -537,8 +527,8 @@ export default function PendingApprovalPage() {
                           <div className="text-sm text-slate-600 dark:text-slate-300">{invite.target.context}</div>
                         ) : null}
                         <div className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                          {invite.target.type.replace('_', ' ')}
-                          {invite.role ? ` · ${invite.role}` : ''}
+                          {getAccessTargetTypeLabel(invite.target.type)}
+                          {invite.role ? ` · ${getAccessRoleLabel(invite.role)}` : ''}
                         </div>
                       </div>
                       <Badge variant={statusVariant(invite.status)}>{invite.status}</Badge>
@@ -603,11 +593,9 @@ export default function PendingApprovalPage() {
                       <option key={team.id} value={team.id}>{team.name}{team.context ? ` · ${team.context}` : ''}</option>
                     ))}
                   </Select>
-                  {!hasPendingTeamLookupRequest && requestTeamId ? (
-                    <div className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-                      Submit a pending team access request for this team first. Player search stays locked until that request exists.
-                    </div>
-                  ) : null}
+                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    Search the team first, then choose the player you need linked to this account.
+                  </div>
                 </div>
               ) : null}
 

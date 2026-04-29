@@ -55,3 +55,25 @@ export function canManageArenaSlots(me: MeResponse | null) {
 export function canManageArenaBookingRequests(me: MeResponse | null) {
   return hasAnyCapability(me, ['platform.manage', 'arena.manage', 'arena.manage_booking_requests']);
 }
+
+export function getPreferredAppPath(me: MeResponse | null) {
+  if (!me) {
+    return '/';
+  }
+  if (!me.user.is_platform_admin && me.user.status !== 'active') {
+    return '/pending';
+  }
+
+  const familyOnlyUser = hasAnyCapability(me, ['player.respond_guarded', 'player.respond_self'])
+    && !hasAnyCapability(me, ['platform.manage', 'team.view', 'team.view_private', 'association.view']);
+  if (familyOnlyUser && me.linked_players.length > 0) {
+    return '/schedule';
+  }
+
+  const arenaOnlyUser = canViewArenas(me) && !canViewTeams(me) && me.accessible_teams.length === 0;
+  if (arenaOnlyUser) {
+    return '/arenas';
+  }
+
+  return '/';
+}

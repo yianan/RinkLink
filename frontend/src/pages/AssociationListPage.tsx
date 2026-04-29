@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Building2, Pencil, Save, Trash2, X } from 'lucide-react';
 import { api } from '../api/client';
 import { Association, Team } from '../types';
-import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import FilterPillGroup, { type FilterOption } from '../components/FilterPillGroup';
@@ -41,7 +40,6 @@ export default function AssociationListPage() {
   const [form, setForm] = useState(emptyForm);
   const [associationLogoFile, setAssociationLogoFile] = useState<File | null>(null);
   const [removeAssociationLogo, setRemoveAssociationLogo] = useState(false);
-  const [associationLogoPreviewUrl, setAssociationLogoPreviewUrl] = useState<string | null>(null);
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
@@ -51,6 +49,18 @@ export default function AssociationListPage() {
   const pushToast = useToast();
   const associationVisible = !authEnabled || canViewAssociations(me);
   const associationEditable = !authEnabled || canManageAssociations(me);
+
+  const editAssociation = useMemo(
+    () => associations.find((association) => association.id === editId) ?? null,
+    [associations, editId],
+  );
+
+  const associationLogoPreviewUrl = useMemo(() => {
+    if (!associationLogoFile) {
+      return removeAssociationLogo ? null : (editAssociation?.logo_url ?? null);
+    }
+    return URL.createObjectURL(associationLogoFile);
+  }, [associationLogoFile, editAssociation?.logo_url, removeAssociationLogo]);
 
   const load = () => {
     let cancelled = false;
@@ -70,20 +80,10 @@ export default function AssociationListPage() {
   };
   useEffect(() => load(), []);
 
-  const editAssociation = useMemo(
-    () => associations.find((association) => association.id === editId) ?? null,
-    [associations, editId],
-  );
-
   useEffect(() => {
-    if (!associationLogoFile) {
-      setAssociationLogoPreviewUrl(removeAssociationLogo ? null : (editAssociation?.logo_url ?? null));
-      return;
-    }
-    const objectUrl = URL.createObjectURL(associationLogoFile);
-    setAssociationLogoPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [associationLogoFile, editAssociation?.logo_url, removeAssociationLogo]);
+    if (!associationLogoFile || !associationLogoPreviewUrl) return;
+    return () => URL.revokeObjectURL(associationLogoPreviewUrl);
+  }, [associationLogoFile, associationLogoPreviewUrl]);
 
   const teamsByAssociation = useMemo(() => {
     const by: Record<string, Team[]> = {};
@@ -162,8 +162,6 @@ export default function AssociationListPage() {
     ];
   }, [ageGroupOptions, cityOptions, competitionOptions, selectedAgeGroups, selectedCities, selectedCompetitionNames, selectedStates, stateOptions]);
 
-  const hasActiveFilters = activeFilterBadges.length > 0;
-
   const clearFilters = () => {
     setSelectedCities([]);
     setSelectedStates([]);
@@ -172,24 +170,23 @@ export default function AssociationListPage() {
   };
 
   const handleSave = async () => {
-    let savedAssociation: Association;
+    const savedAssociation = editId
+      ? await api.updateAssociation(editId, form)
+      : await api.createAssociation(form);
+
     if (editId) {
-      savedAssociation = await api.updateAssociation(editId, form);
       if (removeAssociationLogo && editAssociation?.logo_url) {
-        savedAssociation = await api.deleteAssociationLogo(editId);
+        await api.deleteAssociationLogo(editId);
       }
-    } else {
-      savedAssociation = await api.createAssociation(form);
     }
     if (associationLogoFile) {
-      savedAssociation = await api.uploadAssociationLogo(savedAssociation.id, associationLogoFile);
+      await api.uploadAssociationLogo(savedAssociation.id, associationLogoFile);
     }
     setOpen(false);
     setEditId(null);
     setForm(emptyForm);
     setAssociationLogoFile(null);
     setRemoveAssociationLogo(false);
-    setAssociationLogoPreviewUrl(null);
     load();
   };
 
@@ -233,7 +230,7 @@ export default function AssociationListPage() {
           <>
             <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((open) => !open)} />
             {associationEditable ? (
-              <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setAssociationLogoFile(null); setRemoveAssociationLogo(false); setAssociationLogoPreviewUrl(null); setOpen(true); }}>
+              <Button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setAssociationLogoFile(null); setRemoveAssociationLogo(false); setOpen(true); }}>
                 <Building2 className="h-4 w-4" />
                 Add Association
               </Button>
@@ -443,7 +440,6 @@ export default function AssociationListPage() {
           setOpen(false);
           setAssociationLogoFile(null);
           setRemoveAssociationLogo(false);
-          setAssociationLogoPreviewUrl(null);
         }}
         title={`${editId ? 'Edit' : 'Add'} Association`}
         footer={

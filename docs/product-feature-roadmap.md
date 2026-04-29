@@ -254,6 +254,11 @@ These are not the highest-level roadmap items, but they will improve product qua
 - better dashboard summaries for multi-team and all-season views
 - more complete audit history on state-changing actions
 - soft warnings before destructive actions
+- clearer admin controls for access lifecycle:
+  - separate membership revocation from full app-access revocation
+  - distinguish app-access disablement from auth-account disablement
+  - document and redesign current `revoke user` behavior, which invalidates existing JWTs but still allows a fresh sign-in
+  - see [Admin Access Controls Plan](./admin-access-controls-plan.md)
 
 ### Communication
 

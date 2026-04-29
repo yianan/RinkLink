@@ -4,7 +4,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 
-import { auth, pool } from "./auth.js";
+import { auth, isAuthDisabledForEmail, pool } from "./auth.js";
 import { ensureLockoutSchema, clearSignInFailures, isSignInLocked, recordSignInFailure } from "./lockout.js";
 import { resolvePublicAppUrl, resolveTrustedOrigins } from "./config.js";
 
@@ -43,6 +43,9 @@ app.use("/api/auth/sign-in/email", async (c, next) => {
 
   if (await isSignInLocked(pool, email)) {
     return c.json({ code: "ACCOUNT_LOCKED", message: "Too many failed sign-in attempts. Try again later." }, 423);
+  }
+  if (await isAuthDisabledForEmail(email)) {
+    return c.json({ code: "ACCOUNT_DISABLED", message: "Sign-in is disabled for this account." }, 403);
   }
 
   await next();

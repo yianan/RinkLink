@@ -248,11 +248,18 @@ function SignInCard() {
         || normalizedCode === 'INVALID_CREDENTIALS'
         || normalizedCode === 'INVALID_EMAIL_OR_PASSWORD'
         || normalizedCode === 'CREDENTIALS_SIGN_IN_FAILED';
+      const accountDisabled = status === 403
+        || message.trim().toLowerCase() === 'forbidden'
+        || normalizedCode === 'ACCOUNT_DISABLED';
 
       setPassword('');
       pushToast({
         title: 'Unable to sign in',
-        description: invalidCredentials ? 'Username and password combination not valid.' : message,
+        description: accountDisabled
+          ? 'Sign-in is disabled for this account. Contact your club or platform administrator.'
+          : invalidCredentials
+            ? 'Username and password combination not valid.'
+            : message,
         variant: 'error',
       });
     } finally {

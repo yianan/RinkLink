@@ -198,6 +198,17 @@ def _assert_seed_booking_request_links(db: Session, booking_requests: list[IceBo
                 raise RuntimeError(f"Seed booking request {request.id} does not match its accepted event slot")
 
 
+def _assert_seed_team_competitions(teams: list[Team], memberships: list[TeamCompetitionMembership]) -> None:
+    membership_counts: dict[str, int] = {}
+    for membership in memberships:
+        membership_counts[membership.team_id] = membership_counts.get(membership.team_id, 0) + 1
+
+    unassigned_team_names = [team.name for team in teams if membership_counts.get(team.id, 0) == 0]
+    if unassigned_team_names:
+        joined_names = ", ".join(sorted(unassigned_team_names))
+        raise RuntimeError(f"Seed teams missing competition memberships: {joined_names}")
+
+
 def seed_demo_data(
     db: Session,
     *,
@@ -381,6 +392,7 @@ def seed_demo_data(
     ]
     db.add_all(memberships)
     db.flush()
+    _assert_seed_team_competitions(teams, memberships)
 
     db.flush()
 

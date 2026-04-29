@@ -18,7 +18,7 @@ from ..models import (
     Team,
     TeamMembership,
 )
-from .capabilities import ALL_CAPABILITIES, effective_capabilities
+from .capabilities import ALL_CAPABILITIES, capabilities_for_roles, effective_capabilities
 from .dependencies import current_user, require_active_user
 
 PRIVILEGED_CAPABILITIES = {
@@ -38,6 +38,9 @@ class AuthorizationContext:
     guardianships: list[PlayerGuardianship]
     player_memberships: list[PlayerMembership]
     capabilities: set[str]
+    association_roles: dict[str, str]
+    team_roles: dict[str, str]
+    arena_roles: dict[str, str]
     association_ids: set[str]
     team_ids: set[str]
     arena_ids: set[str]
@@ -82,9 +85,12 @@ def build_authorization_context(db: Session, user: AppUser) -> AuthorizationCont
         )
     )
 
-    association_ids = {membership.association_id for membership in association_memberships}
-    team_ids = {membership.team_id for membership in team_memberships}
-    arena_ids = {membership.arena_id for membership in arena_memberships}
+    association_roles = {membership.association_id: membership.role for membership in association_memberships}
+    team_roles = {membership.team_id: membership.role for membership in team_memberships}
+    arena_roles = {membership.arena_id: membership.role for membership in arena_memberships}
+    association_ids = set(association_roles.keys())
+    team_ids = set(team_roles.keys())
+    arena_ids = set(arena_roles.keys())
     guardian_player_ids = {guardianship.player_id for guardianship in guardianships}
     player_ids = {membership.player_id for membership in player_memberships}
 
@@ -104,6 +110,9 @@ def build_authorization_context(db: Session, user: AppUser) -> AuthorizationCont
         guardianships=guardianships,
         player_memberships=player_memberships,
         capabilities=capabilities,
+        association_roles=association_roles,
+        team_roles=team_roles,
+        arena_roles=arena_roles,
         association_ids=association_ids,
         team_ids=team_ids,
         arena_ids=arena_ids,
@@ -112,6 +121,10 @@ def build_authorization_context(db: Session, user: AppUser) -> AuthorizationCont
         linked_team_ids=linked_team_ids,
         token_claims=getattr(user, "_token_claims", None),
     )
+
+
+def enforced_authorization_context(db: Session, user: AppUser) -> AuthorizationContext:
+    return _enforce_privileged_mfa(build_authorization_context(db, user))
 
 
 def _enforce_privileged_mfa(context: AuthorizationContext) -> AuthorizationContext:
@@ -130,20 +143,23 @@ def authorization_context(
     user: AppUser = Depends(require_active_user),
     db: Session = Depends(get_db),
 ) -> AuthorizationContext:
-    return _enforce_privileged_mfa(build_authorization_context(db, user))
+    return enforced_authorization_context(db, user)
 
 
 def current_authorization_context(
     user: AppUser = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> AuthorizationContext:
-    return _enforce_privileged_mfa(build_authorization_context(db, user))
+    return enforced_authorization_context(db, user)
 
 
 def can_access_association(context: AuthorizationContext, association_id: str, capability: str) -> bool:
     if context.user.is_platform_admin:
         return True
-    return capability in context.capabilities and association_id in context.association_ids
+    role = context.association_roles.get(association_id)
+    if role is None:
+        return False
+    return capability in capabilities_for_roles([role])
 
 
 def has_capability(context: AuthorizationContext, capability: str) -> bool:
@@ -164,9 +180,11 @@ def can_access_team(
             return True
         if context.player_ids and "player.respond_self" in context.capabilities:
             return True
-    if capability not in context.capabilities:
-        return False
-    if team.id in context.team_ids or team.association_id in context.association_ids:
+    team_role = context.team_roles.get(team.id)
+    if team_role is not None and capability in capabilities_for_roles([team_role]):
+        return True
+    association_role = context.association_roles.get(team.association_id)
+    if association_role is not None and capability in capabilities_for_roles([association_role]):
         return True
     return False
 
@@ -174,7 +192,10 @@ def can_access_team(
 def can_access_arena(context: AuthorizationContext, arena_id: str, capability: str) -> bool:
     if context.user.is_platform_admin:
         return True
-    return capability in context.capabilities and arena_id in context.arena_ids
+    role = context.arena_roles.get(arena_id)
+    if role is None:
+        return False
+    return capability in capabilities_for_roles([role])
 
 
 def can_access_any_event_team(

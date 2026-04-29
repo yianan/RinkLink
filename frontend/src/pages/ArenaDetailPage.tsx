@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CalendarPlus2, Check, ChevronLeft, DoorOpen, FileUp, MapPin, Navigation, Pencil, Plus, Save, Trash2, UtensilsCrossed, X, XCircle } from 'lucide-react';
 import { api } from '../api/client';
@@ -180,7 +180,7 @@ export default function ArenaDetailPage() {
   const bookingRequestsSectionRef = useRef<HTMLDivElement | null>(null);
 
   const selectedRink = rinks.find((rink) => rink.id === selectedRinkId) ?? null;
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const [todayIso] = useState(() => new Date().toISOString().slice(0, 10));
   const pendingRequests = [...bookingRequests.filter((request) => request.status === 'requested')]
     .sort((left, right) => requestDateTimeKey(left).localeCompare(requestDateTimeKey(right)));
   const activeRequests = [...bookingRequests.filter((request) => isRequestActive(request, todayIso))]
@@ -214,7 +214,7 @@ export default function ArenaDetailPage() {
     ...orphanBookedSlots.map((slot) => ({ kind: 'slot' as const, sortKey: slotDateTimeKey(slot), slot })),
   ].sort((left, right) => left.sortKey.localeCompare(right.sortKey));
 
-  const loadArena = () => {
+  const loadArena = useCallback(() => {
     api.getArena(arenaId).then((data) => {
       setArena(data);
       setArenaForm({
@@ -229,26 +229,26 @@ export default function ArenaDetailPage() {
         notes: data.notes || '',
       });
     });
-  };
+  }, [arenaId]);
 
-  const loadRinks = () => {
+  const loadRinks = useCallback(() => {
     api.getArenaRinks(arenaId).then((data) => {
       setRinks(data);
       setSelectedRinkId((current) => (current && data.some((rink) => rink.id === current) ? current : data[0]?.id || ''));
     });
-  };
+  }, [arenaId]);
 
-  const loadBookingRequests = () => {
+  const loadBookingRequests = useCallback(() => {
     api.getArenaIceBookingRequests(arenaId).then(setBookingRequests);
-  };
+  }, [arenaId]);
 
-  const loadArenaEvents = () => {
+  const loadArenaEvents = useCallback(() => {
     api.getArenaEvents(arenaId, { date_from: todayIso }).then(setArenaEvents);
-  };
+  }, [arenaId, todayIso]);
 
-  const loadArenaIceSlots = () => {
+  const loadArenaIceSlots = useCallback(() => {
     api.getArenaIceSlots(arenaId, { date_from: todayIso }).then(setArenaIceSlots);
-  };
+  }, [arenaId, todayIso]);
 
   const refreshIceSlots = () => {
     if (!selectedRinkId) return;
@@ -265,7 +265,7 @@ export default function ArenaDetailPage() {
     loadBookingRequests();
     loadArenaEvents();
     loadArenaIceSlots();
-  }, [arenaId]);
+  }, [arenaId, loadArena, loadArenaEvents, loadArenaIceSlots, loadBookingRequests, loadRinks]);
 
   useEffect(() => {
     if (rinks.length === 0 || initialRinkSyncDone.current) {
@@ -276,6 +276,7 @@ export default function ArenaDetailPage() {
       : rinks[0]?.id || '';
     initialRinkSyncDone.current = true;
     if (preferredRinkId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedRinkId(preferredRinkId);
     }
   }, [arenaRinkId, rinks]);
@@ -290,6 +291,7 @@ export default function ArenaDetailPage() {
 
   useEffect(() => {
     if (!selectedRinkId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLockerRooms([]);
       setIceSlots([]);
       setSlotUploadOpen(false);
@@ -327,10 +329,11 @@ export default function ArenaDetailPage() {
       window.removeEventListener('focus', refreshArenaDetail);
       document.removeEventListener('visibilitychange', refreshArenaDetail);
     };
-  }, [arenaId, selectedRinkId]);
+  }, [arenaId, loadArena, loadArenaEvents, loadArenaIceSlots, loadBookingRequests, loadRinks, selectedRinkId]);
 
   useEffect(() => {
     if (!acceptRequest) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAcceptLockerRooms([]);
       return;
     }
@@ -344,6 +347,7 @@ export default function ArenaDetailPage() {
 
   useEffect(() => {
     if (!bookedSlotTarget) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditLockerRooms([]);
       setLockerAssignForm(emptyLockerAssignForm);
       return;
@@ -358,12 +362,14 @@ export default function ArenaDetailPage() {
 
   useEffect(() => {
     if (!actionRequest || !actionMode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActionForm(emptyActionForm);
     }
   }, [actionMode, actionRequest]);
 
   useEffect(() => {
     if (!cancelSlotTarget) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCancelSlotForm(emptyActionForm);
     }
   }, [cancelSlotTarget]);
@@ -371,6 +377,7 @@ export default function ArenaDetailPage() {
   useEffect(() => {
     if (requestTab === 'active' && upcomingItems.length === 0) {
       if (pendingRequests.length > 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setRequestTab('pending');
       } else if (historyRequests.length > 0) {
         setRequestTab('history');
@@ -1693,7 +1700,7 @@ export default function ArenaDetailPage() {
                   {acceptRequest ? (
               <>
                 <div className="font-medium text-slate-900 dark:text-slate-100">
-                  {acceptRequest.away_team_name ? `${acceptRequest.requester_team_name} vs ${acceptRequest.away_team_name}` : `${acceptRequest.requester_team_name} ${getCompetitionLabel(acceptRequest.event_type as any)}`}
+                  {acceptRequest.away_team_name ? `${acceptRequest.requester_team_name} vs ${acceptRequest.away_team_name}` : `${acceptRequest.requester_team_name} ${getCompetitionLabel(acceptRequest.event_type)}`}
                 </div>
                 <div className="mt-1">
                   {[acceptRequest.arena_rink_name, acceptRequest.ice_slot_date ? formatShortDate(acceptRequest.ice_slot_date) : null, acceptRequest.ice_slot_start_time ? formatTimeHHMM(acceptRequest.ice_slot_start_time) || acceptRequest.ice_slot_start_time : null].filter(Boolean).join(' • ')}
@@ -1801,7 +1808,7 @@ export default function ArenaDetailPage() {
             {actionRequest ? (
               <>
                 <div className="font-medium text-slate-900 dark:text-slate-100">
-                  {actionRequest.away_team_name ? `${actionRequest.requester_team_name} vs ${actionRequest.away_team_name}` : `${actionRequest.requester_team_name} ${getCompetitionLabel(actionRequest.event_type as any)}`}
+                  {actionRequest.away_team_name ? `${actionRequest.requester_team_name} vs ${actionRequest.away_team_name}` : `${actionRequest.requester_team_name} ${getCompetitionLabel(actionRequest.event_type)}`}
                 </div>
                 <div className="mt-1">
                   {[actionRequest.arena_rink_name, actionRequest.ice_slot_date ? formatShortDate(actionRequest.ice_slot_date) : null, actionRequest.ice_slot_start_time ? formatTimeHHMM(actionRequest.ice_slot_start_time) || actionRequest.ice_slot_start_time : null].filter(Boolean).join(' • ')}

@@ -17,7 +17,7 @@ import { Select } from '../components/ui/Select';
 import { Badge } from '../components/ui/Badge';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
-import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
+import { getCompetitionBadgeVariant } from '../lib/competition';
 import { canManageTeams, canViewTeams } from '../lib/permissions';
 import { accentLinkClass, destructiveIconButtonClass, tableActionButtonClass } from '../lib/uiClasses';
 import TeamLogo from '../components/TeamLogo';
@@ -64,34 +64,36 @@ export default function TeamListPage() {
   const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const load = async () => {
-    const [teamData, associationData] = await Promise.all([
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
       api.getTeams(effectiveSeason ? { season_id: effectiveSeason.id } : undefined),
       teamEditable ? api.getAssociations() : Promise.resolve([] as Association[]),
-    ]);
-    setTeams(teamData);
-    setAssociations(associationData);
-  };
-
-  useEffect(() => {
-    load();
-  }, [effectiveSeason?.id]);
+    ]).then(([teamData, associationData]) => {
+      if (cancelled) return;
+      setTeams(teamData);
+      setAssociations(associationData);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveSeason, teamEditable]);
 
   const setTeamField = (key: keyof typeof emptyTeamForm, value: string) => {
     setTeamForm((current) => ({ ...current, [key]: value }));
   };
 
-  const [teamLogoPreviewUrl, setTeamLogoPreviewUrl] = useState<string | null>(null);
+  const teamLogoPreviewUrl = useMemo(() => {
+    if (!teamLogoFile) {
+      return removeTeamLogo ? null : (editTeam?.logo_url ?? null);
+    }
+    return URL.createObjectURL(teamLogoFile);
+  }, [editTeam?.logo_url, removeTeamLogo, teamLogoFile]);
 
   useEffect(() => {
-    if (!teamLogoFile) {
-      setTeamLogoPreviewUrl(removeTeamLogo ? null : (editTeam?.logo_url ?? null));
-      return;
-    }
-    const objectUrl = URL.createObjectURL(teamLogoFile);
-    setTeamLogoPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [editTeam?.logo_url, removeTeamLogo, teamLogoFile]);
+    if (!teamLogoFile || !teamLogoPreviewUrl) return;
+    return () => URL.revokeObjectURL(teamLogoPreviewUrl);
+  }, [teamLogoFile, teamLogoPreviewUrl]);
 
   const openCreateTeam = () => {
     setEditTeam(null);
@@ -123,26 +125,32 @@ export default function TeamListPage() {
       ...teamForm,
       myhockey_ranking: teamForm.myhockey_ranking ? Number(teamForm.myhockey_ranking) : null,
     };
-    let savedTeam: Team;
+    const savedTeam = editTeam
+      ? await api.updateTeam(editTeam.id, payload)
+      : await api.createTeam(payload);
+
     if (editTeam) {
-      savedTeam = await api.updateTeam(editTeam.id, payload);
       if (removeTeamLogo && editTeam.logo_url) {
-        savedTeam = await api.deleteTeamLogo(editTeam.id);
+        await api.deleteTeamLogo(editTeam.id);
       }
       pushToast({ variant: 'success', title: 'Team updated' });
     } else {
-      savedTeam = await api.createTeam(payload);
       pushToast({ variant: 'success', title: 'Team created' });
     }
     if (teamLogoFile) {
-      savedTeam = await api.uploadTeamLogo(savedTeam.id, teamLogoFile);
+      await api.uploadTeamLogo(savedTeam.id, teamLogoFile);
     }
     setTeamModalOpen(false);
     setEditTeam(null);
     setTeamForm(emptyTeamForm);
     setTeamLogoFile(null);
     setRemoveTeamLogo(false);
-    await load();
+    const [teamData, associationData] = await Promise.all([
+      api.getTeams(effectiveSeason ? { season_id: effectiveSeason.id } : undefined),
+      teamEditable ? api.getAssociations() : Promise.resolve([] as Association[]),
+    ]);
+    setTeams(teamData);
+    setAssociations(associationData);
     await refreshTeams();
   };
 
@@ -156,7 +164,12 @@ export default function TeamListPage() {
     if (!confirmed) return;
     await api.deleteTeam(team.id);
     pushToast({ variant: 'success', title: 'Team deleted' });
-    await load();
+    const [teamData, associationData] = await Promise.all([
+      api.getTeams(effectiveSeason ? { season_id: effectiveSeason.id } : undefined),
+      teamEditable ? api.getAssociations() : Promise.resolve([] as Association[]),
+    ]);
+    setTeams(teamData);
+    setAssociations(associationData);
     await refreshTeams();
   };
 

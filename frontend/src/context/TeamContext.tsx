@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Team } from '../types';
 import { api } from '../api/client';
@@ -66,8 +67,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         data = accessibleTeamsFallback;
       }
       setTeams(data);
+      const defaultTeamId = me?.user.default_team_id || null;
       const savedTeamId = window.localStorage.getItem('rinklink.activeTeamId');
       const nextActiveTeam =
+        (defaultTeamId ? data.find((team) => team.id === defaultTeamId) : null) ??
         (savedTeamId ? data.find((team) => team.id === savedTeamId) : null) ??
         (activeTeam ? data.find((team) => team.id === activeTeam.id) ?? null : null) ??
         data[0] ??
@@ -76,8 +79,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     } catch {
       if (accessibleTeamsFallback.length > 0) {
         setTeams(accessibleTeamsFallback);
+        const defaultTeamId = me?.user.default_team_id || null;
         const savedTeamId = window.localStorage.getItem('rinklink.activeTeamId');
         const nextActiveTeam =
+          (defaultTeamId ? accessibleTeamsFallback.find((team) => team.id === defaultTeamId) : null) ??
           (savedTeamId ? accessibleTeamsFallback.find((team) => team.id === savedTeamId) : null) ??
           (activeTeam ? accessibleTeamsFallback.find((team) => team.id === activeTeam.id) ?? null : null) ??
           accessibleTeamsFallback[0] ??

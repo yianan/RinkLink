@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth.capabilities import effective_capabilities
 from app.auth.context import authorization_context, build_authorization_context, can_access_any_event_team, can_access_arena, can_access_team
 from app.auth.runtime import assert_auth_runtime_safe
-from app.auth.dependencies import current_user
+from app.auth.dependencies import current_me_user, current_user
 from app.auth import dependencies as auth_dependencies
 from app.models import (
     AppUser,
@@ -26,6 +26,7 @@ from app.models import (
     Team,
     TeamMembership,
 )
+from app.routers.me import get_me
 
 
 def make_association(db: Session, name: str) -> Association:
@@ -62,11 +63,20 @@ def make_season(db: Session) -> Season:
     return season
 
 
-def make_user(db: Session, email: str, *, is_platform_admin: bool = False) -> AppUser:
+def make_user(
+    db: Session,
+    email: str,
+    *,
+    is_platform_admin: bool = False,
+    access_state: str = "active",
+    auth_state: str = "active",
+) -> AppUser:
     user = AppUser(
         auth_id=f"auth-{email}",
         email=email,
         status="active",
+        access_state=access_state,
+        auth_state=auth_state,
         is_platform_admin=is_platform_admin,
     )
     db.add(user)
@@ -188,6 +198,55 @@ def test_guardian_context_allows_only_linked_family_team_and_event_access(db: Se
     assert can_access_any_event_team(context, unrelated_event, "team.view", allow_linked_family=True) is False
 
 
+def test_team_admin_capabilities_do_not_bleed_to_other_team_memberships(db: Session) -> None:
+    association = make_association(db, "Bleed Assoc")
+    team_a = make_team(db, association, "Bleed Team A")
+    team_b = make_team(db, association, "Bleed Team B")
+    user = make_user(db, "multi-role@example.com")
+    db.add(TeamMembership(user_id=user.id, team_id=team_a.id, role="team_admin"))
+    db.add(TeamMembership(user_id=user.id, team_id=team_b.id, role="coach"))
+    db.commit()
+
+    context = build_authorization_context(db, user)
+
+    assert can_access_team(context, team_a, "team.manage_staff") is True
+    assert can_access_team(context, team_a, "team.manage_roster") is True
+    assert can_access_team(context, team_b, "team.manage_scoresheet") is True
+    assert can_access_team(context, team_b, "team.manage_staff") is False
+    assert can_access_team(context, team_b, "team.manage_roster") is False
+
+
+def test_association_admin_scope_does_not_leak_across_associations(db: Session) -> None:
+    assoc_x = make_association(db, "Leak Assoc X")
+    assoc_z = make_association(db, "Leak Assoc Z")
+    team_in_z = make_team(db, assoc_z, "Leak Team in Z")
+    user = make_user(db, "cross-assoc@example.com")
+    db.add(AssociationMembership(user_id=user.id, association_id=assoc_x.id, role="association_admin"))
+    db.add(TeamMembership(user_id=user.id, team_id=team_in_z.id, role="coach"))
+    db.commit()
+
+    context = build_authorization_context(db, user)
+
+    assert can_access_team(context, team_in_z, "team.manage_scoresheet") is True
+    assert can_access_team(context, team_in_z, "team.manage_staff") is False
+    assert can_access_team(context, team_in_z, "team.manage_roster") is False
+
+
+def test_arena_admin_capabilities_do_not_bleed_to_arena_ops_memberships(db: Session) -> None:
+    arena_admin_arena, _ = make_arena(db, "Admin Arena")
+    ops_arena, _ = make_arena(db, "Ops Arena")
+    user = make_user(db, "arena-dual@example.com")
+    db.add(ArenaMembership(user_id=user.id, arena_id=arena_admin_arena.id, role="arena_admin"))
+    db.add(ArenaMembership(user_id=user.id, arena_id=ops_arena.id, role="arena_ops"))
+    db.commit()
+
+    context = build_authorization_context(db, user)
+
+    assert can_access_arena(context, arena_admin_arena.id, "arena.manage") is True
+    assert can_access_arena(context, ops_arena.id, "arena.manage_slots") is True
+    assert can_access_arena(context, ops_arena.id, "arena.manage") is False
+
+
 def test_team_and_arena_memberships_do_not_bleed_across_resource_types(db: Session) -> None:
     association = make_association(db, "Boundary Assoc")
     team = make_team(db, association, "Boundary Team")
@@ -245,6 +304,102 @@ def test_current_user_keeps_existing_email_on_claim_mismatch(db: Session, monkey
     )
 
     assert resolved_user.email == "original@example.com"
+
+
+def test_current_user_rejects_disabled_app_access_with_fresh_token(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    user = AppUser(auth_id="auth-disabled", email="disabled@example.com", status="active", access_state="disabled")
+    db.add(user)
+    db.commit()
+
+    monkeypatch.setattr(auth_dependencies, "assert_auth_runtime_safe", lambda: None)
+    monkeypatch.setattr(auth_dependencies.settings, "auth_enabled", True)
+    monkeypatch.setattr(
+        auth_dependencies,
+        "decode_access_token",
+        lambda token: {"sub": "auth-disabled", "email": "disabled@example.com", "email_verified": True, "iat": 9999999999},
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        current_user(
+            credentials=HTTPAuthorizationCredentials(scheme="Bearer", credentials="token"),
+            db=db,
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "App access is disabled"
+
+
+def test_current_user_rejects_auth_disabled_with_fresh_token(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    user = AppUser(auth_id="auth-disabled-login", email="disabled-login@example.com", status="active", auth_state="disabled")
+    db.add(user)
+    db.commit()
+
+    monkeypatch.setattr(auth_dependencies, "assert_auth_runtime_safe", lambda: None)
+    monkeypatch.setattr(auth_dependencies.settings, "auth_enabled", True)
+    monkeypatch.setattr(
+        auth_dependencies,
+        "decode_access_token",
+        lambda token: {"sub": "auth-disabled-login", "email": "disabled-login@example.com", "email_verified": True, "iat": 9999999999},
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        current_user(
+            credentials=HTTPAuthorizationCredentials(scheme="Bearer", credentials="token"),
+            db=db,
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Sign-in is disabled"
+
+
+def test_current_me_user_allows_disabled_user_for_me_payload(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    user = AppUser(auth_id="auth-disabled-me", email="disabled-me@example.com", status="active", access_state="disabled")
+    db.add(user)
+    db.commit()
+
+    monkeypatch.setattr(auth_dependencies, "assert_auth_runtime_safe", lambda: None)
+    monkeypatch.setattr(auth_dependencies.settings, "auth_enabled", True)
+    monkeypatch.setattr(
+        auth_dependencies,
+        "decode_access_token",
+        lambda token: {"sub": "auth-disabled-me", "email": "disabled-me@example.com", "email_verified": True, "iat": 9999999999},
+    )
+
+    resolved_user = current_me_user(
+        credentials=HTTPAuthorizationCredentials(scheme="Bearer", credentials="token"),
+        db=db,
+    )
+
+    payload = get_me(user=resolved_user, db=db)
+    assert payload.user.id == user.id
+    assert payload.user.access_state == "disabled"
+    assert payload.capabilities == []
+    assert payload.accessible_teams == []
+
+
+def test_current_me_user_allows_auth_disabled_user_for_me_payload(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    user = AppUser(auth_id="auth-disabled-me-auth", email="disabled-me-auth@example.com", status="active", auth_state="disabled")
+    db.add(user)
+    db.commit()
+
+    monkeypatch.setattr(auth_dependencies, "assert_auth_runtime_safe", lambda: None)
+    monkeypatch.setattr(auth_dependencies.settings, "auth_enabled", True)
+    monkeypatch.setattr(
+        auth_dependencies,
+        "decode_access_token",
+        lambda token: {"sub": "auth-disabled-me-auth", "email": "disabled-me-auth@example.com", "email_verified": True, "iat": 9999999999},
+    )
+
+    resolved_user = current_me_user(
+        credentials=HTTPAuthorizationCredentials(scheme="Bearer", credentials="token"),
+        db=db,
+    )
+
+    payload = get_me(user=resolved_user, db=db)
+    assert payload.user.id == user.id
+    assert payload.user.auth_state == "disabled"
+    assert payload.capabilities == []
+    assert payload.accessible_teams == []
 
 
 def test_privileged_authorization_requires_mfa_claim(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:

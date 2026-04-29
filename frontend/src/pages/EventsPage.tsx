@@ -80,10 +80,6 @@ export default function EventsPage() {
   const { activeSeason, seasons } = useSeason();
   const { me } = useAuth();
   const pushToast = useToast();
-  const [tab, setTab] = useState<'upcoming' | 'past' | 'all' | 'requests'>(() => {
-    const requestedTab = searchParams.get('tab');
-    return requestedTab === 'past' || requestedTab === 'all' || requestedTab === 'requests' ? requestedTab : 'upcoming';
-  });
   const [events, setEvents] = useState<Event[]>([]);
   const [bookingRequests, setBookingRequests] = useState<IceBookingRequest[]>([]);
   const [arenas, setArenas] = useState<Arena[]>([]);
@@ -101,20 +97,14 @@ export default function EventsPage() {
   const todayStr = toLocalDateString(new Date());
   const canManageSchedule = !!me?.capabilities.includes('team.manage_schedule');
   const canManageRequests = canManageSchedule;
+  const requestedTab = searchParams.get('tab');
+  const tab = requestedTab === 'past' || requestedTab === 'all' || requestedTab === 'requests' ? requestedTab : 'upcoming';
   const visibleTab = tab === 'requests' && !canManageRequests ? 'upcoming' : tab;
-
-  useEffect(() => {
-    const requestedTab = searchParams.get('tab');
-    const normalizedTab = requestedTab === 'past' || requestedTab === 'all' || requestedTab === 'requests' ? requestedTab : 'upcoming';
-    const nextTab = normalizedTab === 'requests' && !canManageRequests ? 'upcoming' : normalizedTab;
-    if (nextTab !== tab) setTab(nextTab);
-  }, [canManageRequests, searchParams, tab]);
 
   const handleTabChange = (nextTab: 'upcoming' | 'past' | 'all' | 'requests') => {
     if (nextTab === 'requests' && !canManageRequests) {
       return;
     }
-    setTab(nextTab);
     const nextParams = new URLSearchParams(searchParams);
     if (nextTab === 'upcoming') {
       nextParams.delete('tab');
@@ -134,7 +124,7 @@ export default function EventsPage() {
       setBookingRequests(requestData);
       setScoreEdits({});
     });
-  }, [activeTeam?.id, canManageRequests]);
+  }, [activeTeam, canManageRequests]);
 
   useEffect(() => {
     if (!open || !canManageSchedule) return;
@@ -142,18 +132,12 @@ export default function EventsPage() {
   }, [open, canManageSchedule]);
 
   useEffect(() => {
-    if (!form.arena_id) {
-      setArenaRinks([]);
-      return;
-    }
+    if (!form.arena_id) return;
     api.getArenaRinks(form.arena_id).then(setArenaRinks);
   }, [form.arena_id]);
 
   useEffect(() => {
-    if (!open || !form.date) {
-      setOpenIceSlots([]);
-      return;
-    }
+    if (!open || !form.date) return;
     const params: Record<string, string> = { date_from: form.date };
     if (form.arena_id) params.arena_id = form.arena_id;
     if (form.arena_rink_id) params.arena_rink_id = form.arena_rink_id;
@@ -170,9 +154,13 @@ export default function EventsPage() {
     });
   }, [open, form.date, form.arena_id, form.arena_rink_id, form.ice_slot_id]);
 
+  const visibleOpenIceSlots = useMemo(
+    () => (open && form.date ? openIceSlots : []),
+    [form.date, open, openIceSlots],
+  );
   const selectedSlot = useMemo(
-    () => openIceSlots.find((slot) => slot.id === form.ice_slot_id) ?? null,
-    [form.ice_slot_id, openIceSlots],
+    () => visibleOpenIceSlots.find((slot) => slot.id === form.ice_slot_id) ?? null,
+    [form.ice_slot_id, visibleOpenIceSlots],
   );
 
   const eventTypeOptions = useMemo<FilterOption[]>(
@@ -228,10 +216,7 @@ export default function EventsPage() {
     && (selectedStatuses.length === 0 || selectedStatuses.includes(event.status))
     && (selectedArenaNames.length === 0 || (event.arena_name && selectedArenaNames.includes(event.arena_name)))
   ));
-  const filteredRequests = bookingRequests.filter((request) => {
-    if (visibleTab !== 'requests') return false;
-    return true;
-  });
+  const filteredRequests = visibleTab === 'requests' ? bookingRequests : [];
 
   const saveBookingRequest = async () => {
     const requestMessage = [
@@ -640,7 +625,7 @@ export default function EventsPage() {
                 disabled={!form.arena_id}
               >
                 <option value="">{!form.arena_id ? 'Select arena first' : 'All rinks'}</option>
-                {arenaRinks.map((arenaRink) => <option key={arenaRink.id} value={arenaRink.id}>{arenaRink.name}</option>)}
+                {(form.arena_id ? arenaRinks : []).map((arenaRink) => <option key={arenaRink.id} value={arenaRink.id}>{arenaRink.name}</option>)}
               </Select>
             </div>
           </div>
@@ -657,7 +642,7 @@ export default function EventsPage() {
                   </div>
                 ) : (
                   <div className="max-h-64 overflow-y-auto divide-y divide-slate-200 dark:divide-slate-800">
-                    {openIceSlots.map((slot) => {
+                    {visibleOpenIceSlots.map((slot) => {
                       const selected = slot.id === form.ice_slot_id;
                       return (
                         <button

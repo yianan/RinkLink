@@ -15,10 +15,16 @@ from app.routers.access import (
     accept_invite,
     create_access_request,
     create_invite,
+    disable_auth,
+    disable_app_access,
+    get_user_access_summary,
     list_access_requests,
     list_access_targets,
     revoke_membership,
     revoke_user,
+    restore_auth,
+    restore_app_access,
+    list_users,
 )
 from app.schemas import AccessRequestCreate, InviteCreate
 from fastapi.security import HTTPAuthorizationCredentials
@@ -62,11 +68,12 @@ def make_season(db: Session) -> Season:
     return season
 
 
-def make_user(db: Session, email: str, *, status: str = "pending") -> AppUser:
+def make_user(db: Session, email: str, *, status: str = "pending", auth_state: str = "active") -> AppUser:
     user = AppUser(
         auth_id=f"auth-{email}",
         email=email,
         status=status,
+        auth_state=auth_state,
         is_platform_admin=False,
     )
     db.add(user)
@@ -97,14 +104,6 @@ def test_pending_user_can_lookup_request_targets_with_search(db: Session) -> Non
         )
     )
     pending_user = make_user(db, "pending@example.com")
-    db.add(
-        AccessRequest(
-            user_id=pending_user.id,
-            target_type="team",
-            target_id=team.id,
-            status="pending",
-        )
-    )
     db.commit()
 
     context = build_authorization_context(db, pending_user)
@@ -120,7 +119,7 @@ def test_pending_user_can_lookup_request_targets_with_search(db: Session) -> Non
     assert "Parent/guardian access" in (player_targets[0].context or "")
 
 
-def test_player_lookup_requires_team_scope(db: Session) -> None:
+def test_player_lookup_requires_team_id_for_family_link_search(db: Session) -> None:
     association = make_association(db, "Lookup Association")
     team = make_team(db, association, "Lookup Team")
     pending_user = make_user(db, "pending@example.com")
@@ -128,13 +127,13 @@ def test_player_lookup_requires_team_scope(db: Session) -> None:
     context = build_authorization_context(db, pending_user)
 
     with pytest.raises(HTTPException) as exc_info:
-        list_access_targets(target_type="guardian_link", team_id=team.id, q="Jo", context=context, db=db)
+        list_access_targets(target_type="guardian_link", team_id=None, q="Jo", context=context, db=db)
 
-    assert exc_info.value.status_code == 403
-    assert "Submit a pending team access request" in exc_info.value.detail
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail == "team_id is required for player link lookups"
 
 
-def test_guardian_request_requires_pending_team_request(db: Session) -> None:
+def test_guardian_request_can_be_created_without_team_staff_request(db: Session) -> None:
     association = make_association(db, "Family Association")
     team = make_team(db, association, "Family Team")
     season = make_season(db)
@@ -154,16 +153,15 @@ def test_guardian_request_requires_pending_team_request(db: Session) -> None:
     context = build_authorization_context(db, pending_user)
     player = db.query(Player).filter(Player.team_id == team.id).one()
 
-    with pytest.raises(HTTPException) as exc_info:
-        create_access_request(
-            payload=AccessRequestCreate(target_type="guardian_link", target_id=player.id, notes=None),
-            context=context,
-            db=db,
-            request=make_request("/api/access-requests"),
-        )
+    created = create_access_request(
+        payload=AccessRequestCreate(target_type="guardian_link", target_id=player.id, notes=None),
+        context=context,
+        db=db,
+        request=make_request("/api/access-requests"),
+    )
 
-    assert exc_info.value.status_code == 403
-    assert "pending team access request" in exc_info.value.detail
+    assert created.status == "pending"
+    assert created.target.name == "Jordan S."
 
 
 def test_duplicate_access_request_reuses_existing_pending_row(db: Session) -> None:
@@ -196,14 +194,6 @@ def test_player_link_access_request_masks_target_name_for_requester(db: Session)
     )
     pending_user = make_user(db, "masked@example.com")
     db.add(player)
-    db.add(
-        AccessRequest(
-            user_id=pending_user.id,
-            target_type="team",
-            target_id=team.id,
-            status="pending",
-        )
-    )
     db.commit()
 
     context = build_authorization_context(db, pending_user)
@@ -437,3 +427,130 @@ def test_revoke_user_blocks_next_authenticated_request(db: Session, monkeypatch:
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "Access has been revoked"
+
+
+def test_disable_and_restore_app_access_updates_user_state(db: Session) -> None:
+    admin = make_user(db, "platform-admin@example.com", status="active")
+    target = make_user(db, "target@example.com", status="active")
+    admin.is_platform_admin = True
+    db.commit()
+
+    admin_context = build_authorization_context(db, admin)
+    disabled = disable_app_access(
+        user_id=target.id,
+        context=admin_context,
+        db=db,
+        request=make_request("/api/users/disable-app-access"),
+    )
+
+    assert disabled.access_state == "disabled"
+    assert disabled.revoked_at is not None
+
+    restored = restore_app_access(
+        user_id=target.id,
+        context=admin_context,
+        db=db,
+        request=make_request("/api/users/restore-app-access"),
+    )
+
+    assert restored.access_state == "active"
+    assert restored.revoked_at is not None
+
+
+def test_revoke_alias_disables_app_access(db: Session) -> None:
+    admin = make_user(db, "platform-admin@example.com", status="active")
+    target = make_user(db, "target@example.com", status="active")
+    admin.is_platform_admin = True
+    db.commit()
+
+    admin_context = build_authorization_context(db, admin)
+    revoked = revoke_user(
+        user_id=target.id,
+        context=admin_context,
+        db=db,
+        request=make_request("/api/users/revoke"),
+    )
+
+    assert revoked.access_state == "disabled"
+
+
+def test_disable_and_restore_auth_updates_user_state(db: Session) -> None:
+    admin = make_user(db, "platform-admin@example.com", status="active")
+    target = make_user(db, "target@example.com", status="active")
+    admin.is_platform_admin = True
+    db.commit()
+
+    admin_context = build_authorization_context(db, admin)
+    disabled = disable_auth(
+        user_id=target.id,
+        context=admin_context,
+        db=db,
+        request=make_request("/api/users/disable-auth"),
+    )
+
+    assert disabled.auth_state == "disabled"
+    assert disabled.revoked_at is not None
+
+    restored = restore_auth(
+        user_id=target.id,
+        context=admin_context,
+        db=db,
+        request=make_request("/api/users/restore-auth"),
+    )
+
+    assert restored.auth_state == "active"
+    assert restored.revoked_at is not None
+
+
+def test_user_access_summary_includes_memberships_and_history(db: Session) -> None:
+    association = make_association(db, "Summary Association")
+    team = make_team(db, association, "Summary Team")
+    season = make_season(db)
+    player = Player(
+        team_id=team.id,
+        season_id=season.id,
+        first_name="Casey",
+        last_name="Skater",
+        jersey_number=14,
+        position="F",
+    )
+    db.add(player)
+    admin = make_user(db, "platform-admin@example.com", status="active")
+    admin.is_platform_admin = True
+    user = make_user(db, "summary@example.com", status="active")
+    db.flush()
+    db.add(AssociationMembership(user_id=user.id, association_id=association.id, role="association_admin"))
+    db.add(TeamMembership(user_id=user.id, team_id=team.id, role="manager"))
+    db.add(PlayerGuardianship(user_id=user.id, player_id=player.id, relationship_type="guardian"))
+    db.commit()
+
+    admin_context = build_authorization_context(db, admin)
+    disable_app_access(
+        user_id=user.id,
+        context=admin_context,
+        db=db,
+        request=make_request("/api/users/disable-app-access"),
+    )
+
+    summary = get_user_access_summary(user_id=user.id, context=admin_context, db=db)
+
+    assert summary.user.id == user.id
+    assert {entry.membership_kind for entry in summary.access_entries} == {"association", "team", "guardian"}
+    assert any(entry.role == "manager" for entry in summary.access_entries)
+    assert any(entry.relationship_type == "guardian" for entry in summary.access_entries)
+    assert any(entry.action == "user.app_access_disabled" for entry in summary.audit_entries)
+
+
+def test_list_users_filters_by_email_or_display_name(db: Session) -> None:
+    admin = make_user(db, "platform-admin@example.com", status="active")
+    admin.is_platform_admin = True
+    user = make_user(db, "search-target@example.com", status="active")
+    user.display_name = "Search Target"
+    user.auth_state = "disabled"
+    db.commit()
+
+    admin_context = build_authorization_context(db, admin)
+    results = list_users(query="target", limit=10, context=admin_context, db=db)
+
+    assert [result.id for result in results] == [user.id]
+    assert results[0].auth_state == "disabled"

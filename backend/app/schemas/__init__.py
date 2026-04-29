@@ -62,6 +62,10 @@ from .auth import (
     InviteOut,
     AccessRequestCreate,
     AccessRequestDecision,
+    UserAccessChange,
+    UserAccessEntryOut,
+    UserAuditEntryOut,
+    UserAccessSummaryOut,
     AccessRequestOut,
 )
 from .public import PublicEventOut, PublicSeasonOut, PublicTeamOut
@@ -93,6 +97,7 @@ __all__ = [
     "AppUserOut", "AssociationMembershipOut", "TeamMembershipOut", "ArenaMembershipOut",
     "LinkedPlayerOut", "AccessibleTeamOut", "MeOut",
     "AccessTargetOut", "InviteCreate", "InviteOut",
-    "AccessRequestCreate", "AccessRequestDecision", "AccessRequestOut",
+    "AccessRequestCreate", "AccessRequestDecision", "UserAccessChange",
+    "UserAccessEntryOut", "UserAuditEntryOut", "UserAccessSummaryOut", "AccessRequestOut",
     "PublicSeasonOut", "PublicTeamOut", "PublicEventOut",
 ]

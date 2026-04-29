@@ -5,7 +5,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, or_, text
 from sqlalchemy.orm import Session
 
 from ..auth.context import (
@@ -44,6 +44,10 @@ from ..schemas import (
     AppUserOut,
     InviteCreate,
     InviteOut,
+    UserAccessChange,
+    UserAccessEntryOut,
+    UserAccessSummaryOut,
+    UserAuditEntryOut,
 )
 from ..services.email import send_invite_email
 from ..config import settings
@@ -204,6 +208,46 @@ def _mark_user_active(user: AppUser, *, default_team_id: str | None = None) -> N
         user.status = "active"
     if default_team_id and not user.default_team_id:
         user.default_team_id = default_team_id
+
+
+def _set_app_access_state(
+    *,
+    user: AppUser,
+    access_state: str,
+    invalidate_tokens: bool = False,
+) -> tuple[str, str]:
+    previous_state = user.access_state
+    if previous_state != access_state:
+        user.access_state = access_state
+    if invalidate_tokens:
+        user.revoked_at = _utcnow()
+    return previous_state, user.access_state
+
+
+def _set_auth_state(
+    *,
+    user: AppUser,
+    auth_state: str,
+    invalidate_tokens: bool = False,
+) -> tuple[str, str]:
+    previous_state = user.auth_state
+    if previous_state != auth_state:
+        user.auth_state = auth_state
+    if invalidate_tokens:
+        user.revoked_at = _utcnow()
+    return previous_state, user.auth_state
+
+
+def _revoke_auth_sessions(db: Session, *, user: AppUser) -> int:
+    bind = db.get_bind()
+    dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+    if dialect_name != "postgresql":
+        return 0
+    result = db.execute(
+        text('DELETE FROM auth."session" WHERE "userId" = :auth_id'),
+        {"auth_id": user.auth_id},
+    )
+    return max(result.rowcount or 0, 0)
 
 
 def _apply_target_grant(
@@ -385,20 +429,6 @@ def _build_access_target_search_query(search: str) -> str:
     return f"%{search.strip()}%"
 
 
-def _has_pending_team_lookup_request(db: Session, *, user_id: str, team_id: str) -> bool:
-    return (
-        db.query(AccessRequest)
-        .filter(
-            AccessRequest.user_id == user_id,
-            AccessRequest.target_type == "team",
-            AccessRequest.target_id == team_id,
-            AccessRequest.status == "pending",
-        )
-        .first()
-        is not None
-    )
-
-
 def _invite_out(db: Session, invite: Invite) -> InviteOut:
     target = _load_target(db, invite.target_type, invite.target_id)
     inviter = db.get(AppUser, invite.invited_by_user_id)
@@ -442,6 +472,37 @@ def _access_request_out(db: Session, access_request: AccessRequest, *, mask_priv
         reviewed_by_email=reviewer.email if reviewer else None,
         target=_access_request_target_summary(access_request, target, mask_private_target=mask_private_target),
     )
+
+
+def _user_access_entry_out(*, membership_kind: str, membership_id: str, target_type: str, target, role: str | None = None, relationship_type: str | None = None) -> UserAccessEntryOut:
+    summary = _build_target_summary(target_type, target)
+    return UserAccessEntryOut(
+        membership_kind=membership_kind,
+        membership_id=membership_id,
+        target_type=target_type,
+        target_id=summary.id,
+        name=summary.name,
+        context=summary.context,
+        role=role,
+        relationship_type=relationship_type,
+    )
+
+
+def _audit_relates_to_user(audit_log: AuditLog, *, user_id: str) -> bool:
+    if audit_log.resource_type == "user" and audit_log.resource_id == user_id:
+        return True
+    details = audit_log.details_json if isinstance(audit_log.details_json, dict) else None
+    if not details:
+        return False
+    user_reference_keys = {
+        "target_user_id",
+        "revoked_user_id",
+        "user_id",
+        "approved_user_id",
+        "rejected_user_id",
+        "access_request_user_id",
+    }
+    return any(details.get(key) == user_id for key in user_reference_keys)
 
 
 @router.get("/invites", response_model=list[InviteOut])
@@ -697,14 +758,14 @@ def list_access_targets(
     if team is None:
         raise _not_found("Team not found")
     if not (
-        context.user.is_platform_admin
+        target_type in {"guardian_link", "player_link"}
+        or context.user.is_platform_admin
         or can_access_team(context, team, "team.manage_roster")
         or team.id in context.linked_team_ids
-        or _has_pending_team_lookup_request(db, user_id=context.user.id, team_id=team_id)
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Submit a pending team access request before searching for players on that team",
+            detail="You do not have access to search players on this team",
         )
 
     players = (
@@ -742,12 +803,6 @@ def create_access_request(
         rule=ACCESS_REQUEST_RATE_LIMIT,
     )
     target = _load_target(db, payload.target_type, payload.target_id)
-    if payload.target_type in {"guardian_link", "player_link"}:
-        if not _has_pending_team_lookup_request(db, user_id=context.user.id, team_id=target.team_id):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Submit a pending team access request before requesting a player or guardian link",
-            )
     if _has_existing_access(db, user=context.user, target_type=payload.target_type, target=target):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You already have access to this resource")
 
@@ -872,6 +927,7 @@ def reject_access_request(
 def revoke_membership(
     kind: str,
     membership_id: str,
+    payload: UserAccessChange | None = None,
     context: AuthorizationContext = Depends(current_authorization_context),
     db: Session = Depends(get_db),
     request: Request = None,
@@ -911,41 +967,384 @@ def revoke_membership(
     _ensure_manage_target(context, target_type, target)
 
     revoked_user_id = membership.user_id
+    audit_action = "membership.revoked"
+    if kind == "guardian":
+        audit_action = "guardian_link.revoked"
+    elif kind == "player":
+        audit_action = "player_link.revoked"
     db.delete(membership)
     _record_audit(
         db,
         actor_user_id=context.user.id,
-        action="membership.revoked",
+        action=audit_action,
         resource_type=target_type,
         resource_id=getattr(target, "id"),
         request=request,
-        details={"membership_id": membership_id, "revoked_user_id": revoked_user_id, "membership_kind": kind},
+        details={
+            "membership_id": membership_id,
+            "membership_kind": kind,
+            "revoked_user_id": revoked_user_id,
+            "target_user_id": revoked_user_id,
+            "reason": payload.reason if payload else None,
+        },
     )
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/users/{user_id}/revoke", response_model=AppUserOut)
-def revoke_user(
+@router.get("/users", response_model=list[AppUserOut])
+def list_users(
+    query: str = Query(default="", max_length=255),
+    limit: int = Query(default=25, ge=1, le=100),
+    context: AuthorizationContext = Depends(current_authorization_context),
+    db: Session = Depends(get_db),
+):
+    ensure_capability(context, "platform.manage", detail="You do not have permission to view users")
+    users_query = db.query(AppUser)
+    normalized_query = query.strip()
+    if normalized_query:
+        like = f"%{normalized_query.lower()}%"
+        users_query = users_query.filter(
+            or_(
+                func.lower(AppUser.email).like(like),
+                func.lower(func.coalesce(AppUser.display_name, "")).like(like),
+            )
+        )
+    return (
+        users_query
+        .order_by(
+            AppUser.auth_state.asc(),
+            AppUser.access_state.asc(),
+            AppUser.status.asc(),
+            func.lower(AppUser.email).asc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+
+@router.get("/users/{user_id}/access-summary", response_model=UserAccessSummaryOut)
+def get_user_access_summary(
     user_id: str,
     context: AuthorizationContext = Depends(current_authorization_context),
     db: Session = Depends(get_db),
-    request: Request = None,
 ):
-    ensure_capability(context, "platform.manage", detail="You do not have permission to revoke users")
+    ensure_capability(context, "platform.manage", detail="You do not have permission to view user access")
     user = db.get(AppUser, user_id)
     if user is None:
         raise _not_found("User not found")
-    user.revoked_at = _utcnow()
+
+    access_entries: list[UserAccessEntryOut] = []
+    for membership in (
+        db.query(AssociationMembership)
+        .filter(AssociationMembership.user_id == user.id)
+        .order_by(AssociationMembership.created_at.desc())
+        .all()
+    ):
+        association = db.get(Association, membership.association_id)
+        if association is None:
+            continue
+        access_entries.append(
+            _user_access_entry_out(
+                membership_kind="association",
+                membership_id=membership.id,
+                target_type="association",
+                target=association,
+                role=membership.role,
+            )
+        )
+
+    for membership in (
+        db.query(TeamMembership)
+        .filter(TeamMembership.user_id == user.id)
+        .order_by(TeamMembership.created_at.desc())
+        .all()
+    ):
+        team = db.get(Team, membership.team_id)
+        if team is None:
+            continue
+        access_entries.append(
+            _user_access_entry_out(
+                membership_kind="team",
+                membership_id=membership.id,
+                target_type="team",
+                target=team,
+                role=membership.role,
+            )
+        )
+
+    for membership in (
+        db.query(ArenaMembership)
+        .filter(ArenaMembership.user_id == user.id)
+        .order_by(ArenaMembership.created_at.desc())
+        .all()
+    ):
+        arena = db.get(Arena, membership.arena_id)
+        if arena is None:
+            continue
+        access_entries.append(
+            _user_access_entry_out(
+                membership_kind="arena",
+                membership_id=membership.id,
+                target_type="arena",
+                target=arena,
+                role=membership.role,
+            )
+        )
+
+    for guardianship in (
+        db.query(PlayerGuardianship)
+        .filter(PlayerGuardianship.user_id == user.id)
+        .order_by(PlayerGuardianship.created_at.desc())
+        .all()
+    ):
+        player = db.get(Player, guardianship.player_id)
+        if player is None:
+            continue
+        access_entries.append(
+            _user_access_entry_out(
+                membership_kind="guardian",
+                membership_id=guardianship.id,
+                target_type="guardian_link",
+                target=player,
+                relationship_type=guardianship.relationship_type or "guardian",
+            )
+        )
+
+    for membership in (
+        db.query(PlayerMembership)
+        .filter(PlayerMembership.user_id == user.id)
+        .order_by(PlayerMembership.created_at.desc())
+        .all()
+    ):
+        player = db.get(Player, membership.player_id)
+        if player is None:
+            continue
+        access_entries.append(
+            _user_access_entry_out(
+                membership_kind="player",
+                membership_id=membership.id,
+                target_type="player_link",
+                target=player,
+                relationship_type="player",
+            )
+        )
+
+    access_entries.sort(key=lambda entry: (entry.membership_kind, entry.name.lower(), entry.membership_id))
+
+    candidate_logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(300).all()
+    relevant_logs = [audit_log for audit_log in candidate_logs if _audit_relates_to_user(audit_log, user_id=user.id)][:50]
+    actor_ids = {audit_log.actor_user_id for audit_log in relevant_logs if audit_log.actor_user_id}
+    actor_emails = {
+        actor.id: actor.email
+        for actor in db.query(AppUser).filter(AppUser.id.in_(actor_ids)).all()
+    } if actor_ids else {}
+
+    audit_entries = [
+        UserAuditEntryOut(
+            id=audit_log.id,
+            action=audit_log.action,
+            resource_type=audit_log.resource_type,
+            resource_id=audit_log.resource_id,
+            actor_user_id=audit_log.actor_user_id,
+            actor_email=actor_emails.get(audit_log.actor_user_id),
+            details=audit_log.details_json,
+            created_at=audit_log.created_at,
+        )
+        for audit_log in relevant_logs
+    ]
+
+    return UserAccessSummaryOut(
+        user=user,
+        access_entries=access_entries,
+        audit_entries=audit_entries,
+    )
+
+
+def _change_app_access(
+    *,
+    user_id: str,
+    context: AuthorizationContext,
+    db: Session,
+    request: Request | None,
+    access_state: str,
+    action: str,
+    detail_message: str,
+    reason: str | None = None,
+    deprecated_alias: bool = False,
+) -> AppUser:
+    ensure_capability(context, "platform.manage", detail=detail_message)
+    user = db.get(AppUser, user_id)
+    if user is None:
+        raise _not_found("User not found")
+    if user.id == context.user.id and access_state == "disabled":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot disable your own app access")
+    previous_state, next_state = _set_app_access_state(
+        user=user,
+        access_state=access_state,
+        invalidate_tokens=access_state == "disabled",
+    )
     _record_audit(
         db,
         actor_user_id=context.user.id,
-        action="user.revoked",
+        action=action,
         resource_type="user",
         resource_id=user.id,
         request=request,
-        details={"revoked_user_id": user.id, "email": user.email},
+        details={
+            "target_user_id": user.id,
+            "email": user.email,
+            "previous_access_state": previous_state,
+            "new_access_state": next_state,
+            "reason": reason,
+            "deprecated_alias": deprecated_alias or None,
+        },
     )
     db.commit()
     db.refresh(user)
     return user
+
+
+def _change_auth_access(
+    *,
+    user_id: str,
+    context: AuthorizationContext,
+    db: Session,
+    request: Request | None,
+    auth_state: str,
+    action: str,
+    detail_message: str,
+    reason: str | None = None,
+) -> AppUser:
+    ensure_capability(context, "platform.manage", detail=detail_message)
+    user = db.get(AppUser, user_id)
+    if user is None:
+        raise _not_found("User not found")
+    if user.id == context.user.id and auth_state == "disabled":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot disable your own sign-in")
+    previous_state, next_state = _set_auth_state(
+        user=user,
+        auth_state=auth_state,
+        invalidate_tokens=auth_state == "disabled",
+    )
+    revoked_sessions = _revoke_auth_sessions(db, user=user) if auth_state == "disabled" else 0
+    _record_audit(
+        db,
+        actor_user_id=context.user.id,
+        action=action,
+        resource_type="user",
+        resource_id=user.id,
+        request=request,
+        details={
+            "target_user_id": user.id,
+            "email": user.email,
+            "previous_auth_state": previous_state,
+            "new_auth_state": next_state,
+            "reason": reason,
+            "revoked_sessions": revoked_sessions,
+        },
+    )
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/users/{user_id}/disable-app-access", response_model=AppUserOut)
+def disable_app_access(
+    user_id: str,
+    payload: UserAccessChange | None = None,
+    context: AuthorizationContext = Depends(current_authorization_context),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    return _change_app_access(
+        user_id=user_id,
+        context=context,
+        db=db,
+        request=request,
+        access_state="disabled",
+        action="user.app_access_disabled",
+        detail_message="You do not have permission to disable app access",
+        reason=payload.reason if payload else None,
+    )
+
+
+@router.post("/users/{user_id}/restore-app-access", response_model=AppUserOut)
+def restore_app_access(
+    user_id: str,
+    payload: UserAccessChange | None = None,
+    context: AuthorizationContext = Depends(current_authorization_context),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    return _change_app_access(
+        user_id=user_id,
+        context=context,
+        db=db,
+        request=request,
+        access_state="active",
+        action="user.app_access_restored",
+        detail_message="You do not have permission to restore app access",
+        reason=payload.reason if payload else None,
+    )
+
+
+@router.post("/users/{user_id}/disable-auth", response_model=AppUserOut)
+def disable_auth(
+    user_id: str,
+    payload: UserAccessChange | None = None,
+    context: AuthorizationContext = Depends(current_authorization_context),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    return _change_auth_access(
+        user_id=user_id,
+        context=context,
+        db=db,
+        request=request,
+        auth_state="disabled",
+        action="user.auth_disabled",
+        detail_message="You do not have permission to disable sign-in",
+        reason=payload.reason if payload else None,
+    )
+
+
+@router.post("/users/{user_id}/restore-auth", response_model=AppUserOut)
+def restore_auth(
+    user_id: str,
+    payload: UserAccessChange | None = None,
+    context: AuthorizationContext = Depends(current_authorization_context),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    return _change_auth_access(
+        user_id=user_id,
+        context=context,
+        db=db,
+        request=request,
+        auth_state="active",
+        action="user.auth_restored",
+        detail_message="You do not have permission to restore sign-in",
+        reason=payload.reason if payload else None,
+    )
+
+
+@router.post("/users/{user_id}/revoke", response_model=AppUserOut)
+def revoke_user(
+    user_id: str,
+    payload: UserAccessChange | None = None,
+    context: AuthorizationContext = Depends(current_authorization_context),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    return _change_app_access(
+        user_id=user_id,
+        context=context,
+        db=db,
+        request=request,
+        access_state="disabled",
+        action="user.app_access_disabled",
+        detail_message="You do not have permission to revoke users",
+        reason=payload.reason if payload else None,
+        deprecated_alias=True,
+    )

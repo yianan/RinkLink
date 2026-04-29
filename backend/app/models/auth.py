@@ -26,6 +26,8 @@ class AppUser(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", server_default="pending")
+    access_state: Mapped[str] = mapped_column(String(20), nullable=False, default="active", server_default="active")
+    auth_state: Mapped[str] = mapped_column(String(20), nullable=False, default="active", server_default="active")
     is_platform_admin: Mapped[bool] = mapped_column(default=False, server_default="0")
     default_team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

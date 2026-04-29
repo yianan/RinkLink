@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..models import Competition, CompetitionDivision, Event, Team, TeamCompetitionMembership
 from ..schemas import CompetitionDivisionOut, CompetitionOut, StandingsEntry, TeamCompetitionMembershipOut
+from .season_utils import ensure_standard_seasons
 from .team_logos import effective_team_logo_url
 
 COMPETITION_ORDER = {
@@ -43,6 +44,48 @@ def _division_to_out(division: CompetitionDivision, member_count: int = 0) -> Co
         out.competition_short_name = competition.short_name
         out.competition_type = competition.competition_type
     return out
+
+
+def ensure_team_has_standings_membership(db: Session, team: Team, season_id: str) -> bool:
+    existing = (
+        db.query(TeamCompetitionMembership)
+        .options(joinedload(TeamCompetitionMembership.competition_division).joinedload(CompetitionDivision.competition))
+        .filter(TeamCompetitionMembership.team_id == team.id, TeamCompetitionMembership.season_id == season_id)
+        .order_by(TeamCompetitionMembership.is_primary.desc(), TeamCompetitionMembership.sort_order, TeamCompetitionMembership.created_at)
+        .all()
+    )
+    if any(row.competition_division and row.competition_division.standings_enabled for row in existing):
+        return False
+
+    division = (
+        db.query(CompetitionDivision)
+        .options(joinedload(CompetitionDivision.competition))
+        .filter(
+            CompetitionDivision.season_id == season_id,
+            CompetitionDivision.standings_enabled == True,  # noqa: E712
+            CompetitionDivision.age_group == team.age_group,
+            CompetitionDivision.level == team.level,
+        )
+        .order_by(CompetitionDivision.sort_order, CompetitionDivision.name)
+        .first()
+    )
+    if not division:
+        return False
+
+    has_primary = any(row.is_primary for row in existing)
+    next_sort_order = max((row.sort_order for row in existing), default=0) + 10
+    db.add(
+        TeamCompetitionMembership(
+            team_id=team.id,
+            season_id=season_id,
+            competition_division_id=division.id,
+            membership_role="primary" if not has_primary else "league",
+            is_primary=not has_primary,
+            sort_order=10 if not has_primary else next_sort_order,
+        )
+    )
+    db.flush()
+    return True
 
 
 def list_competitions(db: Session, season_id: str | None = None) -> list[CompetitionOut]:
@@ -147,6 +190,13 @@ def memberships_for_teams(
 def primary_membership_for_team(db: Session, team_id: str, season_id: str | None = None) -> TeamCompetitionMembershipOut | None:
     memberships = list_team_memberships(db, team_id, season_id)
     return memberships[0] if memberships else None
+
+
+def ensure_current_season_membership(db: Session, team: Team) -> None:
+    seasons = ensure_standard_seasons(db)
+    current_season = next((season for season in seasons if season.is_active), None)
+    if current_season and ensure_team_has_standings_membership(db, team, current_season.id):
+        db.commit()
 
 
 def shared_divisions_for_teams(

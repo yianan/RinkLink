@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Check, ChevronDown } from 'lucide-react';
 import { useTeam } from '../context/TeamContext';
@@ -11,9 +11,22 @@ const HIDE_TEAM_SWITCHER_PATHS = ['/associations', '/arenas', '/competitions'];
 export default function TeamSwitcher() {
   const { teams, activeTeam, setActiveTeam, loading } = useTeam();
   const location = useLocation();
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState<{ path: string; value: boolean }>({
+    path: location.pathname,
+    value: false,
+  });
   const rootRef = useRef<HTMLDivElement | null>(null);
   const hideTeamSwitcher = HIDE_TEAM_SWITCHER_PATHS.some((path) => location.pathname.startsWith(path));
+  const open = openState.path === location.pathname ? openState.value : false;
+  const setOpen = useCallback((value: boolean | ((current: boolean) => boolean)) => {
+    setOpenState((current) => {
+      const currentValue = current.path === location.pathname ? current.value : false;
+      return {
+        path: location.pathname,
+        value: typeof value === 'function' ? value(currentValue) : value,
+      };
+    });
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -36,11 +49,7 @@ export default function TeamSwitcher() {
       window.removeEventListener('mousedown', handlePointerDown);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open]);
-
-  useEffect(() => {
-    setOpen(false);
-  }, [location.pathname]);
+  }, [open, setOpen]);
 
   if (hideTeamSwitcher) return null;
 

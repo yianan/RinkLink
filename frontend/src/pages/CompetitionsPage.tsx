@@ -84,7 +84,7 @@ export default function CompetitionsPage() {
     return () => {
       cancelled = true;
     };
-  }, [effectiveSeason?.id]);
+  }, [effectiveSeason]);
 
   useEffect(() => {
     const standingsDivisionIds = competitions
@@ -92,10 +92,7 @@ export default function CompetitionsPage() {
       .filter((division) => division.standings_enabled)
       .map((division) => division.id);
 
-    if (standingsDivisionIds.length === 0) {
-      setStandingsByDivision({});
-      return;
-    }
+    if (standingsDivisionIds.length === 0) return;
 
     let cancelled = false;
     Promise.all(
@@ -214,8 +211,6 @@ export default function CompetitionsPage() {
     selectedCompetitionTypes,
     selectedLevels,
   ]);
-
-  const hasActiveFilters = activeFilterBadges.length > 0;
 
   if (!effectiveSeason) {
     return <Alert variant="info">No season is available yet.</Alert>;

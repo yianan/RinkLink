@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowDownLeft, ArrowUpRight, Calendar, CalendarClock, Check, SendHorizontal, X, XCircle } from 'lucide-react';
 import { api } from '../api/client';
@@ -79,7 +79,7 @@ export default function ProposalsPage() {
     message: '',
   });
 
-  const load = () => {
+  const load = useCallback(() => {
     if (!activeTeam) return;
     const activeTab = TABS.find((item) => item.value === tab) || TABS[0];
     const params = {
@@ -98,29 +98,25 @@ export default function ProposalsPage() {
       });
       setProposals(filtered);
     });
-  };
+  }, [activeTeam, effectiveSeason, tab]);
 
   useEffect(() => {
     if (!activeTeam) return;
     load();
     api.getArenas().then(setArenas);
-  }, [activeTeam?.id, tab, effectiveSeason?.id]);
+  }, [activeTeam, load]);
 
   useEffect(() => {
-    if (!rescheduleForm.arena_id) {
-      setArenaRinks([]);
-      return;
-    }
+    if (!rescheduleForm.arena_id) return;
     api.getArenaRinks(rescheduleForm.arena_id).then(setArenaRinks);
   }, [rescheduleForm.arena_id]);
 
   useEffect(() => {
-    if (!rescheduleForm.arena_rink_id || !rescheduleForm.proposed_date) {
-      setSlots([]);
-      return;
-    }
+    if (!rescheduleForm.arena_rink_id || !rescheduleForm.proposed_date) return;
     api.getAvailableIceSlots(rescheduleForm.arena_rink_id, rescheduleForm.proposed_date).then(setSlots).catch(() => setSlots([]));
   }, [rescheduleForm.arena_rink_id, rescheduleForm.proposed_date]);
+  const visibleArenaRinks = rescheduleForm.arena_id ? arenaRinks : [];
+  const visibleSlots = rescheduleForm.arena_rink_id && rescheduleForm.proposed_date ? slots : [];
 
   const sortedProposals = useMemo(() => {
     const next = proposals.slice();
@@ -183,7 +179,7 @@ export default function ProposalsPage() {
 
   const submitReschedule = async () => {
     if (!rescheduleProposal || !rescheduleForm.arena_id || !rescheduleForm.arena_rink_id) return;
-    const selectedSlot = slots.find((slot) => slot.id === rescheduleForm.ice_slot_id);
+    const selectedSlot = visibleSlots.find((slot) => slot.id === rescheduleForm.ice_slot_id);
     await api.rescheduleProposal(rescheduleProposal.id, {
       event_type: rescheduleForm.event_type,
       proposed_date: rescheduleForm.proposed_date,
@@ -383,7 +379,7 @@ export default function ProposalsPage() {
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Arena Rink</label>
             <Select value={rescheduleForm.arena_rink_id} onChange={(event) => setRescheduleForm((current) => ({ ...current, arena_rink_id: event.target.value, ice_slot_id: '' }))}>
               <option value="">Select rink…</option>
-              {arenaRinks.map((arenaRink) => (
+              {visibleArenaRinks.map((arenaRink) => (
                 <option key={arenaRink.id} value={arenaRink.id}>{arenaRink.name}</option>
               ))}
             </Select>
@@ -392,7 +388,7 @@ export default function ProposalsPage() {
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Ice Slot</label>
             <Select value={rescheduleForm.ice_slot_id} onChange={(event) => setRescheduleForm((current) => ({ ...current, ice_slot_id: event.target.value }))}>
               <option value="">No slot selected</option>
-              {slots.map((slot) => (
+              {visibleSlots.map((slot) => (
                 <option key={slot.id} value={slot.id}>
                   {formatTimeHHMM(slot.start_time) || slot.start_time}
                   {slot.end_time ? `-${formatTimeHHMM(slot.end_time) || slot.end_time}` : ''}

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.models import AppUser, Association
+from app.models import AppUser, Association, Team, TeamCompetitionMembership
 from app.seed.seed_data import PreservedAppUser, seed_demo_data
 
 
@@ -38,4 +38,6 @@ def test_seed_demo_data_restores_preserved_platform_admin(db) -> None:
     assert restored_user.status == "active"
     assert restored_user.is_platform_admin is True
     assert db.query(Association).count() > 0
+    assert db.query(Team).count() > 0
+    assert db.query(TeamCompetitionMembership.team_id).distinct().count() == db.query(Team).count()
     assert result["preserved_users"] == 1

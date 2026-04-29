@@ -16,6 +16,8 @@ export interface AppUserIdentity {
   email: string;
   display_name: string | null;
   status: string;
+  access_state: string;
+  auth_state: string;
   is_platform_admin: boolean;
   default_team_id: string | null;
   revoked_at: string | null;
@@ -99,6 +101,34 @@ export interface AccessRequest {
   reviewed_by_user_id: string | null;
   reviewed_by_email: string | null;
   target: AccessTarget;
+}
+
+export interface UserAccessEntry {
+  membership_kind: string;
+  membership_id: string;
+  target_type: string;
+  target_id: string;
+  name: string;
+  context: string | null;
+  role: string | null;
+  relationship_type: string | null;
+}
+
+export interface UserAuditEntry {
+  id: string;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  actor_user_id: string | null;
+  actor_email: string | null;
+  details: Record<string, unknown> | unknown[] | null;
+  created_at: string;
+}
+
+export interface UserAccessSummary {
+  user: AppUserIdentity;
+  access_entries: UserAccessEntry[];
+  audit_entries: UserAuditEntry[];
 }
 
 export interface TeamCompetitionMembership {

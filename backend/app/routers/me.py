@@ -3,7 +3,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from ..auth.context import current_authorization_context
+from ..auth.context import enforced_authorization_context
+from ..auth.dependencies import current_me_user
 from ..database import get_db
 from ..models import Team
 from ..schemas import (
@@ -16,7 +17,19 @@ router = APIRouter(tags=["auth"])
 
 
 @router.get("/me", response_model=MeOut)
-def get_me(context=Depends(current_authorization_context), db: Session = Depends(get_db)):
+def get_me(user=Depends(current_me_user), db: Session = Depends(get_db)):
+    if user.access_state == "disabled" or user.auth_state == "disabled":
+        return MeOut(
+            user=user,
+            capabilities=[],
+            associations=[],
+            teams=[],
+            arenas=[],
+            linked_players=[],
+            accessible_teams=[],
+        )
+
+    context = enforced_authorization_context(db, user)
     accessible_team_ids = set(context.team_ids)
     if context.association_memberships:
         accessible_team_ids.update(

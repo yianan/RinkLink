@@ -17,7 +17,8 @@ async function fetchWithAuth(path: string, options?: RequestInit, retryOnUnautho
     headers,
   });
 
-  if (response.status === 401 && authEnabled && retryOnUnauthorized) {
+  const revokedResponse = response.status === 403 ? await response.clone().text() : '';
+  if ((response.status === 401 || (response.status === 403 && revokedResponse.includes('Access has been revoked'))) && authEnabled && retryOnUnauthorized) {
     clearApiAccessToken();
     const refreshedToken = await getApiAccessToken(true);
     if (refreshedToken) {
@@ -59,6 +60,37 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
 
 export const api = {
   getMe: () => request<import('../types').MeResponse>('/me'),
+  getUsers: (params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return request<import('../types').AppUserIdentity[]>(`/users${qs}`);
+  },
+  getUserAccessSummary: (userId: string) =>
+    request<import('../types').UserAccessSummary>(`/users/${userId}/access-summary`),
+  disableAppAccess: (userId: string, reason?: string | null) =>
+    request<import('../types').AppUserIdentity>(`/users/${userId}/disable-app-access`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason ?? null }),
+    }),
+  restoreAppAccess: (userId: string, reason?: string | null) =>
+    request<import('../types').AppUserIdentity>(`/users/${userId}/restore-app-access`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason ?? null }),
+    }),
+  disableAuth: (userId: string, reason?: string | null) =>
+    request<import('../types').AppUserIdentity>(`/users/${userId}/disable-auth`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason ?? null }),
+    }),
+  restoreAuth: (userId: string, reason?: string | null) =>
+    request<import('../types').AppUserIdentity>(`/users/${userId}/restore-auth`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason ?? null }),
+    }),
+  revokeMembership: (kind: string, membershipId: string, reason?: string | null) =>
+    request<void>(`/memberships/${kind}/${membershipId}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ reason: reason ?? null }),
+    }),
   getBrowseSeasons: () => request<import('../types').PublicSeason[]>('/browse/seasons'),
   getBrowseTeams: (params?: Record<string, string>) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';

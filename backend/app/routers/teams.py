@@ -12,7 +12,7 @@ from ..schemas import (
     TeamOut,
     TeamUpdate,
 )
-from ..services.competitions import memberships_for_teams
+from ..services.competitions import ensure_current_season_membership, memberships_for_teams
 from ..services.team_logos import delete_logo_if_unused, effective_team_logo_url, save_team_logo_upload, team_logo_response
 
 router = APIRouter(tags=["teams"])
@@ -100,6 +100,8 @@ def create_team(
     db.add(team)
     db.commit()
     db.refresh(team)
+    ensure_current_season_membership(db, team)
+    db.refresh(team)
     return _enrich(team, db, {})
 
 
@@ -132,6 +134,8 @@ def update_team(
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(team, k, v)
     db.commit()
+    db.refresh(team)
+    ensure_current_season_membership(db, team)
     db.refresh(team)
     return _enrich(team, db, {})
 

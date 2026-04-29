@@ -46,6 +46,7 @@ import type { MeResponse } from './types';
 const HomePage = lazy(() => import('./pages/HomePage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const PendingApprovalPage = lazy(() => import('./pages/PendingApprovalPage'));
+const DisabledAccessPage = lazy(() => import('./pages/DisabledAccessPage'));
 const InviteAcceptancePage = lazy(() => import('./pages/InviteAcceptancePage'));
 const AccessPage = lazy(() => import('./pages/AccessPage'));
 const AssociationListPage = lazy(() => import('./pages/AssociationListPage'));
@@ -123,6 +124,22 @@ function PendingAuthRedirectRoute() {
   }
 
   return <Navigate to={consumeAuthReturnTo() || '/pending'} replace />;
+}
+
+function DisabledAuthRedirectRoute() {
+  const { pathname = 'sign-in' } = useParams();
+
+  if (pathname === 'settings' || pathname === 'security' || pathname === 'sign-out' || pathname === 'callback') {
+    if (pathname === 'settings') {
+      return <Navigate to="/settings" replace />;
+    }
+    if (pathname === 'security') {
+      return <Navigate to="/settings/security" replace />;
+    }
+    return <AuthPage />;
+  }
+
+  return <Navigate to={consumeAuthReturnTo() || '/disabled'} replace />;
 }
 
 const NAV_SECTIONS = [
@@ -241,10 +258,7 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
   const canManageProposals = hasCapability(me, 'team.manage_proposals');
 
   useEffect(() => {
-    if (!activeTeam || (!canManageSchedule && !canManageProposals)) {
-      setNavBadges({});
-      return;
-    }
+    if (!activeTeam || (!canManageSchedule && !canManageProposals)) return;
     let cancelled = false;
     const todayStr = toLocalDateString(new Date());
     const params: Record<string, string> = { date_from: todayStr };
@@ -274,6 +288,7 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
       cancelled = true;
     };
   }, [activeTeam, canManageProposals, canManageSchedule, effectiveSeason, navBadgeKey]);
+  const visibleNavBadges = activeTeam && (canManageSchedule || canManageProposals) ? navBadges : {};
 
   return (
     <nav className="p-3">
@@ -288,7 +303,7 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
             {visibleItems.map((item) => {
               const Icon = item.icon;
               const isActive = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path);
-              const badgeCount = navBadges[item.path] || 0;
+              const badgeCount = visibleNavBadges[item.path] || 0;
 
               return (
                 <NavLink
@@ -357,7 +372,17 @@ function AppContent() {
   const mobileNavContentRef = useRef<HTMLDivElement | null>(null);
   const mobileNavScrollRef = useRef<HTMLDivElement | null>(null);
   const appLoading = teamsLoading || seasonsLoading;
-  const pendingApproval = runtimeAuthEnabled && isAuthenticated && !!me && !me.user.is_platform_admin && me.user.status !== 'active';
+  const disabledAccess = runtimeAuthEnabled
+    && isAuthenticated
+    && !!me
+    && (me.user.access_state === 'disabled' || me.user.auth_state === 'disabled');
+  const pendingApproval = runtimeAuthEnabled
+    && isAuthenticated
+    && !!me
+    && me.user.access_state !== 'disabled'
+    && me.user.auth_state !== 'disabled'
+    && !me.user.is_platform_admin
+    && me.user.status !== 'active';
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -439,6 +464,18 @@ function AppContent() {
           <Route path="/invite/:token" element={<InviteAcceptancePage />} />
           <Route path="/auth/:pathname" element={<PendingAuthRedirectRoute />} />
           <Route path="*" element={<Navigate to="/pending" replace />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  if (disabledAccess) {
+    return (
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/disabled" element={<DisabledAccessPage />} />
+          <Route path="/auth/:pathname" element={<DisabledAuthRedirectRoute />} />
+          <Route path="*" element={<Navigate to="/disabled" replace />} />
         </Routes>
       </Suspense>
     );
@@ -557,6 +594,7 @@ function AppContent() {
                   <Routes>
                     <Route path="/auth/:pathname" element={<AuthRedirectRoute />} />
                     <Route path="/pending" element={<Navigate to="/" replace />} />
+                    <Route path="/disabled" element={<Navigate to="/" replace />} />
                     <Route path="/login" element={<Navigate to={authEnabled ? '/auth/sign-in' : '/'} replace />} />
                     <Route path="/invite/:token" element={<InviteAcceptancePage />} />
                     <Route path="/" element={<HomePage />} />

@@ -181,7 +181,6 @@ export default function EventPage() {
   const [lockerRooms, setLockerRooms] = useState<LockerRoom[]>([]);
   const [lockerRoomModalOpen, setLockerRoomModalOpen] = useState(false);
   const [lockerRoomForm, setLockerRoomForm] = useState(emptyLockerRoomForm);
-  const backTo = (location.state as { backTo?: string; backLabel?: string } | null)?.backTo || '/schedule';
   const backLabel = (location.state as { backTo?: string; backLabel?: string } | null)?.backLabel
     || ((window.history.state?.idx ?? 0) > 0 ? 'Back' : 'Back to Schedule');
   const handleBack = () => {

@@ -16,7 +16,6 @@ import { Select } from '../components/ui/Select';
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
 import EmptyState from '../components/EmptyState';
-import TeamLogo from '../components/TeamLogo';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { canManageRoster, canViewPrivateRoster } from '../lib/permissions';
@@ -91,18 +90,12 @@ export default function RosterPage() {
   const rosterEditable = !authEnabled || canManageRoster(me);
 
   const load = () => {
-    if (!activeTeam || !effectiveSeason || !rosterVisible) {
-      setPlayers([]);
-      return;
-    }
+    if (!activeTeam || !effectiveSeason || !rosterVisible) return;
     api.getPlayers(activeTeam.id, { season_id: effectiveSeason.id }).then(setPlayers);
   };
 
   useEffect(() => {
-    if (!rosterVisible) {
-      setPlayers([]);
-      return;
-    }
+    if (!rosterVisible) return;
     load();
   }, [activeTeam, effectiveSeason, rosterVisible]); // eslint-disable-line react-hooks/exhaustive-deps
 

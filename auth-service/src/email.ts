@@ -140,7 +140,7 @@ export async function sendVerificationEmail(to: string, verificationUrl: string)
     "Verify your email address to finish setting up your account:",
     verificationUrl,
     "",
-    "After verification, you can review invites, request access, and continue onboarding.",
+    "After verification, RinkLink signs you in automatically and routes you to the right next step.",
     "",
     appFooter(frontendUrl),
   ].join("\n");
@@ -155,7 +155,7 @@ export async function sendVerificationEmail(to: string, verificationUrl: string)
       </p>
       <p style="margin:0 0 16px">If the button does not work, open this link directly:</p>
       <p style="margin:0 0 24px"><a href="${verificationUrl}">${verificationUrl}</a></p>
-      <p style="margin:0;color:#475569">After verification, you can review invites, request access, and continue onboarding.</p>
+      <p style="margin:0;color:#475569">After verification, RinkLink signs you in automatically and routes you to the right next step.</p>
       <p style="margin:16px 0 0;color:#64748b">${appFooter(frontendUrl)}</p>
     </div>
   `;

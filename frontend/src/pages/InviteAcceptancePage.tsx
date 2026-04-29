@@ -7,6 +7,8 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { authClient, clearApiAccessToken } from '../lib/auth-client';
 import { setAuthReturnTo } from '../lib/auth-routing';
+import { getAccessRoleLabel, getAccessTargetTypeLabel } from '../lib/accessLabels';
+import { getPreferredAppPath } from '../lib/permissions';
 import { useAuth } from '../context/AuthContext';
 import type { Invite } from '../types';
 
@@ -33,10 +35,7 @@ export default function InviteAcceptancePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const inviteResolved = useMemo(
-    () => invite?.status === 'accepted' || (me?.user.status === 'active' && invite?.status === 'pending'),
-    [invite?.status, me?.user.status],
-  );
+  const inviteResolved = useMemo(() => invite?.status === 'accepted', [invite?.status]);
 
   const loadInvite = async () => {
     if (!token || !isAuthenticated) return;
@@ -57,6 +56,18 @@ export default function InviteAcceptancePage() {
     if (!isAuthenticated) return;
     void loadInvite();
   }, [isAuthenticated, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!inviteResolved || !me) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      navigate(getPreferredAppPath(me), { replace: true });
+    }, 250);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [inviteResolved, me, navigate]);
 
   if (!authEnabled) {
     return <Navigate to="/" replace />;
@@ -161,8 +172,8 @@ export default function InviteAcceptancePage() {
                     <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">{invite.target.context}</div>
                   ) : null}
                   <div className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                    {invite.target.type.replace('_', ' ')}
-                    {invite.role ? ` · ${invite.role}` : ''}
+                    {getAccessTargetTypeLabel(invite.target.type)}
+                    {invite.role ? ` · ${getAccessRoleLabel(invite.role)}` : ''}
                   </div>
                 </div>
                 <Badge variant={statusVariant(invite.status)}>{invite.status}</Badge>
@@ -195,9 +206,9 @@ export default function InviteAcceptancePage() {
             Sign out and switch account
           </Button>
           {inviteResolved ? (
-            <Button type="button" variant="ghost" onClick={() => navigate('/')}>
-              Continue to app
-            </Button>
+            <div className="flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200">
+              Redirecting to your workspace…
+            </div>
           ) : null}
         </div>
       </Card>

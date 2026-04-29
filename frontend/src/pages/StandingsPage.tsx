@@ -17,34 +17,23 @@ function divisionLabel(division: CompetitionDivision) {
 
 export default function StandingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { activeSeason, seasons, setActiveSeason } = useSeason();
+  const { activeSeason, seasons } = useSeason();
   const { activeTeam } = useTeam();
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const [divisions, setDivisions] = useState<CompetitionDivision[]>([]);
   const [selectedDivisionId, setSelectedDivisionId] = useState('');
-  const [standings, setStandings] = useState<StandingsEntry[]>([]);
   const [loadingDivisions, setLoadingDivisions] = useState(false);
-  const [loadingStandings, setLoadingStandings] = useState(false);
+  const [standingsState, setStandingsState] = useState<{ divisionId: string; entries: StandingsEntry[] }>({
+    divisionId: '',
+    entries: [],
+  });
   const [activeTeamStandingsDivisionId, setActiveTeamStandingsDivisionId] = useState<string | null>(null);
   const [lastResolvedTeamId, setLastResolvedTeamId] = useState<string | null>(null);
   const [lastResolvedSeasonId, setLastResolvedSeasonId] = useState<string | null>(null);
   const requestedDivisionId = searchParams.get('division') || '';
 
   useEffect(() => {
-    if (!activeSeason && effectiveSeason) {
-      setActiveSeason(effectiveSeason);
-    }
-  }, [activeSeason, effectiveSeason, setActiveSeason]);
-
-  useEffect(() => {
-    if (!effectiveSeason) {
-      setDivisions([]);
-      setSelectedDivisionId('');
-      setActiveTeamStandingsDivisionId(null);
-      setLastResolvedTeamId(null);
-      setLastResolvedSeasonId(null);
-      return;
-    }
+    if (!effectiveSeason) return;
     let cancelled = false;
 
     const load = async () => {
@@ -101,21 +90,19 @@ export default function StandingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTeam?.id, effectiveSeason?.id, lastResolvedSeasonId, lastResolvedTeamId, requestedDivisionId]);
+  }, [activeTeam, effectiveSeason, lastResolvedSeasonId, lastResolvedTeamId, requestedDivisionId]);
 
   useEffect(() => {
-    if (!selectedDivisionId) {
-      setStandings([]);
-      return;
-    }
+    if (!selectedDivisionId) return;
     let cancelled = false;
-    setLoadingStandings(true);
     api.getCompetitionDivisionStandings(selectedDivisionId)
       .then((data) => {
-        if (!cancelled) setStandings(data);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingStandings(false);
+        if (!cancelled) {
+          setStandingsState({
+            divisionId: selectedDivisionId,
+            entries: data,
+          });
+        }
       });
     return () => {
       cancelled = true;
@@ -126,6 +113,8 @@ export default function StandingsPage() {
     () => divisions.find((division) => division.id === selectedDivisionId) || null,
     [divisions, selectedDivisionId],
   );
+  const visibleStandings = selectedDivisionId === standingsState.divisionId ? standingsState.entries : [];
+  const loadingStandings = !!selectedDivisionId && standingsState.divisionId !== selectedDivisionId;
 
   useEffect(() => {
     const currentDivision = requestedDivisionId;
@@ -175,12 +164,12 @@ export default function StandingsPage() {
             <TableSkeleton columns={8} rows={5} compact />
           </div>
         </>
-      ) : standings.length === 0 ? (
+      ) : visibleStandings.length === 0 ? (
         <Alert variant="info">No standings data is available for this division yet.</Alert>
       ) : (
         <>
           <div className="space-y-2 md:hidden">
-            {standings.map((entry, index) => (
+            {visibleStandings.map((entry, index) => (
               <Card key={entry.team_id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -221,7 +210,7 @@ export default function StandingsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20">
-                  {standings.map((entry, index) => (
+                  {visibleStandings.map((entry, index) => (
                     <tr key={entry.team_id} className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                       <td className="px-4 py-3 font-bold text-slate-400 dark:text-slate-500">{index + 1}</td>
                       <td className="px-4 py-3">

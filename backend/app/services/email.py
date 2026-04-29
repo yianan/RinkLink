@@ -13,6 +13,39 @@ from ..config import settings
 logger = logging.getLogger(__name__)
 
 
+ACCESS_TARGET_TYPE_LABELS = {
+    "association": "Association Access",
+    "team": "Team Staff Access",
+    "arena": "Arena Staff Access",
+    "guardian_link": "Parent/Guardian Link",
+    "player_link": "Player Link",
+}
+
+ACCESS_ROLE_LABELS = {
+    "association_admin": "Association Admin",
+    "arena_admin": "Arena Admin",
+    "arena_ops": "Arena Ops",
+    "coach": "Coach",
+    "manager": "Manager",
+    "scheduler": "Scheduler",
+    "team_admin": "Team Admin",
+}
+
+
+def _title_case_label(value: str) -> str:
+    return " ".join(part[:1].upper() + part[1:] for part in value.replace("_", " ").split() if part)
+
+
+def _target_type_label(target_type: str) -> str:
+    return ACCESS_TARGET_TYPE_LABELS.get(target_type, _title_case_label(target_type))
+
+
+def _role_label(role: str | None) -> str | None:
+    if not role:
+        return None
+    return ACCESS_ROLE_LABELS.get(role, _title_case_label(role))
+
+
 def email_enabled() -> bool:
     has_transport = bool(settings.brevo_api_key or settings.smtp_host)
     return bool(has_transport and settings.email_from_address)
@@ -108,8 +141,8 @@ def send_invite_email(
     inviter_email: str,
     expires_at: datetime,
 ) -> bool:
-    role_label = role.replace("_", " ") if role else None
-    target_label = target_type.replace("_", " ")
+    role_label = _role_label(role)
+    target_label = _target_type_label(target_type)
     expiry_label = expires_at.strftime("%B %d, %Y at %I:%M %p UTC")
     subject = "You have a RinkLink access invite"
     role_line = f"Role: {role_label}\n" if role_label else ""
