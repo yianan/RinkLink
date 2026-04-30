@@ -304,8 +304,9 @@ export default function ProposalsPage() {
           const canRespond = proposal.status === 'proposed' && isIncoming;
           const canCancel = proposal.status === 'proposed' && !isIncoming;
           const canReschedule = proposal.status === 'accepted' || canRespond;
-          const directionLabel = isIncoming ? 'Received' : 'Sent';
           const proposerName = proposalTeamName(proposal, proposal.proposed_by_team_id);
+          const otherTeamId = proposal.home_team_id === activeTeam.id ? proposal.away_team_id : proposal.home_team_id;
+          const directionLabel = isIncoming ? `From ${proposerName}` : `To ${proposalTeamName(proposal, otherTeamId)}`;
 
           return (
             <Card key={proposal.id} className="overflow-hidden p-0">
@@ -326,7 +327,7 @@ export default function ProposalsPage() {
                             variant={isIncoming ? 'warning' : 'info'}
                             icon={isIncoming ? <ArrowDownLeft className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
                           >
-                            {directionLabel} by {proposerName}
+                            {directionLabel}
                           </Badge>
                           <Badge variant={getCompetitionBadgeVariant(proposal.event_type)}>
                             {getCompetitionLabel(proposal.event_type)}
