@@ -1,0 +1,19 @@
+{
+  "name": "RinkLink",
+  "short_name": "RinkLink",
+  "icons": [
+    {
+      "src": "/icons/rinklink-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/rinklink-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#062b5f",
+  "background_color": "#ffffff",
+  "display": "standalone"
+}

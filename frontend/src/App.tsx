@@ -43,6 +43,8 @@ import { authClient, authEnabled, clearApiAccessToken } from './lib/auth-client'
 import { consumeAuthReturnTo } from './lib/auth-routing';
 import type { MeResponse } from './types';
 
+const appIconSrc = '/icons/rinklink-icon-192.png';
+
 const HomePage = lazy(() => import('./pages/HomePage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const PendingApprovalPage = lazy(() => import('./pages/PendingApprovalPage'));
@@ -533,9 +535,7 @@ function AppContent() {
               </DialogPrimitive.Trigger>
 
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900/5 ring-1 ring-slate-200/70 dark:bg-white/10 dark:ring-white/15">
-                  <Snowflake className="h-5 w-5" />
-                </div>
+                <img src={appIconSrc} alt="RinkLink logo" className="h-9 w-9 shrink-0 rounded-xl" />
                 <div className="min-w-0 leading-tight">
                   <div className="font-display text-sm font-bold tracking-tight text-slate-900 dark:text-white">RinkLink</div>
                   <div className="hidden text-xs text-slate-600 dark:text-white/70 sm:block">Arenas, availability, and schedule</div>
@@ -644,9 +644,7 @@ function AppContent() {
           >
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
               <div className="flex min-w-0 items-center gap-2">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900/5 ring-1 ring-slate-200/70 dark:bg-white/10 dark:ring-white/15">
-                  <Snowflake className="h-4 w-4" />
-                </div>
+                <img src={appIconSrc} alt="RinkLink logo" className="h-8 w-8 shrink-0 rounded-lg" />
                 <div className="min-w-0">
                   <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
                   <DialogPrimitive.Description id={mobileNavDescriptionId} className="text-sm font-semibold text-slate-900 dark:text-slate-100">

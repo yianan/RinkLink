@@ -10,6 +10,8 @@ import { buildAuthCallbackUrl } from '../lib/auth-routing';
 import { cn } from '../lib/cn';
 import { useToast } from '../context/ToastContext';
 
+const appIconSrc = '/icons/rinklink-icon-192.png';
+
 const allowedPathnames = new Set([
   'sign-in',
   'sign-up',
@@ -769,7 +771,7 @@ export default function AuthPage() {
       <div className="rinklink-auth-layout">
         <section className="rinklink-auth-hero">
           <div className="rinklink-auth-brand">
-            <img src="/favicon.svg" alt="RinkLink logo" className="h-11 w-11 shrink-0" />
+            <img src={appIconSrc} alt="RinkLink logo" className="h-11 w-11 shrink-0 rounded-xl" />
             <div className="min-w-0">
               <div className="font-display text-2xl font-bold tracking-tight text-slate-950 dark:text-slate-50">
                 RinkLink
