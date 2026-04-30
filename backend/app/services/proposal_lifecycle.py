@@ -82,6 +82,7 @@ def cancel_proposal_record(
     if response_source == "arena" and not effective_response_message:
         effective_response_message = "The arena cancelled this reserved slot."
     proposal.status = "cancelled"
+    proposal.active_pair_key = None
     proposal.responded_at = datetime.now(timezone.utc)
     proposal.response_message = effective_response_message
     proposal.response_source = response_source

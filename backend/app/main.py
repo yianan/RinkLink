@@ -18,7 +18,11 @@ async def lifespan(app: FastAPI):
     from . import models  # noqa: F401
 
     assert_auth_runtime_safe()
-    yield
+    app.state.auth_proxy_client = httpx.AsyncClient(follow_redirects=False, timeout=30.0)
+    try:
+        yield
+    finally:
+        await app.state.auth_proxy_client.aclose()
 
 
 app = FastAPI(title="RinkLink", version="0.1.0", lifespan=lifespan)
@@ -119,13 +123,21 @@ async def _proxy_auth_request(request: Request, upstream_path: str) -> Response:
         if key.lower() not in _UPSTREAM_HEADER_EXCLUDES
     }
 
-    async with httpx.AsyncClient(follow_redirects=False, timeout=30.0) as client:
+    client: httpx.AsyncClient | None = getattr(request.app.state, "auth_proxy_client", None)
+    close_client = False
+    if client is None:
+        client = httpx.AsyncClient(follow_redirects=False, timeout=30.0)
+        close_client = True
+    try:
         upstream_response = await client.request(
             method=request.method,
             url=upstream_url,
             headers=headers,
             content=await request.body(),
         )
+    finally:
+        if close_client:
+            await client.aclose()
 
     response = Response(
         content=upstream_response.content,

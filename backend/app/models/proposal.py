@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, time, timezone
 
-from sqlalchemy import Date, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -17,6 +17,13 @@ class Proposal(Base):
         Index("ix_proposals_home_team_status_date", "home_team_id", "status", "proposed_date"),
         Index("ix_proposals_away_team_status_date", "away_team_id", "status", "proposed_date"),
         Index("ix_proposals_slot_status", "ice_slot_id", "status"),
+        Index(
+            "uq_proposals_active_pair_key",
+            "active_pair_key",
+            unique=True,
+            sqlite_where=text("status IN ('proposed', 'accepted') AND active_pair_key IS NOT NULL"),
+            postgresql_where=text("status IN ('proposed', 'accepted') AND active_pair_key IS NOT NULL"),
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -25,6 +32,7 @@ class Proposal(Base):
     thread_root_proposal_id: Mapped[str | None] = mapped_column(ForeignKey("proposals.id"), nullable=True, index=True)
     parent_proposal_id: Mapped[str | None] = mapped_column(ForeignKey("proposals.id"), nullable=True, index=True)
     revision_number: Mapped[int] = mapped_column(default=1, server_default="1")
+    active_pair_key: Mapped[str | None] = mapped_column(String(80), nullable=True)
     home_availability_window_id: Mapped[str] = mapped_column(ForeignKey("availability_windows.id"), nullable=False)
     away_availability_window_id: Mapped[str] = mapped_column(ForeignKey("availability_windows.id"), nullable=False)
     event_type: Mapped[str] = mapped_column(String(30), nullable=False)

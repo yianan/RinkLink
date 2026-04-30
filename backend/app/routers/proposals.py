@@ -24,6 +24,10 @@ from ..services.team_logos import effective_team_logo_url
 
 router = APIRouter(tags=["proposals"])
 
+
+def _active_pair_key(home_window_id: str, away_window_id: str) -> str:
+    return "|".join(sorted([home_window_id, away_window_id]))
+
 def _validate_venue(
     db: Session,
     *,
@@ -160,7 +164,7 @@ def create_proposal(
         end_time=body.proposed_end_time,
         ice_slot_id=body.ice_slot_id,
     )
-    proposal = Proposal(**body.model_dump())
+    proposal = Proposal(**body.model_dump(), active_pair_key=_active_pair_key(body.home_availability_window_id, body.away_availability_window_id))
     hold_slot(slot, body.home_team_id)
     db.add(proposal)
     db.commit()
@@ -208,11 +212,13 @@ def request_reschedule(
         revision_number=_next_revision_number(db, root_id),
         home_availability_window_id=base.home_availability_window_id,
         away_availability_window_id=base.away_availability_window_id,
+        active_pair_key=_active_pair_key(base.home_availability_window_id, base.away_availability_window_id),
         status="proposed",
         **body.model_dump(),
     )
     if base.status == "proposed":
         base.status = "declined"
+        base.active_pair_key = None
         base.response_message = "Counter-proposal sent"
         base.response_source = "team"
         base.responded_at = datetime.now(timezone.utc)
@@ -383,6 +389,7 @@ def decline_proposal(
     if proposal.status != "proposed":
         raise HTTPException(400, f"Cannot decline proposal with status '{proposal.status}'")
     proposal.status = "declined"
+    proposal.active_pair_key = None
     proposal.responded_at = datetime.now(timezone.utc)
     release_slot(proposal.ice_slot)
     db.commit()
