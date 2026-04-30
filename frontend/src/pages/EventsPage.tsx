@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CalendarPlus2, Link2, Save, SendHorizontal, X, XCircle } from 'lucide-react';
-import { api } from '../api/client';
+import { api, isAbortError, type ListMeta } from '../api/client';
 import { Arena, ArenaRink, Event, IceBookingRequest, IceSlot, Team } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useSeason } from '../context/SeasonContext';
@@ -26,6 +26,7 @@ import { formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time'
 import { useToast } from '../context/ToastContext';
 
 const EVENT_TYPES: Event['event_type'][] = ['league', 'tournament', 'practice', 'showcase', 'scrimmage', 'exhibition'];
+const LIST_LIMIT = 100;
 
 function formatPriceLabel(pricingMode: string, priceAmountCents: number | null, currency = 'USD') {
   if (pricingMode === 'call_for_pricing') {
@@ -82,6 +83,8 @@ export default function EventsPage() {
   const pushToast = useToast();
   const [events, setEvents] = useState<Event[]>([]);
   const [bookingRequests, setBookingRequests] = useState<IceBookingRequest[]>([]);
+  const [eventsMeta, setEventsMeta] = useState<ListMeta>({ total: 0, limit: LIST_LIMIT, offset: 0 });
+  const [requestsMeta, setRequestsMeta] = useState<ListMeta>({ total: 0, limit: LIST_LIMIT, offset: 0 });
   const [arenas, setArenas] = useState<Arena[]>([]);
   const [arenaRinks, setArenaRinks] = useState<ArenaRink[]>([]);
   const [openIceSlots, setOpenIceSlots] = useState<IceSlot[]>([]);
@@ -92,6 +95,7 @@ export default function EventsPage() {
   const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedArenaNames, setSelectedArenaNames] = useState<string[]>([]);
+  const [pageOffset, setPageOffset] = useState(0);
 
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const todayStr = toLocalDateString(new Date());
@@ -115,9 +119,13 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
+    setPageOffset(0);
+  }, [activeTeam?.id, effectiveSeason?.id, visibleTab]);
+
+  useEffect(() => {
     if (!activeTeam) return;
-    let cancelled = false;
-    const eventParams: Record<string, string> = { limit: '500' };
+    const controller = new AbortController();
+    const eventParams: Record<string, string> = { limit: String(LIST_LIMIT), offset: String(pageOffset) };
     if (effectiveSeason) {
       eventParams.season_id = effectiveSeason.id;
     }
@@ -126,24 +134,32 @@ export default function EventsPage() {
     } else if (visibleTab === 'past') {
       eventParams.date_to = todayStr;
     }
+    const requestParams: Record<string, string> = { limit: String(LIST_LIMIT), offset: String(pageOffset) };
     Promise.all([
-      api.getEvents(activeTeam.id, eventParams),
-      canManageRequests ? api.getTeamIceBookingRequests(activeTeam.id) : Promise.resolve([]),
-    ]).then(([eventData, requestData]) => {
-      if (cancelled) return;
-      setEvents(eventData);
-      setBookingRequests(requestData);
+      visibleTab === 'requests'
+        ? Promise.resolve({ data: [], meta: { total: 0, limit: LIST_LIMIT, offset: 0 } })
+        : api.getEventsList(activeTeam.id, eventParams, { signal: controller.signal }),
+      canManageRequests && visibleTab === 'requests'
+        ? api.getTeamIceBookingRequestsList(activeTeam.id, requestParams, { signal: controller.signal })
+        : Promise.resolve({ data: [], meta: { total: 0, limit: LIST_LIMIT, offset: 0 } }),
+    ]).then(([eventResult, requestResult]) => {
+      setEvents(eventResult.data);
+      setEventsMeta(eventResult.meta);
+      setBookingRequests(requestResult.data);
+      setRequestsMeta(requestResult.meta);
       setScoreEdits({});
-    }).catch(() => {
-      if (cancelled) return;
+    }).catch((error) => {
+      if (isAbortError(error)) return;
       setEvents([]);
       setBookingRequests([]);
+      setEventsMeta({ total: 0, limit: LIST_LIMIT, offset: 0 });
+      setRequestsMeta({ total: 0, limit: LIST_LIMIT, offset: 0 });
       setScoreEdits({});
     });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [activeTeam, canManageRequests, effectiveSeason, todayStr, visibleTab]);
+  }, [activeTeam, canManageRequests, effectiveSeason, pageOffset, todayStr, visibleTab]);
 
   useEffect(() => {
     if (!open || !canManageSchedule) return;
@@ -236,6 +252,25 @@ export default function EventsPage() {
     && (selectedArenaNames.length === 0 || (event.arena_name && selectedArenaNames.includes(event.arena_name)))
   ));
   const filteredRequests = visibleTab === 'requests' ? bookingRequests : [];
+  const activeMeta = visibleTab === 'requests' ? requestsMeta : eventsMeta;
+  const activeLoadedCount = visibleTab === 'requests' ? bookingRequests.length : events.length;
+  const rangeStart = activeMeta.total === 0 ? 0 : activeMeta.offset + 1;
+  const rangeEnd = Math.min(activeMeta.offset + activeLoadedCount, activeMeta.total);
+  const canGoPrevious = activeMeta.offset > 0;
+  const canGoNext = activeMeta.offset + activeMeta.limit < activeMeta.total;
+  const paginationControls = activeMeta.total > activeMeta.limit ? (
+    <div className="flex flex-col gap-2 border-t border-slate-200 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+      <div>{rangeStart}-{rangeEnd} of {activeMeta.total}</div>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={!canGoPrevious} onClick={() => setPageOffset(Math.max(0, activeMeta.offset - activeMeta.limit))}>
+          Previous
+        </Button>
+        <Button type="button" variant="outline" size="sm" disabled={!canGoNext} onClick={() => setPageOffset(activeMeta.offset + activeMeta.limit)}>
+          Next
+        </Button>
+      </div>
+    </div>
+  ) : null;
 
   const saveBookingRequest = async () => {
     const requestMessage = [
@@ -421,7 +456,7 @@ export default function EventsPage() {
                       const updated = await api.cancelTeamIceBookingRequest(activeTeam.id, request.id);
                       setBookingRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
                       if (request.event_id) {
-                        const updatedEvents = await api.getEvents(activeTeam.id, { limit: '500' });
+                        const updatedEvents = await api.getEvents(activeTeam.id, { limit: String(LIST_LIMIT), offset: String(pageOffset) });
                         setEvents(updatedEvents);
                       }
                       pushToast({ variant: 'success', title: 'Booking request cancelled' });
@@ -434,6 +469,7 @@ export default function EventsPage() {
               </div>
             ))}
           </div>
+          {paginationControls}
         </Card>
       ) : (
         <Card className="overflow-hidden">
@@ -555,6 +591,7 @@ export default function EventsPage() {
             );
           })}
         </div>
+        {paginationControls}
       </Card>
       )}
 

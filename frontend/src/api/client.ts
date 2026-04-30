@@ -3,6 +3,36 @@ import { authEnabled, clearApiAccessToken, getApiAccessToken } from '../lib/auth
 const apiOrigin = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 const BASE_URL = apiOrigin ? `${apiOrigin}/api` : '/api';
 
+export type ApiOptions = {
+  signal?: AbortSignal;
+};
+
+export type ListMeta = {
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type ListResponse<T> = {
+  data: T[];
+  meta: ListMeta;
+};
+
+export function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+function metaFromHeaders(headers: Headers, fallbackLength: number): ListMeta {
+  const total = Number(headers.get('X-Total-Count') ?? fallbackLength);
+  const limit = Number(headers.get('X-Limit') ?? fallbackLength);
+  const offset = Number(headers.get('X-Offset') ?? 0);
+  return {
+    total: Number.isFinite(total) ? total : fallbackLength,
+    limit: Number.isFinite(limit) ? limit : fallbackLength,
+    offset: Number.isFinite(offset) ? offset : 0,
+  };
+}
+
 async function fetchWithAuth(path: string, options?: RequestInit, retryOnUnauthorized = true): Promise<Response> {
   const headers = new Headers(options?.headers);
   if (authEnabled) {
@@ -45,6 +75,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
   if (res.status === 204) return undefined as T;
   return res.json();
+}
+
+async function requestList<T>(path: string, options?: RequestInit): Promise<ListResponse<T>> {
+  const res = await fetchWithAuth(path, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${res.status}: ${text}`);
+  }
+  const data = await res.json() as T[];
+  return { data, meta: metaFromHeaders(res.headers, data.length) };
 }
 
 async function upload<T>(path: string, formData: FormData): Promise<T> {
@@ -225,9 +268,13 @@ export const api = {
 
   createProposal: (data: Partial<import('../types').Proposal>) =>
     request<import('../types').Proposal>('/proposals', { method: 'POST', body: JSON.stringify(data) }),
-  getProposals: (teamId: string, params?: Record<string, string>) => {
+  getProposals: (teamId: string, params?: Record<string, string>, options?: ApiOptions) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
-    return request<import('../types').Proposal[]>(`/teams/${teamId}/proposals${qs}`);
+    return request<import('../types').Proposal[]>(`/teams/${teamId}/proposals${qs}`, options);
+  },
+  getProposalsList: (teamId: string, params?: Record<string, string>, options?: ApiOptions) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return requestList<import('../types').Proposal>(`/teams/${teamId}/proposals${qs}`, options);
   },
   getProposalHistory: (id: string) =>
     request<import('../types').Proposal[]>(`/proposals/${id}/history`),
@@ -237,9 +284,13 @@ export const api = {
   rescheduleProposal: (id: string, data: Partial<import('../types').Proposal>) =>
     request<import('../types').Proposal>(`/proposals/${id}/reschedule`, { method: 'POST', body: JSON.stringify(data) }),
 
-  getTeamIceBookingRequests: (teamId: string, params?: Record<string, string>) => {
+  getTeamIceBookingRequests: (teamId: string, params?: Record<string, string>, options?: ApiOptions) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
-    return request<import('../types').IceBookingRequest[]>(`/teams/${teamId}/ice-booking-requests${qs}`);
+    return request<import('../types').IceBookingRequest[]>(`/teams/${teamId}/ice-booking-requests${qs}`, options);
+  },
+  getTeamIceBookingRequestsList: (teamId: string, params?: Record<string, string>, options?: ApiOptions) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return requestList<import('../types').IceBookingRequest>(`/teams/${teamId}/ice-booking-requests${qs}`, options);
   },
   createTeamIceBookingRequest: (teamId: string, data: Partial<import('../types').IceBookingRequest>) =>
     request<import('../types').IceBookingRequest>(`/teams/${teamId}/ice-booking-requests`, { method: 'POST', body: JSON.stringify(data) }),
@@ -278,9 +329,13 @@ export const api = {
       body: JSON.stringify({ response_message: responseMessage || null }),
     }),
 
-  getEvents: (teamId: string, params?: Record<string, string>) => {
+  getEvents: (teamId: string, params?: Record<string, string>, options?: ApiOptions) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
-    return request<import('../types').Event[]>(`/teams/${teamId}/events${qs}`);
+    return request<import('../types').Event[]>(`/teams/${teamId}/events${qs}`, options);
+  },
+  getEventsList: (teamId: string, params?: Record<string, string>, options?: ApiOptions) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return requestList<import('../types').Event>(`/teams/${teamId}/events${qs}`, options);
   },
   getTeamCalendarFeed: (teamId: string) =>
     request<{ url: string }>(`/teams/${teamId}/calendar-feed`),

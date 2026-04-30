@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowDownLeft, ArrowUpRight, Calendar, CalendarClock, Check, History, SendHorizontal, X, XCircle } from 'lucide-react';
-import { api } from '../api/client';
+import { api, isAbortError, type ListMeta } from '../api/client';
 import { Arena, ArenaRink, IceSlot, Proposal } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
@@ -29,6 +29,7 @@ const TABS = [
   { label: 'Accepted', value: 'accepted' as const, direction: 'all', status: 'accepted' },
   { label: 'History', value: 'history' as const, direction: 'all', status: undefined },
 ] as const;
+const LIST_LIMIT = 100;
 
 const statusColors: Record<Proposal['status'], 'warning' | 'success' | 'danger' | 'neutral'> = {
   proposed: 'warning',
@@ -66,6 +67,8 @@ export default function ProposalsPage() {
 
   const [tab, setTab] = useState<(typeof TABS)[number]['value']>('incoming');
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [proposalMeta, setProposalMeta] = useState<ListMeta>({ total: 0, limit: LIST_LIMIT, offset: 0 });
+  const [pageOffset, setPageOffset] = useState(0);
   const [arenas, setArenas] = useState<Arena[]>([]);
   const [arenaRinks, setArenaRinks] = useState<ArenaRink[]>([]);
   const [slots, setSlots] = useState<IceSlot[]>([]);
@@ -88,10 +91,11 @@ export default function ProposalsPage() {
       direction: activeTab.direction,
       ...(activeTab.status ? { status: activeTab.status } : {}),
       ...(effectiveSeason ? { date_from: effectiveSeason.start_date, date_to: effectiveSeason.end_date } : {}),
-      limit: '500',
+      limit: String(LIST_LIMIT),
+      offset: String(pageOffset),
     };
-    api.getProposals(activeTeam.id, params).then((data) => {
-      const filtered = data.filter((proposal) => {
+    api.getProposalsList(activeTeam.id, params).then((result) => {
+      const filtered = result.data.filter((proposal) => {
         if (effectiveSeason && (proposal.proposed_date < effectiveSeason.start_date || proposal.proposed_date > effectiveSeason.end_date)) {
           return false;
         }
@@ -101,22 +105,30 @@ export default function ProposalsPage() {
         return true;
       });
       setProposals(filtered);
-    }).catch(() => setProposals([]));
-  }, [activeTeam, effectiveSeason, tab]);
+      setProposalMeta(result.meta);
+    }).catch(() => {
+      setProposals([]);
+      setProposalMeta({ total: 0, limit: LIST_LIMIT, offset: 0 });
+    });
+  }, [activeTeam, effectiveSeason, pageOffset, tab]);
+
+  useEffect(() => {
+    setPageOffset(0);
+  }, [activeTeam?.id, effectiveSeason?.id, tab]);
 
   useEffect(() => {
     if (!activeTeam) return;
-    let cancelled = false;
+    const controller = new AbortController();
     const activeTab = TABS.find((item) => item.value === tab) || TABS[0];
     const params = {
       direction: activeTab.direction,
       ...(activeTab.status ? { status: activeTab.status } : {}),
       ...(effectiveSeason ? { date_from: effectiveSeason.start_date, date_to: effectiveSeason.end_date } : {}),
-      limit: '500',
+      limit: String(LIST_LIMIT),
+      offset: String(pageOffset),
     };
-    api.getProposals(activeTeam.id, params).then((data) => {
-      if (cancelled) return;
-      const filtered = data.filter((proposal) => {
+    api.getProposalsList(activeTeam.id, params, { signal: controller.signal }).then((result) => {
+      const filtered = result.data.filter((proposal) => {
         if (effectiveSeason && (proposal.proposed_date < effectiveSeason.start_date || proposal.proposed_date > effectiveSeason.end_date)) {
           return false;
         }
@@ -126,18 +138,21 @@ export default function ProposalsPage() {
         return true;
       });
       setProposals(filtered);
-    }).catch(() => {
-      if (!cancelled) setProposals([]);
+      setProposalMeta(result.meta);
+    }).catch((error) => {
+      if (isAbortError(error)) return;
+      setProposals([]);
+      setProposalMeta({ total: 0, limit: LIST_LIMIT, offset: 0 });
     });
     api.getArenas().then((data) => {
-      if (!cancelled) setArenas(data);
+      if (!controller.signal.aborted) setArenas(data);
     }).catch(() => {
-      if (!cancelled) setArenas([]);
+      if (!controller.signal.aborted) setArenas([]);
     });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [activeTeam, effectiveSeason, tab]);
+  }, [activeTeam, effectiveSeason, pageOffset, tab]);
 
   useEffect(() => {
     if (!rescheduleForm.arena_id) return;
@@ -162,6 +177,23 @@ export default function ProposalsPage() {
       `${left.proposed_date}${left.proposed_start_time || ''}`.localeCompare(`${right.proposed_date}${right.proposed_start_time || ''}`),
     );
   }, [proposals, tab]);
+  const rangeStart = proposalMeta.total === 0 ? 0 : proposalMeta.offset + 1;
+  const rangeEnd = Math.min(proposalMeta.offset + proposals.length, proposalMeta.total);
+  const canGoPrevious = proposalMeta.offset > 0;
+  const canGoNext = proposalMeta.offset + proposalMeta.limit < proposalMeta.total;
+  const paginationControls = proposalMeta.total > proposalMeta.limit ? (
+    <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+      <div>{rangeStart}-{rangeEnd} of {proposalMeta.total}</div>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={!canGoPrevious} onClick={() => setPageOffset(Math.max(0, proposalMeta.offset - proposalMeta.limit))}>
+          Previous
+        </Button>
+        <Button type="button" variant="outline" size="sm" disabled={!canGoNext} onClick={() => setPageOffset(proposalMeta.offset + proposalMeta.limit)}>
+          Next
+        </Button>
+      </div>
+    </div>
+  ) : null;
 
   if (!activeTeam) {
     return <Alert variant="info">Select a team to review proposals.</Alert>;
@@ -379,6 +411,7 @@ export default function ProposalsPage() {
             No proposals in this view. Use Find Opponents from Availability to create the next matchup request.
           </Card>
         ) : null}
+        {paginationControls}
       </div>
 
       <Modal
