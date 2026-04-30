@@ -27,7 +27,7 @@ const TABS = [
   { label: 'Incoming', value: 'incoming' as const, direction: 'incoming', status: 'proposed' },
   { label: 'Outgoing', value: 'outgoing' as const, direction: 'outgoing', status: 'proposed' },
   { label: 'Accepted', value: 'accepted' as const, direction: 'all', status: 'accepted' },
-  { label: 'History', value: 'history' as const, direction: 'all', status: undefined },
+  { label: 'History', value: 'history' as const, direction: 'all', status: undefined, status_in: 'declined,cancelled' },
 ] as const;
 const LIST_LIMIT = 100;
 
@@ -103,6 +103,7 @@ export default function ProposalsPage() {
     const params = {
       direction: activeTab.direction,
       ...(activeTab.status ? { status: activeTab.status } : {}),
+      ...('status_in' in activeTab && activeTab.status_in ? { status_in: activeTab.status_in } : {}),
       ...(effectiveSeason ? { date_from: effectiveSeason.start_date, date_to: effectiveSeason.end_date } : {}),
       limit: String(LIST_LIMIT),
       offset: String(pageOffset),
@@ -111,9 +112,6 @@ export default function ProposalsPage() {
       const filtered = result.data.filter((proposal) => {
         if (effectiveSeason && (proposal.proposed_date < effectiveSeason.start_date || proposal.proposed_date > effectiveSeason.end_date)) {
           return false;
-        }
-        if (tab === 'history') {
-          return proposal.status === 'declined' || proposal.status === 'cancelled';
         }
         return true;
       });
@@ -136,6 +134,7 @@ export default function ProposalsPage() {
     const params = {
       direction: activeTab.direction,
       ...(activeTab.status ? { status: activeTab.status } : {}),
+      ...('status_in' in activeTab && activeTab.status_in ? { status_in: activeTab.status_in } : {}),
       ...(effectiveSeason ? { date_from: effectiveSeason.start_date, date_to: effectiveSeason.end_date } : {}),
       limit: String(LIST_LIMIT),
       offset: String(pageOffset),
@@ -144,9 +143,6 @@ export default function ProposalsPage() {
       const filtered = result.data.filter((proposal) => {
         if (effectiveSeason && (proposal.proposed_date < effectiveSeason.start_date || proposal.proposed_date > effectiveSeason.end_date)) {
           return false;
-        }
-        if (tab === 'history') {
-          return proposal.status === 'declined' || proposal.status === 'cancelled';
         }
         return true;
       });

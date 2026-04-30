@@ -245,6 +245,7 @@ def request_reschedule(
 def list_proposals(
     team_id: str,
     status: str | None = Query(None),
+    status_in: str | None = Query(None),
     direction: str = Query("all"),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
@@ -268,7 +269,11 @@ def list_proposals(
         query = query.filter(Proposal.proposed_by_team_id == team_id)
     else:
         query = query.filter((Proposal.home_team_id == team_id) | (Proposal.away_team_id == team_id))
-    if status:
+    if status_in:
+        statuses = [item.strip() for item in status_in.split(",") if item.strip()]
+        if statuses:
+            query = query.filter(Proposal.status.in_(statuses))
+    elif status:
         query = query.filter(Proposal.status == status)
     if date_from:
         query = query.filter(Proposal.proposed_date >= date_from)

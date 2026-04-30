@@ -138,6 +138,7 @@ def test_proposal_list_returns_pagination_headers(db: Session) -> None:
     proposals = list_proposals(
         base.away_team_id,
         status=None,
+        status_in=None,
         direction="all",
         date_from=None,
         date_to=None,
@@ -152,3 +153,44 @@ def test_proposal_list_returns_pagination_headers(db: Session) -> None:
     assert response.headers["X-Total-Count"] == "1"
     assert response.headers["X-Limit"] == "1"
     assert response.headers["X-Offset"] == "0"
+
+
+def test_proposal_list_filters_multiple_statuses_before_pagination(db: Session) -> None:
+    user, base, *_ = make_setup(db)
+    context = build_authorization_context(db, user)
+    base.status = "declined"
+    db.flush()
+    accepted = Proposal(
+        home_team_id=base.home_team_id,
+        away_team_id=base.away_team_id,
+        home_availability_window_id=base.home_availability_window_id,
+        away_availability_window_id=base.away_availability_window_id,
+        event_type="league",
+        proposed_date=base.proposed_date,
+        proposed_start_time=base.proposed_start_time,
+        proposed_end_time=base.proposed_end_time,
+        status="accepted",
+        proposed_by_team_id=base.home_team_id,
+        arena_id=base.arena_id,
+        arena_rink_id=base.arena_rink_id,
+    )
+    db.add(accepted)
+    db.commit()
+    response = Response()
+
+    proposals = list_proposals(
+        base.away_team_id,
+        status=None,
+        status_in="declined,cancelled",
+        direction="all",
+        date_from=None,
+        date_to=None,
+        limit=100,
+        offset=0,
+        response=response,
+        context=context,
+        db=db,
+    )
+
+    assert [proposal.id for proposal in proposals] == [base.id]
+    assert response.headers["X-Total-Count"] == "1"
