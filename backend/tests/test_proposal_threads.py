@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 
 from app.auth.context import build_authorization_context
 from app.models import AppUser, Arena, ArenaRink, Association, AvailabilityWindow, IceSlot, Proposal, Team, TeamMembership
-from app.routers.proposals import proposal_history, request_reschedule
+from fastapi import Response
+
+from app.routers.proposals import list_proposals, proposal_history, request_reschedule
 from app.schemas import ProposalRescheduleCreate
 
 
@@ -126,3 +128,27 @@ def test_counter_proposal_creates_thread_revision_and_declines_base(db: Session)
 
     history = proposal_history(counter.id, context=context, db=db)
     assert [item.id for item in history] == [base.id, counter.id]
+
+
+def test_proposal_list_returns_pagination_headers(db: Session) -> None:
+    user, base, *_ = make_setup(db)
+    context = build_authorization_context(db, user)
+    response = Response()
+
+    proposals = list_proposals(
+        base.away_team_id,
+        status=None,
+        direction="all",
+        date_from=None,
+        date_to=None,
+        limit=1,
+        offset=0,
+        response=response,
+        context=context,
+        db=db,
+    )
+
+    assert [proposal.id for proposal in proposals] == [base.id]
+    assert response.headers["X-Total-Count"] == "1"
+    assert response.headers["X-Limit"] == "1"
+    assert response.headers["X-Offset"] == "0"
