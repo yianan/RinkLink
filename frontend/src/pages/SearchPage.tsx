@@ -151,7 +151,11 @@ export default function SearchPage() {
     let cancelled = false;
 
     Promise.all([
-      api.getAvailability(activeTeam.id),
+      api.getAvailability(activeTeam.id, {
+        status: 'open',
+        ...(effectiveSeason ? { season_id: effectiveSeason.id } : {}),
+        limit: '500',
+      }),
       api.getAutoMatches(activeTeam.id),
       api.getArenas(),
     ]).then(([availabilityData, autoMatchData, arenaData]) => {

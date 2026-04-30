@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from threading import Lock
 
 import httpx
 import jwt as pyjwt
@@ -12,6 +13,16 @@ _NEGATIVE_CACHE_SECONDS = 60
 _cached_keys: dict[str, object] = {}
 _cached_until = 0.0
 _negative_cached_until = 0.0
+_client: httpx.Client | None = None
+_client_lock = Lock()
+
+
+def _jwks_client() -> httpx.Client:
+    global _client
+    with _client_lock:
+        if _client is None:
+            _client = httpx.Client(timeout=5.0)
+        return _client
 
 
 def _refresh_jwks(*, force: bool = False) -> None:
@@ -27,7 +38,7 @@ def _refresh_jwks(*, force: bool = False) -> None:
     last_error: Exception | None = None
     for attempt in range(3):
         try:
-            response = httpx.get(settings.auth_jwks_url, timeout=5.0)
+            response = _jwks_client().get(settings.auth_jwks_url)
             response.raise_for_status()
             payload = response.json()
             keys = payload.get("keys", [])

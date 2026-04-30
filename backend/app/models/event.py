@@ -14,6 +14,11 @@ class Event(Base):
     __table_args__ = (
         Index("ix_events_home_team_date", "home_team_id", "date"),
         Index("ix_events_away_team_date", "away_team_id", "date"),
+        Index("ix_events_arena_date_status", "arena_id", "date", "status"),
+        Index("ix_events_season_date", "season_id", "date"),
+        Index("ix_events_home_window_status", "home_availability_window_id", "status"),
+        Index("ix_events_away_window_status", "away_availability_window_id", "status"),
+        Index("ix_events_ice_slot_status", "ice_slot_id", "status"),
         Index("ix_events_date", "date"),
     )
 

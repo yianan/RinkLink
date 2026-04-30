@@ -85,5 +85,6 @@ class EventOut(BaseModel):
     competition_short_name: str | None = None
     division_name: str | None = None
     attendance_summary: EventAttendanceSummary | None = None
+    schedule_warnings: list[str] = []
 
     model_config = {"from_attributes": True}

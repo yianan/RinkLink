@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from datetime import date
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..auth.context import AuthorizationContext, authorization_context, ensure_team_access
@@ -36,9 +39,45 @@ def _out(window: AvailabilityWindow, db: Session) -> AvailabilityWindowOut:
     return out
 
 
+def _outs(windows: list[AvailabilityWindow], db: Session) -> list[AvailabilityWindowOut]:
+    if not windows:
+        return []
+    window_ids = [window.id for window in windows]
+    events = (
+        db.query(Event)
+        .filter(
+            Event.status.in_(("scheduled", "confirmed", "final")),
+            or_(
+                Event.home_availability_window_id.in_(window_ids),
+                Event.away_availability_window_id.in_(window_ids),
+            ),
+        )
+        .all()
+    )
+    event_by_window_id: dict[str, str] = {}
+    for event in events:
+        if event.home_availability_window_id:
+            event_by_window_id.setdefault(event.home_availability_window_id, event.id)
+        if event.away_availability_window_id:
+            event_by_window_id.setdefault(event.away_availability_window_id, event.id)
+
+    out: list[AvailabilityWindowOut] = []
+    for window in windows:
+        item = AvailabilityWindowOut.model_validate(window)
+        item.event_id = event_by_window_id.get(window.id)
+        out.append(item)
+    return out
+
+
 @router.get("/teams/{team_id}/availability", response_model=list[AvailabilityWindowOut])
 def list_availability(
     team_id: str,
+    status: str | None = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    season_id: str | None = Query(None),
+    limit: int = 500,
+    offset: int = 0,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
@@ -46,13 +85,17 @@ def list_availability(
     if not team:
         raise HTTPException(404, "Team not found")
     ensure_team_access(context, team, "team.manage_schedule")
-    windows = (
-        db.query(AvailabilityWindow)
-        .filter(AvailabilityWindow.team_id == team_id)
-        .order_by(AvailabilityWindow.date, AvailabilityWindow.start_time)
-        .all()
-    )
-    return [_out(window, db) for window in windows]
+    query = db.query(AvailabilityWindow).filter(AvailabilityWindow.team_id == team_id)
+    if status:
+        query = query.filter(AvailabilityWindow.status == status)
+    if date_from:
+        query = query.filter(AvailabilityWindow.date >= date_from)
+    if date_to:
+        query = query.filter(AvailabilityWindow.date <= date_to)
+    if season_id:
+        query = query.filter(AvailabilityWindow.season_id == season_id)
+    windows = query.order_by(AvailabilityWindow.date, AvailabilityWindow.start_time).offset(offset).limit(limit).all()
+    return _outs(windows, db)
 
 
 @router.post("/teams/{team_id}/availability", response_model=AvailabilityWindowOut, status_code=201)
@@ -114,7 +157,7 @@ def confirm_availability_upload(
     db.commit()
     for entry in created:
         db.refresh(entry)
-    return [_out(entry, db) for entry in created]
+    return _outs(created, db)
 
 
 @router.put("/availability-windows/{availability_window_id}", response_model=AvailabilityWindowOut)

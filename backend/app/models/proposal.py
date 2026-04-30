@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, time, timezone
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -11,10 +11,28 @@ from ..database import Base
 
 class Proposal(Base):
     __tablename__ = "proposals"
+    __table_args__ = (
+        Index("ix_proposals_home_window_status", "home_availability_window_id", "status"),
+        Index("ix_proposals_away_window_status", "away_availability_window_id", "status"),
+        Index("ix_proposals_home_team_status_date", "home_team_id", "status", "proposed_date"),
+        Index("ix_proposals_away_team_status_date", "away_team_id", "status", "proposed_date"),
+        Index("ix_proposals_slot_status", "ice_slot_id", "status"),
+        Index(
+            "uq_proposals_active_pair_key",
+            "active_pair_key",
+            unique=True,
+            sqlite_where=text("status IN ('proposed', 'accepted') AND active_pair_key IS NOT NULL"),
+            postgresql_where=text("status IN ('proposed', 'accepted') AND active_pair_key IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     home_team_id: Mapped[str] = mapped_column(ForeignKey("teams.id"), nullable=False)
     away_team_id: Mapped[str] = mapped_column(ForeignKey("teams.id"), nullable=False)
+    thread_root_proposal_id: Mapped[str | None] = mapped_column(ForeignKey("proposals.id"), nullable=True, index=True)
+    parent_proposal_id: Mapped[str | None] = mapped_column(ForeignKey("proposals.id"), nullable=True, index=True)
+    revision_number: Mapped[int] = mapped_column(default=1, server_default="1")
+    active_pair_key: Mapped[str | None] = mapped_column(String(80), nullable=True)
     home_availability_window_id: Mapped[str] = mapped_column(ForeignKey("availability_windows.id"), nullable=False)
     away_availability_window_id: Mapped[str] = mapped_column(ForeignKey("availability_windows.id"), nullable=False)
     event_type: Mapped[str] = mapped_column(String(30), nullable=False)
@@ -41,6 +59,8 @@ class Proposal(Base):
 
     home_team = relationship("Team", foreign_keys=[home_team_id])
     away_team = relationship("Team", foreign_keys=[away_team_id])
+    thread_root_proposal = relationship("Proposal", remote_side=[id], foreign_keys=[thread_root_proposal_id])
+    parent_proposal = relationship("Proposal", remote_side=[id], foreign_keys=[parent_proposal_id])
     home_availability_window = relationship("AvailabilityWindow", foreign_keys=[home_availability_window_id])
     away_availability_window = relationship("AvailabilityWindow", foreign_keys=[away_availability_window_id])
     proposed_by_team = relationship("Team", foreign_keys=[proposed_by_team_id])

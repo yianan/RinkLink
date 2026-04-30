@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CalendarPlus2, Save, SendHorizontal, X, XCircle } from 'lucide-react';
-import { api } from '../api/client';
+import { CalendarPlus2, Link2, Save, SendHorizontal, X, XCircle } from 'lucide-react';
+import { api, isAbortError, type ListMeta } from '../api/client';
 import { Arena, ArenaRink, Event, IceBookingRequest, IceSlot, Team } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useSeason } from '../context/SeasonContext';
@@ -26,6 +26,7 @@ import { formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time'
 import { useToast } from '../context/ToastContext';
 
 const EVENT_TYPES: Event['event_type'][] = ['league', 'tournament', 'practice', 'showcase', 'scrimmage', 'exhibition'];
+const LIST_LIMIT = 100;
 
 function formatPriceLabel(pricingMode: string, priceAmountCents: number | null, currency = 'USD') {
   if (pricingMode === 'call_for_pricing') {
@@ -82,6 +83,8 @@ export default function EventsPage() {
   const pushToast = useToast();
   const [events, setEvents] = useState<Event[]>([]);
   const [bookingRequests, setBookingRequests] = useState<IceBookingRequest[]>([]);
+  const [eventsMeta, setEventsMeta] = useState<ListMeta>({ total: 0, limit: LIST_LIMIT, offset: 0 });
+  const [requestsMeta, setRequestsMeta] = useState<ListMeta>({ total: 0, limit: LIST_LIMIT, offset: 0 });
   const [arenas, setArenas] = useState<Arena[]>([]);
   const [arenaRinks, setArenaRinks] = useState<ArenaRink[]>([]);
   const [openIceSlots, setOpenIceSlots] = useState<IceSlot[]>([]);
@@ -92,6 +95,7 @@ export default function EventsPage() {
   const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedArenaNames, setSelectedArenaNames] = useState<string[]>([]);
+  const [pageOffset, setPageOffset] = useState(0);
 
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const todayStr = toLocalDateString(new Date());
@@ -115,16 +119,47 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
+    setPageOffset(0);
+  }, [activeTeam?.id, effectiveSeason?.id, visibleTab]);
+
+  useEffect(() => {
     if (!activeTeam) return;
+    const controller = new AbortController();
+    const eventParams: Record<string, string> = { limit: String(LIST_LIMIT), offset: String(pageOffset) };
+    if (effectiveSeason) {
+      eventParams.season_id = effectiveSeason.id;
+    }
+    if (visibleTab === 'upcoming') {
+      eventParams.date_from = todayStr;
+    } else if (visibleTab === 'past') {
+      eventParams.date_to = todayStr;
+    }
+    const requestParams: Record<string, string> = { limit: String(LIST_LIMIT), offset: String(pageOffset) };
     Promise.all([
-      api.getEvents(activeTeam.id),
-      canManageRequests ? api.getTeamIceBookingRequests(activeTeam.id) : Promise.resolve([]),
-    ]).then(([eventData, requestData]) => {
-      setEvents(eventData);
-      setBookingRequests(requestData);
+      visibleTab === 'requests'
+        ? Promise.resolve({ data: [], meta: { total: 0, limit: LIST_LIMIT, offset: 0 } })
+        : api.getEventsList(activeTeam.id, eventParams, { signal: controller.signal }),
+      canManageRequests && visibleTab === 'requests'
+        ? api.getTeamIceBookingRequestsList(activeTeam.id, requestParams, { signal: controller.signal })
+        : Promise.resolve({ data: [], meta: { total: 0, limit: LIST_LIMIT, offset: 0 } }),
+    ]).then(([eventResult, requestResult]) => {
+      setEvents(eventResult.data);
+      setEventsMeta(eventResult.meta);
+      setBookingRequests(requestResult.data);
+      setRequestsMeta(requestResult.meta);
+      setScoreEdits({});
+    }).catch((error) => {
+      if (isAbortError(error)) return;
+      setEvents([]);
+      setBookingRequests([]);
+      setEventsMeta({ total: 0, limit: LIST_LIMIT, offset: 0 });
+      setRequestsMeta({ total: 0, limit: LIST_LIMIT, offset: 0 });
       setScoreEdits({});
     });
-  }, [activeTeam, canManageRequests]);
+    return () => {
+      controller.abort();
+    };
+  }, [activeTeam, canManageRequests, effectiveSeason, pageOffset, todayStr, visibleTab]);
 
   useEffect(() => {
     if (!open || !canManageSchedule) return;
@@ -217,6 +252,25 @@ export default function EventsPage() {
     && (selectedArenaNames.length === 0 || (event.arena_name && selectedArenaNames.includes(event.arena_name)))
   ));
   const filteredRequests = visibleTab === 'requests' ? bookingRequests : [];
+  const activeMeta = visibleTab === 'requests' ? requestsMeta : eventsMeta;
+  const activeLoadedCount = visibleTab === 'requests' ? bookingRequests.length : events.length;
+  const rangeStart = activeMeta.total === 0 ? 0 : activeMeta.offset + 1;
+  const rangeEnd = Math.min(activeMeta.offset + activeLoadedCount, activeMeta.total);
+  const canGoPrevious = activeMeta.offset > 0;
+  const canGoNext = activeMeta.offset + activeMeta.limit < activeMeta.total;
+  const paginationControls = activeMeta.total > activeMeta.limit ? (
+    <div className="flex flex-col gap-2 border-t border-slate-200 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+      <div>{rangeStart}-{rangeEnd} of {activeMeta.total}</div>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={!canGoPrevious} onClick={() => setPageOffset(Math.max(0, activeMeta.offset - activeMeta.limit))}>
+          Previous
+        </Button>
+        <Button type="button" variant="outline" size="sm" disabled={!canGoNext} onClick={() => setPageOffset(activeMeta.offset + activeMeta.limit)}>
+          Next
+        </Button>
+      </div>
+    </div>
+  ) : null;
 
   const saveBookingRequest = async () => {
     const requestMessage = [
@@ -256,6 +310,12 @@ export default function EventsPage() {
     pushToast({ variant: 'success', title: 'Score saved' });
   };
 
+  const copyCalendarFeed = async () => {
+    const payload = await api.getTeamCalendarFeed(activeTeam.id);
+    await navigator.clipboard.writeText(payload.url);
+    pushToast({ variant: 'success', title: 'Calendar feed copied' });
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -273,6 +333,11 @@ export default function EventsPage() {
                 className="px-2.5 sm:px-3"
               />
             ) : null}
+            <Button type="button" variant="outline" onClick={copyCalendarFeed}>
+              <Link2 className="h-4 w-4" />
+              <span className="sm:hidden">Feed</span>
+              <span className="hidden sm:inline">Calendar Feed</span>
+            </Button>
             {canManageSchedule ? (
               <Button type="button" onClick={() => setOpen(true)}>
                 <CalendarPlus2 className="h-4 w-4" />
@@ -391,7 +456,7 @@ export default function EventsPage() {
                       const updated = await api.cancelTeamIceBookingRequest(activeTeam.id, request.id);
                       setBookingRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
                       if (request.event_id) {
-                        const updatedEvents = await api.getEvents(activeTeam.id);
+                        const updatedEvents = await api.getEvents(activeTeam.id, { limit: String(LIST_LIMIT), offset: String(pageOffset) });
                         setEvents(updatedEvents);
                       }
                       pushToast({ variant: 'success', title: 'Booking request cancelled' });
@@ -404,6 +469,7 @@ export default function EventsPage() {
               </div>
             ))}
           </div>
+          {paginationControls}
         </Card>
       ) : (
         <Card className="overflow-hidden">
@@ -466,6 +532,13 @@ export default function EventsPage() {
                           {attendanceSummaryLabel(event)}
                         </div>
                       ) : null}
+                      {event.schedule_warnings?.length ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {event.schedule_warnings.map((warning) => (
+                            <Badge key={warning} variant="warning">{warning}</Badge>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </button>
@@ -518,6 +591,7 @@ export default function EventsPage() {
             );
           })}
         </div>
+        {paginationControls}
       </Card>
       )}
 

@@ -41,6 +41,9 @@ class ProposalOut(BaseModel):
     id: str
     home_team_id: str
     away_team_id: str
+    thread_root_proposal_id: str | None
+    parent_proposal_id: str | None
+    revision_number: int
     home_availability_window_id: str
     away_availability_window_id: str
     event_type: str

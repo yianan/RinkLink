@@ -13,6 +13,15 @@ class AvailabilityWindow(Base):
     __tablename__ = "availability_windows"
     __table_args__ = (
         Index("ix_availability_team_date_status", "team_id", "date", "status"),
+        Index(
+            "ix_availability_match_lookup",
+            "date",
+            "start_time",
+            "availability_type",
+            "status",
+            "blocked",
+            "season_id",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))

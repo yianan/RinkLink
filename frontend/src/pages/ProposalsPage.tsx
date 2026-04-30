@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDownLeft, ArrowUpRight, Calendar, CalendarClock, Check, SendHorizontal, X, XCircle } from 'lucide-react';
-import { api } from '../api/client';
+import { ArrowDownLeft, ArrowUpRight, Calendar, CalendarClock, Check, History, SendHorizontal, X, XCircle } from 'lucide-react';
+import { api, isAbortError, type ListMeta } from '../api/client';
 import { Arena, ArenaRink, IceSlot, Proposal } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
@@ -27,8 +27,9 @@ const TABS = [
   { label: 'Incoming', value: 'incoming' as const, direction: 'incoming', status: 'proposed' },
   { label: 'Outgoing', value: 'outgoing' as const, direction: 'outgoing', status: 'proposed' },
   { label: 'Accepted', value: 'accepted' as const, direction: 'all', status: 'accepted' },
-  { label: 'History', value: 'history' as const, direction: 'all', status: undefined },
+  { label: 'History', value: 'history' as const, direction: 'all', status: undefined, status_in: 'declined,cancelled' },
 ] as const;
+const LIST_LIMIT = 100;
 
 const statusColors: Record<Proposal['status'], 'warning' | 'success' | 'danger' | 'neutral'> = {
   proposed: 'warning',
@@ -52,6 +53,19 @@ function proposalVenueLabel(proposal: Proposal) {
   return [venue || proposal.location_label || 'Venue TBD', slot].filter(Boolean).join(' • ');
 }
 
+function proposalTeamName(proposal: Proposal, teamId: string | null) {
+  if (!teamId) return 'Unknown team';
+  if (teamId === proposal.home_team_id) return proposal.home_team_name || 'Home team';
+  if (teamId === proposal.away_team_id) return proposal.away_team_name || 'Away team';
+  return 'Unknown team';
+}
+
+function proposalResponseLabel(proposal: Proposal) {
+  if (!proposal.responded_at) return null;
+  const actor = proposal.response_source === 'arena' ? 'Arena' : proposal.response_source === 'system' ? 'System' : 'Team';
+  return `${actor} response ${formatShortDate(proposal.responded_at)}`;
+}
+
 export default function ProposalsPage() {
   const navigate = useNavigate();
   const { activeTeam } = useTeam();
@@ -66,9 +80,13 @@ export default function ProposalsPage() {
 
   const [tab, setTab] = useState<(typeof TABS)[number]['value']>('incoming');
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [proposalMeta, setProposalMeta] = useState<ListMeta>({ total: 0, limit: LIST_LIMIT, offset: 0 });
+  const [pageOffset, setPageOffset] = useState(0);
   const [arenas, setArenas] = useState<Arena[]>([]);
   const [arenaRinks, setArenaRinks] = useState<ArenaRink[]>([]);
   const [slots, setSlots] = useState<IceSlot[]>([]);
+  const [historyProposal, setHistoryProposal] = useState<Proposal | null>(null);
+  const [historyItems, setHistoryItems] = useState<Proposal[]>([]);
   const [rescheduleProposal, setRescheduleProposal] = useState<Proposal | null>(null);
   const [rescheduleForm, setRescheduleForm] = useState({
     event_type: 'league' as Proposal['event_type'],
@@ -85,26 +103,65 @@ export default function ProposalsPage() {
     const params = {
       direction: activeTab.direction,
       ...(activeTab.status ? { status: activeTab.status } : {}),
+      ...('status_in' in activeTab && activeTab.status_in ? { status_in: activeTab.status_in } : {}),
+      ...(effectiveSeason ? { date_from: effectiveSeason.start_date, date_to: effectiveSeason.end_date } : {}),
+      limit: String(LIST_LIMIT),
+      offset: String(pageOffset),
     };
-    api.getProposals(activeTeam.id, params).then((data) => {
-      const filtered = data.filter((proposal) => {
+    api.getProposalsList(activeTeam.id, params).then((result) => {
+      const filtered = result.data.filter((proposal) => {
         if (effectiveSeason && (proposal.proposed_date < effectiveSeason.start_date || proposal.proposed_date > effectiveSeason.end_date)) {
           return false;
-        }
-        if (tab === 'history') {
-          return proposal.status === 'declined' || proposal.status === 'cancelled';
         }
         return true;
       });
       setProposals(filtered);
+      setProposalMeta(result.meta);
+    }).catch(() => {
+      setProposals([]);
+      setProposalMeta({ total: 0, limit: LIST_LIMIT, offset: 0 });
     });
-  }, [activeTeam, effectiveSeason, tab]);
+  }, [activeTeam, effectiveSeason, pageOffset, tab]);
+
+  useEffect(() => {
+    setPageOffset(0);
+  }, [activeTeam?.id, effectiveSeason?.id, tab]);
 
   useEffect(() => {
     if (!activeTeam) return;
-    load();
-    api.getArenas().then(setArenas);
-  }, [activeTeam, load]);
+    const controller = new AbortController();
+    const activeTab = TABS.find((item) => item.value === tab) || TABS[0];
+    const params = {
+      direction: activeTab.direction,
+      ...(activeTab.status ? { status: activeTab.status } : {}),
+      ...('status_in' in activeTab && activeTab.status_in ? { status_in: activeTab.status_in } : {}),
+      ...(effectiveSeason ? { date_from: effectiveSeason.start_date, date_to: effectiveSeason.end_date } : {}),
+      limit: String(LIST_LIMIT),
+      offset: String(pageOffset),
+    };
+    api.getProposalsList(activeTeam.id, params, { signal: controller.signal }).then((result) => {
+      const filtered = result.data.filter((proposal) => {
+        if (effectiveSeason && (proposal.proposed_date < effectiveSeason.start_date || proposal.proposed_date > effectiveSeason.end_date)) {
+          return false;
+        }
+        return true;
+      });
+      setProposals(filtered);
+      setProposalMeta(result.meta);
+    }).catch((error) => {
+      if (isAbortError(error)) return;
+      setProposals([]);
+      setProposalMeta({ total: 0, limit: LIST_LIMIT, offset: 0 });
+    });
+    api.getArenas().then((data) => {
+      if (!controller.signal.aborted) setArenas(data);
+    }).catch(() => {
+      if (!controller.signal.aborted) setArenas([]);
+    });
+    return () => {
+      controller.abort();
+    };
+  }, [activeTeam, effectiveSeason, pageOffset, tab]);
 
   useEffect(() => {
     if (!rescheduleForm.arena_id) return;
@@ -129,6 +186,23 @@ export default function ProposalsPage() {
       `${left.proposed_date}${left.proposed_start_time || ''}`.localeCompare(`${right.proposed_date}${right.proposed_start_time || ''}`),
     );
   }, [proposals, tab]);
+  const rangeStart = proposalMeta.total === 0 ? 0 : proposalMeta.offset + 1;
+  const rangeEnd = Math.min(proposalMeta.offset + proposals.length, proposalMeta.total);
+  const canGoPrevious = proposalMeta.offset > 0;
+  const canGoNext = proposalMeta.offset + proposalMeta.limit < proposalMeta.total;
+  const paginationControls = proposalMeta.total > proposalMeta.limit ? (
+    <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+      <div>{rangeStart}-{rangeEnd} of {proposalMeta.total}</div>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={!canGoPrevious} onClick={() => setPageOffset(Math.max(0, proposalMeta.offset - proposalMeta.limit))}>
+          Previous
+        </Button>
+        <Button type="button" variant="outline" size="sm" disabled={!canGoNext} onClick={() => setPageOffset(proposalMeta.offset + proposalMeta.limit)}>
+          Next
+        </Button>
+      </div>
+    </div>
+  ) : null;
 
   if (!activeTeam) {
     return <Alert variant="info">Select a team to review proposals.</Alert>;
@@ -177,6 +251,16 @@ export default function ProposalsPage() {
     });
   };
 
+  const openHistory = async (proposal: Proposal) => {
+    setHistoryProposal(proposal);
+    setHistoryItems([]);
+    try {
+      setHistoryItems(await api.getProposalHistory(proposal.id));
+    } catch (error) {
+      pushToast({ variant: 'error', title: 'Unable to load history', description: String(error) });
+    }
+  };
+
   const submitReschedule = async () => {
     if (!rescheduleProposal || !rescheduleForm.arena_id || !rescheduleForm.arena_rink_id) return;
     const selectedSlot = visibleSlots.find((slot) => slot.id === rescheduleForm.ice_slot_id);
@@ -215,8 +299,10 @@ export default function ProposalsPage() {
           const isIncoming = proposal.proposed_by_team_id !== activeTeam.id;
           const canRespond = proposal.status === 'proposed' && isIncoming;
           const canCancel = proposal.status === 'proposed' && !isIncoming;
-          const canReschedule = proposal.status === 'accepted';
-          const directionLabel = isIncoming ? 'Received' : 'Sent';
+          const canReschedule = proposal.status === 'accepted' || canRespond;
+          const proposerName = proposalTeamName(proposal, proposal.proposed_by_team_id);
+          const otherTeamId = proposal.home_team_id === activeTeam.id ? proposal.away_team_id : proposal.home_team_id;
+          const directionLabel = isIncoming ? `From ${proposerName}` : `To ${proposalTeamName(proposal, otherTeamId)}`;
 
           return (
             <Card key={proposal.id} className="overflow-hidden p-0">
@@ -243,6 +329,9 @@ export default function ProposalsPage() {
                             {getCompetitionLabel(proposal.event_type)}
                           </Badge>
                           <Badge variant={statusColors[proposal.status]}>{proposal.status}</Badge>
+                          {proposal.revision_number > 1 ? (
+                            <Badge variant="outline">Revision {proposal.revision_number}</Badge>
+                          ) : null}
                         </div>
                         <div className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">
                           {formatShortDate(proposal.proposed_date)} • {proposalTimeLabel(proposal)}
@@ -305,7 +394,7 @@ export default function ProposalsPage() {
                       <>
                         <Button type="button" size="sm" variant="outline" onClick={() => openReschedule(proposal)}>
                           <CalendarClock className="h-4 w-4" />
-                          Request Reschedule
+                          {proposal.status === 'proposed' ? 'Counter' : 'Request Reschedule'}
                         </Button>
                         <Button type="button" size="sm" variant="ghost" onClick={() => navigate('/schedule')}>
                           <Calendar className="h-4 w-4" />
@@ -317,6 +406,10 @@ export default function ProposalsPage() {
                         </Button>
                       </>
                     ) : null}
+                    <Button type="button" size="sm" variant="ghost" onClick={() => openHistory(proposal)}>
+                      <History className="h-4 w-4" />
+                      History
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -329,7 +422,60 @@ export default function ProposalsPage() {
             No proposals in this view. Use Find Opponents from Availability to create the next matchup request.
           </Card>
         ) : null}
+        {paginationControls}
       </div>
+
+      <Modal
+        open={!!historyProposal}
+        title="Proposal History"
+        description="Thread revisions and responses for this matchup."
+        onClose={() => {
+          setHistoryProposal(null);
+          setHistoryItems([]);
+        }}
+        className="max-w-2xl"
+      >
+        <div className="space-y-3">
+          {historyItems.map((proposal) => {
+            const responseLabel = proposalResponseLabel(proposal);
+            const parentRevision = historyItems.find((item) => item.id === proposal.parent_proposal_id)?.revision_number;
+            return (
+              <div key={proposal.id} className="rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">Revision {proposal.revision_number}</Badge>
+                    {parentRevision ? <Badge variant="neutral">Counter to {parentRevision}</Badge> : null}
+                    <Badge variant={statusColors[proposal.status]}>{proposal.status}</Badge>
+                    <Badge variant={getCompetitionBadgeVariant(proposal.event_type)}>{getCompetitionLabel(proposal.event_type)}</Badge>
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    Sent by {proposalTeamName(proposal, proposal.proposed_by_team_id)}
+                  </div>
+                </div>
+                <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {formatShortDate(proposal.proposed_date)} • {proposalTimeLabel(proposal)}
+                </div>
+                <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">{proposalVenueLabel(proposal)}</div>
+                {proposal.message ? (
+                  <div className="mt-2 text-sm text-slate-700 dark:text-slate-300">{proposal.message}</div>
+                ) : null}
+                {proposal.response_message ? (
+                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                    <span className="font-semibold">{proposal.response_source === 'arena' ? 'Arena note:' : 'Response:'}</span> {proposal.response_message}
+                  </div>
+                ) : null}
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                  <span>Created {formatShortDate(proposal.created_at)}</span>
+                  {responseLabel ? <span>{responseLabel}</span> : null}
+                </div>
+              </div>
+            );
+          })}
+          {historyItems.length === 0 ? (
+            <div className="text-sm text-slate-600 dark:text-slate-400">Loading history...</div>
+          ) : null}
+        </div>
+      </Modal>
 
       <Modal
         open={!!rescheduleProposal}

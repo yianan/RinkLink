@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useId, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -368,6 +368,7 @@ function AppContent() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(56);
+  const mobileNavDescriptionId = useId();
   const headerRef = useRef<HTMLElement | null>(null);
   const mobileNavContentRef = useRef<HTMLDivElement | null>(null);
   const mobileNavScrollRef = useRef<HTMLDivElement | null>(null);
@@ -629,6 +630,7 @@ function AppContent() {
           <DialogPrimitive.Content
             ref={mobileNavContentRef}
             aria-label="Navigation"
+            aria-describedby={mobileNavDescriptionId}
             onOpenAutoFocus={(event) => {
               event.preventDefault();
               const firstNavLink = mobileNavContentRef.current?.querySelector<HTMLAnchorElement>('nav a[href]');
@@ -647,7 +649,7 @@ function AppContent() {
                 </div>
                 <div className="min-w-0">
                   <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
-                  <DialogPrimitive.Description className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  <DialogPrimitive.Description id={mobileNavDescriptionId} className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                     RinkLink
                   </DialogPrimitive.Description>
                 </div>

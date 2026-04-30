@@ -1,7 +1,8 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, selectinload
 
 from ..auth.context import (
     AuthorizationContext,
@@ -18,9 +19,25 @@ from ..services.event_view import enrich_event
 from ..services.season_utils import resolve_season_id
 from ..services.arena_logos import arena_logo_url
 from ..services.proposal_lifecycle import book_slot, cancel_proposal_record, hold_slot, release_slot
+from ..services.schedule_conflicts import assert_no_event_conflicts
 from ..services.team_logos import effective_team_logo_url
 
 router = APIRouter(tags=["proposals"])
+
+
+PROPOSAL_LIST_OPTIONS = (
+    selectinload(Proposal.home_team).selectinload(Team.association),
+    selectinload(Proposal.away_team).selectinload(Team.association),
+    selectinload(Proposal.arena),
+    selectinload(Proposal.arena_rink),
+    selectinload(Proposal.ice_slot),
+    selectinload(Proposal.home_locker_room),
+    selectinload(Proposal.away_locker_room),
+)
+
+
+def _active_pair_key(home_window_id: str, away_window_id: str) -> str:
+    return "|".join(sorted([home_window_id, away_window_id]))
 
 def _validate_venue(
     db: Session,
@@ -85,6 +102,19 @@ def _proposal_out(proposal: Proposal, db: Session) -> ProposalOut:
     return out
 
 
+def _thread_root_id(proposal: Proposal) -> str:
+    return proposal.thread_root_proposal_id or proposal.id
+
+
+def _next_revision_number(db: Session, root_id: str) -> int:
+    revisions = (
+        db.query(Proposal.revision_number)
+        .filter((Proposal.id == root_id) | (Proposal.thread_root_proposal_id == root_id))
+        .all()
+    )
+    return max((revision for (revision,) in revisions), default=1) + 1
+
+
 def _validate_windows(db: Session, home_window_id: str, away_window_id: str):
     home_window = db.get(AvailabilityWindow, home_window_id)
     away_window = db.get(AvailabilityWindow, away_window_id)
@@ -137,7 +167,15 @@ def create_proposal(
     )
     if existing:
         raise HTTPException(409, "A proposal already exists for these availability windows")
-    proposal = Proposal(**body.model_dump())
+    assert_no_event_conflicts(
+        db,
+        team_ids={body.home_team_id, body.away_team_id},
+        event_date=body.proposed_date,
+        start_time=body.proposed_start_time,
+        end_time=body.proposed_end_time,
+        ice_slot_id=body.ice_slot_id,
+    )
+    proposal = Proposal(**body.model_dump(), active_pair_key=_active_pair_key(body.home_availability_window_id, body.away_availability_window_id))
     hold_slot(slot, body.home_team_id)
     db.add(proposal)
     db.commit()
@@ -156,7 +194,7 @@ def request_reschedule(
     if not base:
         raise HTTPException(404, "Proposal not found")
     ensure_proposal_team_access(context, base, "team.manage_proposals")
-    if base.status != "accepted":
+    if base.status not in {"accepted", "proposed"}:
         raise HTTPException(400, f"Cannot reschedule proposal with status '{base.status}'")
     _, _, slot = _validate_venue(
         db,
@@ -168,14 +206,34 @@ def request_reschedule(
         proposed_start_time=body.proposed_start_time,
         proposed_end_time=body.proposed_end_time,
     )
+    assert_no_event_conflicts(
+        db,
+        team_ids={base.home_team_id, base.away_team_id},
+        event_date=body.proposed_date,
+        start_time=body.proposed_start_time,
+        end_time=body.proposed_end_time,
+        ice_slot_id=body.ice_slot_id,
+    )
+    root_id = _thread_root_id(base)
     proposal = Proposal(
         home_team_id=base.home_team_id,
         away_team_id=base.away_team_id,
+        thread_root_proposal_id=root_id,
+        parent_proposal_id=base.id,
+        revision_number=_next_revision_number(db, root_id),
         home_availability_window_id=base.home_availability_window_id,
         away_availability_window_id=base.away_availability_window_id,
+        active_pair_key=_active_pair_key(base.home_availability_window_id, base.away_availability_window_id),
         status="proposed",
         **body.model_dump(),
     )
+    if base.status == "proposed":
+        base.status = "declined"
+        base.active_pair_key = None
+        base.response_message = "Counter-proposal sent"
+        base.response_source = "team"
+        base.responded_at = datetime.now(timezone.utc)
+        release_slot(base.ice_slot)
     hold_slot(slot, base.home_team_id)
     db.add(proposal)
     db.commit()
@@ -187,7 +245,13 @@ def request_reschedule(
 def list_proposals(
     team_id: str,
     status: str | None = Query(None),
+    status_in: str | None = Query(None),
     direction: str = Query("all"),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    response: Response = None,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
@@ -205,10 +269,50 @@ def list_proposals(
         query = query.filter(Proposal.proposed_by_team_id == team_id)
     else:
         query = query.filter((Proposal.home_team_id == team_id) | (Proposal.away_team_id == team_id))
-    if status:
+    if status_in:
+        statuses = [item.strip() for item in status_in.split(",") if item.strip()]
+        if statuses:
+            query = query.filter(Proposal.status.in_(statuses))
+    elif status:
         query = query.filter(Proposal.status == status)
-    proposals = query.order_by(Proposal.proposed_date.asc(), Proposal.proposed_start_time.asc()).all()
+    if date_from:
+        query = query.filter(Proposal.proposed_date >= date_from)
+    if date_to:
+        query = query.filter(Proposal.proposed_date <= date_to)
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Limit"] = str(limit)
+        response.headers["X-Offset"] = str(offset)
+    proposals = (
+        query.options(*PROPOSAL_LIST_OPTIONS)
+        .order_by(Proposal.proposed_date.asc(), Proposal.proposed_start_time.asc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
     return [_proposal_out(proposal, db) for proposal in proposals]
+
+
+@router.get("/proposals/{proposal_id}/history", response_model=list[ProposalOut])
+def proposal_history(
+    proposal_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    proposal = db.get(Proposal, proposal_id)
+    if not proposal:
+        raise HTTPException(404, "Proposal not found")
+    ensure_proposal_team_access(context, proposal, "team.manage_proposals")
+    root_id = _thread_root_id(proposal)
+    history = (
+        db.query(Proposal)
+        .options(*PROPOSAL_LIST_OPTIONS)
+        .filter(or_(Proposal.id == root_id, Proposal.thread_root_proposal_id == root_id))
+        .order_by(Proposal.revision_number.asc(), Proposal.created_at.asc())
+        .all()
+    )
+    return [_proposal_out(item, db) for item in history]
 
 
 @router.patch("/proposals/{proposal_id}/accept", response_model=ProposalOut)
@@ -253,6 +357,15 @@ def accept_proposal(
         "end_time": proposal.proposed_end_time,
         "notes": proposal.message,
     }
+    assert_no_event_conflicts(
+        db,
+        team_ids={proposal.home_team_id, proposal.away_team_id},
+        event_date=proposal.proposed_date,
+        start_time=proposal.proposed_start_time,
+        end_time=proposal.proposed_end_time,
+        ice_slot_id=proposal.ice_slot_id,
+        exclude_event_id=event.id if event else None,
+    )
     previous_slot_id = event.ice_slot_id if event else None
     if event:
         event.away_team_id = event_payload["away_team_id"]
@@ -305,6 +418,7 @@ def decline_proposal(
     if proposal.status != "proposed":
         raise HTTPException(400, f"Cannot decline proposal with status '{proposal.status}'")
     proposal.status = "declined"
+    proposal.active_pair_key = None
     proposal.responded_at = datetime.now(timezone.utc)
     release_slot(proposal.ice_slot)
     db.commit()

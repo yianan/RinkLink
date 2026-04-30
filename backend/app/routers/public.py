@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -11,7 +11,7 @@ from ..database import get_db
 from ..models import Association, Event, Season, Team
 from ..schemas import PublicEventOut, PublicSeasonOut, PublicTeamOut, StandingsEntry
 from ..services.competitions import memberships_for_teams
-from ..services.event_view import enrich_event
+from ..services.event_view import enrich_event, enrich_events
 from ..services.records import final_games_for_season_window
 from ..services.season_utils import ensure_standard_seasons
 from ..services.team_logos import effective_team_logo_url
@@ -85,10 +85,18 @@ def list_public_seasons(
 @router.get("/browse/teams", response_model=list[PublicTeamOut])
 def list_public_teams(
     season_id: str | None = Query(None),
+    limit: int = 500,
+    offset: int = 0,
+    response: Response = None,
     _=Depends(current_authorization_context),
     db: Session = Depends(get_db),
 ):
-    teams = db.query(Team).order_by(Team.name.asc()).all()
+    query = db.query(Team).order_by(Team.name.asc())
+    if response is not None:
+        response.headers["X-Total-Count"] = str(query.count())
+        response.headers["X-Limit"] = str(limit)
+        response.headers["X-Offset"] = str(offset)
+    teams = query.offset(offset).limit(limit).all()
     if season_id:
         memberships = memberships_for_teams(db, [team.id for team in teams], season_id)
         teams = [team for team in teams if memberships.get(team.id)]
@@ -101,6 +109,9 @@ def list_public_team_events(
     date_from: date | None = None,
     date_to: date | None = None,
     season_id: str | None = Query(None),
+    limit: int = 500,
+    offset: int = 0,
+    response: Response = None,
     _=Depends(current_authorization_context),
     db: Session = Depends(get_db),
 ):
@@ -118,7 +129,34 @@ def list_public_team_events(
         query = query.filter(Event.date <= date_to)
     if season_id:
         query = query.filter(Event.season_id == season_id)
-    return [_event_out(event, db) for event in query.order_by(Event.date.asc(), Event.start_time.asc()).all()]
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Limit"] = str(limit)
+        response.headers["X-Offset"] = str(offset)
+    return [
+        PublicEventOut(
+            id=enriched.id,
+            event_type=enriched.event_type,
+            status=enriched.status,
+            date=enriched.date,
+            start_time=enriched.start_time,
+            end_time=enriched.end_time,
+            home_team_id=enriched.home_team_id,
+            away_team_id=enriched.away_team_id,
+            home_team_name=enriched.home_team_name,
+            away_team_name=enriched.away_team_name,
+            home_team_logo_url=enriched.home_team_logo_url,
+            away_team_logo_url=enriched.away_team_logo_url,
+            arena_name=enriched.arena_name,
+            arena_rink_name=enriched.arena_rink_name,
+            location_label=enriched.location_label,
+            competition_name=enriched.competition_name,
+            competition_short_name=enriched.competition_short_name,
+            division_name=enriched.division_name,
+        )
+        for enriched in enrich_events(query.order_by(Event.date.asc(), Event.start_time.asc()).offset(offset).limit(limit).all(), db)
+    ]
 
 
 @router.get("/browse/seasons/{season_id}/standings", response_model=list[StandingsEntry])

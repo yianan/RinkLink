@@ -125,15 +125,17 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!activeTeam) return;
+    let cancelled = false;
 
     Promise.all([
-      canViewAvailabilitySummary ? api.getAvailability(activeTeam.id) : Promise.resolve([]),
-      api.getEvents(activeTeam.id, { date_from: todayStr }),
-      canViewProposalSummary ? api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }) : Promise.resolve([]),
+      canViewAvailabilitySummary ? api.getAvailability(activeTeam.id, { limit: '200' }) : Promise.resolve([]),
+      api.getEvents(activeTeam.id, { date_from: todayStr, limit: '200' }),
+      canViewProposalSummary ? api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed', limit: '100' }) : Promise.resolve([]),
       canViewIceRequestSummary ? api.getTeamIceBookingRequests(activeTeam.id, { status: 'requested' }) : Promise.resolve([]),
       familyMode || !effectiveSeason ? Promise.resolve([]) : api.getStandings(effectiveSeason.id),
       familyMode || !effectiveSeason ? Promise.resolve([]) : api.getTeamCompetitionMemberships(activeTeam.id, { season_id: effectiveSeason.id }),
     ]).then(async ([availabilityData, eventData, proposalData, requestData, standings, memberships]) => {
+      if (cancelled) return;
       setAvailability(availabilityData);
       setEvents(eventData);
       setProposals(proposalData);
@@ -154,8 +156,20 @@ export default function HomePage() {
       }
 
       const divisionStandings = await api.getCompetitionDivisionStandings(standingsMembership.competition_division_id);
+      if (cancelled) return;
       setCompetitionRecord(divisionStandings.find((entry) => entry.team_id === activeTeam.id) || null);
+    }).catch(() => {
+      if (cancelled) return;
+      setAvailability([]);
+      setEvents([]);
+      setProposals([]);
+      setBookingRequests([]);
+      setRecord(null);
+      setCompetitionRecord(null);
     });
+    return () => {
+      cancelled = true;
+    };
   }, [activeTeam, canViewAvailabilitySummary, canViewIceRequestSummary, canViewProposalSummary, effectiveSeason, familyMode, todayStr]);
 
   useEffect(() => {
