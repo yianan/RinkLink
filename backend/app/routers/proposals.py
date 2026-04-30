@@ -18,6 +18,7 @@ from ..services.event_view import enrich_event
 from ..services.season_utils import resolve_season_id
 from ..services.arena_logos import arena_logo_url
 from ..services.proposal_lifecycle import book_slot, cancel_proposal_record, hold_slot, release_slot
+from ..services.schedule_conflicts import assert_no_event_conflicts
 from ..services.team_logos import effective_team_logo_url
 
 router = APIRouter(tags=["proposals"])
@@ -137,6 +138,14 @@ def create_proposal(
     )
     if existing:
         raise HTTPException(409, "A proposal already exists for these availability windows")
+    assert_no_event_conflicts(
+        db,
+        team_ids={body.home_team_id, body.away_team_id},
+        event_date=body.proposed_date,
+        start_time=body.proposed_start_time,
+        end_time=body.proposed_end_time,
+        ice_slot_id=body.ice_slot_id,
+    )
     proposal = Proposal(**body.model_dump())
     hold_slot(slot, body.home_team_id)
     db.add(proposal)
@@ -167,6 +176,14 @@ def request_reschedule(
         proposal_date=body.proposed_date,
         proposed_start_time=body.proposed_start_time,
         proposed_end_time=body.proposed_end_time,
+    )
+    assert_no_event_conflicts(
+        db,
+        team_ids={base.home_team_id, base.away_team_id},
+        event_date=body.proposed_date,
+        start_time=body.proposed_start_time,
+        end_time=body.proposed_end_time,
+        ice_slot_id=body.ice_slot_id,
     )
     proposal = Proposal(
         home_team_id=base.home_team_id,
@@ -261,6 +278,15 @@ def accept_proposal(
         "end_time": proposal.proposed_end_time,
         "notes": proposal.message,
     }
+    assert_no_event_conflicts(
+        db,
+        team_ids={proposal.home_team_id, proposal.away_team_id},
+        event_date=proposal.proposed_date,
+        start_time=proposal.proposed_start_time,
+        end_time=proposal.proposed_end_time,
+        ice_slot_id=proposal.ice_slot_id,
+        exclude_event_id=event.id if event else None,
+    )
     previous_slot_id = event.ice_slot_id if event else None
     if event:
         event.away_team_id = event_payload["away_team_id"]

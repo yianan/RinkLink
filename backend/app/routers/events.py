@@ -34,6 +34,7 @@ from ..services.competitions import normalize_event_competition
 from ..services.event_view import enrich_event
 from ..services.locker_rooms import assign_locker_rooms, event_has_started, notify_locker_room_update
 from ..services.records import is_recordable_event, recompute_team_records
+from ..services.schedule_conflicts import assert_no_event_conflicts
 
 router = APIRouter(tags=["events"])
 ATTENDANCE_MUTATION_RATE_LIMIT = RateLimitRule(limit=60, window_seconds=60)
@@ -296,6 +297,15 @@ def update_event(
     for key, value in body.model_dump(exclude_unset=True).items():
         setattr(event, key, value)
     _validate_event_links(db, event)
+    assert_no_event_conflicts(
+        db,
+        team_ids={event.home_team_id} | ({event.away_team_id} if event.away_team_id else set()),
+        event_date=event.date,
+        start_time=event.start_time,
+        end_time=event.end_time,
+        ice_slot_id=event.ice_slot_id,
+        exclude_event_id=event.id,
+    )
     normalize_event_competition(event, db)
     if previous_slot_id != event.ice_slot_id:
         _release_slot_by_id(db, previous_slot_id)
