@@ -496,6 +496,13 @@ export default function EventsPage() {
                           {attendanceSummaryLabel(event)}
                         </div>
                       ) : null}
+                      {event.schedule_warnings?.length ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {event.schedule_warnings.map((warning) => (
+                            <Badge key={warning} variant="warning">{warning}</Badge>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </button>

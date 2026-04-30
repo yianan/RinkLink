@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from ..models import Arena, ArenaRink, Association, CompetitionDivision, Event, IceBookingRequest, LockerRoom, Proposal, Team
@@ -91,6 +93,7 @@ def enrich_events(events: list[Event], db: Session) -> list[EventOut]:
     } if division_ids else {}
 
     outputs: list[EventOut] = []
+    output_by_event_id: dict[str, EventOut] = {}
     for event in events:
         home = teams.get(event.home_team_id)
         away = teams.get(event.away_team_id) if event.away_team_id else None
@@ -133,4 +136,32 @@ def enrich_events(events: list[Event], db: Session) -> list[EventOut]:
                 out.competition_name = division.competition.name
                 out.competition_short_name = division.competition.short_name
         outputs.append(out)
+        output_by_event_id[event.id] = out
+
+    by_team_date: dict[tuple[str, object], list[Event]] = {}
+    for event in events:
+        by_team_date.setdefault((event.home_team_id, event.date), []).append(event)
+        if event.away_team_id:
+            by_team_date.setdefault((event.away_team_id, event.date), []).append(event)
+    for same_day_events in by_team_date.values():
+        ordered = sorted(same_day_events, key=lambda event: event.start_time or event.end_time or datetime.min.time())
+        for previous, current in zip(ordered, ordered[1:], strict=False):
+            if not previous.end_time or not current.start_time:
+                continue
+            gap_minutes = (
+                datetime.combine(current.date, current.start_time)
+                - datetime.combine(previous.date, previous.end_time)
+            ).total_seconds() / 60
+            if gap_minutes < 0 or gap_minutes > 180:
+                continue
+            previous_arena = arenas.get(previous.arena_id)
+            current_arena = arenas.get(current.arena_id)
+            if not previous_arena or not current_arena or previous_arena.id == current_arena.id:
+                continue
+            warning = (
+                f"Travel warning: only {int(gap_minutes)} minutes between "
+                f"{previous_arena.name} and {current_arena.name}."
+            )
+            output_by_event_id[previous.id].schedule_warnings.append(warning)
+            output_by_event_id[current.id].schedule_warnings.append(warning)
     return outputs

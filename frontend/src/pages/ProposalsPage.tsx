@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDownLeft, ArrowUpRight, Calendar, CalendarClock, Check, SendHorizontal, X, XCircle } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Calendar, CalendarClock, Check, History, SendHorizontal, X, XCircle } from 'lucide-react';
 import { api } from '../api/client';
 import { Arena, ArenaRink, IceSlot, Proposal } from '../types';
 import { useSeason } from '../context/SeasonContext';
@@ -69,6 +69,8 @@ export default function ProposalsPage() {
   const [arenas, setArenas] = useState<Arena[]>([]);
   const [arenaRinks, setArenaRinks] = useState<ArenaRink[]>([]);
   const [slots, setSlots] = useState<IceSlot[]>([]);
+  const [historyProposal, setHistoryProposal] = useState<Proposal | null>(null);
+  const [historyItems, setHistoryItems] = useState<Proposal[]>([]);
   const [rescheduleProposal, setRescheduleProposal] = useState<Proposal | null>(null);
   const [rescheduleForm, setRescheduleForm] = useState({
     event_type: 'league' as Proposal['event_type'],
@@ -206,6 +208,16 @@ export default function ProposalsPage() {
       ice_slot_id: '',
       message: proposal.message || '',
     });
+  };
+
+  const openHistory = async (proposal: Proposal) => {
+    setHistoryProposal(proposal);
+    setHistoryItems([]);
+    try {
+      setHistoryItems(await api.getProposalHistory(proposal.id));
+    } catch (error) {
+      pushToast({ variant: 'error', title: 'Unable to load history', description: String(error) });
+    }
   };
 
   const submitReschedule = async () => {
@@ -351,6 +363,10 @@ export default function ProposalsPage() {
                         </Button>
                       </>
                     ) : null}
+                    <Button type="button" size="sm" variant="ghost" onClick={() => openHistory(proposal)}>
+                      <History className="h-4 w-4" />
+                      History
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -364,6 +380,42 @@ export default function ProposalsPage() {
           </Card>
         ) : null}
       </div>
+
+      <Modal
+        open={!!historyProposal}
+        title="Proposal History"
+        description="Thread revisions and responses for this matchup."
+        onClose={() => {
+          setHistoryProposal(null);
+          setHistoryItems([]);
+        }}
+        className="max-w-2xl"
+      >
+        <div className="space-y-3">
+          {historyItems.map((proposal) => (
+            <div key={proposal.id} className="rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">Revision {proposal.revision_number}</Badge>
+                <Badge variant={statusColors[proposal.status]}>{proposal.status}</Badge>
+                <Badge variant={getCompetitionBadgeVariant(proposal.event_type)}>{getCompetitionLabel(proposal.event_type)}</Badge>
+              </div>
+              <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {formatShortDate(proposal.proposed_date)} • {proposalTimeLabel(proposal)}
+              </div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">{proposalVenueLabel(proposal)}</div>
+              {proposal.message ? (
+                <div className="mt-2 text-sm text-slate-700 dark:text-slate-300">{proposal.message}</div>
+              ) : null}
+              {proposal.response_message ? (
+                <div className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">{proposal.response_message}</div>
+              ) : null}
+            </div>
+          ))}
+          {historyItems.length === 0 ? (
+            <div className="text-sm text-slate-600 dark:text-slate-400">Loading history...</div>
+          ) : null}
+        </div>
+      </Modal>
 
       <Modal
         open={!!rescheduleProposal}

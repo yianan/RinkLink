@@ -563,6 +563,7 @@ export interface Event {
   competition_short_name: string | null;
   division_name: string | null;
   attendance_summary: EventAttendanceSummary | null;
+  schedule_warnings: string[];
 }
 
 export interface Season {
