@@ -229,6 +229,8 @@ export const api = {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').Proposal[]>(`/teams/${teamId}/proposals${qs}`);
   },
+  getProposalHistory: (id: string) =>
+    request<import('../types').Proposal[]>(`/proposals/${id}/history`),
   acceptProposal: (id: string) => request<import('../types').Proposal>(`/proposals/${id}/accept`, { method: 'PATCH' }),
   declineProposal: (id: string) => request<import('../types').Proposal>(`/proposals/${id}/decline`, { method: 'PATCH' }),
   cancelProposal: (id: string) => request<import('../types').Proposal>(`/proposals/${id}/cancel`, { method: 'PATCH' }),

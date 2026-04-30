@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..auth.context import (
@@ -86,6 +87,19 @@ def _proposal_out(proposal: Proposal, db: Session) -> ProposalOut:
     return out
 
 
+def _thread_root_id(proposal: Proposal) -> str:
+    return proposal.thread_root_proposal_id or proposal.id
+
+
+def _next_revision_number(db: Session, root_id: str) -> int:
+    revisions = (
+        db.query(Proposal.revision_number)
+        .filter((Proposal.id == root_id) | (Proposal.thread_root_proposal_id == root_id))
+        .all()
+    )
+    return max((revision for (revision,) in revisions), default=1) + 1
+
+
 def _validate_windows(db: Session, home_window_id: str, away_window_id: str):
     home_window = db.get(AvailabilityWindow, home_window_id)
     away_window = db.get(AvailabilityWindow, away_window_id)
@@ -165,7 +179,7 @@ def request_reschedule(
     if not base:
         raise HTTPException(404, "Proposal not found")
     ensure_proposal_team_access(context, base, "team.manage_proposals")
-    if base.status != "accepted":
+    if base.status not in {"accepted", "proposed"}:
         raise HTTPException(400, f"Cannot reschedule proposal with status '{base.status}'")
     _, _, slot = _validate_venue(
         db,
@@ -185,14 +199,24 @@ def request_reschedule(
         end_time=body.proposed_end_time,
         ice_slot_id=body.ice_slot_id,
     )
+    root_id = _thread_root_id(base)
     proposal = Proposal(
         home_team_id=base.home_team_id,
         away_team_id=base.away_team_id,
+        thread_root_proposal_id=root_id,
+        parent_proposal_id=base.id,
+        revision_number=_next_revision_number(db, root_id),
         home_availability_window_id=base.home_availability_window_id,
         away_availability_window_id=base.away_availability_window_id,
         status="proposed",
         **body.model_dump(),
     )
+    if base.status == "proposed":
+        base.status = "declined"
+        base.response_message = "Counter-proposal sent"
+        base.response_source = "team"
+        base.responded_at = datetime.now(timezone.utc)
+        release_slot(base.ice_slot)
     hold_slot(slot, base.home_team_id)
     db.add(proposal)
     db.commit()
@@ -234,6 +258,26 @@ def list_proposals(
         query = query.filter(Proposal.proposed_date <= date_to)
     proposals = query.order_by(Proposal.proposed_date.asc(), Proposal.proposed_start_time.asc()).offset(offset).limit(limit).all()
     return [_proposal_out(proposal, db) for proposal in proposals]
+
+
+@router.get("/proposals/{proposal_id}/history", response_model=list[ProposalOut])
+def proposal_history(
+    proposal_id: str,
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    proposal = db.get(Proposal, proposal_id)
+    if not proposal:
+        raise HTTPException(404, "Proposal not found")
+    ensure_proposal_team_access(context, proposal, "team.manage_proposals")
+    root_id = _thread_root_id(proposal)
+    history = (
+        db.query(Proposal)
+        .filter(or_(Proposal.id == root_id, Proposal.thread_root_proposal_id == root_id))
+        .order_by(Proposal.revision_number.asc(), Proposal.created_at.asc())
+        .all()
+    )
+    return [_proposal_out(item, db) for item in history]
 
 
 @router.patch("/proposals/{proposal_id}/accept", response_model=ProposalOut)

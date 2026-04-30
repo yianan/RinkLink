@@ -246,7 +246,7 @@ export default function ProposalsPage() {
           const isIncoming = proposal.proposed_by_team_id !== activeTeam.id;
           const canRespond = proposal.status === 'proposed' && isIncoming;
           const canCancel = proposal.status === 'proposed' && !isIncoming;
-          const canReschedule = proposal.status === 'accepted';
+          const canReschedule = proposal.status === 'accepted' || canRespond;
           const directionLabel = isIncoming ? 'Received' : 'Sent';
 
           return (
@@ -274,6 +274,9 @@ export default function ProposalsPage() {
                             {getCompetitionLabel(proposal.event_type)}
                           </Badge>
                           <Badge variant={statusColors[proposal.status]}>{proposal.status}</Badge>
+                          {proposal.revision_number > 1 ? (
+                            <Badge variant="outline">Revision {proposal.revision_number}</Badge>
+                          ) : null}
                         </div>
                         <div className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">
                           {formatShortDate(proposal.proposed_date)} • {proposalTimeLabel(proposal)}
@@ -336,7 +339,7 @@ export default function ProposalsPage() {
                       <>
                         <Button type="button" size="sm" variant="outline" onClick={() => openReschedule(proposal)}>
                           <CalendarClock className="h-4 w-4" />
-                          Request Reschedule
+                          {proposal.status === 'proposed' ? 'Counter' : 'Request Reschedule'}
                         </Button>
                         <Button type="button" size="sm" variant="ghost" onClick={() => navigate('/schedule')}>
                           <Calendar className="h-4 w-4" />

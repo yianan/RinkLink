@@ -388,6 +388,9 @@ export interface Proposal {
   id: string;
   home_team_id: string;
   away_team_id: string;
+  thread_root_proposal_id: string | null;
+  parent_proposal_id: string | null;
+  revision_number: number;
   home_availability_window_id: string;
   away_availability_window_id: string;
   event_type: 'league' | 'tournament' | 'practice' | 'showcase' | 'scrimmage' | 'exhibition';
