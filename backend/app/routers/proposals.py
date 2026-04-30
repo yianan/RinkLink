@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -188,6 +188,10 @@ def list_proposals(
     team_id: str,
     status: str | None = Query(None),
     direction: str = Query("all"),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    limit: int = 500,
+    offset: int = 0,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
@@ -207,7 +211,11 @@ def list_proposals(
         query = query.filter((Proposal.home_team_id == team_id) | (Proposal.away_team_id == team_id))
     if status:
         query = query.filter(Proposal.status == status)
-    proposals = query.order_by(Proposal.proposed_date.asc(), Proposal.proposed_start_time.asc()).all()
+    if date_from:
+        query = query.filter(Proposal.proposed_date >= date_from)
+    if date_to:
+        query = query.filter(Proposal.proposed_date <= date_to)
+    proposals = query.order_by(Proposal.proposed_date.asc(), Proposal.proposed_start_time.asc()).offset(offset).limit(limit).all()
     return [_proposal_out(proposal, db) for proposal in proposals]
 
 

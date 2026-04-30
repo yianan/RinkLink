@@ -136,6 +136,8 @@ def list_events(
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
     season_id: str | None = Query(None),
+    limit: int = 500,
+    offset: int = 0,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
@@ -154,7 +156,7 @@ def list_events(
     if season_id:
         query = query.filter(Event.season_id == season_id)
     enriched_events: list[EventOut] = []
-    for event in query.order_by(Event.date, Event.start_time).all():
+    for event in query.order_by(Event.date, Event.start_time).offset(offset).limit(limit).all():
         out = enrich_event(event, db)
         attach_attendance_summary(db, event, team_id, out)
         enriched_events.append(out)
@@ -167,6 +169,8 @@ def list_arena_events(
     status: str | None = Query(None),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
+    limit: int = 500,
+    offset: int = 0,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
@@ -181,7 +185,7 @@ def list_arena_events(
         query = query.filter(Event.date >= date_from)
     if date_to:
         query = query.filter(Event.date <= date_to)
-    return [enrich_event(event, db) for event in query.order_by(Event.date, Event.start_time).all()]
+    return [enrich_event(event, db) for event in query.order_by(Event.date, Event.start_time).offset(offset).limit(limit).all()]
 
 @router.get("/events/{event_id}", response_model=EventOut)
 def get_event(

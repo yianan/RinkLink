@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from datetime import date
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -70,6 +72,12 @@ def _outs(windows: list[AvailabilityWindow], db: Session) -> list[AvailabilityWi
 @router.get("/teams/{team_id}/availability", response_model=list[AvailabilityWindowOut])
 def list_availability(
     team_id: str,
+    status: str | None = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    season_id: str | None = Query(None),
+    limit: int = 500,
+    offset: int = 0,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
@@ -77,12 +85,16 @@ def list_availability(
     if not team:
         raise HTTPException(404, "Team not found")
     ensure_team_access(context, team, "team.manage_schedule")
-    windows = (
-        db.query(AvailabilityWindow)
-        .filter(AvailabilityWindow.team_id == team_id)
-        .order_by(AvailabilityWindow.date, AvailabilityWindow.start_time)
-        .all()
-    )
+    query = db.query(AvailabilityWindow).filter(AvailabilityWindow.team_id == team_id)
+    if status:
+        query = query.filter(AvailabilityWindow.status == status)
+    if date_from:
+        query = query.filter(AvailabilityWindow.date >= date_from)
+    if date_to:
+        query = query.filter(AvailabilityWindow.date <= date_to)
+    if season_id:
+        query = query.filter(AvailabilityWindow.season_id == season_id)
+    windows = query.order_by(AvailabilityWindow.date, AvailabilityWindow.start_time).offset(offset).limit(limit).all()
     return _outs(windows, db)
 
 

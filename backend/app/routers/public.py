@@ -85,10 +85,12 @@ def list_public_seasons(
 @router.get("/browse/teams", response_model=list[PublicTeamOut])
 def list_public_teams(
     season_id: str | None = Query(None),
+    limit: int = 500,
+    offset: int = 0,
     _=Depends(current_authorization_context),
     db: Session = Depends(get_db),
 ):
-    teams = db.query(Team).order_by(Team.name.asc()).all()
+    teams = db.query(Team).order_by(Team.name.asc()).offset(offset).limit(limit).all()
     if season_id:
         memberships = memberships_for_teams(db, [team.id for team in teams], season_id)
         teams = [team for team in teams if memberships.get(team.id)]
@@ -101,6 +103,8 @@ def list_public_team_events(
     date_from: date | None = None,
     date_to: date | None = None,
     season_id: str | None = Query(None),
+    limit: int = 500,
+    offset: int = 0,
     _=Depends(current_authorization_context),
     db: Session = Depends(get_db),
 ):
@@ -118,7 +122,7 @@ def list_public_team_events(
         query = query.filter(Event.date <= date_to)
     if season_id:
         query = query.filter(Event.season_id == season_id)
-    return [_event_out(event, db) for event in query.order_by(Event.date.asc(), Event.start_time.asc()).all()]
+    return [_event_out(event, db) for event in query.order_by(Event.date.asc(), Event.start_time.asc()).offset(offset).limit(limit).all()]
 
 
 @router.get("/browse/seasons/{season_id}/standings", response_model=list[StandingsEntry])

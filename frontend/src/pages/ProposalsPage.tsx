@@ -85,6 +85,8 @@ export default function ProposalsPage() {
     const params = {
       direction: activeTab.direction,
       ...(activeTab.status ? { status: activeTab.status } : {}),
+      ...(effectiveSeason ? { date_from: effectiveSeason.start_date, date_to: effectiveSeason.end_date } : {}),
+      limit: '500',
     };
     api.getProposals(activeTeam.id, params).then((data) => {
       const filtered = data.filter((proposal) => {
@@ -97,14 +99,43 @@ export default function ProposalsPage() {
         return true;
       });
       setProposals(filtered);
-    });
+    }).catch(() => setProposals([]));
   }, [activeTeam, effectiveSeason, tab]);
 
   useEffect(() => {
     if (!activeTeam) return;
-    load();
-    api.getArenas().then(setArenas);
-  }, [activeTeam, load]);
+    let cancelled = false;
+    const activeTab = TABS.find((item) => item.value === tab) || TABS[0];
+    const params = {
+      direction: activeTab.direction,
+      ...(activeTab.status ? { status: activeTab.status } : {}),
+      ...(effectiveSeason ? { date_from: effectiveSeason.start_date, date_to: effectiveSeason.end_date } : {}),
+      limit: '500',
+    };
+    api.getProposals(activeTeam.id, params).then((data) => {
+      if (cancelled) return;
+      const filtered = data.filter((proposal) => {
+        if (effectiveSeason && (proposal.proposed_date < effectiveSeason.start_date || proposal.proposed_date > effectiveSeason.end_date)) {
+          return false;
+        }
+        if (tab === 'history') {
+          return proposal.status === 'declined' || proposal.status === 'cancelled';
+        }
+        return true;
+      });
+      setProposals(filtered);
+    }).catch(() => {
+      if (!cancelled) setProposals([]);
+    });
+    api.getArenas().then((data) => {
+      if (!cancelled) setArenas(data);
+    }).catch(() => {
+      if (!cancelled) setArenas([]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTeam, effectiveSeason, tab]);
 
   useEffect(() => {
     if (!rescheduleForm.arena_id) return;

@@ -116,15 +116,34 @@ export default function EventsPage() {
 
   useEffect(() => {
     if (!activeTeam) return;
+    let cancelled = false;
+    const eventParams: Record<string, string> = { limit: '500' };
+    if (effectiveSeason) {
+      eventParams.season_id = effectiveSeason.id;
+    }
+    if (visibleTab === 'upcoming') {
+      eventParams.date_from = todayStr;
+    } else if (visibleTab === 'past') {
+      eventParams.date_to = todayStr;
+    }
     Promise.all([
-      api.getEvents(activeTeam.id),
+      api.getEvents(activeTeam.id, eventParams),
       canManageRequests ? api.getTeamIceBookingRequests(activeTeam.id) : Promise.resolve([]),
     ]).then(([eventData, requestData]) => {
+      if (cancelled) return;
       setEvents(eventData);
       setBookingRequests(requestData);
       setScoreEdits({});
+    }).catch(() => {
+      if (cancelled) return;
+      setEvents([]);
+      setBookingRequests([]);
+      setScoreEdits({});
     });
-  }, [activeTeam, canManageRequests]);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTeam, canManageRequests, effectiveSeason, todayStr, visibleTab]);
 
   useEffect(() => {
     if (!open || !canManageSchedule) return;
@@ -391,7 +410,7 @@ export default function EventsPage() {
                       const updated = await api.cancelTeamIceBookingRequest(activeTeam.id, request.id);
                       setBookingRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
                       if (request.event_id) {
-                        const updatedEvents = await api.getEvents(activeTeam.id);
+                        const updatedEvents = await api.getEvents(activeTeam.id, { limit: '500' });
                         setEvents(updatedEvents);
                       }
                       pushToast({ variant: 'success', title: 'Booking request cancelled' });
