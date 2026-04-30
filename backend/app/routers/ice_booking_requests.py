@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy.orm import Session, selectinload
 
 from ..auth.context import AuthorizationContext, authorization_context, ensure_arena_access, ensure_team_access
 from ..database import get_db
@@ -18,6 +18,18 @@ from ..services.team_logos import effective_team_logo_url
 router = APIRouter(tags=["ice-booking-requests"])
 
 
+ICE_BOOKING_REQUEST_LIST_OPTIONS = (
+    selectinload(IceBookingRequest.requester_team).selectinload(Team.association),
+    selectinload(IceBookingRequest.away_team).selectinload(Team.association),
+    selectinload(IceBookingRequest.arena),
+    selectinload(IceBookingRequest.arena_rink),
+    selectinload(IceBookingRequest.ice_slot),
+    selectinload(IceBookingRequest.event),
+    selectinload(IceBookingRequest.home_locker_room),
+    selectinload(IceBookingRequest.away_locker_room),
+)
+
+
 def _location_label(arena: Arena | None, arena_rink: ArenaRink | None) -> str | None:
     if arena and arena_rink:
         return f"{arena.name} > {arena_rink.name}"
@@ -29,9 +41,9 @@ def _location_label(arena: Arena | None, arena_rink: ArenaRink | None) -> str | 
 def _request_out(request_row: IceBookingRequest, db: Session) -> IceBookingRequestOut:
     out = IceBookingRequestOut.model_validate(request_row)
     requester = request_row.requester_team
-    requester_assoc = db.get(Association, requester.association_id) if requester else None
+    requester_assoc = requester.association if requester else None
     away_team = request_row.away_team
-    away_assoc = db.get(Association, away_team.association_id) if away_team else None
+    away_assoc = away_team.association if away_team else None
     arena = request_row.arena
     rink = request_row.arena_rink
     slot = request_row.ice_slot
@@ -104,6 +116,9 @@ def _release_slot(slot: IceSlot | None) -> None:
 def list_team_ice_booking_requests(
     team_id: str,
     status: str | None = Query(None),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    response: Response = None,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
@@ -114,7 +129,18 @@ def list_team_ice_booking_requests(
     query = db.query(IceBookingRequest).filter(IceBookingRequest.requester_team_id == team_id)
     if status:
         query = query.filter(IceBookingRequest.status == status)
-    requests = query.order_by(IceBookingRequest.created_at.desc()).all()
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Limit"] = str(limit)
+        response.headers["X-Offset"] = str(offset)
+    requests = (
+        query.options(*ICE_BOOKING_REQUEST_LIST_OPTIONS)
+        .order_by(IceBookingRequest.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
     return [_request_out(request_row, db) for request_row in requests]
 
 
@@ -167,6 +193,9 @@ def create_team_ice_booking_request(
 def list_arena_ice_booking_requests(
     arena_id: str,
     status: str | None = Query(None),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    response: Response = None,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
@@ -176,7 +205,18 @@ def list_arena_ice_booking_requests(
     query = db.query(IceBookingRequest).filter(IceBookingRequest.arena_id == arena_id)
     if status:
         query = query.filter(IceBookingRequest.status == status)
-    requests = query.order_by(IceBookingRequest.created_at.desc()).all()
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Limit"] = str(limit)
+        response.headers["X-Offset"] = str(offset)
+    requests = (
+        query.options(*ICE_BOOKING_REQUEST_LIST_OPTIONS)
+        .order_by(IceBookingRequest.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
     return [_request_out(request_row, db) for request_row in requests]
 
 

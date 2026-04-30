@@ -1,8 +1,8 @@
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..auth.context import (
     AuthorizationContext,
@@ -23,6 +23,17 @@ from ..services.schedule_conflicts import assert_no_event_conflicts
 from ..services.team_logos import effective_team_logo_url
 
 router = APIRouter(tags=["proposals"])
+
+
+PROPOSAL_LIST_OPTIONS = (
+    selectinload(Proposal.home_team).selectinload(Team.association),
+    selectinload(Proposal.away_team).selectinload(Team.association),
+    selectinload(Proposal.arena),
+    selectinload(Proposal.arena_rink),
+    selectinload(Proposal.ice_slot),
+    selectinload(Proposal.home_locker_room),
+    selectinload(Proposal.away_locker_room),
+)
 
 
 def _active_pair_key(home_window_id: str, away_window_id: str) -> str:
@@ -237,8 +248,9 @@ def list_proposals(
     direction: str = Query("all"),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
-    limit: int = 500,
-    offset: int = 0,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    response: Response = None,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
@@ -262,7 +274,18 @@ def list_proposals(
         query = query.filter(Proposal.proposed_date >= date_from)
     if date_to:
         query = query.filter(Proposal.proposed_date <= date_to)
-    proposals = query.order_by(Proposal.proposed_date.asc(), Proposal.proposed_start_time.asc()).offset(offset).limit(limit).all()
+    total = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Limit"] = str(limit)
+        response.headers["X-Offset"] = str(offset)
+    proposals = (
+        query.options(*PROPOSAL_LIST_OPTIONS)
+        .order_by(Proposal.proposed_date.asc(), Proposal.proposed_start_time.asc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
     return [_proposal_out(proposal, db) for proposal in proposals]
 
 
@@ -279,6 +302,7 @@ def proposal_history(
     root_id = _thread_root_id(proposal)
     history = (
         db.query(Proposal)
+        .options(*PROPOSAL_LIST_OPTIONS)
         .filter(or_(Proposal.id == root_id, Proposal.thread_root_proposal_id == root_id))
         .order_by(Proposal.revision_number.asc(), Proposal.created_at.asc())
         .all()
