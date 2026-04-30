@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, time, timezone
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -11,6 +11,13 @@ from ..database import Base
 
 class Proposal(Base):
     __tablename__ = "proposals"
+    __table_args__ = (
+        Index("ix_proposals_home_window_status", "home_availability_window_id", "status"),
+        Index("ix_proposals_away_window_status", "away_availability_window_id", "status"),
+        Index("ix_proposals_home_team_status_date", "home_team_id", "status", "proposed_date"),
+        Index("ix_proposals_away_team_status_date", "away_team_id", "status", "proposed_date"),
+        Index("ix_proposals_slot_status", "ice_slot_id", "status"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     home_team_id: Mapped[str] = mapped_column(ForeignKey("teams.id"), nullable=False)
