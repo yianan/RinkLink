@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CalendarPlus2, Save, SendHorizontal, X, XCircle } from 'lucide-react';
+import { CalendarPlus2, Link2, Save, SendHorizontal, X, XCircle } from 'lucide-react';
 import { api } from '../api/client';
 import { Arena, ArenaRink, Event, IceBookingRequest, IceSlot, Team } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -275,6 +275,12 @@ export default function EventsPage() {
     pushToast({ variant: 'success', title: 'Score saved' });
   };
 
+  const copyCalendarFeed = async () => {
+    const payload = await api.getTeamCalendarFeed(activeTeam.id);
+    await navigator.clipboard.writeText(payload.url);
+    pushToast({ variant: 'success', title: 'Calendar feed copied' });
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -292,6 +298,11 @@ export default function EventsPage() {
                 className="px-2.5 sm:px-3"
               />
             ) : null}
+            <Button type="button" variant="outline" onClick={copyCalendarFeed}>
+              <Link2 className="h-4 w-4" />
+              <span className="sm:hidden">Feed</span>
+              <span className="hidden sm:inline">Calendar Feed</span>
+            </Button>
             {canManageSchedule ? (
               <Button type="button" onClick={() => setOpen(true)}>
                 <CalendarPlus2 className="h-4 w-4" />

@@ -280,6 +280,8 @@ export const api = {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').Event[]>(`/teams/${teamId}/events${qs}`);
   },
+  getTeamCalendarFeed: (teamId: string) =>
+    request<{ url: string }>(`/teams/${teamId}/calendar-feed`),
   getArenaEvents: (arenaId: string, params?: Record<string, string>) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').Event[]>(`/arenas/${arenaId}/events${qs}`);

@@ -28,6 +28,7 @@ class Settings(BaseModel):
     smtp_password: str | None
     smtp_starttls: bool
     smtp_use_ssl: bool
+    calendar_token_secret: str | None
 
 
 def _load_bool(name: str, default: bool) -> bool:
@@ -121,6 +122,9 @@ def _load() -> Settings:
     smtp_password = os.getenv("SMTP_PASSWORD")
     smtp_starttls = _load_bool("SMTP_STARTTLS", True)
     smtp_use_ssl = _load_bool("SMTP_USE_SSL", False)
+    calendar_token_secret = _normalize_scalar(os.getenv("CALENDAR_TOKEN_SECRET")) or (
+        db_url if app_env == "development" else None
+    )
 
     return Settings(
         app_env=app_env,
@@ -145,6 +149,7 @@ def _load() -> Settings:
         smtp_password=smtp_password,
         smtp_starttls=smtp_starttls,
         smtp_use_ssl=smtp_use_ssl,
+        calendar_token_secret=calendar_token_secret,
     )
 
 
