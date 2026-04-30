@@ -18,32 +18,43 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("proposals", sa.Column("thread_root_proposal_id", sa.String(length=36), nullable=True))
-    op.add_column("proposals", sa.Column("parent_proposal_id", sa.String(length=36), nullable=True))
-    op.add_column("proposals", sa.Column("revision_number", sa.Integer(), server_default="1", nullable=False))
-    op.create_index("ix_proposals_thread_root_proposal_id", "proposals", ["thread_root_proposal_id"])
-    op.create_index("ix_proposals_parent_proposal_id", "proposals", ["parent_proposal_id"])
-    op.create_foreign_key(
-        "fk_proposals_thread_root_proposal_id_proposals",
-        "proposals",
-        "proposals",
-        ["thread_root_proposal_id"],
-        ["id"],
-    )
-    op.create_foreign_key(
-        "fk_proposals_parent_proposal_id_proposals",
-        "proposals",
-        "proposals",
-        ["parent_proposal_id"],
-        ["id"],
-    )
+    inspector = sa.inspect(op.get_bind())
+    columns = {column["name"] for column in inspector.get_columns("proposals")}
+    added_thread_root = False
+    added_parent = False
+    if "thread_root_proposal_id" not in columns:
+        op.add_column("proposals", sa.Column("thread_root_proposal_id", sa.String(length=36), nullable=True))
+        added_thread_root = True
+    if "parent_proposal_id" not in columns:
+        op.add_column("proposals", sa.Column("parent_proposal_id", sa.String(length=36), nullable=True))
+        added_parent = True
+    if "revision_number" not in columns:
+        op.add_column("proposals", sa.Column("revision_number", sa.Integer(), server_default="1", nullable=False))
+    op.create_index("ix_proposals_thread_root_proposal_id", "proposals", ["thread_root_proposal_id"], if_not_exists=True)
+    op.create_index("ix_proposals_parent_proposal_id", "proposals", ["parent_proposal_id"], if_not_exists=True)
+    if added_thread_root:
+        op.create_foreign_key(
+            "fk_proposals_thread_root_proposal_id_proposals",
+            "proposals",
+            "proposals",
+            ["thread_root_proposal_id"],
+            ["id"],
+        )
+    if added_parent:
+        op.create_foreign_key(
+            "fk_proposals_parent_proposal_id_proposals",
+            "proposals",
+            "proposals",
+            ["parent_proposal_id"],
+            ["id"],
+        )
 
 
 def downgrade() -> None:
     op.drop_constraint("fk_proposals_parent_proposal_id_proposals", "proposals", type_="foreignkey")
     op.drop_constraint("fk_proposals_thread_root_proposal_id_proposals", "proposals", type_="foreignkey")
-    op.drop_index("ix_proposals_parent_proposal_id", table_name="proposals")
-    op.drop_index("ix_proposals_thread_root_proposal_id", table_name="proposals")
+    op.drop_index("ix_proposals_parent_proposal_id", table_name="proposals", if_exists=True)
+    op.drop_index("ix_proposals_thread_root_proposal_id", table_name="proposals", if_exists=True)
     op.drop_column("proposals", "revision_number")
     op.drop_column("proposals", "parent_proposal_id")
     op.drop_column("proposals", "thread_root_proposal_id")
