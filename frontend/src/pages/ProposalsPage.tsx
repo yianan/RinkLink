@@ -53,6 +53,19 @@ function proposalVenueLabel(proposal: Proposal) {
   return [venue || proposal.location_label || 'Venue TBD', slot].filter(Boolean).join(' • ');
 }
 
+function proposalTeamName(proposal: Proposal, teamId: string | null) {
+  if (!teamId) return 'Unknown team';
+  if (teamId === proposal.home_team_id) return proposal.home_team_name || 'Home team';
+  if (teamId === proposal.away_team_id) return proposal.away_team_name || 'Away team';
+  return 'Unknown team';
+}
+
+function proposalResponseLabel(proposal: Proposal) {
+  if (!proposal.responded_at) return null;
+  const actor = proposal.response_source === 'arena' ? 'Arena' : proposal.response_source === 'system' ? 'System' : 'Team';
+  return `${actor} response ${formatShortDate(proposal.responded_at)}`;
+}
+
 export default function ProposalsPage() {
   const navigate = useNavigate();
   const { activeTeam } = useTeam();
@@ -292,6 +305,7 @@ export default function ProposalsPage() {
           const canCancel = proposal.status === 'proposed' && !isIncoming;
           const canReschedule = proposal.status === 'accepted' || canRespond;
           const directionLabel = isIncoming ? 'Received' : 'Sent';
+          const proposerName = proposalTeamName(proposal, proposal.proposed_by_team_id);
 
           return (
             <Card key={proposal.id} className="overflow-hidden p-0">
@@ -312,7 +326,7 @@ export default function ProposalsPage() {
                             variant={isIncoming ? 'warning' : 'info'}
                             icon={isIncoming ? <ArrowDownLeft className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
                           >
-                            {directionLabel}
+                            {directionLabel} by {proposerName}
                           </Badge>
                           <Badge variant={getCompetitionBadgeVariant(proposal.event_type)}>
                             {getCompetitionLabel(proposal.event_type)}
@@ -425,25 +439,41 @@ export default function ProposalsPage() {
         className="max-w-2xl"
       >
         <div className="space-y-3">
-          {historyItems.map((proposal) => (
-            <div key={proposal.id} className="rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-slate-800 dark:bg-slate-950/40">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">Revision {proposal.revision_number}</Badge>
-                <Badge variant={statusColors[proposal.status]}>{proposal.status}</Badge>
-                <Badge variant={getCompetitionBadgeVariant(proposal.event_type)}>{getCompetitionLabel(proposal.event_type)}</Badge>
+          {historyItems.map((proposal) => {
+            const responseLabel = proposalResponseLabel(proposal);
+            const parentRevision = historyItems.find((item) => item.id === proposal.parent_proposal_id)?.revision_number;
+            return (
+              <div key={proposal.id} className="rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">Revision {proposal.revision_number}</Badge>
+                    {parentRevision ? <Badge variant="neutral">Counter to {parentRevision}</Badge> : null}
+                    <Badge variant={statusColors[proposal.status]}>{proposal.status}</Badge>
+                    <Badge variant={getCompetitionBadgeVariant(proposal.event_type)}>{getCompetitionLabel(proposal.event_type)}</Badge>
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    Sent by {proposalTeamName(proposal, proposal.proposed_by_team_id)}
+                  </div>
+                </div>
+                <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {formatShortDate(proposal.proposed_date)} • {proposalTimeLabel(proposal)}
+                </div>
+                <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">{proposalVenueLabel(proposal)}</div>
+                {proposal.message ? (
+                  <div className="mt-2 text-sm text-slate-700 dark:text-slate-300">{proposal.message}</div>
+                ) : null}
+                {proposal.response_message ? (
+                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                    <span className="font-semibold">{proposal.response_source === 'arena' ? 'Arena note:' : 'Response:'}</span> {proposal.response_message}
+                  </div>
+                ) : null}
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                  <span>Created {formatShortDate(proposal.created_at)}</span>
+                  {responseLabel ? <span>{responseLabel}</span> : null}
+                </div>
               </div>
-              <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {formatShortDate(proposal.proposed_date)} • {proposalTimeLabel(proposal)}
-              </div>
-              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">{proposalVenueLabel(proposal)}</div>
-              {proposal.message ? (
-                <div className="mt-2 text-sm text-slate-700 dark:text-slate-300">{proposal.message}</div>
-              ) : null}
-              {proposal.response_message ? (
-                <div className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">{proposal.response_message}</div>
-              ) : null}
-            </div>
-          ))}
+            );
+          })}
           {historyItems.length === 0 ? (
             <div className="text-sm text-slate-600 dark:text-slate-400">Loading history...</div>
           ) : null}
