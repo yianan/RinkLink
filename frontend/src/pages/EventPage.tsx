@@ -1004,7 +1004,78 @@ export default function EventPage() {
                   <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
                     <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">{group.title}</div>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950/20 sm:hidden">
+                    {group.players.map((player) => {
+                      const draft = statDraft[player.id] || { goals: 0, assists: 0, shots: 0, team_id: group.teamId };
+                      const updateStat = (field: 'goals' | 'assists' | 'shots', value: string) => {
+                        setStatDraft((current) => ({
+                          ...current,
+                          [player.id]: { ...draft, team_id: group.teamId, [field]: Number(digitsOnly(value) || '0') },
+                        }));
+                      };
+                      return (
+                        <div key={player.id} className="space-y-3 px-4 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                {player.jersey_number != null ? `#${player.jersey_number} ` : ''}{player.first_name} {player.last_name}
+                              </div>
+                              {player.position ? (
+                                <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{player.position}</div>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <label className="min-w-0">
+                              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">G</span>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={String(draft.goals)}
+                                inputMode="numeric"
+                                onKeyDown={blockNonIntegerNumberKeys}
+                                onChange={(inputEvent) => updateStat('goals', inputEvent.target.value)}
+                                className="h-9 text-center"
+                              />
+                            </label>
+                            <label className="min-w-0">
+                              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">A</span>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={String(draft.assists)}
+                                inputMode="numeric"
+                                onKeyDown={blockNonIntegerNumberKeys}
+                                onChange={(inputEvent) => updateStat('assists', inputEvent.target.value)}
+                                className="h-9 text-center"
+                              />
+                            </label>
+                            <label className="min-w-0">
+                              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">SOG</span>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={String(draft.shots)}
+                                inputMode="numeric"
+                                onKeyDown={blockNonIntegerNumberKeys}
+                                onChange={(inputEvent) => updateStat('shots', inputEvent.target.value)}
+                                className="h-9 text-center"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {group.players.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-sm text-slate-600 dark:text-slate-400">
+                        No roster for this team yet.
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="hidden overflow-x-auto sm:block">
                     <table className="w-full text-left text-sm">
                       <thead className="bg-white text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-950/20 dark:text-slate-400">
                         <tr>
@@ -1350,7 +1421,7 @@ export default function EventPage() {
       ) : null}
 
       {(canEditAttendance || canScore) ? (
-        <div className="sticky bottom-4 z-20 flex justify-end">
+        <div className="flex justify-end sm:sticky sm:bottom-4 sm:z-20">
           <Card className="max-w-lg border-cyan-200/70 bg-white/95 p-3 shadow-xl backdrop-blur dark:border-cyan-900/40 dark:bg-slate-950/92" role="status" aria-live="polite">
             <div className="flex flex-wrap items-center justify-end gap-3">
               <Button type="button" onClick={handleSaveAll} aria-label="Save all event changes" disabled={!hasUnsavedChanges}>

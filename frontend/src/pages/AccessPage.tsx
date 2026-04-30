@@ -658,7 +658,7 @@ export default function AccessPage() {
 
       {canManageUsers ? (
         <Card className="p-6">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">User Access</h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
@@ -666,7 +666,7 @@ export default function AccessPage() {
                 Memberships and family links stay separate.
               </p>
             </div>
-            <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-cyan-300 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-800 shadow-sm dark:border-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-200">
+            <span className="inline-flex shrink-0 self-start whitespace-nowrap rounded-full border border-cyan-300 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-800 shadow-sm dark:border-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-200">
               Platform Admin
             </span>
           </div>
@@ -779,7 +779,7 @@ export default function AccessPage() {
       ) : null}
 
       <Card className="p-6">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Create Invite</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
@@ -788,7 +788,7 @@ export default function AccessPage() {
                 : 'Use invites for the exact account email you want linked to a team, association, arena, parent/guardian relationship, or player account.'}
             </p>
           </div>
-          <Badge variant="outline">Preferred onboarding path</Badge>
+          <Badge variant="outline" className="self-start">Preferred onboarding path</Badge>
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(15rem,1fr)_minmax(13rem,0.9fr)_minmax(13rem,0.9fr)]">

@@ -659,7 +659,7 @@ export default function AvailabilityPage() {
                     <div key={label} className="py-1.5">{label}</div>
                   ))}
               </div>
-              <div className="grid grid-cols-7 gap-2 pt-2">
+              <div className="grid grid-cols-7 gap-1 pt-2 sm:gap-2">
                 {month.days.map((day) => {
                   const dayWindows = byDate[day.date] || [];
                   const isInteractiveDay = !!effectiveSeason && day.date >= effectiveSeason.start_date && day.date <= effectiveSeason.end_date;
@@ -679,7 +679,7 @@ export default function AvailabilityPage() {
                         }
                       } : undefined}
                       className={cn(
-                        'group min-h-[7.75rem] rounded-lg border p-2 text-left text-xs transition',
+                        'group min-h-[7.75rem] min-w-0 rounded-lg border p-1 text-left text-xs transition sm:p-2',
                         isInteractiveDay && 'cursor-pointer hover:border-sky-300/80 hover:bg-sky-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60',
                         isInteractiveDay
                           ? `${daySurfaceClasses} dark:hover:border-sky-500/70 dark:hover:bg-sky-950/30`
@@ -691,60 +691,68 @@ export default function AvailabilityPage() {
                         <div className="text-[11px] font-medium text-slate-700 dark:text-slate-200">{day.date.slice(-2)}</div>
                         <div className="h-[18px] w-[18px]" aria-hidden="true" />
                       </div>
-                      <div className="space-y-1">
+                      <div className="min-w-0 space-y-1">
                         {dayWindows.slice(0, 3).map((window) => {
                           const statusLabel = getAvailabilityStatusLabel(window);
                           const toneClasses = window.availability_type === 'home'
                             ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/72 dark:text-emerald-100'
                             : 'bg-sky-100 text-sky-900 dark:bg-sky-950/72 dark:text-sky-100';
                           return (
-                            <div key={window.id} className={`rounded px-1.5 py-1.5 ${toneClasses}`}>
+                            <div key={window.id} className={`min-w-0 rounded px-1 py-1.5 sm:px-1.5 ${toneClasses}`}>
                               <div className="truncate font-medium">
-                                {window.availability_type === 'home' ? 'Home' : 'Away'}
+                                <span className="sm:hidden">{window.availability_type === 'home' ? 'H' : 'A'}</span>
+                                <span className="hidden sm:inline">{window.availability_type === 'home' ? 'Home' : 'Away'}</span>
                               </div>
                               <div className="mt-0.5 whitespace-nowrap text-[10px] leading-tight opacity-90">
                                 {formatWindowTimeCompact(window)}
                               </div>
-                              <div className="mt-1 flex flex-nowrap gap-1 text-[9px] font-medium">
+                              <div className="mt-1 grid min-w-0 gap-1 text-[9px] font-medium sm:flex sm:flex-wrap">
                                 {statusLabel === 'Open' && !window.blocked ? (
                                   <button
                                     type="button"
+                                    aria-label="Find opponent"
                                     onClick={(event) => {
                                       event.stopPropagation();
                                       navigate(`/search?availability=${window.id}&from=availability&tab=${tab}&month=${month.key}&date=${day.date}`);
                                     }}
-                                    className={`${compactChipButtonClass} px-1.5 py-0.5 text-[9px]`}
+                                    className={`${compactChipButtonClass} min-w-0 justify-center px-1 py-0.5 text-[9px] sm:px-1.5`}
                                   >
-                                    Find
+                                    <span className="sm:hidden">F</span>
+                                    <span className="hidden sm:inline">Find</span>
                                   </button>
                                 ) : null}
                                 {!window.event_id ? (
                                   <button
                                     type="button"
+                                    aria-label="Edit availability"
                                     onClick={(event) => {
                                       event.stopPropagation();
                                       openEditAvailability(window);
                                     }}
-                                    className={`${compactChipButtonClass} px-1.5 py-0.5 text-[9px]`}
+                                    className={`${compactChipButtonClass} min-w-0 justify-center px-1 py-0.5 text-[9px] sm:px-1.5`}
                                   >
-                                    Edit
+                                    <span className="sm:hidden">E</span>
+                                    <span className="hidden sm:inline">Edit</span>
                                   </button>
                                 ) : null}
                                 {window.status === 'open' || window.blocked ? (
                                   <button
                                     type="button"
+                                    aria-label={window.blocked ? 'Unblock availability' : 'Block availability'}
                                     onClick={(event) => {
                                       event.stopPropagation();
                                       toggleBlocked(window);
                                     }}
-                                    className={`${compactChipButtonClass} px-1.5 py-0.5 text-[9px]`}
+                                    className={`${compactChipButtonClass} min-w-0 justify-center px-1 py-0.5 text-[9px] sm:px-1.5`}
                                   >
-                                    {window.blocked ? 'Unblock' : 'Block'}
+                                    <span className="sm:hidden">{window.blocked ? 'U' : 'B'}</span>
+                                    <span className="hidden sm:inline">{window.blocked ? 'Unblock' : 'Block'}</span>
                                   </button>
                                 ) : null}
                                 {window.event_id ? (
                                   <button
                                     type="button"
+                                    aria-label="Open event"
                                     onClick={(event) => {
                                       event.stopPropagation();
                                       navigate(`/schedule/${window.event_id}`, {
@@ -754,9 +762,10 @@ export default function AvailabilityPage() {
                                         },
                                       });
                                     }}
-                                    className={`${compactChipButtonClass} px-1.5 py-0.5 text-[9px]`}
+                                    className={`${compactChipButtonClass} min-w-0 justify-center px-1 py-0.5 text-[9px] sm:px-1.5`}
                                   >
-                                    Open
+                                    <span className="sm:hidden">O</span>
+                                    <span className="hidden sm:inline">Open</span>
                                   </button>
                                 ) : null}
                               </div>

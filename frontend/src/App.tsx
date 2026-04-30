@@ -399,7 +399,8 @@ function AppContent() {
     if (!header) return;
 
     const updateHeight = () => {
-      setHeaderHeight(header.getBoundingClientRect().height);
+      const nextHeight = Math.ceil(header.getBoundingClientRect().height);
+      setHeaderHeight((currentHeight) => (currentHeight === nextHeight ? currentHeight : nextHeight));
     };
 
     updateHeight();
@@ -412,7 +413,7 @@ function AppContent() {
       observer.disconnect();
       window.removeEventListener('resize', updateHeight);
     };
-  }, []);
+  });
 
   const handleSignOut = async () => {
     setSigningOut(true);
