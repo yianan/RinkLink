@@ -40,7 +40,7 @@ export function Modal({
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--app-overlay)] backdrop-blur-[2px]" />
         <Dialog.Content
           ref={contentRef}
-          aria-describedby={description ? descriptionId : undefined}
+          aria-describedby={descriptionId}
           onOpenAutoFocus={(event) => {
             event.preventDefault();
             const firstFocusable = contentRef.current?.querySelector<HTMLElement>(
@@ -62,11 +62,9 @@ export function Modal({
               <Dialog.Title className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 {title}
               </Dialog.Title>
-              {description && (
-                <Dialog.Description id={descriptionId} className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                  {description}
-                </Dialog.Description>
-              )}
+              <Dialog.Description id={descriptionId} className={description ? 'mt-1 text-sm text-slate-600 dark:text-slate-400' : 'sr-only'}>
+                {description || title}
+              </Dialog.Description>
             </div>
             <Dialog.Close asChild>
               <Button
