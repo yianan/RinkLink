@@ -6,7 +6,8 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models import Arena, ArenaRink, Association, Event, IceSlot, Team
+from app.models import Arena, ArenaRink, Association, Event, IceSlot, Team, ZipCode
+from app.services.event_view import enrich_events
 from app.services.schedule_conflicts import assert_no_event_conflicts
 
 
@@ -127,3 +128,50 @@ def test_conflict_detection_blocks_reused_ice_slot(db: Session) -> None:
 
     assert exc_info.value.status_code == 409
     assert "ice slot" in exc_info.value.detail
+
+
+def test_event_enrichment_adds_distance_aware_travel_warnings(db: Session) -> None:
+    db.add_all([
+        ZipCode(zip_code="02108", city="Boston", state="MA", latitude=42.3588, longitude=-71.0707),
+        ZipCode(zip_code="01608", city="Worcester", state="MA", latitude=42.2626, longitude=-71.8023),
+    ])
+    association = make_association(db)
+    team = make_team(db, association, "Traveler")
+    opponent = make_team(db, association, "Opponent")
+    first_arena = Arena(name="Boston Arena", city="Boston", state="MA", zip_code="02108")
+    second_arena = Arena(name="Worcester Arena", city="Worcester", state="MA", zip_code="01608")
+    db.add_all([first_arena, second_arena])
+    db.flush()
+    first_rink = ArenaRink(arena_id=first_arena.id, name="Main")
+    second_rink = ArenaRink(arena_id=second_arena.id, name="Main")
+    db.add_all([first_rink, second_rink])
+    db.flush()
+    first = Event(
+        event_type="league",
+        status="scheduled",
+        home_team_id=team.id,
+        away_team_id=opponent.id,
+        arena_id=first_arena.id,
+        arena_rink_id=first_rink.id,
+        date=date(2026, 5, 2),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+    )
+    second = Event(
+        event_type="league",
+        status="scheduled",
+        home_team_id=team.id,
+        away_team_id=opponent.id,
+        arena_id=second_arena.id,
+        arena_rink_id=second_rink.id,
+        date=date(2026, 5, 2),
+        start_time=time(10, 45),
+        end_time=time(11, 45),
+    )
+    db.add_all([first, second])
+    db.flush()
+
+    enriched = enrich_events([first, second], db)
+
+    warnings = [warning for event in enriched for warning in event.schedule_warnings]
+    assert any("miles" in warning and "minutes needed" in warning for warning in warnings)

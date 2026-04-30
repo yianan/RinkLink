@@ -1,3 +1,4 @@
+import math
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -5,6 +6,7 @@ from sqlalchemy.orm import Session
 from ..models import Arena, ArenaRink, Association, CompetitionDivision, Event, IceBookingRequest, LockerRoom, Proposal, Team
 from ..schemas import EventOut
 from .arena_logos import arena_logo_url
+from .distance import get_distance
 from .team_logos import effective_team_logo_url
 
 
@@ -56,6 +58,26 @@ def enrich_event(event: Event, db: Session) -> EventOut:
             out.competition_name = event.competition_division.competition.name
             out.competition_short_name = event.competition_division.competition.short_name
     return out
+
+
+def _travel_warning(previous_arena: Arena, current_arena: Arena, gap_minutes: int, db: Session) -> str | None:
+    if previous_arena.id == current_arena.id:
+        return None
+    distance = get_distance(db, previous_arena.zip_code, current_arena.zip_code)
+    if distance is None:
+        if gap_minutes > 90:
+            return None
+        return (
+            f"Travel warning: only {gap_minutes} minutes between "
+            f"{previous_arena.name} and {current_arena.name}; distance is unavailable."
+        )
+    estimated_travel_minutes = math.ceil((distance / 35) * 60) + 30
+    if gap_minutes >= estimated_travel_minutes:
+        return None
+    return (
+        f"Travel warning: only {gap_minutes} minutes between {previous_arena.name} "
+        f"and {current_arena.name} ({distance:.1f} miles, about {estimated_travel_minutes} minutes needed)."
+    )
 
 
 def enrich_events(events: list[Event], db: Session) -> list[EventOut]:
@@ -156,12 +178,10 @@ def enrich_events(events: list[Event], db: Session) -> list[EventOut]:
                 continue
             previous_arena = arenas.get(previous.arena_id)
             current_arena = arenas.get(current.arena_id)
-            if not previous_arena or not current_arena or previous_arena.id == current_arena.id:
+            if not previous_arena or not current_arena:
                 continue
-            warning = (
-                f"Travel warning: only {int(gap_minutes)} minutes between "
-                f"{previous_arena.name} and {current_arena.name}."
-            )
-            output_by_event_id[previous.id].schedule_warnings.append(warning)
-            output_by_event_id[current.id].schedule_warnings.append(warning)
+            warning = _travel_warning(previous_arena, current_arena, int(gap_minutes), db)
+            if warning:
+                output_by_event_id[previous.id].schedule_warnings.append(warning)
+                output_by_event_id[current.id].schedule_warnings.append(warning)
     return outputs
