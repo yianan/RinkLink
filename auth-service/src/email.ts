@@ -130,15 +130,42 @@ function appFooter(frontendUrl: string): string {
   return `If you did not expect this email, you can ignore it. Manage your account at ${frontendUrl}.`;
 }
 
+export function buildFrontendVerificationUrl(verificationUrl: string, frontendUrl: string): string {
+  try {
+    const source = new URL(verificationUrl);
+    if (!source.pathname.endsWith("/verify-email")) {
+      return verificationUrl;
+    }
+
+    const token = source.searchParams.get("token");
+    if (!token) {
+      return verificationUrl;
+    }
+
+    const appUrl = new URL("/auth/verify-email", frontendUrl.replace(/\/+$/, ""));
+    appUrl.searchParams.set("token", token);
+
+    const callbackURL = source.searchParams.get("callbackURL");
+    if (callbackURL) {
+      appUrl.searchParams.set("callbackURL", callbackURL);
+    }
+
+    return appUrl.toString();
+  } catch {
+    return verificationUrl;
+  }
+}
+
 export async function sendVerificationEmail(to: string, verificationUrl: string): Promise<void> {
   const config = loadConfig();
   const frontendUrl = config?.frontendUrl || resolvePublicAppUrl();
+  const appVerificationUrl = buildFrontendVerificationUrl(verificationUrl, frontendUrl);
   const subject = "Verify your RinkLink email";
   const text = [
     "Welcome to RinkLink.",
     "",
     "Verify your email address to finish setting up your account:",
-    verificationUrl,
+    appVerificationUrl,
     "",
     "After verification, RinkLink signs you in automatically and routes you to the right next step.",
     "",
@@ -149,12 +176,12 @@ export async function sendVerificationEmail(to: string, verificationUrl: string)
       <h2 style="margin:0 0 12px">Verify your RinkLink email</h2>
       <p style="margin:0 0 16px">Welcome to RinkLink. Verify your email address to finish setting up your account.</p>
       <p style="margin:0 0 24px">
-        <a href="${verificationUrl}" style="display:inline-block;background:#0f766e;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:600">
+        <a href="${appVerificationUrl}" style="display:inline-block;background:#0f766e;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:600">
           Verify email
         </a>
       </p>
       <p style="margin:0 0 16px">If the button does not work, open this link directly:</p>
-      <p style="margin:0 0 24px"><a href="${verificationUrl}">${verificationUrl}</a></p>
+      <p style="margin:0 0 24px"><a href="${appVerificationUrl}">${appVerificationUrl}</a></p>
       <p style="margin:0;color:#475569">After verification, RinkLink signs you in automatically and routes you to the right next step.</p>
       <p style="margin:16px 0 0;color:#64748b">${appFooter(frontendUrl)}</p>
     </div>

@@ -99,7 +99,7 @@ function LegacyEventRedirect() {
 function AuthRedirectRoute() {
   const { pathname = 'sign-in' } = useParams();
 
-  if (pathname === 'settings' || pathname === 'security' || pathname === 'sign-out' || pathname === 'callback') {
+  if (pathname === 'settings' || pathname === 'security' || pathname === 'sign-out' || pathname === 'callback' || pathname === 'verify-email') {
     if (pathname === 'settings') {
       return <Navigate to="/settings" replace />;
     }
@@ -115,7 +115,7 @@ function AuthRedirectRoute() {
 function PendingAuthRedirectRoute() {
   const { pathname = 'sign-in' } = useParams();
 
-  if (pathname === 'settings' || pathname === 'security' || pathname === 'sign-out' || pathname === 'callback') {
+  if (pathname === 'settings' || pathname === 'security' || pathname === 'sign-out' || pathname === 'callback' || pathname === 'verify-email') {
     if (pathname === 'settings') {
       return <Navigate to="/settings" replace />;
     }
@@ -131,7 +131,7 @@ function PendingAuthRedirectRoute() {
 function DisabledAuthRedirectRoute() {
   const { pathname = 'sign-in' } = useParams();
 
-  if (pathname === 'settings' || pathname === 'security' || pathname === 'sign-out' || pathname === 'callback') {
+  if (pathname === 'settings' || pathname === 'security' || pathname === 'sign-out' || pathname === 'callback' || pathname === 'verify-email') {
     if (pathname === 'settings') {
       return <Navigate to="/settings" replace />;
     }

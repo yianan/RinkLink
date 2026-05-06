@@ -66,6 +66,22 @@ print(urls[0] if urls else "")
 PY
 }
 
+verification_api_url() {
+  RINKLINK_VERIFY_URL="$1" AUTH_BASE="${AUTH_BASE}" python3 <<'PY'
+import os
+import urllib.parse
+
+verify_url = os.environ["RINKLINK_VERIFY_URL"]
+auth_base = os.environ["AUTH_BASE"].rstrip("/")
+parsed = urllib.parse.urlparse(verify_url)
+query = urllib.parse.parse_qs(parsed.query)
+token = (query.get("token") or [""])[0]
+if not token:
+    raise SystemExit("verification URL is missing token")
+print(f"{auth_base}/api/auth/verify-email?{urllib.parse.urlencode({'token': token})}")
+PY
+}
+
 echo "==> ensuring auth user exists for ${EMAIL}"
 signup_response="$(
   curl -i -sS \
@@ -94,7 +110,7 @@ if [[ "${signup_status}" == "200" ]]; then
   fi
 
   echo "==> verifying email"
-  verify_response="$(curl -i -sS "${verify_url}")"
+  verify_response="$(curl -i -sS "$(verification_api_url "${verify_url}")")"
   session_cookie="$(printf '%s' "${verify_response}" | extract_cookie)"
 else
   echo "==> sign-up returned ${signup_status}, attempting sign-in instead"

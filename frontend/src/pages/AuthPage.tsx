@@ -1,11 +1,11 @@
 import { AuthView, ForgotPasswordForm, ResetPasswordForm } from '@daveyplate/better-auth-ui';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { authClient } from '../lib/auth-client';
+import { authApiBaseUrl, authClient } from '../lib/auth-client';
 import { buildAuthCallbackUrl } from '../lib/auth-routing';
 import { cn } from '../lib/cn';
 import { useToast } from '../context/ToastContext';
@@ -21,6 +21,7 @@ const allowedPathnames = new Set([
   'sign-out',
   'two-factor',
   'callback',
+  'verify-email',
 ]);
 
 function AuthCard({
@@ -127,6 +128,98 @@ function CheckEmailCard() {
             I already verified
           </Button>
         </div>
+      </div>
+    </AuthCard>
+  );
+}
+
+function localVerificationRedirect(value: string | null): string {
+  const fallback = buildAuthCallbackUrl('/pending');
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    const parsed = new URL(value, window.location.origin);
+    if (parsed.origin !== window.location.origin) {
+      return fallback;
+    }
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
+function VerifyEmailCard() {
+  const [searchParams] = useSearchParams();
+  const [status, setStatus] = useState<'verifying' | 'failed'>('verifying');
+  const [message, setMessage] = useState('Verifying your email now.');
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (started.current) {
+      return;
+    }
+    started.current = true;
+
+    const token = searchParams.get('token');
+    if (!token) {
+      setStatus('failed');
+      setMessage('This verification link is missing its token. Use the resend option from sign in.');
+      return;
+    }
+
+    const callbackURL = localVerificationRedirect(searchParams.get('callbackURL'));
+
+    void (async () => {
+      const response = await fetch(`${authApiBaseUrl}/verify-email?token=${encodeURIComponent(token)}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+      });
+
+      if (!response.ok) {
+        let detail = `${response.status}`;
+        try {
+          const payload = await response.json() as { code?: string; message?: string };
+          detail = payload.message || payload.code || detail;
+        } catch {
+          detail = await response.text();
+        }
+        throw new Error(detail);
+      }
+
+      window.location.assign(callbackURL);
+    })().catch((error) => {
+      setStatus('failed');
+      setMessage(error instanceof Error ? error.message : String(error));
+    });
+  }, [searchParams]);
+
+  return (
+    <AuthCard
+      eyebrow={status === 'verifying' ? 'Verifying email' : 'Verification failed'}
+      title={status === 'verifying' ? 'Finishing your RinkLink account' : 'Unable to verify this link'}
+      description={message}
+      footer={(
+        <RouterLink to="/auth/sign-in" className="rinklink-auth-footer-link inline-flex items-center gap-1.5">
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Back to sign in</span>
+        </RouterLink>
+      )}
+    >
+      <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
+        {status === 'verifying' ? (
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/50">
+            RinkLink will continue automatically when verification is complete.
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" onClick={() => window.location.assign('/auth/sign-in')}>
+              Return to sign in
+            </Button>
+          </div>
+        )}
       </div>
     </AuthCard>
   );
@@ -590,6 +683,7 @@ export default function AuthPage() {
   const isForgotPassword = pathname === 'forgot-password';
   const isResetPassword = pathname === 'reset-password';
   const isTwoFactor = pathname === 'two-factor';
+  const isVerifyEmail = pathname === 'verify-email';
 
   if (!allowedPathnames.has(pathname)) {
     return <Navigate to="/auth/sign-in" replace />;
@@ -611,6 +705,14 @@ export default function AuthPage() {
           cardTitle: 'Finish verifying your email',
           cardDescription: null,
         }
+      : isVerifyEmail
+        ? {
+            mastheadTitle: 'Verifying your email.',
+            mastheadSubtitle: 'RinkLink is completing the identity step and preparing your session.',
+            cardEyebrow: 'Verifying email',
+            cardTitle: 'Finishing verification',
+            cardDescription: null,
+          }
       : pathname === 'forgot-password'
         ? {
             mastheadTitle: 'Reset your password.',
@@ -674,6 +776,21 @@ export default function AuthPage() {
           copy: 'Verified users can still browse published teams, schedules, and standings while waiting on approval.',
         },
       ]
+    : isVerifyEmail
+      ? [
+          {
+            title: 'Secure handoff',
+            copy: 'The browser opens the RinkLink app first, then verification completes against the auth service behind it.',
+          },
+          {
+            title: 'Session ready',
+            copy: 'After the email check succeeds, RinkLink signs you in and continues to the right next step.',
+          },
+          {
+            title: 'Access remains scoped',
+            copy: 'Verification confirms identity; team, family, arena, and admin rights still come from explicit grants.',
+          },
+        ]
     : isForgotPassword || isResetPassword
       ? [
           {
@@ -802,6 +919,8 @@ export default function AuthPage() {
             ? <SignUpCard />
             : isCheckEmail
               ? <CheckEmailCard />
+              : isVerifyEmail
+                ? <VerifyEmailCard />
               : pathname === 'sign-in'
                 ? <SignInCard />
               : isTwoFactor

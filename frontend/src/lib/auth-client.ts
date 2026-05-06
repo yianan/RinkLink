@@ -5,7 +5,7 @@ const defaultAuthOrigin = import.meta.env.DEV
   ? 'http://localhost:3000'
   : window.location.origin;
 const authOrigin = (import.meta.env.VITE_AUTH_BASE_URL || defaultAuthOrigin).replace(/\/+$/, '');
-const authApiBaseUrl = `${authOrigin}/api/auth`;
+export const authApiBaseUrl = `${authOrigin}/api/auth`;
 const tokenRefreshSkewMs = 30_000;
 
 const authFlag = import.meta.env.VITE_AUTH_ENABLED;

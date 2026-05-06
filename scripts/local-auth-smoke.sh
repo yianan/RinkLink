@@ -61,8 +61,24 @@ if [[ -z "${verify_url}" ]]; then
   exit 1
 fi
 
+verify_api_url="$(
+  RINKLINK_VERIFY_URL="${verify_url}" AUTH_BASE="${AUTH_BASE}" python3 <<'PY'
+import os
+import urllib.parse
+
+verify_url = os.environ["RINKLINK_VERIFY_URL"]
+auth_base = os.environ["AUTH_BASE"].rstrip("/")
+parsed = urllib.parse.urlparse(verify_url)
+query = urllib.parse.parse_qs(parsed.query)
+token = (query.get("token") or [""])[0]
+if not token:
+    raise SystemExit("verification URL is missing token")
+print(f"{auth_base}/api/auth/verify-email?{urllib.parse.urlencode({'token': token})}")
+PY
+)"
+
 echo "==> verifying email"
-verify_response="$(curl -i -sS "${verify_url}")"
+verify_response="$(curl -i -sS "${verify_api_url}")"
 session_cookie="$(
   printf '%s' "${verify_response}" | python3 -c 'import re, sys; headers = sys.stdin.read(); match = re.search(r"^set-cookie:\s*(better-auth\.session_token=[^;]+)", headers, re.IGNORECASE | re.MULTILINE); print(match.group(1) if match else "")'
 )"
