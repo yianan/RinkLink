@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 from app.auth.context import build_authorization_context, can_access_team
 from app.auth.dependencies import current_user
 from app.auth import dependencies as auth_dependencies
-from app.models import AccessRequest, AppUser, Arena, Association, AssociationMembership, Invite, Player, PlayerGuardianship, Season, Team, TeamMembership
+from app.config import settings
+from app.models import AccessRequest, AppUser, Arena, ArenaMembership, Association, AssociationMembership, Invite, Player, PlayerGuardianship, Season, Team, TeamMembership
 from app.routers.access import (
+    approve_access_request,
     accept_invite,
     create_access_request,
     create_invite,
@@ -24,9 +26,10 @@ from app.routers.access import (
     revoke_user,
     restore_auth,
     restore_app_access,
+    reject_access_request,
     list_users,
 )
-from app.schemas import AccessRequestCreate, InviteCreate
+from app.schemas import AccessRequestCreate, AccessRequestDecision, InviteCreate
 from fastapi.security import HTTPAuthorizationCredentials
 
 
@@ -180,6 +183,77 @@ def test_duplicate_access_request_reuses_existing_pending_row(db: Session) -> No
     assert db.query(AccessRequest).count() == 1
 
 
+def test_team_access_request_notifies_current_reviewers(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.routers import access as access_router
+
+    association = make_association(db, "Notify Association")
+    team = make_team(db, association, "Notify Team")
+    requester = make_user(db, "requester@example.com")
+    team_admin = make_user(db, "team-admin@example.com", status="active")
+    association_admin = make_user(db, "association-admin@example.com", status="active")
+    manager = make_user(db, "manager@example.com", status="active")
+    platform_admin = make_user(db, "platform-admin@example.com", status="active")
+    platform_admin.is_platform_admin = True
+    db.add(TeamMembership(user_id=team_admin.id, team_id=team.id, role="team_admin"))
+    db.add(AssociationMembership(user_id=association_admin.id, association_id=association.id, role="association_admin"))
+    db.add(TeamMembership(user_id=manager.id, team_id=team.id, role="manager"))
+    db.commit()
+
+    sent: list[dict] = []
+    monkeypatch.setattr(access_router, "send_access_request_review_email", lambda **kwargs: sent.append(kwargs) or True)
+
+    context = build_authorization_context(db, requester)
+    create_access_request(
+        payload=AccessRequestCreate(target_type="team", target_id=team.id, notes="Need scheduler access"),
+        context=context,
+        db=db,
+        request=make_request("/api/access-requests"),
+    )
+
+    assert {email["to_email"] for email in sent} == {
+        "association-admin@example.com",
+        "platform-admin@example.com",
+        "team-admin@example.com",
+    }
+    assert "manager@example.com" not in {email["to_email"] for email in sent}
+    assert sent[0]["review_link"].endswith("/access?requestId=" + db.query(AccessRequest).one().id)
+
+
+def test_family_access_request_notifies_team_managers(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.routers import access as access_router
+
+    association = make_association(db, "Family Notify Association")
+    team = make_team(db, association, "Family Notify Team")
+    season = make_season(db)
+    player = Player(
+        team_id=team.id,
+        season_id=season.id,
+        first_name="Jordan",
+        last_name="Skater",
+        jersey_number=12,
+        position="F",
+    )
+    requester = make_user(db, "guardian-requester@example.com")
+    manager = make_user(db, "family-manager@example.com", status="active")
+    db.add(player)
+    db.add(TeamMembership(user_id=manager.id, team_id=team.id, role="manager"))
+    db.commit()
+
+    sent: list[dict] = []
+    monkeypatch.setattr(access_router, "send_access_request_review_email", lambda **kwargs: sent.append(kwargs) or True)
+
+    context = build_authorization_context(db, requester)
+    create_access_request(
+        payload=AccessRequestCreate(target_type="guardian_link", target_id=player.id, notes=None),
+        context=context,
+        db=db,
+        request=make_request("/api/access-requests"),
+    )
+
+    assert [email["to_email"] for email in sent] == ["family-manager@example.com"]
+    assert sent[0]["target_name"] == "Jordan Skater"
+
+
 def test_player_link_access_request_masks_target_name_for_requester(db: Session) -> None:
     association = make_association(db, "Masked Association")
     team = make_team(db, association, "Masked Team")
@@ -229,6 +303,80 @@ def test_existing_membership_blocks_redundant_access_request(db: Session) -> Non
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == "You already have access to this resource"
+
+
+def test_approving_access_request_emails_requester_with_app_link(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.routers import access as access_router
+
+    association = make_association(db, "Approve Association")
+    team = make_team(db, association, "Approve Team")
+    requester = make_user(db, "approve-requester@example.com")
+    admin = make_user(db, "approver@example.com", status="active")
+    db.add(TeamMembership(user_id=admin.id, team_id=team.id, role="team_admin"))
+    access_request = AccessRequest(user_id=requester.id, target_type="team", target_id=team.id, status="pending")
+    db.add(access_request)
+    db.commit()
+
+    sent: list[dict] = []
+    monkeypatch.setattr(access_router, "send_access_request_decision_email", lambda **kwargs: sent.append(kwargs) or True)
+
+    admin_context = build_authorization_context(db, admin)
+    approved = approve_access_request(
+        request_id=access_request.id,
+        payload=AccessRequestDecision(role="scheduler"),
+        context=admin_context,
+        db=db,
+        request=make_request(f"/api/access-requests/{access_request.id}/approve"),
+    )
+
+    assert approved.status == "approved"
+    assert sent == [
+        {
+            "to_email": "approve-requester@example.com",
+            "status": "approved",
+            "target_name": "Approve Team",
+            "target_type": "team",
+            "role": "scheduler",
+            "app_link": f"{settings.frontend_url.rstrip('/')}/",
+            "reviewer_email": "approver@example.com",
+        }
+    ]
+
+
+def test_rejecting_access_request_emails_requester_without_app_link(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.routers import access as access_router
+
+    arena = make_arena(db, "Reject Arena")
+    requester = make_user(db, "reject-requester@example.com")
+    admin = make_user(db, "arena-admin@example.com", status="active")
+    db.add(ArenaMembership(user_id=admin.id, arena_id=arena.id, role="arena_admin"))
+    access_request = AccessRequest(user_id=requester.id, target_type="arena", target_id=arena.id, status="pending")
+    db.add(access_request)
+    db.commit()
+
+    sent: list[dict] = []
+    monkeypatch.setattr(access_router, "send_access_request_decision_email", lambda **kwargs: sent.append(kwargs) or True)
+
+    admin_context = build_authorization_context(db, admin)
+    rejected = reject_access_request(
+        request_id=access_request.id,
+        context=admin_context,
+        db=db,
+        request=make_request(f"/api/access-requests/{access_request.id}/reject"),
+    )
+
+    assert rejected.status == "rejected"
+    assert sent == [
+        {
+            "to_email": "reject-requester@example.com",
+            "status": "rejected",
+            "target_name": "Reject Arena",
+            "target_type": "arena",
+            "role": None,
+            "app_link": None,
+            "reviewer_email": "arena-admin@example.com",
+        }
+    ]
 
 
 def test_accept_invite_activates_pending_user_membership(db: Session) -> None:

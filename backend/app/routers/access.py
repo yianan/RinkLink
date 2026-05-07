@@ -49,7 +49,7 @@ from ..schemas import (
     UserAccessSummaryOut,
     UserAuditEntryOut,
 )
-from ..services.email import send_invite_email
+from ..services.email import send_access_request_decision_email, send_access_request_review_email, send_invite_email
 from ..config import settings
 
 router = APIRouter(tags=["auth"])
@@ -99,6 +99,24 @@ def _build_target_summary(target_type: str, target) -> AccessTargetOut:
     if target_type == "player_link":
         context = f"{team_name} · Player access" if team_name else "Player access"
     return AccessTargetOut(type=target_type, id=target.id, name=player_name, context=context)
+
+
+def _app_url(path: str) -> str:
+    return f"{settings.frontend_url.rstrip('/')}/{path.lstrip('/')}"
+
+
+def _access_request_review_link(access_request: AccessRequest) -> str:
+    return _app_url(f"/access?requestId={access_request.id}")
+
+
+def _access_request_target_link(target_type: str, target) -> str:
+    if target_type == "arena":
+        return _app_url(f"/arenas/{target.id}")
+    if target_type in {"team", "guardian_link", "player_link"}:
+        return _app_url("/")
+    if target_type == "association":
+        return _app_url("/associations")
+    return _app_url("/")
 
 
 def _masked_player_name(target) -> str:
@@ -423,6 +441,134 @@ def _manageable_scope_ids(context: AuthorizationContext, db: Session) -> tuple[s
         for player in db.query(Player).filter(Player.team_id.in_(team_manage_roster_ids)).all()
     } if team_manage_roster_ids else set()
     return association_manage_ids, team_manage_staff_ids, arena_manage_ids, manageable_player_ids
+
+
+def _active_user_query(db: Session):
+    return db.query(AppUser).filter(
+        AppUser.status == "active",
+        AppUser.access_state == "active",
+        AppUser.auth_state == "active",
+    )
+
+
+def _access_request_reviewer_emails(db: Session, *, target_type: str, target, requester_user_id: str) -> list[str]:
+    users_by_email: dict[str, AppUser] = {}
+
+    def add_users(users: list[AppUser]) -> None:
+        for user in users:
+            if user.id == requester_user_id:
+                continue
+            users_by_email[_normalize_email(user.email)] = user
+
+    add_users(_active_user_query(db).filter(AppUser.is_platform_admin.is_(True)).all())
+
+    if target_type == "association":
+        add_users(
+            _active_user_query(db)
+            .join(AssociationMembership, AssociationMembership.user_id == AppUser.id)
+            .filter(
+                AssociationMembership.association_id == target.id,
+                AssociationMembership.role.in_(ASSOCIATION_ROLES),
+            )
+            .all()
+        )
+    elif target_type == "team":
+        add_users(
+            _active_user_query(db)
+            .join(TeamMembership, TeamMembership.user_id == AppUser.id)
+            .filter(
+                TeamMembership.team_id == target.id,
+                TeamMembership.role == "team_admin",
+            )
+            .all()
+        )
+        add_users(
+            _active_user_query(db)
+            .join(AssociationMembership, AssociationMembership.user_id == AppUser.id)
+            .filter(
+                AssociationMembership.association_id == target.association_id,
+                AssociationMembership.role.in_(ASSOCIATION_ROLES),
+            )
+            .all()
+        )
+    elif target_type == "arena":
+        add_users(
+            _active_user_query(db)
+            .join(ArenaMembership, ArenaMembership.user_id == AppUser.id)
+            .filter(
+                ArenaMembership.arena_id == target.id,
+                ArenaMembership.role == "arena_admin",
+            )
+            .all()
+        )
+    elif target_type in {"guardian_link", "player_link"}:
+        add_users(
+            _active_user_query(db)
+            .join(TeamMembership, TeamMembership.user_id == AppUser.id)
+            .filter(
+                TeamMembership.team_id == target.team_id,
+                TeamMembership.role.in_(("team_admin", "manager")),
+            )
+            .all()
+        )
+        if target.team is not None:
+            add_users(
+                _active_user_query(db)
+                .join(AssociationMembership, AssociationMembership.user_id == AppUser.id)
+                .filter(
+                    AssociationMembership.association_id == target.team.association_id,
+                    AssociationMembership.role.in_(ASSOCIATION_ROLES),
+                )
+                .all()
+            )
+
+    return sorted(users_by_email.keys())
+
+
+def _notify_access_request_reviewers(db: Session, *, access_request: AccessRequest, target, requester: AppUser) -> None:
+    target_summary = _build_target_summary(access_request.target_type, target)
+    review_link = _access_request_review_link(access_request)
+    for reviewer_email in _access_request_reviewer_emails(
+        db,
+        target_type=access_request.target_type,
+        target=target,
+        requester_user_id=requester.id,
+    ):
+        try:
+            send_access_request_review_email(
+                to_email=reviewer_email,
+                requester_email=requester.email,
+                target_name=target_summary.name,
+                target_type=access_request.target_type,
+                notes=access_request.notes,
+                review_link=review_link,
+            )
+        except Exception:
+            logger.exception("Failed to send access request review email for request %s to %s", access_request.id, reviewer_email)
+
+
+def _notify_access_request_decision(
+    *,
+    access_request: AccessRequest,
+    target,
+    requester: AppUser,
+    reviewer: AppUser,
+    role: str | None = None,
+) -> None:
+    target_summary = _build_target_summary(access_request.target_type, target)
+    app_link = _access_request_target_link(access_request.target_type, target) if access_request.status == "approved" else None
+    try:
+        send_access_request_decision_email(
+            to_email=requester.email,
+            status=access_request.status,
+            target_name=target_summary.name,
+            target_type=access_request.target_type,
+            role=role,
+            app_link=app_link,
+            reviewer_email=reviewer.email,
+        )
+    except Exception:
+        logger.exception("Failed to send access request decision email for request %s", access_request.id)
 
 
 def _build_access_target_search_query(search: str) -> str:
@@ -838,6 +984,7 @@ def create_access_request(
     )
     db.commit()
     db.refresh(access_request)
+    _notify_access_request_reviewers(db, access_request=access_request, target=target, requester=context.user)
     return _access_request_out(db, access_request, mask_private_target=True)
 
 
@@ -887,6 +1034,13 @@ def approve_access_request(
     )
     db.commit()
     db.refresh(access_request)
+    _notify_access_request_decision(
+        access_request=access_request,
+        target=target,
+        requester=user,
+        reviewer=context.user,
+        role=payload.role,
+    )
     return _access_request_out(db, access_request)
 
 
@@ -920,6 +1074,14 @@ def reject_access_request(
     )
     db.commit()
     db.refresh(access_request)
+    requester = db.get(AppUser, access_request.user_id)
+    if requester is not None:
+        _notify_access_request_decision(
+            access_request=access_request,
+            target=target,
+            requester=requester,
+            reviewer=context.user,
+        )
     return _access_request_out(db, access_request)
 
 
