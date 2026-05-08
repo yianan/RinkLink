@@ -242,6 +242,9 @@ Current cloud shape:
 | `AUTH_AUDIENCE` | `rinklink-api` | JWT audience expected by FastAPI |
 | `EMAIL_FROM_ADDRESS` | `no-reply@example.com` | Verified Brevo sender address |
 | `BREVO_API_KEY` | `xkeysib-...` | Brevo API key for transactional email |
+| `RINKLINK_BOOTSTRAP_ADMIN_EMAIL` | `admin@example.com` | Optional startup admin account to create/promote |
+| `RINKLINK_BOOTSTRAP_ADMIN_PASSWORD` | generated strong password | Required when `RINKLINK_BOOTSTRAP_ADMIN_EMAIL` is set |
+| `RINKLINK_BOOTSTRAP_ADMIN_NAME` | `RinkLink Admin` | Display name for the startup admin account |
 
 ### Render + Neon deployment
 
@@ -294,6 +297,12 @@ status and platform-admin flags, run:
 ```bash
 python -m app.seed.bootstrap_demo --preserve-existing-users
 ```
+
+The single-service Docker startup script also creates or repairs a permanent
+platform admin when `RINKLINK_BOOTSTRAP_ADMIN_EMAIL` and
+`RINKLINK_BOOTSTRAP_ADMIN_PASSWORD` are set. It creates the Better Auth user if
+needed, marks the email verified, and ensures the matching `app_users` row is
+`active` and `platform_admin`.
 
 The single-service Docker startup script also honors
 `RESEED_DEMO_ON_START=true`, optionally guarded with

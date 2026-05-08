@@ -40,6 +40,7 @@ export PUBLIC_APP_URL AUTH_INTERNAL_BASE_URL AUTH_SERVICE_HOST AUTH_SERVICE_PORT
 cd /app/auth-service
 node dist/ensure-auth-schema.js
 npm run auth:migrate:compiled:yes
+node dist/bootstrap-admin.js
 PORT="$AUTH_SERVICE_PORT" node dist/index.js &
 AUTH_PID=$!
 
