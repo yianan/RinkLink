@@ -3,21 +3,102 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..auth.context import AuthorizationContext, authorization_context, can_access_team
 from ..database import get_db
-from ..models import Team
-from ..schemas import TeamDashboardSummaryOut
-from ..services.competitions import division_standings
+from ..models import Association, Event, IceBookingRequest, Proposal, Season, Team
+from ..schemas import StandingsEntry, TeamDashboardSummaryOut
+from ..services.competitions import list_team_memberships
+from ..services.records import compute_team_record
+from ..services.team_logos import effective_team_logo_url
 from .availability import list_availability
-from .competitions import get_team_competition_memberships
 from .events import list_events
-from .ice_booking_requests import list_team_ice_booking_requests
-from .proposals import list_proposals
-from .seasons import get_standings
+from .ice_booking_requests import ICE_BOOKING_REQUEST_LIST_OPTIONS, _request_out
+from .proposals import PROPOSAL_LIST_OPTIONS, _proposal_out
 
 router = APIRouter(tags=["dashboard"])
+
+
+def _record_entry(db: Session, team: Team, games: list[Event]) -> StandingsEntry:
+    wins, losses, ties = compute_team_record(team.id, games)
+    games_played = wins + losses + ties
+    association = team.association or db.get(Association, team.association_id)
+    return StandingsEntry(
+        team_id=team.id,
+        team_name=team.name,
+        logo_url=effective_team_logo_url(team, association),
+        association_name=association.name if association else None,
+        age_group=team.age_group,
+        level=team.level,
+        wins=wins,
+        losses=losses,
+        ties=ties,
+        points=2 * wins + ties,
+        games_played=games_played,
+    )
+
+
+def _team_season_record(db: Session, team: Team, season: Season) -> StandingsEntry:
+    games = (
+        db.query(Event)
+        .filter(
+            or_(Event.home_team_id == team.id, Event.away_team_id == team.id),
+            Event.event_type == "league",
+            Event.status == "final",
+            Event.home_score.isnot(None),
+            Event.away_score.isnot(None),
+            Event.date >= season.start_date,
+            Event.date <= season.end_date,
+        )
+        .all()
+    )
+    return _record_entry(db, team, games)
+
+
+def _team_division_record(db: Session, team: Team, division_id: str) -> StandingsEntry:
+    games = (
+        db.query(Event)
+        .filter(
+            Event.competition_division_id == division_id,
+            Event.counts_for_standings == True,  # noqa: E712
+            Event.status == "final",
+            Event.home_score.isnot(None),
+            Event.away_score.isnot(None),
+            or_(Event.home_team_id == team.id, Event.away_team_id == team.id),
+        )
+        .all()
+    )
+    return _record_entry(db, team, games)
+
+
+def _incoming_proposals(db: Session, team_id: str):
+    proposals = (
+        db.query(Proposal)
+        .options(*PROPOSAL_LIST_OPTIONS)
+        .filter(
+            ((Proposal.home_team_id == team_id) | (Proposal.away_team_id == team_id)),
+            Proposal.proposed_by_team_id != team_id,
+            Proposal.status == "proposed",
+        )
+        .order_by(Proposal.proposed_date.asc(), Proposal.proposed_start_time.asc())
+        .limit(100)
+        .all()
+    )
+    return [_proposal_out(proposal, db) for proposal in proposals]
+
+
+def _requested_booking_requests(db: Session, team_id: str):
+    requests = (
+        db.query(IceBookingRequest)
+        .options(*ICE_BOOKING_REQUEST_LIST_OPTIONS)
+        .filter(IceBookingRequest.requester_team_id == team_id, IceBookingRequest.status == "requested")
+        .order_by(IceBookingRequest.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    return [_request_out(request_row, db) for request_row in requests]
 
 
 @router.get("/teams/{team_id}/dashboard-summary", response_model=TeamDashboardSummaryOut)
@@ -73,32 +154,12 @@ def get_team_dashboard_summary(
         db=db,
     )
     proposals = (
-        list_proposals(
-            team_id=team_id,
-            status="proposed",
-            status_in=None,
-            direction="incoming",
-            date_from=None,
-            date_to=None,
-            limit=100,
-            offset=0,
-            response=None,
-            context=context,
-            db=db,
-        )
+        _incoming_proposals(db, team_id)
         if can_manage_proposals
         else []
     )
     booking_requests = (
-        list_team_ice_booking_requests(
-            team_id=team_id,
-            status="requested",
-            limit=100,
-            offset=0,
-            response=None,
-            context=context,
-            db=db,
-        )
+        _requested_booking_requests(db, team_id)
         if can_manage_schedule
         else []
     )
@@ -107,24 +168,18 @@ def get_team_dashboard_summary(
     competition_record = None
     primary_membership = None
     if season_id and not family_mode:
-        standings = get_standings(
-            id=season_id,
-            association_id=None,
-            age_group=None,
-            level=None,
-            db=db,
-        )
-        record = next((entry for entry in standings if entry.team_id == team_id), None)
+        season = db.get(Season, season_id)
+        if season:
+            record = _team_season_record(db, team, season)
 
-        memberships = get_team_competition_memberships(team_id=team_id, season_id=season_id, context=context, db=db)
+        memberships = list_team_memberships(db, team_id, season_id)
         primary_membership = next((membership for membership in memberships if membership.is_primary), None) or (memberships[0] if memberships else None)
         standings_membership = (
             next((membership for membership in memberships if membership.is_primary and membership.standings_enabled), None)
             or next((membership for membership in memberships if membership.standings_enabled), None)
         )
         if standings_membership:
-            division_entries = division_standings(db, standings_membership.competition_division_id)
-            competition_record = next((entry for entry in division_entries if entry.team_id == team_id), None)
+            competition_record = _team_division_record(db, team, standings_membership.competition_division_id)
 
     return TeamDashboardSummaryOut(
         availability=availability,
