@@ -7,6 +7,7 @@ const defaultAuthOrigin = import.meta.env.DEV
 const authOrigin = (import.meta.env.VITE_AUTH_BASE_URL || defaultAuthOrigin).replace(/\/+$/, '');
 export const authApiBaseUrl = `${authOrigin}/api/auth`;
 const tokenRefreshSkewMs = 30_000;
+const tokenStorageKey = 'rinklink.apiToken';
 
 const authFlag = import.meta.env.VITE_AUTH_ENABLED;
 
@@ -33,16 +34,56 @@ function parseJwtExpiration(token: string): number {
   try {
     const [, payload] = token.split('.');
     if (!payload) return 0;
-    const decoded = JSON.parse(window.atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedPayload = normalizedPayload.padEnd(normalizedPayload.length + ((4 - normalizedPayload.length % 4) % 4), '=');
+    const decoded = JSON.parse(window.atob(paddedPayload));
     return typeof decoded.exp === 'number' ? decoded.exp * 1000 : 0;
   } catch {
     return 0;
   }
 }
 
+function cacheApiAccessToken(token: string) {
+  cachedApiToken = token;
+  cachedApiTokenExpiresAt = parseJwtExpiration(token);
+  try {
+    window.sessionStorage.setItem(tokenStorageKey, JSON.stringify({
+      token,
+      expiresAt: cachedApiTokenExpiresAt,
+    }));
+  } catch {
+    // Session storage is an optimization only; the memory cache still works.
+  }
+}
+
+function loadStoredApiAccessToken(now: number): string | null {
+  if (cachedApiToken && cachedApiTokenExpiresAt > now + tokenRefreshSkewMs) {
+    return cachedApiToken;
+  }
+  try {
+    const stored = window.sessionStorage.getItem(tokenStorageKey);
+    if (!stored) return null;
+    const payload = JSON.parse(stored) as { token?: string; expiresAt?: number };
+    if (!payload.token || !payload.expiresAt || payload.expiresAt <= now + tokenRefreshSkewMs) {
+      window.sessionStorage.removeItem(tokenStorageKey);
+      return null;
+    }
+    cachedApiToken = payload.token;
+    cachedApiTokenExpiresAt = payload.expiresAt;
+    return payload.token;
+  } catch {
+    return null;
+  }
+}
+
 export function clearApiAccessToken() {
   cachedApiToken = null;
   cachedApiTokenExpiresAt = 0;
+  try {
+    window.sessionStorage.removeItem(tokenStorageKey);
+  } catch {
+    // Ignore storage availability failures.
+  }
 }
 
 export async function getApiAccessToken(forceRefresh = false): Promise<string | null> {
@@ -51,8 +92,11 @@ export async function getApiAccessToken(forceRefresh = false): Promise<string | 
   }
 
   const now = Date.now();
-  if (!forceRefresh && cachedApiToken && cachedApiTokenExpiresAt > now + tokenRefreshSkewMs) {
-    return cachedApiToken;
+  if (!forceRefresh) {
+    const storedToken = loadStoredApiAccessToken(now);
+    if (storedToken) {
+      return storedToken;
+    }
   }
 
   if (!forceRefresh && tokenRequest) {
@@ -84,8 +128,7 @@ export async function getApiAccessToken(forceRefresh = false): Promise<string | 
       return null;
     }
 
-    cachedApiToken = payload.token;
-    cachedApiTokenExpiresAt = parseJwtExpiration(payload.token);
+    cacheApiAccessToken(payload.token);
     return payload.token;
   })().finally(() => {
     tokenRequest = null;

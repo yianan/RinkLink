@@ -5,7 +5,7 @@ import { Link as RouterLink, Navigate, useNavigate, useParams, useSearchParams }
 
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { authApiBaseUrl, authClient } from '../lib/auth-client';
+import { authApiBaseUrl, authClient, getApiAccessToken } from '../lib/auth-client';
 import { buildAuthCallbackUrl } from '../lib/auth-routing';
 import { cn } from '../lib/cn';
 import { useToast } from '../context/ToastContext';
@@ -323,6 +323,7 @@ function SignInCard() {
         return;
       }
 
+      await getApiAccessToken(true).catch(() => null);
       window.location.assign(buildAuthCallbackUrl('/'));
     } catch (error) {
       const { message, errorCode, status } = getAuthErrorDetails(error);

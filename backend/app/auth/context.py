@@ -51,6 +51,27 @@ class AuthorizationContext:
 
 
 def build_authorization_context(db: Session, user: AppUser) -> AuthorizationContext:
+    if user.is_platform_admin:
+        return AuthorizationContext(
+            user=user,
+            association_memberships=[],
+            team_memberships=[],
+            arena_memberships=[],
+            guardianships=[],
+            player_memberships=[],
+            capabilities=set(ALL_CAPABILITIES),
+            association_roles={},
+            team_roles={},
+            arena_roles={},
+            association_ids=set(),
+            team_ids=set(),
+            arena_ids=set(),
+            guardian_player_ids=set(),
+            player_ids=set(),
+            linked_team_ids=set(),
+            token_claims=getattr(user, "_token_claims", None),
+        )
+
     association_memberships = (
         db.query(AssociationMembership)
         .filter(AssociationMembership.user_id == user.id)

@@ -11,11 +11,25 @@ from ..services.season_utils import ensure_standard_seasons
 from ..services.team_logos import effective_team_logo_url
 
 
-def _season_with_game_count(db: Session, season: Season) -> dict:
-    count = db.query(func.count(Event.id)).filter(Event.season_id == season.id).scalar() or 0
+def _season_with_game_count(season: Season, game_counts: dict[str, int]) -> dict:
     data = {c.key: getattr(season, c.key) for c in season.__table__.columns}
-    data["game_count"] = count
+    data["game_count"] = game_counts.get(season.id, 0)
     return data
+
+
+def _game_counts_for_seasons(db: Session, season_ids: list[str]) -> dict[str, int]:
+    if not season_ids:
+        return {}
+    return {
+        season_id: count
+        for season_id, count in (
+            db.query(Event.season_id, func.count(Event.id))
+            .filter(Event.season_id.in_(season_ids))
+            .group_by(Event.season_id)
+            .all()
+        )
+        if season_id
+    }
 
 
 router = APIRouter(tags=["seasons"])
@@ -24,7 +38,8 @@ router = APIRouter(tags=["seasons"])
 @router.get("/seasons", response_model=list[SeasonOut])
 def list_seasons(_: AuthorizationContext = Depends(authorization_context), db: Session = Depends(get_db)):
     seasons = ensure_standard_seasons(db)
-    return [_season_with_game_count(db, season) for season in seasons]
+    game_counts = _game_counts_for_seasons(db, [season.id for season in seasons])
+    return [_season_with_game_count(season, game_counts) for season in seasons]
 
 
 @router.get("/seasons/{id}", response_model=SeasonOut)
@@ -33,7 +48,7 @@ def get_season(id: str, _: AuthorizationContext = Depends(authorization_context)
     season = db.get(Season, id)
     if not season:
         raise HTTPException(404, "Season not found")
-    return _season_with_game_count(db, season)
+    return _season_with_game_count(season, _game_counts_for_seasons(db, [season.id]))
 
 
 @router.get("/seasons/{id}/standings", response_model=list[StandingsEntry])

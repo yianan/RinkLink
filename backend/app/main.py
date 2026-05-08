@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
+import time
 from urllib.parse import urljoin
 
 import httpx
@@ -11,6 +13,8 @@ from starlette.responses import Response
 from .config import settings
 from .database import engine  # noqa: F401 — imported to ensure engine is initialised
 from .auth.runtime import assert_auth_runtime_safe
+
+logger = logging.getLogger("rinklink.request_timing")
 
 
 @asynccontextmanager
@@ -37,6 +41,23 @@ if settings.app_env == "development":
     cors_options["allow_origin_regex"] = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
 app.add_middleware(CORSMiddleware, **cors_options)
+
+
+@app.middleware("http")
+async def request_timing_middleware(request: Request, call_next):
+    started_at = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - started_at) * 1000
+    response.headers["X-Process-Time-Ms"] = f"{duration_ms:.1f}"
+    if request.url.path != "/api/health":
+        logger.info(
+            "request_timing method=%s path=%s status=%s duration_ms=%.1f",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+        )
+    return response
 
 
 @app.get("/api/health")
