@@ -10,6 +10,7 @@ import { resolvePublicAppUrl, resolveTrustedOrigins } from "./config.js";
 
 const app = new Hono();
 const port = Number(process.env.AUTH_SERVICE_PORT || process.env.PORT || 3000);
+const hostname = process.env.AUTH_SERVICE_HOST || "0.0.0.0";
 const frontendUrl = resolvePublicAppUrl();
 const allowedOrigins = new Set(resolveTrustedOrigins());
 await ensureLockoutSchema(pool);
@@ -69,9 +70,10 @@ app.get("/.well-known/jwks.json", (c) =>
 serve(
   {
     fetch: app.fetch,
+    hostname,
     port,
   },
   (info) => {
-    console.info(`[auth-service] listening on http://localhost:${info.port}`);
+    console.info(`[auth-service] listening on http://${hostname}:${info.port}`);
   },
 );
