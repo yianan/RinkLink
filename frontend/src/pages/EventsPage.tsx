@@ -96,6 +96,7 @@ export default function EventsPage() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedArenaNames, setSelectedArenaNames] = useState<string[]>([]);
   const [pageOffset, setPageOffset] = useState(0);
+  const [calendarBusy, setCalendarBusy] = useState(false);
 
   const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
   const todayStr = toLocalDateString(new Date());
@@ -311,13 +312,28 @@ export default function EventsPage() {
   };
 
   const copyCalendarFeed = async () => {
-    const payload = await api.getTeamCalendarFeed(activeTeam.id);
-    await navigator.clipboard.writeText(payload.url);
-    pushToast({
-      variant: 'success',
-      title: 'Calendar link copied',
-      description: 'Paste it into your calendar app once. Updates from RinkLink will stay in sync automatically.',
-    });
+    if (!activeTeam || calendarBusy) {
+      return;
+    }
+
+    setCalendarBusy(true);
+    try {
+      const payload = await api.getTeamCalendarFeed(activeTeam.id);
+      await navigator.clipboard.writeText(payload.url);
+      pushToast({
+        variant: 'success',
+        title: 'Calendar link copied',
+        description: 'Paste it into your calendar app once. Updates from RinkLink will stay in sync automatically.',
+      });
+    } catch {
+      pushToast({
+        variant: 'error',
+        title: 'Unable to copy calendar link',
+        description: 'Try again in a moment. If it still fails, ask an admin to check calendar feed configuration.',
+      });
+    } finally {
+      setCalendarBusy(false);
+    }
   };
 
   return (
@@ -342,10 +358,11 @@ export default function EventsPage() {
               variant="outline"
               className="h-10 border-emerald-300 bg-emerald-50 px-4 text-emerald-800 hover:border-emerald-400 hover:bg-emerald-100 hover:text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:border-emerald-600 dark:hover:bg-emerald-900/60"
               onClick={copyCalendarFeed}
+              disabled={!activeTeam || calendarBusy}
             >
               <CalendarCheck2 className="h-4 w-4" />
               <span className="sm:hidden">Calendar</span>
-              <span className="hidden sm:inline">Add to Calendar</span>
+              <span className="hidden sm:inline">{calendarBusy ? 'Copying...' : 'Add to Calendar'}</span>
             </Button>
             {canManageSchedule ? (
               <Button type="button" className="h-10 px-4" onClick={() => setOpen(true)}>

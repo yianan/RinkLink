@@ -122,8 +122,10 @@ def _load() -> Settings:
     smtp_password = os.getenv("SMTP_PASSWORD")
     smtp_starttls = _load_bool("SMTP_STARTTLS", True)
     smtp_use_ssl = _load_bool("SMTP_USE_SSL", False)
-    calendar_token_secret = _normalize_scalar(os.getenv("CALENDAR_TOKEN_SECRET")) or (
-        db_url if app_env == "development" else None
+    calendar_token_secret = (
+        _normalize_scalar(os.getenv("CALENDAR_TOKEN_SECRET"))
+        or _normalize_scalar(os.getenv("BETTER_AUTH_SECRET"))
+        or (db_url if app_env == "development" else None)
     )
 
     return Settings(
