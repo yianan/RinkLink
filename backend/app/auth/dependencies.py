@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
+from time import monotonic
 
 import jwt as pyjwt
 from fastapi import Depends, HTTPException, status
@@ -17,6 +18,8 @@ from .runtime import assert_auth_runtime_safe
 
 bearer_scheme = HTTPBearer(auto_error=False)
 logger = logging.getLogger(__name__)
+CURRENT_USER_CACHE_TTL_SECONDS = 10
+_current_user_cache: dict[str, tuple[float, dict]] = {}
 
 
 def _synthetic_admin() -> AppUser:
@@ -38,12 +41,51 @@ def _synthetic_admin() -> AppUser:
     )
 
 
+def _cache_user(user: AppUser) -> AppUser:
+    _current_user_cache[user.auth_id] = (
+        monotonic() + CURRENT_USER_CACHE_TTL_SECONDS,
+        {
+            "id": user.id,
+            "auth_id": user.auth_id,
+            "email": user.email,
+            "display_name": user.display_name,
+            "status": user.status,
+            "access_state": user.access_state,
+            "auth_state": user.auth_state,
+            "is_platform_admin": user.is_platform_admin,
+            "default_team_id": user.default_team_id,
+            "revoked_at": user.revoked_at,
+            "created_at": user.created_at,
+            "updated_at": user.updated_at,
+        },
+    )
+    return user
+
+
+def _cached_user(auth_id: str, email: str | None) -> AppUser | None:
+    entry = _current_user_cache.get(auth_id)
+    if not entry:
+        return None
+    expires_at, data = entry
+    if expires_at <= monotonic():
+        _current_user_cache.pop(auth_id, None)
+        return None
+    if email and data.get("email") != email:
+        _current_user_cache.pop(auth_id, None)
+        return None
+    return AppUser(**data)
+
+
 def _upsert_user_from_claims(db: Session, claims: dict) -> AppUser:
     auth_id = str(claims["sub"])
     email = claims.get("email")
     if claims.get("email_verified") is not True or not email:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Verified email is required")
     display_name = claims.get("name")
+
+    cached = _cached_user(auth_id, email)
+    if cached:
+        return cached
 
     user = db.query(AppUser).filter(AppUser.auth_id == auth_id).first()
     if user is None:
@@ -59,7 +101,7 @@ def _upsert_user_from_claims(db: Session, claims: dict) -> AppUser:
         db.add(user)
         db.commit()
         db.refresh(user)
-        return user
+        return _cache_user(user)
 
     changed = False
     if user.email != email:
@@ -70,7 +112,7 @@ def _upsert_user_from_claims(db: Session, claims: dict) -> AppUser:
     if changed:
         db.commit()
         db.refresh(user)
-    return user
+    return _cache_user(user)
 
 
 def _resolve_current_user(
