@@ -291,6 +291,63 @@ function getAuthErrorDetails(error: unknown) {
   };
 }
 
+async function parseAuthErrorResponse(response: Response): Promise<Error & { error?: { code?: string }; status?: number }> {
+  let payload: unknown = null;
+  let fallbackMessage = response.statusText || `${response.status}`;
+
+  try {
+    payload = await response.json();
+  } catch {
+    try {
+      fallbackMessage = await response.text();
+    } catch {
+      // Keep the HTTP status text fallback.
+    }
+  }
+
+  const payloadObject = typeof payload === 'object' && payload !== null
+    ? payload as {
+      code?: string;
+      message?: string;
+      error?: string | { code?: string; message?: string };
+    }
+    : null;
+  const nestedError = typeof payloadObject?.error === 'object' && payloadObject.error !== null
+    ? payloadObject.error
+    : null;
+  const message = payloadObject?.message
+    || nestedError?.message
+    || (typeof payloadObject?.error === 'string' ? payloadObject.error : undefined)
+    || fallbackMessage;
+  const code = payloadObject?.code || nestedError?.code;
+  const error = new Error(message) as Error & { error?: { code?: string }; status?: number };
+  error.status = response.status;
+  error.error = code ? { code } : undefined;
+  return error;
+}
+
+async function signInWithEmail(email: string, password: string): Promise<Record<string, unknown>> {
+  const response = await fetch(`${authApiBaseUrl}/sign-in/email`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    throw await parseAuthErrorResponse(response);
+  }
+
+  try {
+    return await response.json() as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 function SignInCard() {
   const navigate = useNavigate();
   const pushToast = useToast();
@@ -313,11 +370,7 @@ function SignInCard() {
 
     setBusy(true);
     try {
-      const response = await (authClient.signIn.email as unknown as (body: Record<string, unknown>) => Promise<Record<string, unknown>>)({
-        email: trimmedEmail,
-        password,
-        fetchOptions: { throw: true },
-      });
+      const response = await signInWithEmail(trimmedEmail, password);
 
       if (response && 'twoFactorRedirect' in response && response.twoFactorRedirect) {
         window.location.assign('/auth/two-factor');
