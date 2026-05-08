@@ -1,7 +1,7 @@
 import "dotenv/config";
 
 import { betterAuth } from "better-auth";
-import { createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { haveIBeenPwned, jwt, twoFactor } from "better-auth/plugins";
 import type { BetterAuthPlugin } from "better-auth";
 import { Pool } from "pg";
@@ -130,6 +130,47 @@ const SIGN_IN_PATHS = new Set([
   "/sign-in/username",
   "/sign-in/phone-number",
 ]);
+
+async function authEmailExists(email: string): Promise<boolean> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    return false;
+  }
+  const result = await queryWithRetry<{ exists: boolean }>(
+    pool,
+    `
+      SELECT EXISTS (
+        SELECT 1
+        FROM auth."user"
+        WHERE lower(email) = $1
+      ) AS exists
+    `,
+    [normalizedEmail],
+  );
+  return result.rows[0]?.exists === true;
+}
+
+const signUpEmailGuardPlugin: BetterAuthPlugin = {
+  id: "rinklink-signup-email-guard",
+  hooks: {
+    before: [
+      {
+        matcher: (ctx) => typeof ctx.path === "string" && ctx.path === "/sign-up/email",
+        handler: createAuthMiddleware(async (ctx) => {
+          const email = typeof ctx.body === "object" && ctx.body !== null && "email" in ctx.body
+            ? String((ctx.body as { email?: unknown }).email ?? "")
+            : "";
+          if (await authEmailExists(email)) {
+            throw new APIError("BAD_REQUEST", {
+              code: "USER_ALREADY_EXISTS",
+              message: "An account with this email already exists.",
+            });
+          }
+        }),
+      },
+    ],
+  },
+};
 
 // Marks a session as having satisfied the 2FA challenge when the sign-in
 // path survived the twoFactor plugin's after-hook while the user has 2FA
@@ -278,6 +319,7 @@ export const auth = betterAuth({
   },
   socialProviders: socialProviderConfig(),
   plugins: [
+    signUpEmailGuardPlugin,
     haveIBeenPwned(),
     twoFactor({
       issuer: "RinkLink",

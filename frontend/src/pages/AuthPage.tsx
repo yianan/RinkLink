@@ -277,19 +277,61 @@ function PasswordField({
 }
 
 function getAuthErrorDetails(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  const errorCode = typeof error === 'object' && error !== null && 'error' in error
-    ? (error as { error?: { code?: string } }).error?.code
-    : undefined;
-  const status = typeof error === 'object' && error !== null && 'status' in error
-    ? (error as { status?: number }).status
-    : undefined;
+  const payload = typeof error === 'object' && error !== null
+    ? error as {
+      code?: string;
+      message?: string;
+      status?: number;
+      error?: { code?: string; message?: string } | string;
+    }
+    : null;
+  const nestedError = typeof payload?.error === 'object' && payload.error !== null
+    ? payload.error
+    : null;
+  const message = error instanceof Error
+    ? error.message
+    : payload?.message
+      || nestedError?.message
+      || (typeof payload?.error === 'string' ? payload.error : undefined)
+      || String(error);
+  const errorCode = nestedError?.code
+    || (typeof payload?.error === 'string' ? payload.error : undefined)
+    || payload?.code;
+  const status = payload?.status;
 
   return {
     message,
     errorCode,
     status,
   };
+}
+
+function describeSignUpError(error: unknown): string {
+  const { message, errorCode, status } = getAuthErrorDetails(error);
+  const normalizedCode = errorCode?.toUpperCase();
+  const normalizedMessage = message.trim().toLowerCase();
+
+  if (
+    normalizedCode === 'USER_ALREADY_EXISTS'
+    || normalizedCode === 'EMAIL_ALREADY_EXISTS'
+    || normalizedMessage.includes('already exists')
+  ) {
+    return 'An account with this email already exists. Sign in instead, or use forgot password if needed.';
+  }
+
+  if (normalizedCode === 'PASSWORD_TOO_SHORT' || normalizedMessage.includes('password too short')) {
+    return 'Use a password with at least 12 characters.';
+  }
+
+  if (normalizedCode === 'INVALID_CALLBACK_URL' || normalizedMessage.includes('invalid callback')) {
+    return 'Open the current RinkLink sign-up page and try again.';
+  }
+
+  if (status === 400) {
+    return 'Check the email, name, and password, then try again.';
+  }
+
+  return message;
 }
 
 async function parseAuthErrorResponse(response: Response): Promise<Error & { error?: { code?: string }; status?: number }> {
@@ -538,7 +580,7 @@ function SignUpCard() {
     } catch (error) {
       pushToast({
         title: 'Unable to create account',
-        description: error instanceof Error ? error.message : String(error),
+        description: describeSignUpError(error),
         variant: 'error',
       });
     } finally {

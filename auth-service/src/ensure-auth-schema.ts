@@ -42,6 +42,44 @@ async function main() {
     await client.query(`
       DO $$
       BEGIN
+        IF to_regclass('auth."user"') IS NOT NULL THEN
+          WITH ranked_users AS (
+            SELECT
+              u.id,
+              ROW_NUMBER() OVER (
+                PARTITION BY lower(u.email)
+                ORDER BY
+                  u."emailVerified" DESC,
+                  u."createdAt" ASC,
+                  u.id ASC
+              ) AS duplicate_rank
+            FROM auth."user" u
+          )
+          DELETE FROM auth."user" u
+          USING ranked_users
+          WHERE u.id = ranked_users.id
+            AND ranked_users.duplicate_rank > 1;
+
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_constraint
+            WHERE connamespace = 'auth'::regnamespace
+              AND conrelid = 'auth."user"'::regclass
+              AND conname = 'user_email_key'
+          ) THEN
+            ALTER TABLE auth."user"
+              ADD CONSTRAINT user_email_key UNIQUE (email);
+          END IF;
+
+          CREATE UNIQUE INDEX IF NOT EXISTS user_email_lower_key
+            ON auth."user" (lower(email));
+        END IF;
+      END
+      $$;
+    `);
+    await client.query(`
+      DO $$
+      BEGIN
         IF to_regclass('auth.session') IS NOT NULL THEN
           IF NOT EXISTS (
             SELECT 1
