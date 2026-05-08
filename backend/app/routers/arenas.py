@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..auth.context import (
@@ -159,10 +160,10 @@ def _arena_id_for_slot(db: Session, slot: IceSlot) -> str:
     return arena_rink.arena_id
 
 
-def _arena_out(arena: Arena, db: Session) -> ArenaOut:
+def _arena_out(arena: Arena, db: Session, rink_count: int | None = None) -> ArenaOut:
     out = ArenaOut.model_validate(arena)
     out.logo_url = arena_logo_url(arena.logo_asset_id, arena.logo_path)
-    out.rink_count = db.query(ArenaRink).filter(ArenaRink.arena_id == arena.id).count()
+    out.rink_count = rink_count if rink_count is not None else db.query(ArenaRink).filter(ArenaRink.arena_id == arena.id).count()
     return out
 
 
@@ -246,7 +247,18 @@ def list_arenas(
     db: Session = Depends(get_db),
 ):
     ensure_capability(context, "arena.view")
-    return [_arena_out(arena, db) for arena in db.query(Arena).order_by(Arena.name).all()]
+    arenas = db.query(Arena).order_by(Arena.name).all()
+    rink_counts = (
+        dict(
+            db.query(ArenaRink.arena_id, func.count(ArenaRink.id))
+            .filter(ArenaRink.arena_id.in_([arena.id for arena in arenas]))
+            .group_by(ArenaRink.arena_id)
+            .all()
+        )
+        if arenas
+        else {}
+    )
+    return [_arena_out(arena, db, rink_counts.get(arena.id, 0)) for arena in arenas]
 
 
 @router.post("/arenas", response_model=ArenaOut, status_code=201)

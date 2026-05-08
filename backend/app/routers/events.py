@@ -24,6 +24,7 @@ from ..schemas import (
 )
 from ..services.attendance import (
     attach_attendance_summary,
+    attach_attendance_summaries,
     attendance_players_for_roster,
     build_attendance_players,
     team_roster_for_event,
@@ -162,11 +163,14 @@ def list_events(
         response.headers["X-Total-Count"] = str(total)
         response.headers["X-Limit"] = str(limit)
         response.headers["X-Offset"] = str(offset)
-    enriched_events: list[EventOut] = []
     events = query.order_by(Event.date, Event.start_time).offset(offset).limit(limit).all()
-    for event, out in zip(events, enrich_events(events, db), strict=False):
-        attach_attendance_summary(db, event, team_id, out)
-        enriched_events.append(out)
+    enriched_events = enrich_events(events, db)
+    attach_attendance_summaries(
+        db,
+        events,
+        team_id,
+        {event.id: out for event, out in zip(events, enriched_events, strict=False)},
+    )
     return enriched_events
 
 

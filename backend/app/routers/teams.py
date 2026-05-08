@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..auth.context import AuthorizationContext, authorization_context, ensure_association_access, ensure_team_access
 from ..database import get_db
@@ -19,7 +19,7 @@ router = APIRouter(tags=["teams"])
 
 
 def _enrich(team: Team, db: Session, memberships_by_team: dict[str, list] | None = None) -> TeamOut:
-    assoc = db.get(Association, team.association_id)
+    assoc = team.association or db.get(Association, team.association_id)
     out = TeamOut.model_validate(team)
     out.logo_url = effective_team_logo_url(team, assoc)
     out.association_name = assoc.name if assoc else None
@@ -82,7 +82,7 @@ def list_teams(
         q = q.filter(Team.age_group == age_group)
     if level:
         q = q.filter(Team.level == level)
-    teams = q.order_by(Team.name).all()
+    teams = q.options(selectinload(Team.association)).order_by(Team.name).all()
     memberships_by_team = memberships_for_teams(db, [team.id for team in teams], season_id)
     return [_enrich(t, db, memberships_by_team) for t in teams]
 

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models import Event, EventAttendance, Player
@@ -81,6 +83,58 @@ def summarize_attendance(players: list[EventAttendancePlayer]) -> EventAttendanc
 def attach_attendance_summary(db: Session, event: Event, team_id: str, out) -> None:
     players = build_attendance_players(db, event, team_id)
     out.attendance_summary = summarize_attendance(players)
+
+
+def attach_attendance_summaries(db: Session, events: list[Event], team_id: str, outputs_by_event_id: dict[str, Any]) -> None:
+    if not events:
+        return
+
+    event_ids = [event.id for event in events]
+    season_ids = {event.season_id for event in events if event.season_id}
+    roster_totals: dict[str | None, int] = {
+        None: db.query(Player).filter(Player.team_id == team_id).count(),
+    }
+    if season_ids:
+        roster_totals.update(
+            {
+                season_id: count
+                for season_id, count in (
+                    db.query(Player.season_id, func.count(Player.id))
+                    .filter(Player.team_id == team_id, Player.season_id.in_(season_ids))
+                    .group_by(Player.season_id)
+                    .all()
+                )
+            }
+        )
+
+    event_seasons = {event.id: event.season_id for event in events}
+    status_counts: dict[str, dict[str, int]] = {event.id: {} for event in events}
+    rows = (
+        db.query(EventAttendance.event_id, Player.season_id, EventAttendance.status, func.count(EventAttendance.player_id))
+        .join(Player, Player.id == EventAttendance.player_id)
+        .filter(EventAttendance.event_id.in_(event_ids), Player.team_id == team_id)
+        .group_by(EventAttendance.event_id, Player.season_id, EventAttendance.status)
+        .all()
+    )
+    for event_id, player_season_id, status, count in rows:
+        event_season_id = event_seasons.get(event_id)
+        if event_season_id and player_season_id != event_season_id:
+            continue
+        status_counts.setdefault(event_id, {})[status] = count
+
+    for event in events:
+        counts = status_counts.get(event.id, {})
+        attending_count = counts.get("attending", 0)
+        tentative_count = counts.get("tentative", 0)
+        absent_count = counts.get("absent", 0)
+        total_players = roster_totals.get(event.season_id, 0) if event.season_id else roster_totals.get(None, 0)
+        outputs_by_event_id[event.id].attendance_summary = EventAttendanceSummary(
+            attending_count=attending_count,
+            tentative_count=tentative_count,
+            absent_count=absent_count,
+            unknown_count=max(total_players - attending_count - tentative_count - absent_count, 0),
+            total_players=total_players,
+        )
 
 
 def upsert_attendance_updates(db: Session, event: Event, team_id: str, updates: dict[str, str]) -> list[EventAttendancePlayer]:

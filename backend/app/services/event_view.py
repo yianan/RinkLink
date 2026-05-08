@@ -1,7 +1,7 @@
 import math
 from datetime import datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..models import Arena, ArenaRink, Association, CompetitionDivision, Event, IceBookingRequest, LockerRoom, Proposal, Team
 from ..schemas import EventOut
@@ -109,10 +109,17 @@ def enrich_events(events: list[Event], db: Session) -> list[EventOut]:
         for request in db.query(IceBookingRequest).filter(IceBookingRequest.event_id.in_([event.id for event in events])).all()
         if request.event_id
     }
-    divisions = {
-        division.id: division
-        for division in db.query(CompetitionDivision).filter(CompetitionDivision.id.in_(division_ids)).all()
-    } if division_ids else {}
+    divisions = (
+        {
+            division.id: division
+            for division in db.query(CompetitionDivision)
+            .options(joinedload(CompetitionDivision.competition))
+            .filter(CompetitionDivision.id.in_(division_ids))
+            .all()
+        }
+        if division_ids
+        else {}
+    )
 
     outputs: list[EventOut] = []
     output_by_event_id: dict[str, EventOut] = {}
