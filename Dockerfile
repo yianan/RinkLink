@@ -5,6 +5,7 @@ COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
 ENV VITE_AUTH_ENABLED=true
+ENV RINKLINK_FRONTEND_BUILD_VERSION=auth-session-startup-2026-05-08
 RUN npm run build
 
 # Stage 2: Build auth-service
