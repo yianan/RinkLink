@@ -4,6 +4,7 @@ import argparse
 
 from ..database import SessionLocal
 from ..models import AppUser
+from .pinned_admins import pinned_platform_admin_emails
 from .seed_data import PreservedAppUser, seed_demo_data
 
 
@@ -34,6 +35,7 @@ def main() -> int:
 
     db = SessionLocal()
     try:
+        pinned_admin_emails = pinned_platform_admin_emails()
         existing_users = []
         if args.preserve_existing_users:
             existing_users = db.query(AppUser).order_by(AppUser.email).all()
@@ -58,8 +60,16 @@ def main() -> int:
                     auth_id=existing_user.auth_id,
                     email=existing_user.email,
                     display_name=existing_user.display_name,
-                    status=existing_user.status if args.preserve_existing_users else "active",
-                    is_platform_admin=existing_user.is_platform_admin if args.preserve_existing_users else True,
+                    status=(
+                        "active"
+                        if (not args.preserve_existing_users or existing_user.email.lower() in pinned_admin_emails)
+                        else existing_user.status
+                    ),
+                    is_platform_admin=(
+                        True
+                        if (not args.preserve_existing_users or existing_user.email.lower() in pinned_admin_emails)
+                        else existing_user.is_platform_admin
+                    ),
                 )
                 for existing_user in existing_users
             ],

@@ -298,6 +298,13 @@ status and platform-admin flags, run:
 python -m app.seed.bootstrap_demo --preserve-existing-users
 ```
 
+Preserve mode always restores pinned platform-admin emails as `active` +
+`platform_admin`. By default this includes `justin.visconti@gmail.com`; set
+`RINKLINK_PINNED_PLATFORM_ADMIN_EMAILS` to a comma-separated list to override
+that default, or to an empty string to disable pinned admin repair.
+The single-service Docker startup also runs the same repair before any optional
+demo reseed, so existing pinned users are restored even when no reseed runs.
+
 The single-service Docker startup script also creates or repairs a permanent
 platform admin when `RINKLINK_BOOTSTRAP_ADMIN_EMAIL` and
 `RINKLINK_BOOTSTRAP_ADMIN_PASSWORD` are set. It creates the Better Auth user if

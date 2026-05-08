@@ -46,6 +46,7 @@ AUTH_PID=$!
 
 cd /app/backend
 alembic upgrade head
+python -m app.seed.repair_pinned_admins
 
 if [ "${RESEED_DEMO_ON_START:-false}" = "true" ]; then
   if [ -n "${RESEED_DEMO_ON_START_COMMIT:-}" ] && [ "${RENDER_GIT_COMMIT:-}" != "${RESEED_DEMO_ON_START_COMMIT}" ]; then

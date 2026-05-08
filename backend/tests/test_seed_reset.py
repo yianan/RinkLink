@@ -1,8 +1,54 @@
 from __future__ import annotations
 
+import pytest
+
 from app.models import AppUser, Arena, Association, Proposal, Team, TeamCompetitionMembership
+from app.seed.pinned_admins import pinned_platform_admin_emails, repair_pinned_platform_admins
 from app.seed.seed_data import PreservedAppUser, seed_demo_data
 from app.services.schedule_conflicts import find_event_conflicts
+
+
+def test_demo_reseed_pins_justin_as_platform_admin_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("RINKLINK_PINNED_PLATFORM_ADMIN_EMAILS", raising=False)
+
+    assert "justin.visconti@gmail.com" in pinned_platform_admin_emails()
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        ("admin@example.com, other@example.com", {"admin@example.com", "other@example.com"}),
+        ("", set()),
+    ],
+)
+def test_demo_reseed_pinned_admins_can_be_configured(monkeypatch, configured: str, expected: set[str]) -> None:
+    monkeypatch.setenv("RINKLINK_PINNED_PLATFORM_ADMIN_EMAILS", configured)
+
+    assert pinned_platform_admin_emails() == expected
+
+
+def test_repair_pinned_platform_admins_promotes_existing_user(db, monkeypatch) -> None:
+    monkeypatch.setenv("RINKLINK_PINNED_PLATFORM_ADMIN_EMAILS", "justin.visconti@gmail.com")
+    user = AppUser(
+        auth_id="auth-justin",
+        email="justin.visconti@gmail.com",
+        display_name="Justin Visconti",
+        status="pending",
+        access_state="disabled",
+        auth_state="disabled",
+        is_platform_admin=False,
+    )
+    db.add(user)
+    db.commit()
+
+    repaired = repair_pinned_platform_admins(db)
+    db.refresh(user)
+
+    assert repaired == 1
+    assert user.status == "active"
+    assert user.access_state == "active"
+    assert user.auth_state == "active"
+    assert user.is_platform_admin is True
 
 
 def test_seed_demo_data_restores_preserved_platform_admin(db) -> None:
