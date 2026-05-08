@@ -78,6 +78,8 @@ export default function TeamSwitcher() {
             logoUrl={activeTeam?.logo_url || null}
             className="h-8 w-8 shrink-0 rounded-lg"
             initialsClassName="text-[11px]"
+            loading="eager"
+            fetchPriority="high"
           />
           <span className="min-w-0 flex-1 truncate">{triggerLabel}</span>
           <ChevronDown className={cn('h-4 w-4 shrink-0 text-slate-500 transition-transform dark:text-slate-400', open && 'rotate-180')} />

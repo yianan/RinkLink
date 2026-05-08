@@ -94,7 +94,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { activeTeam, teams } = useTeam();
   const { activeSeason, seasons } = useSeason();
-  const { me } = useAuth();
+  const { me, bootstrap } = useAuth();
   const confirm = useConfirmDialog();
 
   const [availability, setAvailability] = useState<AvailabilityWindow[]>([]);
@@ -126,11 +126,15 @@ export default function HomePage() {
   useEffect(() => {
     if (!activeTeam) return;
     let cancelled = false;
-
-    api.getTeamDashboardSummary(activeTeam.id, {
-      date_from: todayStr,
-      ...(effectiveSeason ? { season_id: effectiveSeason.id } : {}),
-    }).then((summary) => {
+    const applySummary = (summary: {
+      availability: AvailabilityWindow[];
+      events: Event[];
+      proposals: Proposal[];
+      booking_requests: IceBookingRequest[];
+      record: StandingsEntry | null;
+      primary_membership: TeamCompetitionMembership | null;
+      competition_record: StandingsEntry | null;
+    }) => {
       if (cancelled) return;
       setAvailability(canViewAvailabilitySummary ? summary.availability : []);
       setEvents(summary.events);
@@ -139,6 +143,24 @@ export default function HomePage() {
       setRecord(summary.record);
       setPrimaryMembership(summary.primary_membership);
       setCompetitionRecord(familyMode ? null : summary.competition_record);
+    };
+    if (
+      bootstrap?.initial_dashboard
+      && bootstrap.initial_dashboard_team_id === activeTeam.id
+      && bootstrap.initial_dashboard_date_from === todayStr
+      && (bootstrap.initial_dashboard_season_id || null) === (effectiveSeason?.id || null)
+    ) {
+      applySummary(bootstrap.initial_dashboard);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    api.getTeamDashboardSummary(activeTeam.id, {
+      date_from: todayStr,
+      ...(effectiveSeason ? { season_id: effectiveSeason.id } : {}),
+    }).then((summary) => {
+      applySummary(summary);
     }).catch(() => {
       if (cancelled) return;
       setAvailability([]);
@@ -151,7 +173,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTeam, canViewAvailabilitySummary, canViewIceRequestSummary, canViewProposalSummary, effectiveSeason, familyMode, todayStr]);
+  }, [activeTeam, bootstrap, canViewAvailabilitySummary, canViewIceRequestSummary, canViewProposalSummary, effectiveSeason, familyMode, todayStr]);
 
   useEffect(() => {
     if (!arenaOnlyMode || !me) {
@@ -326,7 +348,14 @@ export default function HomePage() {
       <PageHeader
         title={(
           <span className="inline-flex items-center gap-3">
-            <TeamLogo name={activeTeam.name} logoUrl={activeTeam.logo_url} className="h-10 w-10 rounded-xl" initialsClassName="text-xs" />
+            <TeamLogo
+              name={activeTeam.name}
+              logoUrl={activeTeam.logo_url}
+              className="h-10 w-10 rounded-xl"
+              initialsClassName="text-xs"
+              loading="eager"
+              fetchPriority="high"
+            />
             <span>{familyMode ? `${activeTeam.name} Family Dashboard` : `${activeTeam.name} Dashboard`}</span>
           </span>
         )}

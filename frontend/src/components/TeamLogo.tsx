@@ -14,11 +14,15 @@ export default function TeamLogo({
   logoUrl,
   className,
   initialsClassName,
+  loading = 'lazy',
+  fetchPriority = 'low',
 }: {
   name: string;
   logoUrl?: string | null;
   className?: string;
   initialsClassName?: string;
+  loading?: 'eager' | 'lazy';
+  fetchPriority?: 'high' | 'low' | 'auto';
 }) {
   const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
   const imageFailed = !!logoUrl && failedLogoUrl === logoUrl;
@@ -39,6 +43,9 @@ export default function TeamLogo({
           key={logoUrl}
           src={logoUrl}
           alt=""
+          loading={loading}
+          decoding="async"
+          fetchPriority={fetchPriority}
           className="h-full w-full object-contain"
           onError={() => setFailedLogoUrl(logoUrl)}
         />

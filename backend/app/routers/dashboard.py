@@ -102,20 +102,15 @@ def _requested_booking_requests(db: Session, team_id: str):
     return [_request_out(request_row, db) for request_row in requests]
 
 
-@router.get("/teams/{team_id}/dashboard-summary", response_model=TeamDashboardSummaryOut)
-def get_team_dashboard_summary(
-    team_id: str,
-    date_from: date | None = Query(None),
-    season_id: str | None = Query(None),
-    context: AuthorizationContext = Depends(authorization_context),
-    db: Session = Depends(get_db),
-):
-    team = db.get(Team, team_id)
-    if not team:
-        raise HTTPException(404, "Team not found")
-    if not can_access_team(context, team, "team.view", allow_linked_family=True):
-        raise HTTPException(403, "You do not have access to this team")
-
+def dashboard_summary_cached(
+    *,
+    db: Session,
+    context: AuthorizationContext,
+    team: Team,
+    date_from: date | None,
+    season_id: str | None,
+) -> TeamDashboardSummaryOut:
+    team_id = team.id
     can_manage_schedule = "team.manage_schedule" in context.capabilities
     can_manage_proposals = "team.manage_proposals" in context.capabilities
     can_view_private_roster = "team.view_private" in context.capabilities
@@ -207,3 +202,20 @@ def get_team_dashboard_summary(
         )
 
     return ttl_get_or_set(cache_key, 10, build)
+
+
+@router.get("/teams/{team_id}/dashboard-summary", response_model=TeamDashboardSummaryOut)
+def get_team_dashboard_summary(
+    team_id: str,
+    date_from: date | None = Query(None),
+    season_id: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    team = db.get(Team, team_id)
+    if not team:
+        raise HTTPException(404, "Team not found")
+    if not can_access_team(context, team, "team.view", allow_linked_family=True):
+        raise HTTPException(403, "You do not have access to this team")
+
+    return dashboard_summary_cached(db=db, context=context, team=team, date_from=date_from, season_id=season_id)

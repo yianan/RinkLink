@@ -45,7 +45,8 @@ import type { MeResponse } from './types';
 
 const appIconSrc = '/icons/rinklink-icon-192.png';
 
-const HomePage = lazy(() => import('./pages/HomePage'));
+const loadHomePage = () => import('./pages/HomePage');
+const HomePage = lazy(loadHomePage);
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const PendingApprovalPage = lazy(() => import('./pages/PendingApprovalPage'));
 const DisabledAccessPage = lazy(() => import('./pages/DisabledAccessPage'));
@@ -351,6 +352,12 @@ function AppContent() {
     && me.user.auth_state !== 'disabled'
     && !me.user.is_platform_admin
     && me.user.status !== 'active';
+
+  useEffect(() => {
+    if (isAuthenticated && !pendingApproval && !disabledAccess) {
+      void loadHomePage();
+    }
+  }, [disabledAccess, isAuthenticated, pendingApproval]);
 
   useEffect(() => {
     setMobileNavOpen(false);

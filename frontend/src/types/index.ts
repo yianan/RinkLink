@@ -71,6 +71,10 @@ export interface AppBootstrap {
   me: MeResponse;
   seasons: Season[];
   teams: TeamSummary[];
+  initial_dashboard_team_id: string | null;
+  initial_dashboard_season_id: string | null;
+  initial_dashboard_date_from: string | null;
+  initial_dashboard: TeamDashboardSummary | null;
 }
 
 export interface AccessTarget {
