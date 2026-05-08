@@ -10,10 +10,33 @@ if (!databaseUrl) {
 
 const client = new Client({
   connectionString: databaseUrl,
+  connectionTimeoutMillis: 10000,
 });
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function connectWithRetry(): Promise<void> {
+  let lastError: unknown;
+  const delays = [500, 1000, 2500, 5000, 10000];
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    try {
+      await client.connect();
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === delays.length) {
+        throw error;
+      }
+      await sleep(delays[attempt]);
+    }
+  }
+  throw lastError;
+}
+
 async function main() {
-  await client.connect();
+  await connectWithRetry();
   try {
     await client.query("CREATE SCHEMA IF NOT EXISTS auth");
     await client.query(`

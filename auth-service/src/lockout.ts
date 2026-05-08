@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { queryWithRetry } from "./db.js";
 
 const LOCKOUT_WINDOW_MINUTES = 15;
 const LOCKOUT_FAILURE_LIMIT = 5;
@@ -10,7 +11,7 @@ function normalizeEmail(email: string | null | undefined): string | null {
 }
 
 export async function ensureLockoutSchema(pool: Pool): Promise<void> {
-  await pool.query(`
+  await queryWithRetry(pool, `
     CREATE TABLE IF NOT EXISTS auth.sign_in_lockouts (
       email TEXT PRIMARY KEY,
       failed_attempts INTEGER NOT NULL DEFAULT 0,
@@ -27,9 +28,10 @@ export async function isSignInLocked(pool: Pool, email: string | null | undefine
     return false;
   }
 
-  const result = await pool.query<{
+  const result = await queryWithRetry<{
     locked_until: Date | null;
   }>(
+    pool,
     `SELECT locked_until FROM auth.sign_in_lockouts WHERE email = $1`,
     [normalizedEmail],
   );
@@ -42,7 +44,7 @@ export async function clearSignInFailures(pool: Pool, email: string | null | und
   if (!normalizedEmail) {
     return;
   }
-  await pool.query(`DELETE FROM auth.sign_in_lockouts WHERE email = $1`, [normalizedEmail]);
+  await queryWithRetry(pool, `DELETE FROM auth.sign_in_lockouts WHERE email = $1`, [normalizedEmail]);
 }
 
 export async function recordSignInFailure(pool: Pool, email: string | null | undefined): Promise<void> {
@@ -51,7 +53,8 @@ export async function recordSignInFailure(pool: Pool, email: string | null | und
     return;
   }
 
-  await pool.query(
+  await queryWithRetry(
+    pool,
     `
       INSERT INTO auth.sign_in_lockouts (email, failed_attempts, first_failed_at, locked_until, updated_at)
       VALUES ($1, 1, NOW(), NULL, NOW())

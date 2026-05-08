@@ -13,6 +13,7 @@ import {
   resolvePublicAppUrl,
   resolveTrustedOrigins,
 } from "./config.js";
+import { queryWithRetry } from "./db.js";
 import { sendResetPasswordEmail, sendVerificationEmail } from "./email.js";
 
 const databaseUrl = process.env.AUTH_DATABASE_URL || process.env.DATABASE_URL;
@@ -43,6 +44,9 @@ if (!apiAudience) {
 
 export const pool = new Pool({
   connectionString: databaseUrl,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 5,
 });
 
 type AppUserAccessRow = {
@@ -51,7 +55,8 @@ type AppUserAccessRow = {
 };
 
 async function getAppUserAccessRowByAuthId(authId: string): Promise<AppUserAccessRow | null> {
-  const result = await pool.query<AppUserAccessRow>(
+  const result = await queryWithRetry<AppUserAccessRow>(
+    pool,
     `
       SELECT auth_state, updated_at
       FROM public.app_users
@@ -68,7 +73,8 @@ export async function isAuthDisabledForEmail(email: string | null | undefined): 
   if (!normalizedEmail) {
     return false;
   }
-  const result = await pool.query<{ auth_state: string }>(
+  const result = await queryWithRetry<{ auth_state: string }>(
+    pool,
     `
       SELECT auth_state
       FROM public.app_users
