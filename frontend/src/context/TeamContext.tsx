@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Team } from '../types';
+import { Team, TeamSummary } from '../types';
 import { api } from '../api/client';
 import { useAuth } from './AuthContext';
 
@@ -19,6 +19,29 @@ const TeamContext = createContext<TeamContextType>({
   refreshTeams: async () => {},
   loading: true,
 });
+
+function summaryToTeam(team: TeamSummary): Team {
+  return {
+    id: team.id,
+    association_id: team.association_id,
+    name: team.name,
+    age_group: team.age_group,
+    level: team.level,
+    manager_name: '',
+    manager_email: '',
+    manager_phone: '',
+    logo_url: team.logo_url,
+    myhockey_ranking: null,
+    wins: 0,
+    losses: 0,
+    ties: 0,
+    association_name: team.association_name,
+    primary_membership: null,
+    memberships: [],
+    created_at: '',
+    updated_at: '',
+  };
+}
 
 export function TeamProvider({ children }: { children: ReactNode }) {
   const { authEnabled, isAuthenticated, loading: authLoading, me } = useAuth();
@@ -62,7 +85,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-      let data = await api.getTeams();
+      let data = (await api.getTeamSummaries()).map(summaryToTeam);
       if (data.length === 0 && accessibleTeamsFallback.length > 0) {
         data = accessibleTeamsFallback;
       }

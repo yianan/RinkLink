@@ -47,3 +47,15 @@ class TeamOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TeamSummaryOut(BaseModel):
+    id: str
+    association_id: str
+    name: str
+    age_group: str
+    level: str
+    logo_url: str | None = None
+    association_name: str | None = None
+
+    model_config = {"from_attributes": True}

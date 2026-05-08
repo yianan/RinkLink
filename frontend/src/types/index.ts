@@ -246,6 +246,16 @@ export interface Team {
   updated_at: string;
 }
 
+export interface TeamSummary {
+  id: string;
+  association_id: string;
+  name: string;
+  age_group: string;
+  level: string;
+  logo_url: string | null;
+  association_name: string | null;
+}
+
 export interface Arena {
   id: string;
   name: string;

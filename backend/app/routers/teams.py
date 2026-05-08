@@ -10,6 +10,7 @@ from ..schemas import (
     TeamSeasonVenueAssignmentOut,
     TeamSeasonVenueAssignmentUpdate,
     TeamOut,
+    TeamSummaryOut,
     TeamUpdate,
 )
 from ..services.competitions import ensure_current_season_membership, memberships_for_teams
@@ -26,6 +27,14 @@ def _enrich(team: Team, db: Session, memberships_by_team: dict[str, list] | None
     memberships = (memberships_by_team or {}).get(team.id, [])
     out.memberships = memberships
     out.primary_membership = memberships[0] if memberships else None
+    return out
+
+
+def _summary(team: Team, db: Session) -> TeamSummaryOut:
+    assoc = team.association or db.get(Association, team.association_id)
+    out = TeamSummaryOut.model_validate(team)
+    out.logo_url = effective_team_logo_url(team, assoc)
+    out.association_name = assoc.name if assoc else None
     return out
 
 
@@ -85,6 +94,25 @@ def list_teams(
     teams = q.options(selectinload(Team.association)).order_by(Team.name).all()
     memberships_by_team = memberships_for_teams(db, [team.id for team in teams], season_id)
     return [_enrich(t, db, memberships_by_team) for t in teams]
+
+
+@router.get("/teams/summary", response_model=list[TeamSummaryOut])
+def list_team_summaries(
+    association_id: str | None = Query(None),
+    age_group: str | None = Query(None),
+    level: str | None = Query(None),
+    context: AuthorizationContext = Depends(authorization_context),
+    db: Session = Depends(get_db),
+):
+    q = _scoped_teams_query(db, context)
+    if association_id:
+        q = q.filter(Team.association_id == association_id)
+    if age_group:
+        q = q.filter(Team.age_group == age_group)
+    if level:
+        q = q.filter(Team.level == level)
+    teams = q.options(selectinload(Team.association)).order_by(Team.name).all()
+    return [_summary(t, db) for t in teams]
 
 
 @router.post("/teams", response_model=TeamOut, status_code=201)

@@ -225,6 +225,10 @@ export const api = {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').Team[]>(`/teams${qs}`);
   },
+  getTeamSummaries: (params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return request<import('../types').TeamSummary[]>(`/teams/summary${qs}`);
+  },
   getTeam: (id: string, params?: Record<string, string>) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').Team>(`/teams/${id}${qs}`);

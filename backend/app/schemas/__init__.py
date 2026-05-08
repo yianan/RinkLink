@@ -4,7 +4,7 @@ from .attendance import (
     EventAttendanceSummary,
 )
 from .association import AssociationCreate, AssociationUpdate, AssociationOut
-from .team import TeamCreate, TeamUpdate, TeamOut
+from .team import TeamCreate, TeamUpdate, TeamOut, TeamSummaryOut
 from .availability_window import (
     AvailabilityWindowCreate,
     AvailabilityWindowUpdate,
@@ -73,7 +73,7 @@ from .public import PublicEventOut, PublicSeasonOut, PublicTeamOut
 __all__ = [
     "AssociationCreate", "AssociationUpdate", "AssociationOut",
     "BulkEventAttendanceUpdate", "EventAttendancePlayer", "EventAttendanceSummary",
-    "TeamCreate", "TeamUpdate", "TeamOut",
+    "TeamCreate", "TeamUpdate", "TeamOut", "TeamSummaryOut",
     "AvailabilityWindowCreate", "AvailabilityWindowUpdate", "AvailabilityWindowOut",
     "AvailabilityUploadPreview", "AvailabilityConfirmUpload",
     "ProposalCreate", "ProposalOut", "ProposalRescheduleCreate",
