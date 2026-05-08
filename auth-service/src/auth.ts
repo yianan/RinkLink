@@ -15,6 +15,7 @@ import {
 } from "./config.js";
 import { queryWithRetry } from "./db.js";
 import { sendResetPasswordEmail, sendVerificationEmail } from "./email.js";
+import { hashPassword, verifyPassword } from "./password.js";
 
 const databaseUrl = process.env.AUTH_DATABASE_URL || process.env.DATABASE_URL;
 
@@ -259,6 +260,10 @@ export const auth = betterAuth({
     autoSignIn: false,
     minPasswordLength: 12,
     maxPasswordLength: 128,
+    password: {
+      hash: hashPassword,
+      verify: verifyPassword,
+    },
     sendResetPassword: async ({ user, url }) => {
       await sendResetPasswordEmail(user.email, url);
     },
