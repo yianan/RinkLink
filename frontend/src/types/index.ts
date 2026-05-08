@@ -612,6 +612,16 @@ export interface TeamSeasonRecord {
   updated_at: string;
 }
 
+export interface TeamDashboardSummary {
+  availability: AvailabilityWindow[];
+  events: Event[];
+  proposals: Proposal[];
+  booking_requests: IceBookingRequest[];
+  record: StandingsEntry | null;
+  competition_record: StandingsEntry | null;
+  primary_membership: TeamCompetitionMembership | null;
+}
+
 export interface Notification {
   id: string;
   team_id: string;

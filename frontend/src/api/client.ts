@@ -233,6 +233,10 @@ export const api = {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').Team>(`/teams/${id}${qs}`);
   },
+  getTeamDashboardSummary: (teamId: string, params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return request<import('../types').TeamDashboardSummary>(`/teams/${teamId}/dashboard-summary${qs}`);
+  },
   createTeam: (data: Partial<import('../types').Team>) =>
     request<import('../types').Team>('/teams', { method: 'POST', body: JSON.stringify(data) }),
   updateTeam: (id: string, data: Partial<import('../types').Team>) =>

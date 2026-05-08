@@ -199,6 +199,7 @@ from .routers import (  # noqa: E402
     scoresheet,
     seasons,
     competitions,
+    dashboard,
     me,
     public,
     access,
@@ -219,6 +220,7 @@ app.include_router(players.router, prefix="/api")
 app.include_router(scoresheet.router, prefix="/api")
 app.include_router(seasons.router, prefix="/api")
 app.include_router(competitions.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
 app.include_router(me.router, prefix="/api")
 app.include_router(public.router, prefix="/api")
 app.include_router(access.router, prefix="/api")

@@ -127,37 +127,18 @@ export default function HomePage() {
     if (!activeTeam) return;
     let cancelled = false;
 
-    Promise.all([
-      canViewAvailabilitySummary ? api.getAvailability(activeTeam.id, { limit: '200' }) : Promise.resolve([]),
-      api.getEvents(activeTeam.id, { date_from: todayStr, limit: '200' }),
-      canViewProposalSummary ? api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed', limit: '100' }) : Promise.resolve([]),
-      canViewIceRequestSummary ? api.getTeamIceBookingRequests(activeTeam.id, { status: 'requested' }) : Promise.resolve([]),
-      familyMode || !effectiveSeason ? Promise.resolve([]) : api.getStandings(effectiveSeason.id),
-      familyMode || !effectiveSeason ? Promise.resolve([]) : api.getTeamCompetitionMemberships(activeTeam.id, { season_id: effectiveSeason.id }),
-    ]).then(async ([availabilityData, eventData, proposalData, requestData, standings, memberships]) => {
+    api.getTeamDashboardSummary(activeTeam.id, {
+      date_from: todayStr,
+      ...(effectiveSeason ? { season_id: effectiveSeason.id } : {}),
+    }).then((summary) => {
       if (cancelled) return;
-      setAvailability(availabilityData);
-      setEvents(eventData);
-      setProposals(proposalData);
-      setBookingRequests(requestData);
-      setRecord(standings.find((entry) => entry.team_id === activeTeam.id) || null);
-
-      const primary = memberships.find((membership) => membership.is_primary) ?? memberships[0] ?? null;
-      setPrimaryMembership(primary);
-
-      const standingsMembership =
-        memberships.find((membership) => membership.is_primary && membership.standings_enabled)
-        ?? memberships.find((membership) => membership.standings_enabled)
-        ?? null;
-
-      if (familyMode || !standingsMembership) {
-        setCompetitionRecord(null);
-        return;
-      }
-
-      const divisionStandings = await api.getCompetitionDivisionStandings(standingsMembership.competition_division_id);
-      if (cancelled) return;
-      setCompetitionRecord(divisionStandings.find((entry) => entry.team_id === activeTeam.id) || null);
+      setAvailability(canViewAvailabilitySummary ? summary.availability : []);
+      setEvents(summary.events);
+      setProposals(canViewProposalSummary ? summary.proposals : []);
+      setBookingRequests(canViewIceRequestSummary ? summary.booking_requests : []);
+      setRecord(summary.record);
+      setPrimaryMembership(summary.primary_membership);
+      setCompetitionRecord(familyMode ? null : summary.competition_record);
     }).catch(() => {
       if (cancelled) return;
       setAvailability([]);
