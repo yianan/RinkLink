@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Evanston Wildkits Hockey logo">
+  <rect width="120" height="120" rx="24" fill="#111827"/>
+  <circle cx="60" cy="60" r="45" fill="#7c2d12"/>
+  <path d="M24 70c20-34 52-34 72 0-18 20-54 20-72 0z" fill="#fdba74"/>
+  <path d="M36 58c14-16 34-16 48 0-15 10-33 10-48 0z" fill="#fff7ed"/>
+  <text x="60" y="82" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="800" fill="#111827">EV</text>
+</svg>

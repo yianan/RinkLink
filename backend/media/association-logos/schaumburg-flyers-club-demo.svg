@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Schaumburg Flyers Hockey logo">
+  <rect width="120" height="120" rx="24" fill="#172554"/>
+  <circle cx="60" cy="60" r="45" fill="#2563eb"/>
+  <path d="M22 65h76L64 35h-8z" fill="#bfdbfe"/>
+  <path d="M37 78h46L60 96z" fill="#f8fafc"/>
+  <text x="60" y="70" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="800" fill="#172554">SF</text>
+</svg>

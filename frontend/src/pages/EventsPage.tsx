@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CalendarPlus2, Link2, Save, SendHorizontal, X, XCircle } from 'lucide-react';
+import { CalendarCheck2, CalendarPlus2, Save, SendHorizontal, X, XCircle } from 'lucide-react';
 import { api, isAbortError, type ListMeta } from '../api/client';
 import { Arena, ArenaRink, Event, IceBookingRequest, IceSlot, Team } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -313,7 +313,11 @@ export default function EventsPage() {
   const copyCalendarFeed = async () => {
     const payload = await api.getTeamCalendarFeed(activeTeam.id);
     await navigator.clipboard.writeText(payload.url);
-    pushToast({ variant: 'success', title: 'Calendar feed copied' });
+    pushToast({
+      variant: 'success',
+      title: 'Calendar link copied',
+      description: 'Paste it into your calendar app once. Updates from RinkLink will stay in sync automatically.',
+    });
   };
 
   return (
@@ -333,13 +337,18 @@ export default function EventsPage() {
                 className="px-2.5 sm:px-3"
               />
             ) : null}
-            <Button type="button" variant="outline" onClick={copyCalendarFeed}>
-              <Link2 className="h-4 w-4" />
-              <span className="sm:hidden">Feed</span>
-              <span className="hidden sm:inline">Calendar Feed</span>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 border-emerald-300 bg-emerald-50 px-4 text-emerald-800 hover:border-emerald-400 hover:bg-emerald-100 hover:text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:border-emerald-600 dark:hover:bg-emerald-900/60"
+              onClick={copyCalendarFeed}
+            >
+              <CalendarCheck2 className="h-4 w-4" />
+              <span className="sm:hidden">Calendar</span>
+              <span className="hidden sm:inline">Add to Calendar</span>
             </Button>
             {canManageSchedule ? (
-              <Button type="button" onClick={() => setOpen(true)}>
+              <Button type="button" className="h-10 px-4" onClick={() => setOpen(true)}>
                 <CalendarPlus2 className="h-4 w-4" />
                 <span className="sm:hidden">Schedule</span>
                 <span className="hidden sm:inline">Schedule Event</span>

@@ -84,6 +84,8 @@ def test_team_calendar_contains_events_and_availability(db: Session) -> None:
     feed = build_team_calendar(db, home.id)
 
     assert feed.startswith("BEGIN:VCALENDAR")
+    assert f"UID:event-{db.query(Event).one().id}@rinklink" in feed
+    assert f"UID:availability-{db.query(AvailabilityWindow).one().id}@rinklink" in feed
     assert "SUMMARY:Calendar Home vs Calendar Away" in feed
     assert "SUMMARY:Calendar Home open home availability" in feed
     assert "LOCATION:Calendar Arena > Rink A" in feed

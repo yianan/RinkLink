@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Naperville Sabres logo">
+  <rect width="120" height="120" rx="24" fill="#18181b"/>
+  <circle cx="60" cy="60" r="46" fill="#be123c"/>
+  <path d="M28 72l61-43 7 10-61 43z" fill="#f8fafc"/>
+  <path d="M31 84l60-42 4 6-60 42z" fill="#fbbf24"/>
+  <text x="58" y="66" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="800" fill="#18181b">NP</text>
+</svg>

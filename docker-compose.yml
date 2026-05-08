@@ -98,8 +98,9 @@ services:
       auth-service:
         condition: service_started
     environment:
-      VITE_API_BASE_URL: http://localhost:8000/api
-      VITE_AUTH_BASE_URL: http://localhost:3000/api/auth
+      VITE_API_BASE_URL: http://localhost:8000
+      VITE_AUTH_BASE_URL: http://localhost:3000
+      VITE_PROXY_API_TARGET: http://backend:8000
     command: >
       sh -c "npm install &&
       npm run dev -- --host 0.0.0.0"

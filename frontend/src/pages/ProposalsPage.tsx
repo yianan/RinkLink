@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowDownLeft, ArrowUpRight, Calendar, CalendarClock, Check, History, SendHorizontal, X, XCircle } from 'lucide-react';
-import { api, isAbortError, type ListMeta } from '../api/client';
+import { api, apiErrorMessage, isAbortError, type ListMeta } from '../api/client';
 import { Arena, ArenaRink, IceSlot, Proposal } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
@@ -212,17 +212,25 @@ export default function ProposalsPage() {
   }
 
   const acceptProposal = async (proposalId: string) => {
-    await api.acceptProposal(proposalId);
-    refreshNavBadges();
-    pushToast({ variant: 'success', title: 'Proposal accepted' });
-    load();
+    try {
+      await api.acceptProposal(proposalId);
+      refreshNavBadges();
+      pushToast({ variant: 'success', title: 'Proposal accepted' });
+      load();
+    } catch (error) {
+      pushToast({ variant: 'error', title: 'Unable to accept proposal', description: apiErrorMessage(error) });
+    }
   };
 
   const declineProposal = async (proposalId: string) => {
-    await api.declineProposal(proposalId);
-    refreshNavBadges();
-    pushToast({ variant: 'success', title: 'Proposal declined' });
-    load();
+    try {
+      await api.declineProposal(proposalId);
+      refreshNavBadges();
+      pushToast({ variant: 'success', title: 'Proposal declined' });
+      load();
+    } catch (error) {
+      pushToast({ variant: 'error', title: 'Unable to decline proposal', description: apiErrorMessage(error) });
+    }
   };
 
   const cancelProposal = async (proposal: Proposal) => {
@@ -400,10 +408,12 @@ export default function ProposalsPage() {
                           <Calendar className="h-4 w-4" />
                           Open Schedule
                         </Button>
-                        <Button type="button" size="sm" variant="destructive" onClick={() => cancelProposal(proposal)}>
-                          <XCircle className="h-4 w-4" />
-                          Cancel Proposal
-                        </Button>
+                        {proposal.status === 'accepted' ? (
+                          <Button type="button" size="sm" variant="destructive" onClick={() => cancelProposal(proposal)}>
+                            <XCircle className="h-4 w-4" />
+                            Cancel Proposal
+                          </Button>
+                        ) : null}
                       </>
                     ) : null}
                     <Button type="button" size="sm" variant="ghost" onClick={() => openHistory(proposal)}>

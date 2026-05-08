@@ -18,8 +18,41 @@ export type ListResponse<T> = {
   meta: ListMeta;
 };
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 export function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError';
+}
+
+export function apiErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) return error.message;
+  return String(error);
+}
+
+async function apiErrorFromResponse(response: Response): Promise<ApiError> {
+  const text = await response.text();
+  if (text) {
+    try {
+      const payload = JSON.parse(text) as { detail?: unknown; message?: unknown };
+      const detail = payload.detail ?? payload.message;
+      if (typeof detail === 'string' && detail.trim()) {
+        return new ApiError(response.status, detail.trim());
+      }
+    } catch {
+      if (text.trim()) {
+        return new ApiError(response.status, text.trim());
+      }
+    }
+  }
+  return new ApiError(response.status, `Request failed with status ${response.status}`);
 }
 
 function metaFromHeaders(headers: Headers, fallbackLength: number): ListMeta {
@@ -70,8 +103,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${res.status}: ${text}`);
+    throw await apiErrorFromResponse(res);
   }
   if (res.status === 204) return undefined as T;
   return res.json();
@@ -83,8 +115,7 @@ async function requestList<T>(path: string, options?: RequestInit): Promise<List
     headers: { 'Content-Type': 'application/json', ...options?.headers },
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${res.status}: ${text}`);
+    throw await apiErrorFromResponse(res);
   }
   const data = await res.json() as T[];
   return { data, meta: metaFromHeaders(res.headers, data.length) };
@@ -96,7 +127,7 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
     body: formData,
   });
   if (!res.ok) {
-    throw new Error(`${res.status}: ${await res.text()}`);
+    throw await apiErrorFromResponse(res);
   }
   return res.json() as Promise<T>;
 }

@@ -102,7 +102,11 @@ def media_asset_response(db: Session, *, asset_ref: str, kind: str, legacy_kind:
         if asset.kind != kind:
             raise HTTPException(404, "Logo not found")
         return Response(asset.data, media_type=asset.content_type)
+    try:
+        payload = media_file_path(legacy_kind, asset_ref).read_bytes()
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "Logo not found") from exc
     return Response(
-        content=media_file_path(legacy_kind, asset_ref).read_bytes(),
+        content=payload,
         media_type=_content_type_for_filename(asset_ref),
     )

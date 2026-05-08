@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Rocket Ice Arena logo">
+  <rect width="120" height="120" rx="22" fill="#450a0a"/>
+  <circle cx="60" cy="60" r="44" fill="#dc2626"/>
+  <path d="M36 76l43-43 10 10-43 43-19 7z" fill="#fee2e2"/>
+  <path d="M80 33l10-10 7 24z" fill="#f97316"/>
+  <text x="58" y="73" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="800" fill="#450a0a">RIA</text>
+</svg>

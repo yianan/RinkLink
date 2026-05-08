@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from app.models import AppUser, Association, Team, TeamCompetitionMembership
+from app.models import AppUser, Arena, Association, Proposal, Team, TeamCompetitionMembership
 from app.seed.seed_data import PreservedAppUser, seed_demo_data
+from app.services.schedule_conflicts import find_event_conflicts
 
 
 def test_seed_demo_data_restores_preserved_platform_admin(db) -> None:
@@ -39,5 +40,28 @@ def test_seed_demo_data_restores_preserved_platform_admin(db) -> None:
     assert restored_user.is_platform_admin is True
     assert db.query(Association).count() > 0
     assert db.query(Team).count() > 0
+    associations = db.query(Association).all()
+    arenas = db.query(Arena).all()
+    teams = db.query(Team).all()
+    assert len({association.logo_asset_id for association in associations}) == len(associations)
+    assert len({arena.logo_asset_id for arena in arenas}) == len(arenas)
+    assert len({team.logo_asset_id for team in teams}) == len(teams)
+    proposed_proposals = db.query(Proposal).filter(Proposal.status == "proposed").all()
+    intentional_conflict_count = 0
+    for proposal in proposed_proposals:
+        conflicts = find_event_conflicts(
+            db,
+            team_ids={proposal.home_team_id, proposal.away_team_id},
+            event_date=proposal.proposed_date,
+            start_time=proposal.proposed_start_time,
+            end_time=proposal.proposed_end_time,
+            ice_slot_id=proposal.ice_slot_id,
+        )
+        if proposal.message and proposal.message.startswith("Conflict demo:"):
+            intentional_conflict_count += 1
+            assert conflicts, proposal.message
+        else:
+            assert conflicts == [], proposal.message
+    assert intentional_conflict_count == 1
     assert db.query(TeamCompetitionMembership.team_id).distinct().count() == db.query(Team).count()
     assert result["preserved_users"] == 1

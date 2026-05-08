@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Oak Park Eagles logo">
+  <rect width="120" height="120" rx="24" fill="#064e3b"/>
+  <path d="M60 15l44 32-17 52H33L16 47z" fill="#16a34a"/>
+  <path d="M34 54h52L60 33z" fill="#fef3c7"/>
+  <path d="M31 67h58L60 90z" fill="#d97706"/>
+  <text x="60" y="74" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="800" fill="#064e3b">OP</text>
+</svg>

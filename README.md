@@ -27,7 +27,7 @@ Auth implementation work uses a shared local Postgres instance and a dedicated a
 Start the shared services from the repo root:
 
 ```bash
-docker compose up postgres auth-service backend
+docker compose up
 ```
 
 The auth service runs Better Auth schema migrations automatically during startup.
@@ -37,17 +37,8 @@ This starts:
 - Postgres on `localhost:5432`
 - Better Auth service on `http://localhost:3000`
 - FastAPI backend on `http://localhost:8000`
+- Vite frontend on `http://localhost:5173`
 - Mailpit SMTP/web UI on `http://localhost:8025`
-
-Then run the frontend separately:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The frontend runs on `http://localhost:5173`.
 
 Local env examples:
 
@@ -154,6 +145,11 @@ curl -X POST \
 ```
 
 Or use `Reset Demo Data` from the dashboard as an authenticated active admin.
+
+The seeded demo universe includes expanded teams, associations, arenas, games,
+booking requests, and proposal flows. Most proposed matchups are immediately
+actionable, and one incoming proposal is intentionally stale/conflicting so the
+accept-conflict toast path can be demonstrated.
 
 ## Current Migration Lineage
 

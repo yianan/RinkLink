@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Highland Park Falcons logo">
+  <rect width="120" height="120" rx="24" fill="#083344"/>
+  <path d="M60 16l42 18v29c0 25-17 40-42 50-25-10-42-25-42-50V34z" fill="#0e7490"/>
+  <path d="M30 55h60l-30 38z" fill="#facc15"/>
+  <path d="M38 44h44l-22 18z" fill="#cffafe"/>
+  <text x="60" y="77" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="800" fill="#083344">HP</text>
+</svg>

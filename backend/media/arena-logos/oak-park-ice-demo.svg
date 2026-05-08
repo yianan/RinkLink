@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Oak Park Ice House logo">
+  <rect width="120" height="120" rx="22" fill="#134e4a"/>
+  <rect x="22" y="26" width="76" height="68" rx="16" fill="#ccfbf1"/>
+  <path d="M35 45h50M35 60h50M35 75h50" stroke="#0f766e" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="60" cy="60" r="13" fill="#fef9c3"/>
+  <text x="60" y="67" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="17" font-weight="800" fill="#134e4a">OPI</text>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Northbrook Sports Center logo">
+  <rect width="120" height="120" rx="22" fill="#052e16"/>
+  <circle cx="60" cy="60" r="45" fill="#22c55e"/>
+  <rect x="30" y="38" width="60" height="44" rx="10" fill="#ecfdf5"/>
+  <path d="M30 60h60M60 38v44" stroke="#052e16" stroke-width="4"/>
+  <text x="60" y="72" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="800" fill="#052e16">NSC</text>
+</svg>

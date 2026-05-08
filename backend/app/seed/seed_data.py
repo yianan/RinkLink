@@ -34,7 +34,7 @@ from ..models import (
     TeamSeasonVenueAssignment,
     ZipCode,
 )
-from ..services.logo_assets import create_bundled_media_asset
+from ..services.logo_assets import create_bundled_media_asset, create_media_asset
 from ..services.records import recompute_team_records
 from ..services.season_utils import canonical_season_bounds, canonical_season_name
 
@@ -123,6 +123,33 @@ def _seed_demo_logo_asset(db: Session, *, kind: str, bundled_kind: str, filename
     return asset.id
 
 
+def _seed_generated_team_logo_asset(
+    db: Session,
+    *,
+    filename: str,
+    initials: str,
+    primary: str,
+    secondary: str,
+    accent: str,
+) -> str:
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="{initials} team logo">
+  <rect width="120" height="120" rx="24" fill="{primary}"/>
+  <path d="M60 14l43 22v48l-43 22-43-22V36z" fill="{secondary}"/>
+  <path d="M29 67c18-18 44-18 62 0" fill="none" stroke="{accent}" stroke-width="10" stroke-linecap="round"/>
+  <path d="M34 45h52" stroke="#ffffff" stroke-width="7" stroke-linecap="round" opacity=".86"/>
+  <text x="60" y="79" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="800" fill="#ffffff">{initials}</text>
+</svg>
+"""
+    asset = create_media_asset(
+        db,
+        kind="team-logo",
+        filename=filename,
+        payload=svg.encode("utf-8"),
+        content_type="image/svg+xml",
+    )
+    return asset.id
+
+
 def seed_zip_codes(db: Session):
     zips = [
         ("60091", "Wilmette", "IL", 42.0764, -87.7229),
@@ -130,6 +157,13 @@ def seed_zip_codes(db: Session):
         ("60134", "Geneva", "IL", 41.8872, -88.3054),
         ("60025", "Glenview", "IL", 42.0698, -87.7878),
         ("60062", "Northbrook", "IL", 42.1275, -87.8290),
+        ("60035", "Highland Park", "IL", 42.1817, -87.8003),
+        ("60201", "Evanston", "IL", 42.0565, -87.6942),
+        ("60540", "Naperville", "IL", 41.7750, -88.1487),
+        ("60302", "Oak Park", "IL", 41.8946, -87.7892),
+        ("60173", "Schaumburg", "IL", 42.0629, -88.1227),
+        ("60440", "Bolingbrook", "IL", 41.6986, -88.0684),
+        ("60462", "Orland Park", "IL", 41.6303, -87.8539),
     ]
     for zip_code, city, state, lat, lon in zips:
         if not db.get(ZipCode, zip_code):
@@ -239,33 +273,78 @@ def seed_demo_data(
         "northshore": _seed_demo_logo_asset(db, kind="association-logo", bundled_kind="association-logos", filename="northshore-club-demo.svg"),
         "mission": _seed_demo_logo_asset(db, kind="association-logo", bundled_kind="association-logos", filename="mission-club-official.png"),
         "team_illinois": _seed_demo_logo_asset(db, kind="association-logo", bundled_kind="association-logos", filename="team-illinois-club-official.png"),
+        "glenview": _seed_demo_logo_asset(db, kind="association-logo", bundled_kind="association-logos", filename="glenview-stars-club-demo.svg"),
+        "highland_park": _seed_demo_logo_asset(db, kind="association-logo", bundled_kind="association-logos", filename="highland-park-falcons-club-demo.svg"),
+        "evanston": _seed_demo_logo_asset(db, kind="association-logo", bundled_kind="association-logos", filename="evanston-wildkits-club-demo.svg"),
+        "naperville": _seed_demo_logo_asset(db, kind="association-logo", bundled_kind="association-logos", filename="naperville-sabres-club-demo.svg"),
+        "oak_park": _seed_demo_logo_asset(db, kind="association-logo", bundled_kind="association-logos", filename="oak-park-eagles-club-demo.svg"),
+        "schaumburg": _seed_demo_logo_asset(db, kind="association-logo", bundled_kind="association-logos", filename="schaumburg-flyers-club-demo.svg"),
     }
     team_logo_assets = {
-        "northshore": _seed_demo_logo_asset(db, kind="team-logo", bundled_kind="team-logos", filename="northshore-demo.svg"),
-        "mission": _seed_demo_logo_asset(db, kind="team-logo", bundled_kind="team-logos", filename="mission-official.png"),
-        "team_illinois": _seed_demo_logo_asset(db, kind="team-logo", bundled_kind="team-logos", filename="team-illinois-official.png"),
+        "northshore_14u": _seed_generated_team_logo_asset(db, filename="northshore-14u-aa.svg", initials="N14", primary="#0f172a", secondary="#2563eb", accent="#38bdf8"),
+        "northshore_12u": _seed_generated_team_logo_asset(db, filename="northshore-12u-a.svg", initials="N12", primary="#1e3a8a", secondary="#0ea5e9", accent="#f8fafc"),
+        "mission_14u": _seed_generated_team_logo_asset(db, filename="mission-14u-aa.svg", initials="M14", primary="#111827", secondary="#dc2626", accent="#fbbf24"),
+        "mission_12u": _seed_generated_team_logo_asset(db, filename="mission-12u-a.svg", initials="M12", primary="#7f1d1d", secondary="#ef4444", accent="#ffffff"),
+        "team_illinois_14u": _seed_generated_team_logo_asset(db, filename="team-illinois-14u-aa.svg", initials="TI14", primary="#172554", secondary="#1d4ed8", accent="#facc15"),
+        "team_illinois_12u": _seed_generated_team_logo_asset(db, filename="team-illinois-12u-a.svg", initials="TI12", primary="#1e1b4b", secondary="#4338ca", accent="#bfdbfe"),
+        "glenview_14u": _seed_generated_team_logo_asset(db, filename="glenview-stars-14u-aa.svg", initials="G14", primary="#0f172a", secondary="#0284c7", accent="#f8fafc"),
+        "glenview_12u": _seed_generated_team_logo_asset(db, filename="glenview-stars-12u-a.svg", initials="G12", primary="#082f49", secondary="#38bdf8", accent="#facc15"),
+        "highland_park_14u": _seed_generated_team_logo_asset(db, filename="highland-park-falcons-14u-aa.svg", initials="H14", primary="#083344", secondary="#0891b2", accent="#fef08a"),
+        "highland_park_12u": _seed_generated_team_logo_asset(db, filename="highland-park-falcons-12u-a.svg", initials="H12", primary="#164e63", secondary="#06b6d4", accent="#ffffff"),
+        "evanston_14u": _seed_generated_team_logo_asset(db, filename="evanston-wildkits-14u-aa.svg", initials="E14", primary="#431407", secondary="#ea580c", accent="#fed7aa"),
+        "evanston_12u": _seed_generated_team_logo_asset(db, filename="evanston-wildkits-12u-a.svg", initials="E12", primary="#7c2d12", secondary="#fb923c", accent="#fff7ed"),
+        "naperville_14u": _seed_generated_team_logo_asset(db, filename="naperville-sabres-14u-aa.svg", initials="NP14", primary="#4c0519", secondary="#be123c", accent="#fbbf24"),
+        "naperville_12u": _seed_generated_team_logo_asset(db, filename="naperville-sabres-12u-a.svg", initials="NP12", primary="#881337", secondary="#e11d48", accent="#ffffff"),
+        "oak_park_14u": _seed_generated_team_logo_asset(db, filename="oak-park-eagles-14u-aa.svg", initials="O14", primary="#052e16", secondary="#16a34a", accent="#fef3c7"),
+        "oak_park_12u": _seed_generated_team_logo_asset(db, filename="oak-park-eagles-12u-a.svg", initials="O12", primary="#14532d", secondary="#22c55e", accent="#fdba74"),
+        "schaumburg_14u": _seed_generated_team_logo_asset(db, filename="schaumburg-flyers-14u-aa.svg", initials="S14", primary="#172554", secondary="#2563eb", accent="#dbeafe"),
+        "schaumburg_12u": _seed_generated_team_logo_asset(db, filename="schaumburg-flyers-12u-a.svg", initials="S12", primary="#1e40af", secondary="#60a5fa", accent="#f8fafc"),
     }
     arena_logo_assets = {
         "centennial": _seed_demo_logo_asset(db, kind="arena-logo", bundled_kind="arena-logos", filename="centennial-demo.svg"),
         "edge": _seed_demo_logo_asset(db, kind="arena-logo", bundled_kind="arena-logos", filename="edge-demo.svg"),
         "fox": _seed_demo_logo_asset(db, kind="arena-logo", bundled_kind="arena-logos", filename="foxvalley-demo.svg"),
+        "glenview": _seed_demo_logo_asset(db, kind="arena-logo", bundled_kind="arena-logos", filename="glenview-ice-demo.svg"),
+        "northbrook": _seed_demo_logo_asset(db, kind="arena-logo", bundled_kind="arena-logos", filename="northbrook-sports-demo.svg"),
+        "robert_crown": _seed_demo_logo_asset(db, kind="arena-logo", bundled_kind="arena-logos", filename="robert-crown-demo.svg"),
+        "rocket": _seed_demo_logo_asset(db, kind="arena-logo", bundled_kind="arena-logos", filename="rocket-ice-demo.svg"),
+        "oak_park": _seed_demo_logo_asset(db, kind="arena-logo", bundled_kind="arena-logos", filename="oak-park-ice-demo.svg"),
+        "schaumburg": _seed_demo_logo_asset(db, kind="arena-logo", bundled_kind="arena-logos", filename="schaumburg-ice-demo.svg"),
     }
 
     associations = [
         Association(id=_id(), name="Northshore Youth Hockey", address="1215 Wilmette Ave", city="Wilmette", state="IL", zip_code="60091", logo_asset_id=association_logo_assets["northshore"]),
         Association(id=_id(), name="Chicago Mission", address="900 W Devon Ave", city="Bensenville", state="IL", zip_code="60106", logo_asset_id=association_logo_assets["mission"]),
         Association(id=_id(), name="Team Illinois", address="710 Western Ave", city="Geneva", state="IL", zip_code="60134", logo_asset_id=association_logo_assets["team_illinois"]),
+        Association(id=_id(), name="Glenview Stars Hockey", address="1851 Landwehr Rd", city="Glenview", state="IL", zip_code="60025", logo_asset_id=association_logo_assets["glenview"]),
+        Association(id=_id(), name="Highland Park Falcons", address="636 Ridge Rd", city="Highland Park", state="IL", zip_code="60035", logo_asset_id=association_logo_assets["highland_park"]),
+        Association(id=_id(), name="Evanston Wildkits Hockey", address="1700 Dodge Ave", city="Evanston", state="IL", zip_code="60201", logo_asset_id=association_logo_assets["evanston"]),
+        Association(id=_id(), name="Naperville Sabres", address="1807 S Washington St", city="Naperville", state="IL", zip_code="60540", logo_asset_id=association_logo_assets["naperville"]),
+        Association(id=_id(), name="Oak Park Eagles", address="415 Lake St", city="Oak Park", state="IL", zip_code="60302", logo_asset_id=association_logo_assets["oak_park"]),
+        Association(id=_id(), name="Schaumburg Flyers Hockey", address="505 N Springinsguth Rd", city="Schaumburg", state="IL", zip_code="60173", logo_asset_id=association_logo_assets["schaumburg"]),
     ]
     db.add_all(associations)
     db.flush()
 
     teams = [
-        Team(id=_id(), association_id=associations[0].id, name="Northshore 14U AA", age_group="14U", level="AA", manager_name="Mike Johnson", manager_email="mike@northshore.org", manager_phone="847-555-0101", logo_asset_id=team_logo_assets["northshore"], myhockey_ranking=15),
-        Team(id=_id(), association_id=associations[0].id, name="Northshore 12U A", age_group="12U", level="A", manager_name="Sarah Chen", manager_email="sarah@northshore.org", manager_phone="847-555-0102", logo_asset_id=team_logo_assets["northshore"], myhockey_ranking=25),
-        Team(id=_id(), association_id=associations[1].id, name="Mission 14U AA", age_group="14U", level="AA", manager_name="Tom Williams", manager_email="tom@mission.org", manager_phone="630-555-0201", logo_asset_id=team_logo_assets["mission"], myhockey_ranking=8),
-        Team(id=_id(), association_id=associations[1].id, name="Mission 12U A", age_group="12U", level="A", manager_name="Lisa Park", manager_email="lisa@mission.org", manager_phone="630-555-0202", logo_asset_id=team_logo_assets["mission"], myhockey_ranking=12),
-        Team(id=_id(), association_id=associations[2].id, name="Team IL 14U AA", age_group="14U", level="AA", manager_name="Dave Brown", manager_email="dave@teamil.org", manager_phone="630-555-0301", logo_asset_id=team_logo_assets["team_illinois"], myhockey_ranking=20),
-        Team(id=_id(), association_id=associations[2].id, name="Team IL 12U A", age_group="12U", level="A", manager_name="Amy White", manager_email="amy@teamil.org", manager_phone="630-555-0302", logo_asset_id=team_logo_assets["team_illinois"], myhockey_ranking=30),
+        Team(id=_id(), association_id=associations[0].id, name="Northshore 14U AA", age_group="14U", level="AA", manager_name="Mike Johnson", manager_email="mike@northshore.org", manager_phone="847-555-0101", logo_asset_id=team_logo_assets["northshore_14u"], myhockey_ranking=15),
+        Team(id=_id(), association_id=associations[0].id, name="Northshore 12U A", age_group="12U", level="A", manager_name="Sarah Chen", manager_email="sarah@northshore.org", manager_phone="847-555-0102", logo_asset_id=team_logo_assets["northshore_12u"], myhockey_ranking=25),
+        Team(id=_id(), association_id=associations[1].id, name="Mission 14U AA", age_group="14U", level="AA", manager_name="Tom Williams", manager_email="tom@mission.org", manager_phone="630-555-0201", logo_asset_id=team_logo_assets["mission_14u"], myhockey_ranking=8),
+        Team(id=_id(), association_id=associations[1].id, name="Mission 12U A", age_group="12U", level="A", manager_name="Lisa Park", manager_email="lisa@mission.org", manager_phone="630-555-0202", logo_asset_id=team_logo_assets["mission_12u"], myhockey_ranking=12),
+        Team(id=_id(), association_id=associations[2].id, name="Team IL 14U AA", age_group="14U", level="AA", manager_name="Dave Brown", manager_email="dave@teamil.org", manager_phone="630-555-0301", logo_asset_id=team_logo_assets["team_illinois_14u"], myhockey_ranking=20),
+        Team(id=_id(), association_id=associations[2].id, name="Team IL 12U A", age_group="12U", level="A", manager_name="Amy White", manager_email="amy@teamil.org", manager_phone="630-555-0302", logo_asset_id=team_logo_assets["team_illinois_12u"], myhockey_ranking=30),
+        Team(id=_id(), association_id=associations[3].id, name="Glenview Stars 14U AA", age_group="14U", level="AA", manager_name="Kevin O'Neill", manager_email="kevin@glenviewstars.org", manager_phone="847-555-0401", logo_asset_id=team_logo_assets["glenview_14u"], myhockey_ranking=18),
+        Team(id=_id(), association_id=associations[3].id, name="Glenview Stars 12U A", age_group="12U", level="A", manager_name="Nina Patel", manager_email="nina@glenviewstars.org", manager_phone="847-555-0402", logo_asset_id=team_logo_assets["glenview_12u"], myhockey_ranking=33),
+        Team(id=_id(), association_id=associations[4].id, name="Highland Park Falcons 14U AA", age_group="14U", level="AA", manager_name="Rachel Kim", manager_email="rachel@hpfalcons.org", manager_phone="847-555-0501", logo_asset_id=team_logo_assets["highland_park_14u"], myhockey_ranking=22),
+        Team(id=_id(), association_id=associations[4].id, name="Highland Park Falcons 12U A", age_group="12U", level="A", manager_name="Ben Carter", manager_email="ben@hpfalcons.org", manager_phone="847-555-0502", logo_asset_id=team_logo_assets["highland_park_12u"], myhockey_ranking=38),
+        Team(id=_id(), association_id=associations[5].id, name="Evanston Wildkits 14U AA", age_group="14U", level="AA", manager_name="Maya Robinson", manager_email="maya@wildkitshockey.org", manager_phone="847-555-0601", logo_asset_id=team_logo_assets["evanston_14u"], myhockey_ranking=26),
+        Team(id=_id(), association_id=associations[5].id, name="Evanston Wildkits 12U A", age_group="12U", level="A", manager_name="Chris Vaughn", manager_email="chris@wildkitshockey.org", manager_phone="847-555-0602", logo_asset_id=team_logo_assets["evanston_12u"], myhockey_ranking=41),
+        Team(id=_id(), association_id=associations[6].id, name="Naperville Sabres 14U AA", age_group="14U", level="AA", manager_name="Elena Garcia", manager_email="elena@napervillesabres.org", manager_phone="630-555-0701", logo_asset_id=team_logo_assets["naperville_14u"], myhockey_ranking=13),
+        Team(id=_id(), association_id=associations[6].id, name="Naperville Sabres 12U A", age_group="12U", level="A", manager_name="Matt Lewis", manager_email="matt@napervillesabres.org", manager_phone="630-555-0702", logo_asset_id=team_logo_assets["naperville_12u"], myhockey_ranking=28),
+        Team(id=_id(), association_id=associations[7].id, name="Oak Park Eagles 14U AA", age_group="14U", level="AA", manager_name="Priya Shah", manager_email="priya@oakparkeagles.org", manager_phone="708-555-0801", logo_asset_id=team_logo_assets["oak_park_14u"], myhockey_ranking=31),
+        Team(id=_id(), association_id=associations[7].id, name="Oak Park Eagles 12U A", age_group="12U", level="A", manager_name="Sean Murphy", manager_email="sean@oakparkeagles.org", manager_phone="708-555-0802", logo_asset_id=team_logo_assets["oak_park_12u"], myhockey_ranking=47),
+        Team(id=_id(), association_id=associations[8].id, name="Schaumburg Flyers 14U AA", age_group="14U", level="AA", manager_name="Dana Brooks", manager_email="dana@schaumburgflyers.org", manager_phone="847-555-0901", logo_asset_id=team_logo_assets["schaumburg_14u"], myhockey_ranking=29),
+        Team(id=_id(), association_id=associations[8].id, name="Schaumburg Flyers 12U A", age_group="12U", level="A", manager_name="Omar Hassan", manager_email="omar@schaumburgflyers.org", manager_phone="847-555-0902", logo_asset_id=team_logo_assets["schaumburg_12u"], myhockey_ranking=44),
     ]
     db.add_all(teams)
     db.flush()
@@ -274,6 +353,12 @@ def seed_demo_data(
         Arena(id=_id(), name="Centennial Ice Arena", address="2300 Old Glenview Rd", city="Wilmette", state="IL", zip_code="60091", phone="847-555-1100", contact_email="ops@centennialice.com", logo_asset_id=arena_logo_assets["centennial"], website="https://centennial.example.com"),
         Arena(id=_id(), name="Edge Ice Center", address="4500 Devon Ave", city="Bensenville", state="IL", zip_code="60106", phone="630-555-1200", contact_email="ops@edgeice.com", logo_asset_id=arena_logo_assets["edge"], website="https://edge.example.com"),
         Arena(id=_id(), name="Fox Valley Ice House", address="710 Western Ave", city="Geneva", state="IL", zip_code="60134", phone="630-555-1300", contact_email="ops@foxvalleyice.com", logo_asset_id=arena_logo_assets["fox"], website="https://foxvalley.example.com"),
+        Arena(id=_id(), name="Glenview Community Ice Center", address="1851 Landwehr Rd", city="Glenview", state="IL", zip_code="60025", phone="847-555-1400", contact_email="ops@glenviewice.com", logo_asset_id=arena_logo_assets["glenview"], website="https://glenviewice.example.com"),
+        Arena(id=_id(), name="Northbrook Sports Center", address="1730 Pfingsten Rd", city="Northbrook", state="IL", zip_code="60062", phone="847-555-1500", contact_email="ops@northbrooksports.com", logo_asset_id=arena_logo_assets["northbrook"], website="https://northbrooksports.example.com"),
+        Arena(id=_id(), name="Robert Crown Community Center", address="1801 Main St", city="Evanston", state="IL", zip_code="60201", phone="847-555-1600", contact_email="ice@robertcrown.example.com", logo_asset_id=arena_logo_assets["robert_crown"], website="https://robertcrown.example.com"),
+        Arena(id=_id(), name="Rocket Ice Arena", address="180 Canterbury Ln", city="Bolingbrook", state="IL", zip_code="60440", phone="630-555-1700", contact_email="ops@rocketice.example.com", logo_asset_id=arena_logo_assets["rocket"], website="https://rocketice.example.com"),
+        Arena(id=_id(), name="Oak Park Ice House", address="415 Lake St", city="Oak Park", state="IL", zip_code="60302", phone="708-555-1800", contact_email="ops@oakparkice.example.com", logo_asset_id=arena_logo_assets["oak_park"], website="https://oakparkice.example.com"),
+        Arena(id=_id(), name="Schaumburg Ice Center", address="505 N Springinsguth Rd", city="Schaumburg", state="IL", zip_code="60173", phone="847-555-1900", contact_email="ops@schaumburgice.example.com", logo_asset_id=arena_logo_assets["schaumburg"], website="https://schaumburgice.example.com"),
     ]
     db.add_all(arenas)
     db.flush()
@@ -341,6 +426,34 @@ def seed_demo_data(
         "centennial_request_practice_accepted": ("Centennial Ice Arena", "Rink A", request_practice_accepted_date, time(20, 15), time(21, 30), "fixed_price", 43500),
         "fox_request_cancelled": ("Fox Valley Ice House", "Rink B", request_cancelled_date, time(19, 15), time(20, 30), "fixed_price", 56000),
     }
+    for arena_index, arena in enumerate(arenas):
+        slot_specs[f"demo_open_{arena_index}_prime"] = (
+            arena.name,
+            "Rink A",
+            open_date + timedelta(days=arena_index % 4),
+            time(15 + (arena_index % 3), 30),
+            time(16 + (arena_index % 3), 45),
+            "fixed_price",
+            42000 + (arena_index * 1750),
+        )
+        slot_specs[f"demo_request_{arena_index}_game"] = (
+            arena.name,
+            "Rink B",
+            request_pending_date + timedelta(days=arena_index % 5),
+            time(18 + (arena_index % 2), 0),
+            time(19 + (arena_index % 2), 15),
+            "fixed_price",
+            47000 + (arena_index * 1600),
+        )
+        slot_specs[f"demo_practice_{arena_index}_late"] = (
+            arena.name,
+            "Rink A" if arena_index % 2 == 0 else "Rink B",
+            request_practice_accepted_date + timedelta(days=arena_index % 6),
+            time(20, 15),
+            time(21, 30),
+            "call_for_pricing" if arena_index % 3 == 0 else "fixed_price",
+            None if arena_index % 3 == 0 else 39000 + (arena_index * 1500),
+        )
     for slot_key, (arena_name, rink_name, slot_date, start_time, end_time, pricing_mode, price_amount_cents) in slot_specs.items():
         arena_rink = arena_rink_by_key[(arena_name, rink_name)]
         slot = IceSlot(
@@ -378,18 +491,31 @@ def seed_demo_data(
     db.add_all(divisions)
     db.flush()
 
-    memberships = [
-        TeamCompetitionMembership(team_id=teams[0].id, season_id=season_id, competition_division_id=divisions[0].id, membership_role="primary", is_primary=True, sort_order=10),
-        TeamCompetitionMembership(team_id=teams[2].id, season_id=season_id, competition_division_id=divisions[0].id, membership_role="primary", is_primary=True, sort_order=10),
-        TeamCompetitionMembership(team_id=teams[4].id, season_id=season_id, competition_division_id=divisions[0].id, membership_role="primary", is_primary=True, sort_order=10),
-        TeamCompetitionMembership(team_id=teams[1].id, season_id=season_id, competition_division_id=divisions[1].id, membership_role="primary", is_primary=True, sort_order=10),
-        TeamCompetitionMembership(team_id=teams[3].id, season_id=season_id, competition_division_id=divisions[1].id, membership_role="primary", is_primary=True, sort_order=10),
-        TeamCompetitionMembership(team_id=teams[5].id, season_id=season_id, competition_division_id=divisions[1].id, membership_role="primary", is_primary=True, sort_order=10),
-        TeamCompetitionMembership(team_id=teams[0].id, season_id=season_id, competition_division_id=divisions[2].id, membership_role="showcase", is_primary=False, sort_order=20),
-        TeamCompetitionMembership(team_id=teams[2].id, season_id=season_id, competition_division_id=divisions[2].id, membership_role="showcase", is_primary=False, sort_order=20),
-        TeamCompetitionMembership(team_id=teams[1].id, season_id=season_id, competition_division_id=divisions[3].id, membership_role="tournament", is_primary=False, sort_order=20),
-        TeamCompetitionMembership(team_id=teams[3].id, season_id=season_id, competition_division_id=divisions[3].id, membership_role="tournament", is_primary=False, sort_order=20),
-    ]
+    memberships: list[TeamCompetitionMembership] = []
+    for team_index, team in enumerate(teams):
+        primary_division = divisions[0] if team.age_group == "14U" else divisions[1]
+        secondary_division = divisions[2] if team.age_group == "14U" else divisions[3]
+        memberships.append(
+            TeamCompetitionMembership(
+                team_id=team.id,
+                season_id=season_id,
+                competition_division_id=primary_division.id,
+                membership_role="primary",
+                is_primary=True,
+                sort_order=10 + team_index,
+            )
+        )
+        if team_index % 3 != 2:
+            memberships.append(
+                TeamCompetitionMembership(
+                    team_id=team.id,
+                    season_id=season_id,
+                    competition_division_id=secondary_division.id,
+                    membership_role="showcase" if team.age_group == "14U" else "tournament",
+                    is_primary=False,
+                    sort_order=30 + team_index,
+                )
+            )
     db.add_all(memberships)
     db.flush()
     _assert_seed_team_competitions(teams, memberships)
@@ -406,6 +532,33 @@ def seed_demo_data(
         AvailabilityWindow(id=_id(), team_id=teams[3].id, season_id=season_id, date=search_demo_date, start_time=time(18, 30), end_time=time(19, 45), availability_type="home"),
         AvailabilityWindow(id=_id(), team_id=teams[5].id, season_id=season_id, date=search_demo_date, start_time=time(18, 30), end_time=time(19, 45), availability_type="away"),
     ]
+    for team_index, team in enumerate(teams[6:], start=6):
+        demo_date = open_date + timedelta(days=team_index % 7)
+        start_hour = 17 + (team_index % 3)
+        availability.append(
+            AvailabilityWindow(
+                id=_id(),
+                team_id=team.id,
+                season_id=season_id,
+                date=demo_date,
+                start_time=time(start_hour, 0),
+                end_time=time(start_hour + 1, 15),
+                availability_type="home" if team_index % 2 == 0 else "away",
+                notes="Demo availability for expanded search and proposal flows.",
+            )
+        )
+        availability.append(
+            AvailabilityWindow(
+                id=_id(),
+                team_id=team.id,
+                season_id=season_id,
+                date=demo_date + timedelta(days=3),
+                start_time=None,
+                end_time=None,
+                availability_type="away" if team_index % 2 == 0 else "home",
+                notes="Flexible demo availability.",
+            )
+        )
     db.add_all(availability)
     db.flush()
 
@@ -449,6 +602,62 @@ def seed_demo_data(
         message="Confirmed for Saturday evening at Centennial.",
     )
     db.add(accepted_confirmed_proposal)
+    db.flush()
+
+    supplemental_proposals: list[Proposal] = []
+    supplemental_proposal_specs = [
+        (6, 8, "demo_request_3_game", divisions[0].id, "Glenview and Highland Park matchup for the expanded demo slate."),
+        (10, 12, "demo_request_5_game", divisions[0].id, "Evanston can travel if Naperville wants the late sheet."),
+        (7, 9, "demo_open_8_prime", divisions[1].id, "12U cross-suburb league option."),
+        (13, 15, "demo_request_7_game", divisions[1].id, "Naperville and Oak Park request for open ice."),
+        (7, 9, "demo_request_4_game", divisions[1].id, "Conflict demo: this stale proposal overlaps an existing Highland Park event, so accepting it should show a conflict."),
+    ]
+    for home_index, away_index, slot_key, division_id, message in supplemental_proposal_specs:
+        slot = slot_by_key[slot_key]
+        arena_rink = slot.arena_rink
+        home_window = AvailabilityWindow(
+            id=_id(),
+            team_id=teams[home_index].id,
+            season_id=season_id,
+            date=slot.date,
+            start_time=slot.start_time,
+            end_time=slot.end_time,
+            availability_type="home",
+            notes="Proposal-specific demo availability.",
+        )
+        away_window = AvailabilityWindow(
+            id=_id(),
+            team_id=teams[away_index].id,
+            season_id=season_id,
+            date=slot.date,
+            start_time=slot.start_time,
+            end_time=slot.end_time,
+            availability_type="away",
+            notes="Proposal-specific demo availability.",
+        )
+        availability.extend([home_window, away_window])
+        db.add_all([home_window, away_window])
+        db.flush()
+        supplemental_proposals.append(
+            Proposal(
+                id=_id(),
+                home_team_id=teams[home_index].id,
+                away_team_id=teams[away_index].id,
+                home_availability_window_id=home_window.id,
+                away_availability_window_id=away_window.id,
+                event_type="league",
+                proposed_date=slot.date,
+                proposed_start_time=slot.start_time,
+                proposed_end_time=slot.end_time,
+                status="proposed",
+                proposed_by_team_id=teams[home_index].id,
+                arena_id=arena_rink.arena_id,
+                arena_rink_id=arena_rink.id,
+                ice_slot_id=slot.id,
+                message=message,
+            )
+        )
+    db.add_all(supplemental_proposals)
     db.flush()
 
     events = [
@@ -605,6 +814,85 @@ def seed_demo_data(
     db.add_all(events)
     db.flush()
 
+    supplemental_events: list[Event] = []
+    supplemental_final_specs = [
+        (6, 8, 3, 1, completed_game_date + timedelta(days=1), arenas[3], "Rink A"),
+        (10, 12, 2, 2, completed_game_date + timedelta(days=2), arenas[5], "Rink B"),
+        (14, 16, 1, 4, completed_game_date + timedelta(days=3), arenas[7], "Rink A"),
+        (8, 12, 5, 3, completed_game_date + timedelta(days=4), arenas[4], "Rink B"),
+        (6, 14, 2, 0, completed_game_date + timedelta(days=5), arenas[8], "Rink A"),
+        (10, 16, 4, 2, completed_game_date + timedelta(days=6), arenas[6], "Rink B"),
+        (7, 9, 2, 1, completed_team_il_12u_date + timedelta(days=1), arenas[3], "Rink B"),
+        (11, 13, 3, 5, completed_team_il_12u_date + timedelta(days=2), arenas[5], "Rink A"),
+        (15, 17, 4, 4, completed_team_il_12u_date + timedelta(days=3), arenas[8], "Rink B"),
+        (9, 13, 1, 2, completed_team_il_12u_date + timedelta(days=4), arenas[4], "Rink A"),
+        (7, 15, 6, 2, completed_team_il_12u_date + timedelta(days=5), arenas[7], "Rink B"),
+        (11, 17, 0, 3, completed_team_il_12u_date + timedelta(days=6), arenas[6], "Rink A"),
+    ]
+    for home_index, away_index, home_score, away_score, event_date, arena, rink_name in supplemental_final_specs:
+        division = divisions[0] if teams[home_index].age_group == "14U" else divisions[1]
+        supplemental_events.append(
+            Event(
+                id=_id(),
+                event_type="league",
+                status="final",
+                home_team_id=teams[home_index].id,
+                away_team_id=teams[away_index].id,
+                season_id=season_id,
+                competition_division_id=division.id,
+                arena_id=arena.id,
+                arena_rink_id=arena_rink_by_key[(arena.name, rink_name)].id,
+                home_locker_room_id=locker_room_by_key[(arena.name, rink_name, "Home")].id,
+                away_locker_room_id=locker_room_by_key[(arena.name, rink_name, "Away")].id,
+                date=event_date,
+                start_time=time(18, 0),
+                end_time=time(19, 15),
+                home_score=home_score,
+                away_score=away_score,
+                counts_for_standings=True,
+            )
+        )
+
+    supplemental_scheduled_specs = [
+        (6, 10, request_accepted_date + timedelta(days=2), arenas[3], "Rink A", "league"),
+        (8, 14, request_accepted_date + timedelta(days=3), arenas[4], "Rink B", "league"),
+        (12, 16, request_accepted_date + timedelta(days=4), arenas[6], "Rink A", "showcase"),
+        (7, 11, request_accepted_date + timedelta(days=2), arenas[5], "Rink B", "league"),
+        (9, 15, request_accepted_date + timedelta(days=3), arenas[7], "Rink A", "league"),
+        (13, 17, request_accepted_date + timedelta(days=4), arenas[8], "Rink B", "tournament"),
+        (14, None, request_practice_accepted_date + timedelta(days=2), arenas[7], "Rink B", "practice"),
+        (16, None, request_practice_accepted_date + timedelta(days=3), arenas[8], "Rink A", "practice"),
+    ]
+    for home_index, away_index, event_date, arena, rink_name, event_type in supplemental_scheduled_specs:
+        division = None
+        if away_index is not None:
+            division = divisions[0] if teams[home_index].age_group == "14U" else divisions[1]
+        supplemental_events.append(
+            Event(
+                id=_id(),
+                event_type=event_type,
+                status="scheduled",
+                home_team_id=teams[home_index].id,
+                away_team_id=teams[away_index].id if away_index is not None else None,
+                season_id=season_id,
+                competition_division_id=division.id if division else None,
+                arena_id=arena.id,
+                arena_rink_id=arena_rink_by_key[(arena.name, rink_name)].id,
+                home_locker_room_id=locker_room_by_key[(arena.name, rink_name, "Home" if away_index is not None else "Practice")].id,
+                away_locker_room_id=locker_room_by_key[(arena.name, rink_name, "Away")].id if away_index is not None else None,
+                date=event_date,
+                start_time=time(17, 30),
+                end_time=time(18, 45),
+                counts_for_standings=event_type == "league",
+                home_weekly_confirmed=True,
+                away_weekly_confirmed=away_index is not None,
+                notes="Expanded demo schedule item.",
+            )
+        )
+    db.add_all(supplemental_events)
+    db.flush()
+    events.extend(supplemental_events)
+
     accepted_request_event = Event(
         id=_id(),
         event_type="league",
@@ -665,6 +953,46 @@ def seed_demo_data(
         notes="Cancelled after bracket change.",
     )
     db.add(cancelled_request_event)
+    db.flush()
+
+    supplemental_booking_events: list[Event] = []
+    supplemental_accepted_booking_specs = [
+        (6, 8, "demo_practice_3_late", "league", divisions[0].id),
+        (10, 12, "demo_practice_5_late", "showcase", divisions[2].id),
+        (7, None, "demo_practice_4_late", "practice", None),
+        (13, 15, "demo_practice_7_late", "league", divisions[1].id),
+        (14, 16, "demo_practice_8_late", "tournament", divisions[2].id),
+        (17, None, "demo_practice_2_late", "practice", None),
+    ]
+    for home_index, away_index, slot_key, event_type, division_id in supplemental_accepted_booking_specs:
+        slot = slot_by_key[slot_key]
+        arena_rink = slot.arena_rink
+        arena = arena_rink.arena
+        rink_name = arena_rink.name
+        supplemental_booking_events.append(
+            Event(
+                id=_id(),
+                event_type=event_type,
+                status="scheduled",
+                home_team_id=teams[home_index].id,
+                away_team_id=teams[away_index].id if away_index is not None else None,
+                season_id=season_id,
+                competition_division_id=division_id,
+                arena_id=arena.id,
+                arena_rink_id=arena_rink.id,
+                ice_slot_id=slot.id,
+                home_locker_room_id=locker_room_by_key[(arena.name, rink_name, "Home" if away_index is not None else "Practice")].id,
+                away_locker_room_id=locker_room_by_key[(arena.name, rink_name, "Away")].id if away_index is not None else None,
+                date=slot.date,
+                start_time=slot.start_time,
+                end_time=slot.end_time,
+                counts_for_standings=event_type == "league",
+                home_weekly_confirmed=True,
+                away_weekly_confirmed=away_index is not None,
+                notes="Accepted expanded-demo ice request.",
+            )
+        )
+    db.add_all(supplemental_booking_events)
     db.flush()
 
     booking_requests = [
@@ -825,6 +1153,97 @@ def seed_demo_data(
             response_message="Cancelled after the event was moved to another sheet.",
         ),
     ]
+    for accepted_event, (home_index, away_index, slot_key, event_type, _division_id) in zip(
+        supplemental_booking_events,
+        supplemental_accepted_booking_specs,
+        strict=True,
+    ):
+        slot = slot_by_key[slot_key]
+        arena_rink = slot.arena_rink
+        arena = arena_rink.arena
+        rink_name = arena_rink.name
+        booking_requests.append(
+            IceBookingRequest(
+                id=_id(),
+                requester_team_id=teams[home_index].id,
+                away_team_id=teams[away_index].id if away_index is not None else None,
+                season_id=season_id,
+                event_type=event_type,
+                status="accepted",
+                arena_id=arena.id,
+                arena_rink_id=arena_rink.id,
+                ice_slot_id=slot.id,
+                event_id=accepted_event.id,
+                pricing_mode=slot.pricing_mode,
+                price_amount_cents=slot.price_amount_cents,
+                currency=slot.currency,
+                final_price_amount_cents=slot.price_amount_cents,
+                final_currency=slot.currency if slot.price_amount_cents is not None else None,
+                home_locker_room_id=locker_room_by_key[(arena.name, rink_name, "Home" if away_index is not None else "Practice")].id,
+                away_locker_room_id=locker_room_by_key[(arena.name, rink_name, "Away")].id if away_index is not None else None,
+                message="Expanded demo accepted ice request.",
+                response_message="Accepted. Locker rooms assigned for the expanded demo schedule.",
+            )
+        )
+
+    supplemental_requested_specs = [
+        (8, 10, "demo_request_0_game", "league"),
+        (12, 14, "demo_request_1_game", "showcase"),
+        (16, None, "demo_request_2_game", "practice"),
+        (6, 12, "demo_request_6_game", "league"),
+        (10, 14, "demo_request_8_game", "tournament"),
+        (7, 13, "demo_open_3_prime", "league"),
+        (9, None, "demo_open_4_prime", "practice"),
+        (15, 17, "demo_open_5_prime", "league"),
+    ]
+    for home_index, away_index, slot_key, event_type in supplemental_requested_specs:
+        slot = slot_by_key[slot_key]
+        arena_rink = slot.arena_rink
+        booking_requests.append(
+            IceBookingRequest(
+                id=_id(),
+                requester_team_id=teams[home_index].id,
+                away_team_id=teams[away_index].id if away_index is not None else None,
+                season_id=season_id,
+                event_type=event_type,
+                status="requested",
+                arena_id=arena_rink.arena_id,
+                arena_rink_id=arena_rink.id,
+                ice_slot_id=slot.id,
+                pricing_mode=slot.pricing_mode,
+                price_amount_cents=slot.price_amount_cents,
+                currency=slot.currency,
+                message="Expanded demo pending request for arena review.",
+            )
+        )
+
+    supplemental_cancelled_specs = [
+        (11, 17, "demo_open_6_prime", "league"),
+        (13, None, "demo_open_7_prime", "practice"),
+    ]
+    for home_index, away_index, slot_key, event_type in supplemental_cancelled_specs:
+        slot = slot_by_key[slot_key]
+        arena_rink = slot.arena_rink
+        booking_requests.append(
+            IceBookingRequest(
+                id=_id(),
+                requester_team_id=teams[home_index].id,
+                away_team_id=teams[away_index].id if away_index is not None else None,
+                season_id=season_id,
+                event_type=event_type,
+                status="cancelled",
+                arena_id=arena_rink.arena_id,
+                arena_rink_id=arena_rink.id,
+                ice_slot_id=slot.id,
+                pricing_mode=slot.pricing_mode,
+                price_amount_cents=slot.price_amount_cents,
+                currency=slot.currency,
+                final_price_amount_cents=slot.price_amount_cents,
+                final_currency=slot.currency if slot.price_amount_cents is not None else None,
+                message="Expanded demo cancelled request.",
+                response_message="Cancelled during demo planning.",
+            )
+        )
     db.add_all(booking_requests)
     db.flush()
 
@@ -848,15 +1267,34 @@ def seed_demo_data(
     slot_by_key["centennial_request_practice_accepted"].booked_by_team_id = teams[5].id
     slot_by_key["fox_request_cancelled"].status = "available"
     slot_by_key["fox_request_cancelled"].booked_by_team_id = None
+    for _home_index, _away_index, slot_key, _division_id, _message in supplemental_proposal_specs:
+        slot_by_key[slot_key].status = "held"
+        slot_by_key[slot_key].booked_by_team_id = teams[_home_index].id
+    for home_index, _away_index, slot_key, _event_type, _division_id in supplemental_accepted_booking_specs:
+        slot_by_key[slot_key].status = "booked"
+        slot_by_key[slot_key].booked_by_team_id = teams[home_index].id
+    for home_index, _away_index, slot_key, _event_type in supplemental_requested_specs:
+        slot_by_key[slot_key].status = "held"
+        slot_by_key[slot_key].booked_by_team_id = teams[home_index].id
+    for _home_index, _away_index, slot_key, _event_type in supplemental_cancelled_specs:
+        slot_by_key[slot_key].status = "available"
+        slot_by_key[slot_key].booked_by_team_id = None
 
     availability[0].status = "scheduled"
     availability[0].opponent_team_id = teams[2].id
     availability[1].status = "scheduled"
     availability[1].opponent_team_id = teams[0].id
 
-    seeded_events = [*events, accepted_request_event, accepted_practice_request_event, cancelled_request_event]
+    seeded_events = [
+        *events,
+        accepted_request_event,
+        accepted_practice_request_event,
+        cancelled_request_event,
+        *supplemental_booking_events,
+    ]
     _assert_seed_event_links(db, seeded_events)
-    _assert_seed_proposal_links(db, [proposal, accepted_confirmed_proposal])
+    seeded_proposals = [proposal, accepted_confirmed_proposal, *supplemental_proposals]
+    _assert_seed_proposal_links(db, seeded_proposals)
     _assert_seed_booking_request_links(db, booking_requests)
 
     def add_roster(team_id: str, last_name_prefix: str):
@@ -887,12 +1325,28 @@ def seed_demo_data(
                 )
             )
 
-    add_roster(teams[0].id, "NS14-")
-    add_roster(teams[1].id, "NS12-")
-    add_roster(teams[2].id, "MI14-")
-    add_roster(teams[3].id, "MI12-")
-    add_roster(teams[4].id, "TI14-")
-    add_roster(teams[5].id, "TI12-")
+    roster_prefixes = [
+        "NS14-",
+        "NS12-",
+        "MI14-",
+        "MI12-",
+        "TI14-",
+        "TI12-",
+        "GV14-",
+        "GV12-",
+        "HP14-",
+        "HP12-",
+        "EV14-",
+        "EV12-",
+        "NP14-",
+        "NP12-",
+        "OP14-",
+        "OP12-",
+        "SF14-",
+        "SF12-",
+    ]
+    for team, roster_prefix in zip(teams, roster_prefixes, strict=True):
+        add_roster(team.id, roster_prefix)
 
     db.flush()
 
@@ -1000,6 +1454,35 @@ def seed_demo_data(
             message=f"{teams[2].name} vs {teams[0].name}\n{request_cancelled_date.isoformat()} 19:15\n{arenas[2].name} • Rink B\nHome: Home Rink B | Away: Away Rink B\nNote: Cancelled after the event was moved to another sheet.",
         ),
     ]
+    for accepted_event, (home_index, away_index, _slot_key, _event_type, _division_id) in zip(
+        supplemental_booking_events,
+        supplemental_accepted_booking_specs,
+        strict=True,
+    ):
+        notification_message = (
+            f"{teams[home_index].name}"
+            f"{f' vs {teams[away_index].name}' if away_index is not None else ' Practice'}\n"
+            f"{accepted_event.date.isoformat()} {accepted_event.start_time.strftime('%H:%M') if accepted_event.start_time else ''}\n"
+            f"{accepted_event.arena.name} • {accepted_event.arena_rink.name}\n"
+            "Note: Accepted. Locker rooms assigned for the expanded demo schedule."
+        )
+        notifications.append(
+            Notification(
+                team_id=teams[home_index].id,
+                notif_type="locker_room_update",
+                title="Expanded demo ice accepted",
+                message=notification_message,
+            )
+        )
+        if away_index is not None:
+            notifications.append(
+                Notification(
+                    team_id=teams[away_index].id,
+                    notif_type="locker_room_update",
+                    title="Expanded demo ice accepted",
+                    message=notification_message,
+                )
+            )
     db.add_all(notifications)
 
     db.commit()
@@ -1020,7 +1503,7 @@ def seed_demo_data(
         "availability_windows": len(availability),
         "events": len(seeded_events),
         "event_attendance": db.query(EventAttendance).count(),
-        "proposals": 2,
+        "proposals": len(seeded_proposals),
         "booking_requests": len(booking_requests),
         "notifications": len(notifications),
         "preserved_users": len(preserved_users),
