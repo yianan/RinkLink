@@ -8,6 +8,7 @@ import { Input } from '../components/ui/Input';
 import { authApiBaseUrl, authClient } from '../lib/auth-client';
 import { buildAuthCallbackUrl, consumeAuthReturnTo } from '../lib/auth-routing';
 import { cn } from '../lib/cn';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
 const appIconSrc = '/icons/rinklink-icon-192.png';
@@ -293,6 +294,7 @@ function getAuthErrorDetails(error: unknown) {
 function SignInCard() {
   const navigate = useNavigate();
   const pushToast = useToast();
+  const { refreshProfile } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -323,7 +325,8 @@ function SignInCard() {
         return;
       }
 
-      window.location.assign(consumeAuthReturnTo() || '/');
+      await refreshProfile({ assumeAuthenticated: true });
+      navigate(consumeAuthReturnTo() || '/', { replace: true });
     } catch (error) {
       const { message, errorCode, status } = getAuthErrorDetails(error);
 

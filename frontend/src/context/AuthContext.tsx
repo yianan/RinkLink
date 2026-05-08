@@ -15,7 +15,7 @@ interface AuthContextValue {
   me: MeResponse | null;
   bootstrap: AppBootstrap | null;
   error: string | null;
-  refreshProfile: (options?: { silent?: boolean }) => Promise<void>;
+  refreshProfile: (options?: { assumeAuthenticated?: boolean; silent?: boolean }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -96,11 +96,14 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
   const { data: session, isPending, error: sessionError, refetch } = authClient.useSession();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [bootstrap, setBootstrap] = useState<AppBootstrap | null>(null);
+  const [authenticatedOverride, setAuthenticatedOverride] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
-  const loadProfile = async ({ silent = false }: { silent?: boolean } = {}) => {
-    if (!session) {
+  const isAuthenticated = !!session || authenticatedOverride;
+
+  const loadProfile = async ({ assumeAuthenticated = false, silent = false }: { assumeAuthenticated?: boolean; silent?: boolean } = {}) => {
+    if (!session && !assumeAuthenticated) {
       clearApiAccessToken();
       clearStoredBootstrap();
       setMe(null);
@@ -109,6 +112,11 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (assumeAuthenticated) {
+      clearApiAccessToken();
+      clearStoredBootstrap();
+      setAuthenticatedOverride(true);
+    }
     const email = sessionEmail(session);
     const cachedBootstrap = silent ? null : loadStoredBootstrap(email);
     if (cachedBootstrap) {
@@ -123,7 +131,7 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
       const data = await api.getAppBootstrap();
       setBootstrap(data);
       setMe(data.me);
-      storeBootstrap(data, email);
+      storeBootstrap(data, email ?? data.me.user.email);
       setProfileError(null);
     } catch (error) {
       if (!cachedBootstrap && !silent) {
@@ -139,21 +147,32 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    if (!session && authenticatedOverride) {
+      return;
+    }
+    if (session && authenticatedOverride) {
+      setAuthenticatedOverride(false);
+      return;
+    }
     void loadProfile();
-  }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authenticatedOverride, session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <AuthContext.Provider
       value={{
         authEnabled: true,
         loading: isPending || profileLoading,
-        isAuthenticated: !!session,
+        isAuthenticated,
         me,
         bootstrap,
         error: profileError ?? sessionError?.message ?? null,
         refreshProfile: async (options) => {
           if (options?.silent) {
             await loadProfile({ silent: true });
+            return;
+          }
+          if (options?.assumeAuthenticated) {
+            await loadProfile({ assumeAuthenticated: true });
             return;
           }
           await refetch();

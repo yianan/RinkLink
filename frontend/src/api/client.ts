@@ -3,6 +3,7 @@ import type { TeamDashboardSummary } from '../types';
 
 const apiOrigin = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 const BASE_URL = apiOrigin ? `${apiOrigin}/api` : '/api';
+let appBootstrapRequest: Promise<import('../types').AppBootstrap> | null = null;
 const dashboardSummaryRequests = new Map<string, Promise<TeamDashboardSummary>>();
 
 export type ApiOptions = {
@@ -136,7 +137,15 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
 
 export const api = {
   getMe: () => request<import('../types').MeResponse>('/me'),
-  getAppBootstrap: () => request<import('../types').AppBootstrap>('/app-bootstrap'),
+  getAppBootstrap: () => {
+    if (appBootstrapRequest) {
+      return appBootstrapRequest;
+    }
+    appBootstrapRequest = request<import('../types').AppBootstrap>('/app-bootstrap').finally(() => {
+      appBootstrapRequest = null;
+    });
+    return appBootstrapRequest;
+  },
   getUsers: (params?: Record<string, string>) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').AppUserIdentity[]>(`/users${qs}`);
