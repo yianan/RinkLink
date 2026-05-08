@@ -44,6 +44,16 @@ AUTH_PID=$!
 
 cd /app/backend
 alembic upgrade head
+
+if [ "${RESEED_DEMO_ON_START:-false}" = "true" ]; then
+  if [ -n "${RESEED_DEMO_ON_START_COMMIT:-}" ] && [ "${RENDER_GIT_COMMIT:-}" != "${RESEED_DEMO_ON_START_COMMIT}" ]; then
+    echo "Skipping demo reseed: RENDER_GIT_COMMIT does not match RESEED_DEMO_ON_START_COMMIT"
+  else
+    echo "Reseeding demo data while preserving existing app users"
+    python -m app.seed.bootstrap_demo --preserve-existing-users
+  fi
+fi
+
 uvicorn app.main:app --host 0.0.0.0 --port "$APP_PORT" &
 API_PID=$!
 

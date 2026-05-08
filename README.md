@@ -288,6 +288,18 @@ That command:
 - restores the specified user as `active` + `platform_admin`
 - leaves future `Reset Demo Data` actions available from the frontend when `APP_ENV=development`
 
+For a temporary hosted reseed where existing app users should keep their current
+status and platform-admin flags, run:
+
+```bash
+python -m app.seed.bootstrap_demo --preserve-existing-users
+```
+
+The single-service Docker startup script also honors
+`RESEED_DEMO_ON_START=true`, optionally guarded with
+`RESEED_DEMO_ON_START_COMMIT=<commit sha>`, for one-off Render reseeds after
+migrations. Clear the env vars after the reseed deploy completes.
+
 ### First cloud deploy
 
 1. Create or choose a Neon Postgres database or branch dedicated to this Render service.
