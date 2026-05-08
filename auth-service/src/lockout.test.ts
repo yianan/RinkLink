@@ -41,7 +41,7 @@ class FakePool {
           locked_until: null,
           updated_at: now,
         };
-        return { rows: [] };
+        return { rows: [{ locked_until: this.row.locked_until, failed_attempts: this.row.failed_attempts } as T] };
       }
 
       const windowFloor = new Date(now.getTime() - 15 * 60 * 1000);
@@ -59,7 +59,7 @@ class FakePool {
             : this.row.locked_until,
         updated_at: now,
       };
-      return { rows: [] };
+      return { rows: [{ locked_until: this.row.locked_until, failed_attempts: this.row.failed_attempts } as T] };
     }
 
     throw new Error(`Unexpected query: ${sql}`);

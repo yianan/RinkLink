@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { auth, pool } from "./auth.js";
 import { queryWithRetry } from "./db.js";
+import { hashPassword } from "./password.js";
 
 type AuthUserRow = {
   id: string;
@@ -83,6 +84,22 @@ async function verifyAuthUser(authId: string, name: string): Promise<void> {
   );
 }
 
+async function refreshBootstrapPassword(authId: string, password: string): Promise<void> {
+  const passwordHash = await hashPassword(password);
+  await queryWithRetry(
+    pool,
+    `
+      UPDATE auth.account
+      SET password = $2,
+          "updatedAt" = NOW()
+      WHERE "userId" = $1
+        AND "providerId" = 'credential'
+    `,
+    [authId, passwordHash],
+  );
+  console.info("[bootstrap-admin] Refreshed bootstrap admin password hash");
+}
+
 async function upsertPlatformAdmin(authUser: AuthUserRow, name: string): Promise<void> {
   const existing = await queryWithRetry<AppUserRow>(
     pool,
@@ -159,6 +176,7 @@ async function main(): Promise<void> {
 
   const authUser = await ensureAuthUser(email.toLowerCase(), password, name);
   await verifyAuthUser(authUser.id, name);
+  await refreshBootstrapPassword(authUser.id, password);
   await upsertPlatformAdmin({ ...authUser, email: email.toLowerCase() }, name);
 }
 
