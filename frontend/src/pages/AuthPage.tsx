@@ -316,7 +316,6 @@ function SignInCard() {
       const response = await (authClient.signIn.email as unknown as (body: Record<string, unknown>) => Promise<Record<string, unknown>>)({
         email: trimmedEmail,
         password,
-        callbackURL: buildAuthCallbackUrl('/'),
         fetchOptions: { throw: true },
       });
 
