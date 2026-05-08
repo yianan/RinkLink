@@ -248,49 +248,9 @@ function canViewPath(path: string, me: MeResponse | null, runtimeAuthEnabled: bo
   }
 }
 
-function AppNav({ onNavigate }: { onNavigate?: () => void }) {
+function AppNav({ navBadges = {}, onNavigate }: { navBadges?: Record<string, number>; onNavigate?: () => void }) {
   const location = useLocation();
-  const { activeTeam } = useTeam();
-  const { activeSeason, seasons } = useSeason();
   const { authEnabled: runtimeAuthEnabled, me } = useAuth();
-  const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
-  const [navBadges, setNavBadges] = useState<Record<string, number>>({});
-  const navBadgeKey = useNavBadgeKey();
-  const canManageSchedule = hasCapability(me, 'team.manage_schedule');
-  const canManageProposals = hasCapability(me, 'team.manage_proposals');
-
-  useEffect(() => {
-    if (!activeTeam || (!canManageSchedule && !canManageProposals)) return;
-    let cancelled = false;
-    const todayStr = toLocalDateString(new Date());
-    const params: Record<string, string> = { date_from: todayStr };
-    if (effectiveSeason) {
-      params.season_id = effectiveSeason.id;
-    }
-
-    Promise.all([
-      canManageProposals ? api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }) : Promise.resolve([]),
-      canManageSchedule ? api.getEvents(activeTeam.id, params) : Promise.resolve([]),
-    ]).then(([incomingProposals, events]) => {
-      if (cancelled) return;
-      const awaitingConfirmationCount = events.filter((event) => {
-        if (!event.away_team_id) return false;
-        if (event.status === 'cancelled' || event.status === 'final') return false;
-        return event.home_team_id === activeTeam.id ? !event.home_weekly_confirmed : !event.away_weekly_confirmed;
-      }).length;
-      setNavBadges({
-        '/proposals': canManageProposals ? incomingProposals.length : 0,
-        '/schedule': canManageSchedule ? awaitingConfirmationCount : 0,
-      });
-    }).catch(() => {
-      if (!cancelled) setNavBadges({});
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTeam, canManageProposals, canManageSchedule, effectiveSeason, navBadgeKey]);
-  const visibleNavBadges = activeTeam && (canManageSchedule || canManageProposals) ? navBadges : {};
 
   return (
     <nav className="p-3">
@@ -305,7 +265,7 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
             {visibleItems.map((item) => {
               const Icon = item.icon;
               const isActive = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path);
-              const badgeCount = visibleNavBadges[item.path] || 0;
+              const badgeCount = navBadges[item.path] || 0;
 
               return (
                 <NavLink
@@ -363,18 +323,23 @@ function AppNav({ onNavigate }: { onNavigate?: () => void }) {
 
 function AppContent() {
   const { authEnabled: runtimeAuthEnabled, isAuthenticated, me, loading: authLoading, error: authError } = useAuth();
-  const { loading: teamsLoading } = useTeam();
-  const { loading: seasonsLoading } = useSeason();
+  const { activeTeam, loading: teamsLoading } = useTeam();
+  const { activeSeason, seasons, loading: seasonsLoading } = useSeason();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [navBadges, setNavBadges] = useState<Record<string, number>>({});
   const [headerHeight, setHeaderHeight] = useState(56);
   const mobileNavDescriptionId = useId();
   const headerRef = useRef<HTMLElement | null>(null);
   const mobileNavContentRef = useRef<HTMLDivElement | null>(null);
   const mobileNavScrollRef = useRef<HTMLDivElement | null>(null);
+  const navBadgeKey = useNavBadgeKey();
   const appLoading = teamsLoading || seasonsLoading;
+  const effectiveSeason = activeSeason ?? seasons.find((season) => season.is_active) ?? seasons[0] ?? null;
+  const canManageSchedule = hasCapability(me, 'team.manage_schedule');
+  const canManageProposals = hasCapability(me, 'team.manage_proposals');
   const disabledAccess = runtimeAuthEnabled
     && isAuthenticated
     && !!me
@@ -396,6 +361,50 @@ function AppContent() {
       setSigningOut(false);
     }
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (
+      location.pathname === '/'
+      || location.pathname.startsWith('/auth')
+      || location.pathname.startsWith('/invite')
+      || location.pathname === '/pending'
+      || location.pathname === '/disabled'
+      || !activeTeam
+      || (!canManageSchedule && !canManageProposals)
+    ) {
+      setNavBadges({});
+      return;
+    }
+
+    let cancelled = false;
+    const todayStr = toLocalDateString(new Date());
+    const params: Record<string, string> = { date_from: todayStr };
+    if (effectiveSeason) {
+      params.season_id = effectiveSeason.id;
+    }
+
+    Promise.all([
+      canManageProposals ? api.getProposals(activeTeam.id, { direction: 'incoming', status: 'proposed' }) : Promise.resolve([]),
+      canManageSchedule ? api.getEvents(activeTeam.id, params) : Promise.resolve([]),
+    ]).then(([incomingProposals, events]) => {
+      if (cancelled) return;
+      const awaitingConfirmationCount = events.filter((event) => {
+        if (!event.away_team_id) return false;
+        if (event.status === 'cancelled' || event.status === 'final') return false;
+        return event.home_team_id === activeTeam.id ? !event.home_weekly_confirmed : !event.away_weekly_confirmed;
+      }).length;
+      setNavBadges({
+        '/proposals': canManageProposals ? incomingProposals.length : 0,
+        '/schedule': canManageSchedule ? awaitingConfirmationCount : 0,
+      });
+    }).catch(() => {
+      if (!cancelled) setNavBadges({});
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTeam, canManageProposals, canManageSchedule, effectiveSeason, location.pathname, navBadgeKey]);
 
   useEffect(() => {
     const header = headerRef.current;
@@ -576,7 +585,7 @@ function AppContent() {
 
         <div style={{ paddingTop: headerHeight }}>
           <aside className="hidden lg:fixed lg:inset-y-14 lg:left-0 lg:block lg:w-56 lg:overflow-y-auto lg:border-r lg:border-slate-200/70 lg:bg-white/80 lg:backdrop-blur-sm dark:lg:border-slate-800/70 dark:lg:bg-slate-950/90">
-            <AppNav />
+            <AppNav navBadges={navBadges} />
           </aside>
 
           <main className="w-full px-4 py-6 sm:px-6 lg:pl-64 lg:pr-6">
@@ -676,7 +685,7 @@ function AppContent() {
               tabIndex={0}
               className="min-h-0 flex-1 overflow-y-scroll overscroll-contain focus:outline-none"
             >
-              <AppNav onNavigate={() => setMobileNavOpen(false)} />
+              <AppNav navBadges={navBadges} onNavigate={() => setMobileNavOpen(false)} />
             </div>
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
