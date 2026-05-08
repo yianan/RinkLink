@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { api } from '../api/client';
 import type { AppBootstrap, MeResponse } from '../types';
@@ -99,6 +99,7 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
   const [authenticatedOverride, setAuthenticatedOverride] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const skipNextSessionProfileLoadRef = useRef(false);
 
   const isAuthenticated = !!session || authenticatedOverride;
 
@@ -151,7 +152,12 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (session && authenticatedOverride) {
+      skipNextSessionProfileLoadRef.current = true;
       setAuthenticatedOverride(false);
+      return;
+    }
+    if (session && skipNextSessionProfileLoadRef.current) {
+      skipNextSessionProfileLoadRef.current = false;
       return;
     }
     void loadProfile();
