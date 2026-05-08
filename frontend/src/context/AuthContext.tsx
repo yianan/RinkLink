@@ -1,9 +1,10 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 
-import { api } from '../api/client';
+import { api, ApiError } from '../api/client';
 import type { AppBootstrap, MeResponse } from '../types';
-import { authClient, authEnabled, clearApiAccessToken } from '../lib/auth-client';
+import { authEnabled, clearApiAccessToken, getApiAccessToken } from '../lib/auth-client';
 
 const bootstrapStorageKey = 'rinklink.appBootstrap';
 const bootstrapCacheTtlMs = 60_000;
@@ -15,6 +16,7 @@ interface AuthContextValue {
   me: MeResponse | null;
   bootstrap: AppBootstrap | null;
   error: string | null;
+  clearProfile: () => void;
   refreshProfile: (options?: { assumeAuthenticated?: boolean; silent?: boolean }) => Promise<void>;
 }
 
@@ -25,16 +27,9 @@ const AuthContext = createContext<AuthContextValue>({
   me: null,
   bootstrap: null,
   error: null,
+  clearProfile: () => {},
   refreshProfile: async () => {},
 });
-
-function sessionEmail(session: unknown): string | null {
-  if (!session || typeof session !== 'object') return null;
-  const user = (session as { user?: unknown }).user;
-  if (!user || typeof user !== 'object') return null;
-  const email = (user as { email?: unknown }).email;
-  return typeof email === 'string' ? email : null;
-}
 
 function loadStoredBootstrap(email: string | null): AppBootstrap | null {
   try {
@@ -84,6 +79,7 @@ function DisabledAuthProvider({ children }: { children: ReactNode }) {
         me: null,
         bootstrap: null,
         error: null,
+        clearProfile: () => {},
         refreshProfile: async () => {},
       }}
     >
@@ -92,37 +88,65 @@ function DisabledAuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+function isPublicAuthPath(pathname: string) {
+  return (
+    pathname === '/login'
+    || pathname === '/auth/sign-in'
+    || pathname === '/auth/sign-up'
+    || pathname === '/auth/check-email'
+    || pathname === '/auth/forgot-password'
+    || pathname === '/auth/reset-password'
+  );
+}
+
 function EnabledAuthProvider({ children }: { children: ReactNode }) {
-  const { data: session, isPending, error: sessionError, refetch } = authClient.useSession();
+  const location = useLocation();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [bootstrap, setBootstrap] = useState<AppBootstrap | null>(null);
-  const [authenticatedOverride, setAuthenticatedOverride] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
-  const skipNextSessionProfileLoadRef = useRef(false);
 
-  const isAuthenticated = !!session || authenticatedOverride;
+  const clearProfile = useCallback(() => {
+    clearApiAccessToken();
+    clearStoredBootstrap();
+    setAuthenticated(false);
+    setMe(null);
+    setBootstrap(null);
+    setProfileError(null);
+    setProfileLoading(false);
+    setInitializing(false);
+  }, []);
 
-  const loadProfile = async ({ assumeAuthenticated = false, silent = false }: { assumeAuthenticated?: boolean; silent?: boolean } = {}) => {
-    if (!session && !assumeAuthenticated) {
-      clearApiAccessToken();
-      clearStoredBootstrap();
-      setMe(null);
-      setBootstrap(null);
-      setProfileError(null);
-      return;
-    }
-
+  const loadProfile = useCallback(async ({
+    assumeAuthenticated = false,
+    silent = false,
+    requireValidToken = false,
+  }: {
+    assumeAuthenticated?: boolean;
+    silent?: boolean;
+    requireValidToken?: boolean;
+  } = {}) => {
     if (assumeAuthenticated) {
       clearApiAccessToken();
       clearStoredBootstrap();
-      setAuthenticatedOverride(true);
     }
-    const email = sessionEmail(session);
+
+    if (requireValidToken && !assumeAuthenticated) {
+      const token = await getApiAccessToken();
+      if (!token) {
+        clearProfile();
+        return;
+      }
+    }
+
+    const email = me?.user.email ?? null;
     const cachedBootstrap = silent ? null : loadStoredBootstrap(email);
     if (cachedBootstrap) {
       setBootstrap(cachedBootstrap);
       setMe(cachedBootstrap.me);
+      setAuthenticated(true);
       setProfileError(null);
       setProfileLoading(false);
     } else if (!silent) {
@@ -130,48 +154,54 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
     }
     try {
       const data = await api.getAppBootstrap();
+      setAuthenticated(true);
       setBootstrap(data);
       setMe(data.me);
-      storeBootstrap(data, email ?? data.me.user.email);
+      storeBootstrap(data, data.me.user.email);
       setProfileError(null);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearProfile();
+        return;
+      }
       if (!cachedBootstrap && !silent) {
         setMe(null);
         setBootstrap(null);
+      }
+      if (assumeAuthenticated || requireValidToken || authenticated) {
+        setAuthenticated(true);
       }
       setProfileError(String(error));
     } finally {
       if (!silent) {
         setProfileLoading(false);
       }
+      setInitializing(false);
     }
-  };
+  }, [authenticated, clearProfile, me?.user.email]);
 
   useEffect(() => {
-    if (!session && authenticatedOverride) {
+    if (authenticated && bootstrap) {
+      setInitializing(false);
       return;
     }
-    if (session && authenticatedOverride) {
-      skipNextSessionProfileLoadRef.current = true;
-      setAuthenticatedOverride(false);
+    if (isPublicAuthPath(location.pathname)) {
+      setInitializing(false);
       return;
     }
-    if (session && skipNextSessionProfileLoadRef.current) {
-      skipNextSessionProfileLoadRef.current = false;
-      return;
-    }
-    void loadProfile();
-  }, [authenticatedOverride, session]); // eslint-disable-line react-hooks/exhaustive-deps
+    void loadProfile({ requireValidToken: true });
+  }, [authenticated, bootstrap, loadProfile, location.pathname]);
 
   return (
     <AuthContext.Provider
       value={{
         authEnabled: true,
-        loading: isPending || profileLoading,
-        isAuthenticated,
+        loading: initializing || profileLoading,
+        isAuthenticated: authenticated,
         me,
         bootstrap,
-        error: profileError ?? sessionError?.message ?? null,
+        error: profileError,
+        clearProfile,
         refreshProfile: async (options) => {
           if (options?.silent) {
             await loadProfile({ silent: true });
@@ -181,8 +211,7 @@ function EnabledAuthProvider({ children }: { children: ReactNode }) {
             await loadProfile({ assumeAuthenticated: true });
             return;
           }
-          await refetch();
-          await loadProfile();
+          await loadProfile({ requireValidToken: true });
         },
       }}
     >

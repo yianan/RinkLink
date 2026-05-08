@@ -24,7 +24,6 @@ import {
 import { TeamProvider, useTeam } from './context/TeamContext';
 import { SeasonProvider, useSeason } from './context/SeasonContext';
 import { AuthProvider } from './context/AuthContext';
-import { BetterAuthUiProvider } from './context/BetterAuthUiProvider';
 import { useAuth } from './context/AuthContext';
 import TeamSwitcher from './components/TeamSwitcher';
 import SeasonSwitcher from './components/SeasonSwitcher';
@@ -323,7 +322,14 @@ function AppNav({ navBadges = {}, onNavigate }: { navBadges?: Record<string, num
 }
 
 function AppContent() {
-  const { authEnabled: runtimeAuthEnabled, isAuthenticated, me, loading: authLoading, error: authError } = useAuth();
+  const {
+    authEnabled: runtimeAuthEnabled,
+    isAuthenticated,
+    me,
+    loading: authLoading,
+    error: authError,
+    clearProfile,
+  } = useAuth();
   const { activeTeam, loading: teamsLoading } = useTeam();
   const { activeSeason, seasons, loading: seasonsLoading } = useSeason();
   const location = useLocation();
@@ -437,6 +443,7 @@ function AppContent() {
   const handleSignOut = async () => {
     setSigningOut(true);
     clearApiAccessToken();
+    clearProfile();
     navigate('/auth/sign-in', { replace: true });
     let signedOut = false;
     try {
@@ -705,19 +712,17 @@ export default function App() {
   return (
     <TooltipPrimitive.Provider delayDuration={120}>
       <ToastProvider>
-        <BetterAuthUiProvider>
-          <AuthProvider>
-            <TeamProvider>
-              <SeasonProvider>
-                <NavBadgeProvider>
-                  <ConfirmDialogProvider>
-                    <AppContent />
-                  </ConfirmDialogProvider>
-                </NavBadgeProvider>
-              </SeasonProvider>
-            </TeamProvider>
-          </AuthProvider>
-        </BetterAuthUiProvider>
+        <AuthProvider>
+          <TeamProvider>
+            <SeasonProvider>
+              <NavBadgeProvider>
+                <ConfirmDialogProvider>
+                  <AppContent />
+                </ConfirmDialogProvider>
+              </NavBadgeProvider>
+            </SeasonProvider>
+          </TeamProvider>
+        </AuthProvider>
       </ToastProvider>
     </TooltipPrimitive.Provider>
   );

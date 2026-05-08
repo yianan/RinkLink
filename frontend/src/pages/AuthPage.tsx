@@ -9,6 +9,7 @@ import { authApiBaseUrl, authClient } from '../lib/auth-client';
 import { buildAuthCallbackUrl, consumeAuthReturnTo } from '../lib/auth-routing';
 import { cn } from '../lib/cn';
 import { useAuth } from '../context/AuthContext';
+import { BetterAuthUiProvider } from '../context/BetterAuthUiProvider';
 import { useToast } from '../context/ToastContext';
 
 const appIconSrc = '/icons/rinklink-icon-192.png';
@@ -937,6 +938,11 @@ export default function AuthPage() {
       <div className="rinklink-auth-footer rinklink-auth-footer--back">{customRecoveryFooter}</div>
     </div>
   );
+  const authUi = (node: ReactNode) => (
+    <BetterAuthUiProvider>
+      {node}
+    </BetterAuthUiProvider>
+  );
 
   return (
     <main className="rinklink-auth-shell rinklink-auth-page">
@@ -981,35 +987,37 @@ export default function AuthPage() {
               : isTwoFactor
                 ? <TwoFactorSignInCard />
               : isForgotPassword
-                ? recoveryCard(
+                ? authUi(recoveryCard(
                     <ForgotPasswordForm
                       classNames={authViewClassNames.form}
                       localization={{}}
                     />,
-                  )
+                  ))
                 : isResetPassword
-                  ? recoveryCard(
+                  ? authUi(recoveryCard(
                       <ResetPasswordForm
                         classNames={authViewClassNames.form}
                         localization={{}}
                       />,
-                    )
+                    ))
                   : (
-                    <AuthView
-                      pathname={pathname}
-                      classNames={authViewClassNames}
-                      cardHeader={(
-                        <div className={cn('space-y-2', isSignUp && 'rinklink-auth-card-header--signup')}>
-                          <div className="rinklink-auth-card-eyebrow">{pageMeta.cardEyebrow}</div>
-                          <div className={cn('rinklink-auth-card-title', isSignUp && 'rinklink-auth-card-title--signup')}>
-                            {pageMeta.cardTitle}
+                    authUi(
+                      <AuthView
+                        pathname={pathname}
+                        classNames={authViewClassNames}
+                        cardHeader={(
+                          <div className={cn('space-y-2', isSignUp && 'rinklink-auth-card-header--signup')}>
+                            <div className="rinklink-auth-card-eyebrow">{pageMeta.cardEyebrow}</div>
+                            <div className={cn('rinklink-auth-card-title', isSignUp && 'rinklink-auth-card-title--signup')}>
+                              {pageMeta.cardTitle}
+                            </div>
+                            {pageMeta.cardDescription ? (
+                              <div className="rinklink-auth-card-copy">{pageMeta.cardDescription}</div>
+                            ) : null}
                           </div>
-                          {pageMeta.cardDescription ? (
-                            <div className="rinklink-auth-card-copy">{pageMeta.cardDescription}</div>
-                          ) : null}
-                        </div>
-                      )}
-                    />
+                        )}
+                      />,
+                    )
                   )}
         </section>
       </div>

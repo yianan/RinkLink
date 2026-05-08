@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 
 import AccountSettingsCards from '../components/settings/AccountSettingsCards';
 import SecuritySettingsCards from '../components/settings/SecuritySettingsCards';
+import { BetterAuthUiProvider } from '../context/BetterAuthUiProvider';
 import PageHeader from '../components/PageHeader';
 import SegmentedTabs from '../components/SegmentedTabs';
 
@@ -58,26 +59,28 @@ export default function SettingsPage() {
       };
 
   return (
-    <div className="rinklink-settings-page mx-auto flex w-full max-w-5xl flex-col gap-6">
-      <PageHeader
-        title="Settings"
-        subtitle={pageMeta.subtitle}
-        actions={(
-          <SegmentedTabs
-            items={tabs}
-            value={tab}
-            onChange={handleTabChange}
-          />
-        )}
-      />
+    <BetterAuthUiProvider>
+      <div className="rinklink-settings-page mx-auto flex w-full max-w-5xl flex-col gap-6">
+        <PageHeader
+          title="Settings"
+          subtitle={pageMeta.subtitle}
+          actions={(
+            <SegmentedTabs
+              items={tabs}
+              value={tab}
+              onChange={handleTabChange}
+            />
+          )}
+        />
 
-      <div className="grid gap-5">
-        {tab === 'security' ? (
-          <SecuritySettingsCards classNames={{ cards: 'grid gap-5', card: settingsCardClassNames }} />
-        ) : (
-          <AccountSettingsCards classNames={{ cards: 'grid gap-5', card: settingsCardClassNames }} />
-        )}
+        <div className="grid gap-5">
+          {tab === 'security' ? (
+            <SecuritySettingsCards classNames={{ cards: 'grid gap-5', card: settingsCardClassNames }} />
+          ) : (
+            <AccountSettingsCards classNames={{ cards: 'grid gap-5', card: settingsCardClassNames }} />
+          )}
+        </div>
       </div>
-    </div>
+    </BetterAuthUiProvider>
   );
 }
