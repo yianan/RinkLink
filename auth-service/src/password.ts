@@ -1,4 +1,5 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { recordTiming } from "./timing.js";
 
 const SCRYPT_CONFIG = {
   N: 16384,
@@ -9,7 +10,8 @@ const SCRYPT_CONFIG = {
 };
 
 async function derivePasswordKey(password: string, salt: string): Promise<Buffer> {
-  return await new Promise((resolve, reject) => {
+  const startedAt = performance.now();
+  return await new Promise<Buffer>((resolve, reject) => {
     scrypt(
       password.normalize("NFKC"),
       salt,
@@ -28,6 +30,8 @@ async function derivePasswordKey(password: string, salt: string): Promise<Buffer
         resolve(Buffer.from(key));
       },
     );
+  }).finally(() => {
+    recordTiming("scrypt", performance.now() - startedAt);
   });
 }
 

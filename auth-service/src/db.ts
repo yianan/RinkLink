@@ -1,4 +1,5 @@
 import type { Pool, QueryResult, QueryResultRow } from "pg";
+import { recordTiming } from "./timing.js";
 
 const RETRYABLE_PG_CODES = new Set(["08000", "08003", "08006", "57P01", "XX000"]);
 
@@ -26,9 +27,13 @@ export async function queryWithRetry<T extends QueryResultRow = QueryResultRow>(
   const delays = [250, 750, 1500, 3000];
 
   for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    const startedAt = performance.now();
     try {
-      return await pool.query<T>(text, values);
+      const result = await pool.query<T>(text, values);
+      recordTiming("db", performance.now() - startedAt);
+      return result;
     } catch (error) {
+      recordTiming("db", performance.now() - startedAt);
       lastError = error;
       if (!isRetryableDatabaseError(error) || attempt === delays.length) {
         throw error;
