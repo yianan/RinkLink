@@ -736,7 +736,7 @@ export default function PendingApprovalPage() {
                   className={cn(
                     `flex min-h-11 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-sm text-slate-900 transition sm:min-h-10 dark:text-slate-100 ${focusRingClass}`,
                     toolbarSelectClass,
-                    'hover:bg-slate-100/80 dark:hover:bg-slate-800/80 dark:hover:ring-slate-600/80 disabled:cursor-not-allowed disabled:opacity-70',
+                    'bg-white hover:bg-slate-100/80 dark:bg-slate-950 dark:hover:bg-slate-800 dark:hover:ring-slate-600/80 disabled:cursor-not-allowed disabled:opacity-70',
                   )}
                 >
                   <TeamLogo
@@ -760,7 +760,7 @@ export default function PendingApprovalPage() {
                   <div
                     role="listbox"
                     aria-label="Browse team"
-                    className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-xl border border-[color:var(--app-border-subtle)] bg-[var(--app-surface-strong)] shadow-xl ring-1 ring-slate-200/70 dark:ring-slate-700/60"
+                    className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-xl border border-[color:var(--app-border-subtle)] bg-white shadow-xl ring-1 ring-slate-200/70 dark:bg-slate-950 dark:ring-slate-700/60"
                   >
                     <div className="max-h-80 overflow-y-auto p-1.5">
                       {browseTeams.map((team) => {
