@@ -42,6 +42,13 @@ def _synthetic_admin() -> AppUser:
 
 
 def _cache_user(user: AppUser) -> AppUser:
+    if (
+        (not user.is_platform_admin and user.status != "active")
+        or user.access_state != "active"
+        or user.auth_state != "active"
+    ):
+        _current_user_cache.pop(user.auth_id, None)
+        return user
     _current_user_cache[user.auth_id] = (
         monotonic() + CURRENT_USER_CACHE_TTL_SECONDS,
         {

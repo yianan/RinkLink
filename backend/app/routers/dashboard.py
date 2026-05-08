@@ -10,6 +10,7 @@ from ..auth.context import AuthorizationContext, authorization_context, can_acce
 from ..database import get_db
 from ..models import Association, Event, IceBookingRequest, Proposal, Season, Team
 from ..schemas import StandingsEntry, TeamDashboardSummaryOut
+from ..services.app_cache import ttl_get_or_set
 from ..services.competitions import list_team_memberships
 from ..services.records import compute_team_record
 from ..services.team_logos import effective_team_logo_url
@@ -125,68 +126,84 @@ def get_team_dashboard_summary(
         and bool(context.guardianships or context.player_memberships)
     )
 
-    availability = (
-        list_availability(
+    cache_key = ":".join(
+        [
+            "dashboard:summary",
+            team_id,
+            season_id or "-",
+            date_from.isoformat() if date_from else "-",
+            "schedule" if can_manage_schedule else "-",
+            "proposals" if can_manage_proposals else "-",
+            "private" if can_view_private_roster else "-",
+            "family" if family_mode else "-",
+        ]
+    )
+
+    def build() -> TeamDashboardSummaryOut:
+        availability = (
+            list_availability(
+                team_id=team_id,
+                status=None,
+                date_from=None,
+                date_to=None,
+                season_id=None,
+                limit=200,
+                offset=0,
+                context=context,
+                db=db,
+            )
+            if can_manage_schedule
+            else []
+        )
+        events = list_events(
             team_id=team_id,
             status=None,
-            date_from=None,
+            date_from=date_from,
             date_to=None,
             season_id=None,
             limit=200,
             offset=0,
+            include_total=False,
+            response=None,
             context=context,
             db=db,
         )
-        if can_manage_schedule
-        else []
-    )
-    events = list_events(
-        team_id=team_id,
-        status=None,
-        date_from=date_from,
-        date_to=None,
-        season_id=None,
-        limit=200,
-        offset=0,
-        include_total=False,
-        response=None,
-        context=context,
-        db=db,
-    )
-    proposals = (
-        _incoming_proposals(db, team_id)
-        if can_manage_proposals
-        else []
-    )
-    booking_requests = (
-        _requested_booking_requests(db, team_id)
-        if can_manage_schedule
-        else []
-    )
-
-    record = None
-    competition_record = None
-    primary_membership = None
-    if season_id and not family_mode:
-        season = db.get(Season, season_id)
-        if season:
-            record = _team_season_record(db, team, season)
-
-        memberships = list_team_memberships(db, team_id, season_id)
-        primary_membership = next((membership for membership in memberships if membership.is_primary), None) or (memberships[0] if memberships else None)
-        standings_membership = (
-            next((membership for membership in memberships if membership.is_primary and membership.standings_enabled), None)
-            or next((membership for membership in memberships if membership.standings_enabled), None)
+        proposals = (
+            _incoming_proposals(db, team_id)
+            if can_manage_proposals
+            else []
         )
-        if standings_membership:
-            competition_record = _team_division_record(db, team, standings_membership.competition_division_id)
+        booking_requests = (
+            _requested_booking_requests(db, team_id)
+            if can_manage_schedule
+            else []
+        )
 
-    return TeamDashboardSummaryOut(
-        availability=availability,
-        events=events,
-        proposals=proposals,
-        booking_requests=booking_requests,
-        record=record,
-        competition_record=competition_record,
-        primary_membership=primary_membership,
-    )
+        record = None
+        competition_record = None
+        primary_membership = None
+        if season_id and not family_mode:
+            season = db.get(Season, season_id)
+            if season:
+                record = _team_season_record(db, team, season)
+
+            memberships = list_team_memberships(db, team_id, season_id)
+            primary_membership = next((membership for membership in memberships if membership.is_primary), None) or (memberships[0] if memberships else None)
+            standings_membership = (
+                next((membership for membership in memberships if membership.is_primary and membership.standings_enabled), None)
+                or next((membership for membership in memberships if membership.standings_enabled), None)
+            )
+            if standings_membership:
+                competition_record = _team_division_record(db, team, standings_membership.competition_division_id)
+
+        return TeamDashboardSummaryOut(
+            availability=availability,
+            events=events,
+            proposals=proposals,
+            booking_requests=booking_requests,
+            record=record,
+            competition_record=competition_record,
+            primary_membership=primary_membership,
+        )
+
+    return ttl_get_or_set(cache_key, 10, build)

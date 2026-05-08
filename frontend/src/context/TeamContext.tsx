@@ -8,7 +8,7 @@ interface TeamContextType {
   teams: Team[];
   activeTeam: Team | null;
   setActiveTeam: (team: Team | null) => void;
-  refreshTeams: () => Promise<void>;
+  refreshTeams: (options?: { force?: boolean }) => Promise<void>;
   loading: boolean;
 }
 
@@ -44,7 +44,7 @@ function summaryToTeam(team: TeamSummary): Team {
 }
 
 export function TeamProvider({ children }: { children: ReactNode }) {
-  const { authEnabled, isAuthenticated, loading: authLoading, me } = useAuth();
+  const { authEnabled, isAuthenticated, loading: authLoading, me, bootstrap } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTeam, setActiveTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,7 +75,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     updated_at: '',
   }));
 
-  const refreshTeams = async () => {
+  const refreshTeams = async (options: { force?: boolean } = {}) => {
     if (!appAccessReady) {
       setTeams([]);
       setActiveTeam(null);
@@ -85,7 +85,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-      let data = (await api.getTeamSummaries()).map(summaryToTeam);
+      let data = (!options.force && bootstrap?.teams
+        ? bootstrap.teams
+        : await api.getTeamSummaries()
+      ).map(summaryToTeam);
       if (data.length === 0 && accessibleTeamsFallback.length > 0) {
         data = accessibleTeamsFallback;
       }
@@ -125,7 +128,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       return;
     }
     refreshTeams();
-  }, [appAccessReady, authLoading, me?.accessible_teams]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [appAccessReady, authLoading, me?.accessible_teams, bootstrap?.teams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (activeTeam?.id) {

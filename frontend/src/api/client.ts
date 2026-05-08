@@ -1,7 +1,9 @@
 import { authEnabled, clearApiAccessToken, getApiAccessToken } from '../lib/auth-client';
+import type { TeamDashboardSummary } from '../types';
 
 const apiOrigin = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 const BASE_URL = apiOrigin ? `${apiOrigin}/api` : '/api';
+const dashboardSummaryRequests = new Map<string, Promise<TeamDashboardSummary>>();
 
 export type ApiOptions = {
   signal?: AbortSignal;
@@ -134,6 +136,7 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
 
 export const api = {
   getMe: () => request<import('../types').MeResponse>('/me'),
+  getAppBootstrap: () => request<import('../types').AppBootstrap>('/app-bootstrap'),
   getUsers: (params?: Record<string, string>) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').AppUserIdentity[]>(`/users${qs}`);
@@ -235,7 +238,16 @@ export const api = {
   },
   getTeamDashboardSummary: (teamId: string, params?: Record<string, string>) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
-    return request<import('../types').TeamDashboardSummary>(`/teams/${teamId}/dashboard-summary${qs}`);
+    const path = `/teams/${teamId}/dashboard-summary${qs}`;
+    const existing = dashboardSummaryRequests.get(path);
+    if (existing) {
+      return existing;
+    }
+    const pending = request<TeamDashboardSummary>(path).finally(() => {
+      dashboardSummaryRequests.delete(path);
+    });
+    dashboardSummaryRequests.set(path, pending);
+    return pending;
   },
   createTeam: (data: Partial<import('../types').Team>) =>
     request<import('../types').Team>('/teams', { method: 'POST', body: JSON.stringify(data) }),

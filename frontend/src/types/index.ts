@@ -67,6 +67,12 @@ export interface MeResponse {
   accessible_teams: AccessibleTeam[];
 }
 
+export interface AppBootstrap {
+  me: MeResponse;
+  seasons: Season[];
+  teams: TeamSummary[];
+}
+
 export interface AccessTarget {
   type: string;
   id: string;

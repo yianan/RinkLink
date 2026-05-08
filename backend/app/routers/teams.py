@@ -14,6 +14,7 @@ from ..schemas import (
     TeamUpdate,
 )
 from ..services.competitions import ensure_current_season_membership, memberships_for_teams
+from ..services.app_cache import ttl_clear_prefix, ttl_get_or_set
 from ..services.team_logos import delete_logo_if_unused, effective_team_logo_url, save_team_logo_upload, team_logo_response
 
 router = APIRouter(tags=["teams"])
@@ -75,6 +76,53 @@ def _scoped_teams_query(db: Session, context: AuthorizationContext):
     return db.query(Team).filter(False)
 
 
+def _team_summary_cache_key(
+    context: AuthorizationContext,
+    *,
+    association_id: str | None,
+    age_group: str | None,
+    level: str | None,
+) -> str:
+    return ":".join(
+        [
+            "teams:summary",
+            "platform" if context.user.is_platform_admin else "scoped",
+            "view" if "team.view" in context.capabilities else "no-view",
+            ",".join(sorted(context.association_ids)) or "-",
+            ",".join(sorted(context.team_ids)) or "-",
+            association_id or "-",
+            age_group or "-",
+            level or "-",
+        ]
+    )
+
+
+def team_summary_outputs(
+    *,
+    db: Session,
+    context: AuthorizationContext,
+    association_id: str | None = None,
+    age_group: str | None = None,
+    level: str | None = None,
+) -> list[TeamSummaryOut]:
+    def build() -> list[TeamSummaryOut]:
+        q = _scoped_teams_query(db, context)
+        if association_id:
+            q = q.filter(Team.association_id == association_id)
+        if age_group:
+            q = q.filter(Team.age_group == age_group)
+        if level:
+            q = q.filter(Team.level == level)
+        teams = q.options(selectinload(Team.association)).order_by(Team.name).all()
+        return [_summary(t, db) for t in teams]
+
+    return ttl_get_or_set(
+        _team_summary_cache_key(context, association_id=association_id, age_group=age_group, level=level),
+        30,
+        build,
+    )
+
+
 @router.get("/teams", response_model=list[TeamOut])
 def list_teams(
     association_id: str | None = Query(None),
@@ -104,15 +152,13 @@ def list_team_summaries(
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
-    q = _scoped_teams_query(db, context)
-    if association_id:
-        q = q.filter(Team.association_id == association_id)
-    if age_group:
-        q = q.filter(Team.age_group == age_group)
-    if level:
-        q = q.filter(Team.level == level)
-    teams = q.options(selectinload(Team.association)).order_by(Team.name).all()
-    return [_summary(t, db) for t in teams]
+    return team_summary_outputs(
+        db=db,
+        context=context,
+        association_id=association_id,
+        age_group=age_group,
+        level=level,
+    )
 
 
 @router.post("/teams", response_model=TeamOut, status_code=201)
@@ -127,6 +173,7 @@ def create_team(
     team = Team(**body.model_dump())
     db.add(team)
     db.commit()
+    ttl_clear_prefix("teams:summary")
     db.refresh(team)
     ensure_current_season_membership(db, team)
     db.refresh(team)
@@ -162,6 +209,7 @@ def update_team(
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(team, k, v)
     db.commit()
+    ttl_clear_prefix("teams:summary")
     db.refresh(team)
     ensure_current_season_membership(db, team)
     db.refresh(team)
@@ -183,6 +231,7 @@ async def upload_team_logo(
     team.logo_asset_id = await save_team_logo_upload(db, id, file)
     team.logo_path = None
     db.commit()
+    ttl_clear_prefix("teams:summary")
     db.refresh(team)
     delete_logo_if_unused(db, previous_logo_asset_id, ignore_team_id=team.id)
     return _enrich(team, db, {})
@@ -202,6 +251,7 @@ def delete_team_logo(
     team.logo_asset_id = None
     team.logo_path = None
     db.commit()
+    ttl_clear_prefix("teams:summary")
     db.refresh(team)
     delete_logo_if_unused(db, previous_logo_asset_id, ignore_team_id=team.id)
     return _enrich(team, db, {})
@@ -219,6 +269,7 @@ def delete_team(
     ensure_association_access(context, team.association_id, "association.manage")
     db.delete(team)
     db.commit()
+    ttl_clear_prefix("teams:summary")
 
 
 @router.get("/teams/{team_id}/venue-assignments", response_model=list[TeamSeasonVenueAssignmentOut])

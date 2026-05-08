@@ -70,6 +70,7 @@ from .auth import (
 )
 from .public import PublicEventOut, PublicSeasonOut, PublicTeamOut
 from .dashboard import TeamDashboardSummaryOut
+from .bootstrap import AppBootstrapOut
 
 __all__ = [
     "AssociationCreate", "AssociationUpdate", "AssociationOut",
@@ -101,5 +102,5 @@ __all__ = [
     "AccessRequestCreate", "AccessRequestDecision", "UserAccessChange",
     "UserAccessEntryOut", "UserAuditEntryOut", "UserAccessSummaryOut", "AccessRequestOut",
     "PublicSeasonOut", "PublicTeamOut", "PublicEventOut",
-    "TeamDashboardSummaryOut",
+    "TeamDashboardSummaryOut", "AppBootstrapOut",
 ]

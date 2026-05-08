@@ -6,6 +6,7 @@ from ..auth.context import AuthorizationContext, authorization_context
 from ..database import get_db
 from ..models import Association, Event, Season, Team
 from ..schemas.season import SeasonOut, StandingsEntry
+from ..services.app_cache import ttl_get_or_set
 from ..services.records import final_games_for_season_window
 from ..services.season_utils import ensure_standard_seasons
 from ..services.team_logos import effective_team_logo_url
@@ -35,11 +36,18 @@ def _game_counts_for_seasons(db: Session, season_ids: list[str]) -> dict[str, in
 router = APIRouter(tags=["seasons"])
 
 
+def season_outputs(db: Session) -> list[dict]:
+    def build() -> list[dict]:
+        seasons = ensure_standard_seasons(db)
+        game_counts = _game_counts_for_seasons(db, [season.id for season in seasons])
+        return [_season_with_game_count(season, game_counts) for season in seasons]
+
+    return ttl_get_or_set("seasons:list", 30, build)
+
+
 @router.get("/seasons", response_model=list[SeasonOut])
 def list_seasons(_: AuthorizationContext = Depends(authorization_context), db: Session = Depends(get_db)):
-    seasons = ensure_standard_seasons(db)
-    game_counts = _game_counts_for_seasons(db, [season.id for season in seasons])
-    return [_season_with_game_count(season, game_counts) for season in seasons]
+    return season_outputs(db)
 
 
 @router.get("/seasons/{id}", response_model=SeasonOut)

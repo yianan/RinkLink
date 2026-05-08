@@ -151,7 +151,7 @@ export default function TeamListPage() {
     ]);
     setTeams(teamData);
     setAssociations(associationData);
-    await refreshTeams();
+    await refreshTeams({ force: true });
   };
 
   const deleteTeam = async (team: Team) => {
@@ -170,7 +170,7 @@ export default function TeamListPage() {
     ]);
     setTeams(teamData);
     setAssociations(associationData);
-    await refreshTeams();
+    await refreshTeams({ force: true });
   };
 
   const associationOptions = useMemo<FilterOption[]>(

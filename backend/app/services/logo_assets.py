@@ -96,12 +96,19 @@ def media_asset_url(route_prefix: str, asset_id: str | None, legacy_logo_path: s
     return None
 
 
+def _cache_headers(*, sha256: str) -> dict[str, str]:
+    return {
+        "Cache-Control": "public, max-age=86400, immutable",
+        "ETag": f'"{sha256}"',
+    }
+
+
 def media_asset_response(db: Session, *, asset_ref: str, kind: str, legacy_kind: str) -> Response:
     asset = db.get(MediaAsset, asset_ref)
     if asset is not None:
         if asset.kind != kind:
             raise HTTPException(404, "Logo not found")
-        return Response(asset.data, media_type=asset.content_type)
+        return Response(asset.data, media_type=asset.content_type, headers=_cache_headers(sha256=asset.sha256))
     try:
         payload = media_file_path(legacy_kind, asset_ref).read_bytes()
     except FileNotFoundError as exc:
@@ -109,4 +116,5 @@ def media_asset_response(db: Session, *, asset_ref: str, kind: str, legacy_kind:
     return Response(
         content=payload,
         media_type=_content_type_for_filename(asset_ref),
+        headers=_cache_headers(sha256=hashlib.sha256(payload).hexdigest()),
     )

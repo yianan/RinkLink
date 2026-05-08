@@ -8,7 +8,7 @@ interface SeasonContextType {
   seasons: Season[];
   activeSeason: Season | null;
   setActiveSeason: (season: Season | null) => void;
-  refreshSeasons: () => Promise<void>;
+  refreshSeasons: (options?: { force?: boolean }) => Promise<void>;
   loading: boolean;
 }
 
@@ -21,7 +21,7 @@ const SeasonContext = createContext<SeasonContextType>({
 });
 
 export function SeasonProvider({ children }: { children: ReactNode }) {
-  const { authEnabled, isAuthenticated, loading: authLoading, me } = useAuth();
+  const { authEnabled, isAuthenticated, loading: authLoading, me, bootstrap } = useAuth();
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [activeSeason, setActiveSeason] = useState<Season | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,7 +31,7 @@ export function SeasonProvider({ children }: { children: ReactNode }) {
     && (me.user.is_platform_admin || me.user.status === 'active')
   );
 
-  const refreshSeasons = async () => {
+  const refreshSeasons = async (options: { force?: boolean } = {}) => {
     if (!appAccessReady) {
       setSeasons([]);
       setActiveSeason(null);
@@ -41,7 +41,9 @@ export function SeasonProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-      const data = await api.getSeasons();
+      const data = !options.force && bootstrap?.seasons
+        ? bootstrap.seasons
+        : await api.getSeasons();
       setSeasons(data);
       const savedSeasonId = window.localStorage.getItem('rinklink.activeSeasonId');
       const nextActiveSeason =
@@ -61,7 +63,7 @@ export function SeasonProvider({ children }: { children: ReactNode }) {
       return;
     }
     refreshSeasons();
-  }, [appAccessReady, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [appAccessReady, authLoading, bootstrap?.seasons]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (activeSeason?.id) {

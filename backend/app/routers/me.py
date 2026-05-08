@@ -16,8 +16,7 @@ from ..schemas import (
 router = APIRouter(tags=["auth"])
 
 
-@router.get("/me", response_model=MeOut)
-def get_me(user=Depends(current_me_user), db: Session = Depends(get_db)):
+def build_me_response(user, db: Session) -> MeOut:
     if user.access_state == "disabled" or user.auth_state == "disabled":
         return MeOut(
             user=user,
@@ -101,3 +100,8 @@ def get_me(user=Depends(current_me_user), db: Session = Depends(get_db)):
             for team in accessible_teams
         ],
     )
+
+
+@router.get("/me", response_model=MeOut)
+def get_me(user=Depends(current_me_user), db: Session = Depends(get_db)):
+    return build_me_response(user, db)
