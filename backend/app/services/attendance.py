@@ -91,9 +91,9 @@ def attach_attendance_summaries(db: Session, events: list[Event], team_id: str, 
 
     event_ids = [event.id for event in events]
     season_ids = {event.season_id for event in events if event.season_id}
-    roster_totals: dict[str | None, int] = {
-        None: db.query(Player).filter(Player.team_id == team_id).count(),
-    }
+    roster_totals: dict[str | None, int] = {}
+    if any(event.season_id is None for event in events):
+        roster_totals[None] = db.query(Player).filter(Player.team_id == team_id).count()
     if season_ids:
         roster_totals.update(
             {

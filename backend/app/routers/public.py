@@ -11,7 +11,7 @@ from ..database import get_db
 from ..models import Association, Event, Season, Team
 from ..schemas import PublicEventOut, PublicSeasonOut, PublicTeamOut, StandingsEntry
 from ..services.competitions import memberships_for_teams
-from ..services.event_view import enrich_event, enrich_events
+from ..services.event_view import enrich_event, enrich_events, event_enrichment_options
 from ..services.records import final_games_for_season_window
 from ..services.season_utils import ensure_standard_seasons
 from ..services.team_logos import effective_team_logo_url
@@ -155,7 +155,10 @@ def list_public_team_events(
             competition_short_name=enriched.competition_short_name,
             division_name=enriched.division_name,
         )
-        for enriched in enrich_events(query.order_by(Event.date.asc(), Event.start_time.asc()).offset(offset).limit(limit).all(), db)
+        for enriched in enrich_events(
+            query.options(*event_enrichment_options()).order_by(Event.date.asc(), Event.start_time.asc()).offset(offset).limit(limit).all(),
+            db,
+        )
     ]
 
 

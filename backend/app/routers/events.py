@@ -32,7 +32,7 @@ from ..services.attendance import (
     validate_attendance_team,
 )
 from ..services.competitions import normalize_event_competition
-from ..services.event_view import enrich_event, enrich_events
+from ..services.event_view import enrich_event, enrich_events, event_enrichment_options
 from ..services.locker_rooms import assign_locker_rooms, event_has_started, notify_locker_room_update
 from ..services.records import is_recordable_event, recompute_team_records
 from ..services.schedule_conflicts import assert_no_event_conflicts
@@ -140,6 +140,7 @@ def list_events(
     season_id: str | None = Query(None),
     limit: int = 500,
     offset: int = 0,
+    include_total: bool = Query(True),
     response: Response = None,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
@@ -158,12 +159,17 @@ def list_events(
         query = query.filter(Event.date <= date_to)
     if season_id:
         query = query.filter(Event.season_id == season_id)
-    total = query.count()
+    fetch_limit = limit if include_total else limit + 1
+    data_query = query.options(*event_enrichment_options()).order_by(Event.date, Event.start_time).offset(offset).limit(fetch_limit)
+    events = data_query.all()
+    has_more = not include_total and len(events) > limit
+    if has_more:
+        events = events[:limit]
+    total = query.count() if include_total else offset + len(events) + (1 if has_more else 0)
     if response is not None:
         response.headers["X-Total-Count"] = str(total)
         response.headers["X-Limit"] = str(limit)
         response.headers["X-Offset"] = str(offset)
-    events = query.order_by(Event.date, Event.start_time).offset(offset).limit(limit).all()
     enriched_events = enrich_events(events, db)
     attach_attendance_summaries(
         db,
@@ -182,6 +188,7 @@ def list_arena_events(
     date_to: date | None = Query(None),
     limit: int = 500,
     offset: int = 0,
+    include_total: bool = Query(True),
     response: Response = None,
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
@@ -197,12 +204,17 @@ def list_arena_events(
         query = query.filter(Event.date >= date_from)
     if date_to:
         query = query.filter(Event.date <= date_to)
-    total = query.count()
+    fetch_limit = limit if include_total else limit + 1
+    events = query.options(*event_enrichment_options()).order_by(Event.date, Event.start_time).offset(offset).limit(fetch_limit).all()
+    has_more = not include_total and len(events) > limit
+    if has_more:
+        events = events[:limit]
+    total = query.count() if include_total else offset + len(events) + (1 if has_more else 0)
     if response is not None:
         response.headers["X-Total-Count"] = str(total)
         response.headers["X-Limit"] = str(limit)
         response.headers["X-Offset"] = str(offset)
-    return enrich_events(query.order_by(Event.date, Event.start_time).offset(offset).limit(limit).all(), db)
+    return enrich_events(events, db)
 
 @router.get("/events/{event_id}", response_model=EventOut)
 def get_event(

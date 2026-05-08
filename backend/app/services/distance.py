@@ -28,3 +28,22 @@ def get_distance(db: Session, zip1: str, zip2: str) -> float | None:
     if not z1 or not z2:
         return None
     return round(haversine(z1.latitude, z1.longitude, z2.latitude, z2.longitude), 1)
+
+
+def get_distance_lookup(db: Session, zip_codes: set[str | None]) -> dict[tuple[str, str], float]:
+    """Return pairwise distances for a small set of zip codes using one DB read."""
+    normalized = {zip_code for zip_code in zip_codes if zip_code}
+    if len(normalized) < 2:
+        return {}
+
+    rows = db.query(ZipCode).filter(ZipCode.zip_code.in_(normalized)).all()
+    by_zip = {row.zip_code: row for row in rows}
+    lookup: dict[tuple[str, str], float] = {}
+    zip_list = sorted(by_zip)
+    for index, left_zip in enumerate(zip_list):
+        left = by_zip[left_zip]
+        for right_zip in zip_list[index + 1:]:
+            right = by_zip[right_zip]
+            key = tuple(sorted((left_zip, right_zip)))
+            lookup[key] = round(haversine(left.latitude, left.longitude, right.latitude, right.longitude), 1)
+    return lookup

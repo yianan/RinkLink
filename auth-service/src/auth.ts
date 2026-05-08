@@ -54,7 +54,36 @@ type AppUserAccessRow = {
   updated_at: Date | string;
 };
 
+const configuredAccessCacheTtlMs = Number(process.env.AUTH_ACCESS_CACHE_TTL_MS || 10000);
+const ACCESS_CACHE_TTL_MS = Number.isFinite(configuredAccessCacheTtlMs) && configuredAccessCacheTtlMs > 0
+  ? configuredAccessCacheTtlMs
+  : 10000;
+const accessCache = new Map<string, { value: AppUserAccessRow | null; expiresAt: number }>();
+const disabledEmailCache = new Map<string, { value: boolean; expiresAt: number }>();
+
+function readCache<T>(cache: Map<string, { value: T; expiresAt: number }>, key: string): T | undefined {
+  const entry = cache.get(key);
+  if (!entry) {
+    return undefined;
+  }
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return undefined;
+  }
+  return entry.value;
+}
+
+function writeCache<T>(cache: Map<string, { value: T; expiresAt: number }>, key: string, value: T): T {
+  cache.set(key, { value, expiresAt: Date.now() + ACCESS_CACHE_TTL_MS });
+  return value;
+}
+
 async function getAppUserAccessRowByAuthId(authId: string): Promise<AppUserAccessRow | null> {
+  const cacheKey = `auth:${authId}`;
+  const cached = readCache(accessCache, cacheKey);
+  if (cached !== undefined) {
+    return cached;
+  }
   const result = await queryWithRetry<AppUserAccessRow>(
     pool,
     `
@@ -65,13 +94,17 @@ async function getAppUserAccessRowByAuthId(authId: string): Promise<AppUserAcces
     `,
     [authId],
   );
-  return result.rows[0] ?? null;
+  return writeCache(accessCache, cacheKey, result.rows[0] ?? null);
 }
 
 export async function isAuthDisabledForEmail(email: string | null | undefined): Promise<boolean> {
   const normalizedEmail = email?.trim().toLowerCase();
   if (!normalizedEmail) {
     return false;
+  }
+  const cached = readCache(disabledEmailCache, normalizedEmail);
+  if (cached !== undefined) {
+    return cached;
   }
   const result = await queryWithRetry<{ auth_state: string }>(
     pool,
@@ -83,7 +116,7 @@ export async function isAuthDisabledForEmail(email: string | null | undefined): 
     `,
     [normalizedEmail],
   );
-  return result.rows[0]?.auth_state === "disabled";
+  return writeCache(disabledEmailCache, normalizedEmail, result.rows[0]?.auth_state === "disabled");
 }
 
 async function isAuthSignInAllowed(authId: string): Promise<boolean> {

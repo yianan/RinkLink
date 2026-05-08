@@ -23,20 +23,31 @@ export async function ensureLockoutSchema(pool: Pool): Promise<void> {
 }
 
 export async function isSignInLocked(pool: Pool, email: string | null | undefined): Promise<boolean> {
+  return (await getSignInFailureState(pool, email)).locked;
+}
+
+export async function getSignInFailureState(
+  pool: Pool,
+  email: string | null | undefined,
+): Promise<{ locked: boolean; hasFailures: boolean }> {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) {
-    return false;
+    return { locked: false, hasFailures: false };
   }
 
   const result = await queryWithRetry<{
     locked_until: Date | null;
+    failed_attempts: number;
   }>(
     pool,
-    `SELECT locked_until FROM auth.sign_in_lockouts WHERE email = $1`,
+    `SELECT locked_until, failed_attempts FROM auth.sign_in_lockouts WHERE email = $1`,
     [normalizedEmail],
   );
   const row = result.rows[0];
-  return Boolean(row?.locked_until && row.locked_until.getTime() > Date.now());
+  return {
+    locked: Boolean(row?.locked_until && row.locked_until.getTime() > Date.now()),
+    hasFailures: Boolean(row && row.failed_attempts > 0),
+  };
 }
 
 export async function clearSignInFailures(pool: Pool, email: string | null | undefined): Promise<void> {

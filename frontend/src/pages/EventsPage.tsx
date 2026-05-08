@@ -125,7 +125,7 @@ export default function EventsPage() {
   useEffect(() => {
     if (!activeTeam) return;
     const controller = new AbortController();
-    const eventParams: Record<string, string> = { limit: String(LIST_LIMIT), offset: String(pageOffset) };
+    const eventParams: Record<string, string> = { limit: String(LIST_LIMIT), offset: String(pageOffset), include_total: 'false' };
     if (effectiveSeason) {
       eventParams.season_id = effectiveSeason.id;
     }
@@ -465,8 +465,9 @@ export default function EventsPage() {
                       const updated = await api.cancelTeamIceBookingRequest(activeTeam.id, request.id);
                       setBookingRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
                       if (request.event_id) {
-                        const updatedEvents = await api.getEvents(activeTeam.id, { limit: String(LIST_LIMIT), offset: String(pageOffset) });
-                        setEvents(updatedEvents);
+                        const updatedEvents = await api.getEventsList(activeTeam.id, { limit: String(LIST_LIMIT), offset: String(pageOffset), include_total: 'false' });
+                        setEvents(updatedEvents.data);
+                        setEventsMeta(updatedEvents.meta);
                       }
                       pushToast({ variant: 'success', title: 'Booking request cancelled' });
                     }}>

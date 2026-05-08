@@ -5,7 +5,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 import { auth, isAuthDisabledForEmail, pool } from "./auth.js";
-import { ensureLockoutSchema, clearSignInFailures, isSignInLocked, recordSignInFailure } from "./lockout.js";
+import { ensureLockoutSchema, clearSignInFailures, getSignInFailureState, recordSignInFailure } from "./lockout.js";
 import { resolvePublicAppUrl, resolveTrustedOrigins } from "./config.js";
 
 const app = new Hono();
@@ -37,12 +37,23 @@ app.use(
   }),
 );
 
+app.use("/api/auth/*", async (c, next) => {
+  const startedAt = performance.now();
+  await next();
+  const durationMs = performance.now() - startedAt;
+  c.header("X-Auth-Service-Time-Ms", durationMs.toFixed(1));
+  console.info(
+    `[auth-service] request_timing method=${c.req.method} path=${c.req.path} status=${c.res.status} duration_ms=${durationMs.toFixed(1)}`,
+  );
+});
+
 app.use("/api/auth/sign-in/email", async (c, next) => {
   const requestClone = c.req.raw.clone();
   const body = await requestClone.json().catch(() => null) as { email?: string } | null;
   const email = body?.email;
 
-  if (await isSignInLocked(pool, email)) {
+  const failureState = await getSignInFailureState(pool, email);
+  if (failureState.locked) {
     return c.json({ code: "ACCOUNT_LOCKED", message: "Too many failed sign-in attempts. Try again later." }, 423);
   }
   if (await isAuthDisabledForEmail(email)) {
@@ -52,7 +63,9 @@ app.use("/api/auth/sign-in/email", async (c, next) => {
   await next();
 
   if (c.res.status >= 200 && c.res.status < 300) {
-    await clearSignInFailures(pool, email);
+    if (failureState.hasFailures) {
+      await clearSignInFailures(pool, email);
+    }
     return;
   }
   if ([400, 401, 403].includes(c.res.status)) {
