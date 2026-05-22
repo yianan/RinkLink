@@ -642,9 +642,9 @@ export default function PendingApprovalPage() {
           <Card className="p-7 sm:p-8">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Request access</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Request additional access</h2>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  Choose what you need and send it to the right administrator for approval.
+                  Choose anything else you need and send it to the right administrator for approval.
                 </p>
               </div>
               <Badge variant={statusVariant(me?.user.status || 'pending')}>{me?.user.status || 'pending'}</Badge>
