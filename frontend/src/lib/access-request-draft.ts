@@ -8,6 +8,7 @@ export type SignupAccessRequestDraft = {
   target_name: string;
   target_context: string | null;
   notes: string | null;
+  details?: Record<string, unknown> | null;
 };
 
 export function saveSignupAccessRequestDraft(target: AccessTarget, notes: string | null) {
@@ -17,6 +18,7 @@ export function saveSignupAccessRequestDraft(target: AccessTarget, notes: string
     target_name: target.name,
     target_context: target.context,
     notes,
+    details: null,
   }]);
 }
 
@@ -33,6 +35,7 @@ function normalizeDraft(value: Partial<SignupAccessRequestDraft>): SignupAccessR
     target_name: value.target_name,
     target_context: value.target_context ?? null,
     notes: value.notes ?? null,
+    details: value.details ?? null,
   };
 }
 

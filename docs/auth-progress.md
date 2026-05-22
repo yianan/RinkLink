@@ -11,6 +11,30 @@
 
 ## Checkpoints
 
+### 2026-05-22
+
+- Added self-service `Add Access` and expanded signup access requests:
+  - pending signup users can request parent/guardian player access, player self access, team staff access, new team setup, association access, or arena access before approval
+  - active users can request additional access from the authenticated `Add Access` page
+  - new team setup requests collect team name, age group, level, and location, then create a standalone team on approval and grant the requester team-admin access
+  - team admins can request that an existing team join or move to an association from the team edit workflow
+  - association admins review team association requests from the normal Access review queue
+- Updated admin review and notification behavior:
+  - access request details now carry request-specific metadata in `details_json`
+  - the Access review queue shows team, current association, and requested association for association requests
+  - approval buttons use request-specific copy such as `Create team`, `Add to association`, or `Move team`
+  - reviewer and decision emails use request-specific labels for new team and association requests
+- Added schema and authorization support:
+  - `teams.association_id` can be null for independent teams
+  - `access_requests.details_json` stores new team setup and association attachment details
+  - platform admins can directly set or change a team association
+  - team admins can submit association attachment requests; association admins can approve requests for associations they manage
+- Validation:
+  - `cd backend && uv run alembic upgrade head` succeeded
+  - `cd backend && uv run pytest tests/test_team_association.py tests/test_access_requests.py tests/test_public_browse.py` passed
+  - `cd frontend && npm run build` succeeded
+  - browser E2E approved a pending association request from the Access queue and verified the team appeared under the requested association with no pending badge
+
 ### 2026-03-29
 
 - Started implementation on `codex/auth-foundation`.

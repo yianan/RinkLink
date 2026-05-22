@@ -18,7 +18,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    inspector = sa.inspect(op.get_bind())
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
     columns = {column["name"] for column in inspector.get_columns("proposals")}
     added_thread_root = False
     added_parent = False
@@ -32,6 +33,8 @@ def upgrade() -> None:
         op.add_column("proposals", sa.Column("revision_number", sa.Integer(), server_default="1", nullable=False))
     op.create_index("ix_proposals_thread_root_proposal_id", "proposals", ["thread_root_proposal_id"], if_not_exists=True)
     op.create_index("ix_proposals_parent_proposal_id", "proposals", ["parent_proposal_id"], if_not_exists=True)
+    if bind.dialect.name == "sqlite":
+        return
     if added_thread_root:
         op.create_foreign_key(
             "fk_proposals_thread_root_proposal_id_proposals",
@@ -51,8 +54,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_proposals_parent_proposal_id_proposals", "proposals", type_="foreignkey")
-    op.drop_constraint("fk_proposals_thread_root_proposal_id_proposals", "proposals", type_="foreignkey")
+    bind = op.get_bind()
+    if bind.dialect.name != "sqlite":
+        op.drop_constraint("fk_proposals_parent_proposal_id_proposals", "proposals", type_="foreignkey")
+        op.drop_constraint("fk_proposals_thread_root_proposal_id_proposals", "proposals", type_="foreignkey")
     op.drop_index("ix_proposals_parent_proposal_id", table_name="proposals", if_exists=True)
     op.drop_index("ix_proposals_thread_root_proposal_id", table_name="proposals", if_exists=True)
     op.drop_column("proposals", "revision_number")

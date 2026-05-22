@@ -150,6 +150,46 @@ function getRemoveAccessCopy(entry: UserAccessEntry, user: AppUserIdentity) {
   };
 }
 
+function requestReviewCopy(request: AccessRequest) {
+  if (request.target.type === 'association_attach') {
+    const details = request.details && !Array.isArray(request.details) ? request.details : {};
+    const currentAssociationName = typeof details.current_association_name === 'string' && details.current_association_name.trim()
+      ? details.current_association_name
+      : 'Independent team';
+    const requestedAssociationName = typeof details.association_name === 'string' && details.association_name.trim()
+      ? details.association_name
+      : request.target.context?.replace(/^Join\s+|^Move to\s+/, '') || 'Association';
+    const isTransfer = currentAssociationName !== 'Independent team';
+    return {
+      requestedBy: 'Requested by',
+      approveLabel: isTransfer ? 'Move team' : 'Add to association',
+      noteLabel: 'Requester note',
+      description: 'Team association request',
+      details: [
+        ['Team', request.target.name],
+        ['Current association', currentAssociationName],
+        ['Requested association', requestedAssociationName],
+      ],
+    };
+  }
+  if (request.target.type === 'team_setup') {
+    return {
+      requestedBy: 'Requested by',
+      approveLabel: 'Create team',
+      noteLabel: 'Requester note',
+      description: request.target.context || 'New team setup request',
+      details: [],
+    };
+  }
+  return {
+    requestedBy: 'Requested by',
+    approveLabel: 'Approve',
+    noteLabel: 'Requester note',
+    description: request.target.context,
+    details: [],
+  };
+}
+
 function formatAuditAction(action: string) {
   switch (action) {
     case 'membership.revoked':
@@ -921,7 +961,7 @@ export default function AccessPage() {
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                   {familyOnlyMode
                     ? 'These requests are waiting for approval on parent, guardian, and player access for teams you manage.'
-                    : 'These requests are waiting for approval on teams, associations, arenas, parent access, or player access that you manage.'}
+                    : 'Review access requests, new team requests, and team requests to join associations you manage.'}
                 </p>
               </div>
               <Badge variant="outline">{filteredRequests.length} open</Badge>
@@ -940,6 +980,7 @@ export default function AccessPage() {
                 filteredRequests.map((request) => {
                   const requestRoleOptions = roleOptionsForTarget(request.target.type);
                   const selectedRole = requestRoles[request.id] ?? requestRoleOptions[0] ?? '';
+                  const copy = requestReviewCopy(request);
 
                   return (
                     <div
@@ -949,8 +990,8 @@ export default function AccessPage() {
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="space-y-1">
                           <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{request.target.name}</div>
-                          {request.target.context ? (
-                            <div className="text-sm text-slate-600 dark:text-slate-300">{request.target.context}</div>
+                          {copy.description ? (
+                            <div className="text-sm text-slate-600 dark:text-slate-300">{copy.description}</div>
                           ) : null}
                           <div className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                             {getAccessTargetTypeLabel(request.target.type)}
@@ -960,10 +1001,21 @@ export default function AccessPage() {
                       </div>
 
                       <div className="mt-4 text-sm text-slate-600 dark:text-slate-300">
-                        Requested by <span className="font-medium text-slate-900 dark:text-slate-100">{request.user_email || 'Unknown user'}</span>
+                        {copy.requestedBy} <span className="font-medium text-slate-900 dark:text-slate-100">{request.user_email || 'Unknown user'}</span>
                       </div>
+                      {copy.details.length > 0 ? (
+                        <div className="mt-3 grid gap-2 rounded-xl border border-slate-200/80 bg-white/80 px-3 py-3 text-sm dark:border-slate-800 dark:bg-slate-950/40">
+                          {copy.details.map(([label, value]) => (
+                            <div key={label} className="flex flex-wrap items-center justify-between gap-3">
+                              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{label}</span>
+                              <span className="font-medium text-slate-900 dark:text-slate-100">{value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                       {request.notes ? (
                         <div className="mt-2 rounded-xl border border-slate-200/80 bg-white/80 px-3 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
+                          <div className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{copy.noteLabel}</div>
                           {request.notes}
                         </div>
                       ) : null}
@@ -989,7 +1041,7 @@ export default function AccessPage() {
                       <div className="mt-4 flex flex-wrap gap-3">
                         <Button type="button" onClick={() => void approveRequest(request)} disabled={busyKey !== null}>
                           <UserCheck className="h-4 w-4" />
-                          Approve
+                          {copy.approveLabel}
                         </Button>
                         <Button type="button" variant="ghost" onClick={() => openRequestRejection(request)} disabled={busyKey !== null}>
                           <XCircle className="h-4 w-4" />

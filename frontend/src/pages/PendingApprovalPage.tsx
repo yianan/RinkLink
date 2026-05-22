@@ -175,6 +175,7 @@ export default function PendingApprovalPage() {
       target_type: draft.target_type,
       target_id: draft.target_id,
       notes: draft.notes,
+      details: draft.details ?? null,
     })))
       .then((createdRequests) => {
         if (cancelled) return;
@@ -420,13 +421,16 @@ export default function PendingApprovalPage() {
     let cancelled = false;
     setBrowseLoading(true);
     setBrowseError(null);
+    const standingsParams: Record<string, string> = {
+      age_group: selectedBrowseTeam.age_group,
+      level: selectedBrowseTeam.level,
+    };
+    if (selectedBrowseTeam.association_id) {
+      standingsParams.association_id = selectedBrowseTeam.association_id;
+    }
     Promise.all([
       api.getBrowseTeamEvents(selectedBrowseTeam.id, { season_id: browseSeasonId }),
-      api.getBrowseStandings(browseSeasonId, {
-        association_id: selectedBrowseTeam.association_id,
-        age_group: selectedBrowseTeam.age_group,
-        level: selectedBrowseTeam.level,
-      }),
+      api.getBrowseStandings(browseSeasonId, standingsParams),
     ])
       .then(([events, standings]) => {
         if (cancelled) return;

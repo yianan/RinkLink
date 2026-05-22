@@ -136,10 +136,11 @@
 
 - `id`
 - `user_id`
-- `target_type`: `association`, `team`, `arena`, `guardian_link`, `player_link`
+- `target_type`: `association`, `team`, `arena`, `guardian_link`, `player_link`, `team_setup`, `association_attach`
 - `target_id`
 - `status`: `pending`, `approved`, `rejected`
 - `notes` nullable
+- `details_json` nullable for request-specific metadata such as new team setup fields or requested association attachment
 - `reviewed_by_user_id` nullable
 - `reviewed_at` nullable
 
@@ -489,14 +490,19 @@
 
 ### Access request flow
 
-- Public signed-up user with no access lands in pending and request UX.
+- Public signed-up user creates an account, verifies email, and lands in pending until approved.
 - User may request:
   - team access
+  - new team setup
+  - association access
+  - association attachment for a team they administer
   - arena access
   - guardian link
   - player link
+- Existing active users can request additional access from `Add Access`.
 - Reviewer approves or rejects.
-- Approval creates membership or link row and activates relevant access.
+- Approval creates the relevant membership or player link, creates a standalone team for `team_setup`, or moves/adds a team under an association for `association_attach`.
+- Rejection can include a reviewer note.
 
 ## Local Development and Deployment
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Phone, Save, Trash2, Users, X } from 'lucide-react';
 import { api } from '../api/client';
-import { Association, Team } from '../types';
+import { AccessRequest, AccessTarget, Association, Team } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,7 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
+import { Textarea } from '../components/ui/Textarea';
 import { Badge } from '../components/ui/Badge';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
@@ -48,15 +49,26 @@ export default function TeamListPage() {
   const pushToast = useToast();
   const teamVisible = !authEnabled || canViewTeams(me);
   const teamEditable = !authEnabled || canManageTeams(me);
+  const canEditAssociations =
+    !authEnabled ||
+    !!me?.capabilities.includes('platform.manage') ||
+    !!me?.capabilities.includes('association.manage');
+  const canChangeTeamAssociation = !authEnabled || !!me?.capabilities.includes('platform.manage');
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [associations, setAssociations] = useState<Association[]>([]);
+  const [associationRequests, setAssociationRequests] = useState<AccessRequest[]>([]);
 
   const [teamModalOpen, setTeamModalOpen] = useState(false);
   const [editTeam, setEditTeam] = useState<Team | null>(null);
   const [teamForm, setTeamForm] = useState(emptyTeamForm);
   const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null);
   const [removeTeamLogo, setRemoveTeamLogo] = useState(false);
+  const [associationRequestQuery, setAssociationRequestQuery] = useState('');
+  const [associationRequestOptions, setAssociationRequestOptions] = useState<AccessTarget[]>([]);
+  const [associationRequestId, setAssociationRequestId] = useState('');
+  const [associationRequestNotes, setAssociationRequestNotes] = useState('');
+  const [associationRequestLoading, setAssociationRequestLoading] = useState(false);
 
   const [selectedAssociationIds, setSelectedAssociationIds] = useState<string[]>([]);
   const [selectedCompetitionNames, setSelectedCompetitionNames] = useState<string[]>([]);
@@ -68,16 +80,18 @@ export default function TeamListPage() {
     let cancelled = false;
     Promise.all([
       api.getTeams(effectiveSeason ? { season_id: effectiveSeason.id } : undefined),
-      teamEditable ? api.getAssociations() : Promise.resolve([] as Association[]),
-    ]).then(([teamData, associationData]) => {
+      canEditAssociations ? api.getAssociations() : Promise.resolve([] as Association[]),
+      authEnabled ? api.getAccessRequests({ scope: 'mine' }) : Promise.resolve([] as AccessRequest[]),
+    ]).then(([teamData, associationData, accessRequests]) => {
       if (cancelled) return;
       setTeams(teamData);
       setAssociations(associationData);
+      setAssociationRequests(accessRequests.filter((request) => request.target.type === 'association_attach'));
     });
     return () => {
       cancelled = true;
     };
-  }, [effectiveSeason, teamEditable]);
+  }, [authEnabled, canEditAssociations, effectiveSeason]);
 
   const setTeamField = (key: keyof typeof emptyTeamForm, value: string) => {
     setTeamForm((current) => ({ ...current, [key]: value }));
@@ -95,18 +109,51 @@ export default function TeamListPage() {
     return () => URL.revokeObjectURL(teamLogoPreviewUrl);
   }, [teamLogoFile, teamLogoPreviewUrl]);
 
+  useEffect(() => {
+    if (!editTeam || canChangeTeamAssociation || associationRequestQuery.trim().length < 2) {
+      setAssociationRequestOptions([]);
+      setAssociationRequestId('');
+      return;
+    }
+    let cancelled = false;
+    api.getAccessTargets({ target_type: 'association', q: associationRequestQuery.trim() })
+      .then((targets) => {
+        if (cancelled) return;
+        setAssociationRequestOptions(targets);
+        setAssociationRequestId((current) => (current && targets.some((target) => target.id === current) ? current : targets[0]?.id || ''));
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setAssociationRequestOptions([]);
+          setAssociationRequestId('');
+          pushToast({
+            variant: 'error',
+            title: 'Unable to search associations',
+            description: error instanceof Error ? error.message : String(error),
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [associationRequestQuery, canChangeTeamAssociation, editTeam?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const openCreateTeam = () => {
     setEditTeam(null);
     setTeamForm(emptyTeamForm);
     setTeamLogoFile(null);
     setRemoveTeamLogo(false);
+    setAssociationRequestQuery('');
+    setAssociationRequestOptions([]);
+    setAssociationRequestId('');
+    setAssociationRequestNotes('');
     setTeamModalOpen(true);
   };
 
   const openEditTeam = (team: Team) => {
     setEditTeam(team);
     setTeamForm({
-      association_id: team.association_id,
+      association_id: team.association_id || '',
       name: team.name,
       age_group: team.age_group,
       level: team.level,
@@ -117,12 +164,17 @@ export default function TeamListPage() {
     });
     setTeamLogoFile(null);
     setRemoveTeamLogo(false);
+    setAssociationRequestQuery('');
+    setAssociationRequestOptions([]);
+    setAssociationRequestId('');
+    setAssociationRequestNotes('');
     setTeamModalOpen(true);
   };
 
   const saveTeam = async () => {
     const payload = {
       ...teamForm,
+      association_id: teamForm.association_id || null,
       myhockey_ranking: teamForm.myhockey_ranking ? Number(teamForm.myhockey_ranking) : null,
     };
     const savedTeam = editTeam
@@ -145,13 +197,48 @@ export default function TeamListPage() {
     setTeamForm(emptyTeamForm);
     setTeamLogoFile(null);
     setRemoveTeamLogo(false);
-    const [teamData, associationData] = await Promise.all([
+    const [teamData, associationData, accessRequests] = await Promise.all([
       api.getTeams(effectiveSeason ? { season_id: effectiveSeason.id } : undefined),
-      teamEditable ? api.getAssociations() : Promise.resolve([] as Association[]),
+      canEditAssociations ? api.getAssociations() : Promise.resolve([] as Association[]),
+      authEnabled ? api.getAccessRequests({ scope: 'mine' }) : Promise.resolve([] as AccessRequest[]),
     ]);
     setTeams(teamData);
     setAssociations(associationData);
+    setAssociationRequests(accessRequests.filter((request) => request.target.type === 'association_attach'));
     await refreshTeams({ force: true });
+  };
+
+  const requestAssociationChange = async () => {
+    if (!editTeam || !associationRequestId) {
+      pushToast({ variant: 'warning', title: 'Choose an association first' });
+      return;
+    }
+    setAssociationRequestLoading(true);
+    try {
+      const created = await api.createAccessRequest({
+        target_type: 'association_attach',
+        target_id: editTeam.id,
+        notes: associationRequestNotes.trim() || null,
+        details: {
+          team_id: editTeam.id,
+          association_id: associationRequestId,
+        },
+      });
+      setAssociationRequests((current) => [created, ...current.filter((request) => request.id !== created.id)]);
+      pushToast({ variant: 'success', title: 'Association request sent', description: created.target.context || created.target.name });
+      setAssociationRequestQuery('');
+      setAssociationRequestOptions([]);
+      setAssociationRequestId('');
+      setAssociationRequestNotes('');
+    } catch (error) {
+      pushToast({
+        variant: 'error',
+        title: 'Unable to send association request',
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setAssociationRequestLoading(false);
+    }
   };
 
   const deleteTeam = async (team: Team) => {
@@ -164,14 +251,21 @@ export default function TeamListPage() {
     if (!confirmed) return;
     await api.deleteTeam(team.id);
     pushToast({ variant: 'success', title: 'Team deleted' });
-    const [teamData, associationData] = await Promise.all([
+    const [teamData, associationData, accessRequests] = await Promise.all([
       api.getTeams(effectiveSeason ? { season_id: effectiveSeason.id } : undefined),
-      teamEditable ? api.getAssociations() : Promise.resolve([] as Association[]),
+      canEditAssociations ? api.getAssociations() : Promise.resolve([] as Association[]),
+      authEnabled ? api.getAccessRequests({ scope: 'mine' }) : Promise.resolve([] as AccessRequest[]),
     ]);
     setTeams(teamData);
     setAssociations(associationData);
+    setAssociationRequests(accessRequests.filter((request) => request.target.type === 'association_attach'));
     await refreshTeams({ force: true });
   };
+
+  const associationRequestForTeam = (teamId: string) => associationRequests.find((request) => {
+    const details = request.details && !Array.isArray(request.details) ? request.details : null;
+    return details?.team_id === teamId && request.status === 'pending';
+  });
 
   const associationOptions = useMemo<FilterOption[]>(
     () => associations
@@ -207,7 +301,7 @@ export default function TeamListPage() {
   const filteredTeams = useMemo(
     () => teams.filter((team) => {
       const primaryCompetitionName = team.primary_membership?.competition_short_name || team.primary_membership?.competition_name || '';
-      return (selectedAssociationIds.length === 0 || selectedAssociationIds.includes(team.association_id))
+      return (selectedAssociationIds.length === 0 || (!!team.association_id && selectedAssociationIds.includes(team.association_id)))
         && (selectedCompetitionNames.length === 0 || (primaryCompetitionName && selectedCompetitionNames.includes(primaryCompetitionName)))
         && (selectedAgeGroups.length === 0 || selectedAgeGroups.includes(team.age_group))
         && (selectedLevels.length === 0 || selectedLevels.includes(team.level));
@@ -283,6 +377,7 @@ export default function TeamListPage() {
 
       <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {filteredTeams.map((team) => {
+          const pendingAssociationRequest = associationRequestForTeam(team.id);
           return (
             <Card key={team.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
@@ -299,6 +394,11 @@ export default function TeamListPage() {
                       <Badge variant="outline">{team.age_group} {team.level}</Badge>
                     </div>
                     <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">{team.association_name || 'No association'}</div>
+                    {pendingAssociationRequest ? (
+                      <div className="mt-2">
+                        <Badge variant="warning">{pendingAssociationRequest.target.context || 'Association request pending'}</Badge>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 {teamEditable ? (
@@ -383,11 +483,15 @@ export default function TeamListPage() {
           setTeamModalOpen(false);
           setTeamLogoFile(null);
           setRemoveTeamLogo(false);
+          setAssociationRequestQuery('');
+          setAssociationRequestOptions([]);
+          setAssociationRequestId('');
+          setAssociationRequestNotes('');
         }}
         title={editTeam ? 'Edit Team' : 'Add Team'}
         footer={(
           <>
-            <Button type="button" onClick={saveTeam} disabled={!teamForm.name || !teamForm.association_id || !teamForm.age_group || !teamForm.level}>
+            <Button type="button" onClick={saveTeam} disabled={!teamForm.name || (!editTeam && !teamForm.association_id) || !teamForm.age_group || !teamForm.level}>
               <Save className="h-4 w-4" />
               Save
             </Button>
@@ -438,12 +542,53 @@ export default function TeamListPage() {
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Association</label>
-            <Select value={teamForm.association_id} onChange={(event) => setTeamField('association_id', event.target.value)}>
-              <option value="">Select association…</option>
+            <Select
+              value={teamForm.association_id}
+              onChange={(event) => setTeamField('association_id', event.target.value)}
+              disabled={editTeam ? !canChangeTeamAssociation : !canEditAssociations}
+            >
+              <option value="">{editTeam ? 'Independent team' : 'Select association…'}</option>
               {associations.map((association) => (
                 <option key={association.id} value={association.id}>{association.name}</option>
               ))}
             </Select>
+            {editTeam && associationRequestForTeam(editTeam.id) ? (
+              <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                {associationRequestForTeam(editTeam.id)?.target.context || 'Association request pending'}
+              </div>
+            ) : null}
+            {editTeam && !canChangeTeamAssociation ? (
+              <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-950/35">
+                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Request association change</div>
+                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Send a request to the association admins for approval.
+                </div>
+                <div className="mt-3 grid gap-3">
+                  <Input
+                    value={associationRequestQuery}
+                    onChange={(event) => setAssociationRequestQuery(event.target.value)}
+                    placeholder="Search associations"
+                  />
+                  <Select value={associationRequestId} onChange={(event) => setAssociationRequestId(event.target.value)} disabled={associationRequestOptions.length === 0}>
+                    {associationRequestOptions.length === 0 ? <option value="">Search first</option> : null}
+                    {associationRequestOptions.map((association) => (
+                      <option key={association.id} value={association.id}>{association.name}</option>
+                    ))}
+                  </Select>
+                  <Textarea
+                    rows={3}
+                    value={associationRequestNotes}
+                    onChange={(event) => setAssociationRequestNotes(event.target.value)}
+                    placeholder="Optional note"
+                  />
+                  <div>
+                    <Button type="button" variant="outline" onClick={() => void requestAssociationChange()} disabled={associationRequestLoading || !associationRequestId}>
+                      {associationRequestLoading ? 'Sending…' : 'Send request'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Team Name</label>

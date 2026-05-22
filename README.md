@@ -156,10 +156,11 @@ accept-conflict toast path can be demonstrated.
 The original Alembic history is preserved.
 
 - Previous head before the redesign: `7f2b6c8a91d3`
-- Current head: `c4b9a5930f12`
+- Current head: `6a8e3f1b2c90`
 - Forward redesign migration: `backend/alembic/versions/092fd6e43b19_arena_availability_events_redesign.py`
 - Attendance migration: `backend/alembic/versions/7b6a6c0f4d21_add_event_attendance.py`
 - Open-ice pricing and booking-request migration: `backend/alembic/versions/c4b9a5930f12_add_ice_booking_requests_and_slot_pricing.py`
+- Team setup and association request migration: `backend/alembic/versions/6a8e3f1b2c90_add_team_setup_access_requests.py`
 
 Important:
 

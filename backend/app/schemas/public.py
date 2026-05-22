@@ -16,7 +16,7 @@ class PublicSeasonOut(BaseModel):
 
 class PublicTeamOut(BaseModel):
     id: str
-    association_id: str
+    association_id: str | None = None
     association_name: str | None = None
     name: str
     age_group: str

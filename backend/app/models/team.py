@@ -13,7 +13,7 @@ class Team(Base):
     __tablename__ = "teams"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    association_id: Mapped[str] = mapped_column(ForeignKey("associations.id", ondelete="CASCADE"), nullable=False)
+    association_id: Mapped[str | None] = mapped_column(ForeignKey("associations.id", ondelete="SET NULL"), nullable=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     age_group: Mapped[str] = mapped_column(String(20), nullable=False)
     level: Mapped[str] = mapped_column(String(50), nullable=False)

@@ -412,6 +412,59 @@ def test_approving_access_request_emails_requester_with_app_link(db: Session, mo
     ]
 
 
+def test_platform_admin_can_approve_new_team_request(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.routers import access as access_router
+
+    requester = make_user(db, "new-team-requester@example.com")
+    admin = make_user(db, "platform-admin@example.com", status="active")
+    admin.is_platform_admin = True
+    db.commit()
+
+    sent_reviews: list[dict] = []
+    sent_decisions: list[dict] = []
+    monkeypatch.setattr(access_router, "send_access_request_review_email", lambda **kwargs: sent_reviews.append(kwargs) or True)
+    monkeypatch.setattr(access_router, "send_access_request_decision_email", lambda **kwargs: sent_decisions.append(kwargs) or True)
+
+    request_context = build_authorization_context(db, requester)
+    created = create_access_request(
+        payload=AccessRequestCreate(
+            target_type="team_setup",
+            target_id="new-team",
+            notes="I run this team.",
+            details={"team_name": "Independent 12U Blue", "age_group": "12U", "level": "AA", "location": "Boston"},
+        ),
+        context=request_context,
+        db=db,
+        request=make_request("/api/access-requests"),
+    )
+
+    assert created.status == "pending"
+    assert created.target.type == "team_setup"
+    assert created.target.name == "Independent 12U Blue"
+    assert sent_reviews[0]["to_email"] == "platform-admin@example.com"
+
+    approved = approve_access_request(
+        request_id=created.id,
+        payload=AccessRequestDecision(role=None),
+        context=build_authorization_context(db, admin),
+        db=db,
+        request=make_request(f"/api/access-requests/{created.id}/approve"),
+    )
+
+    team = db.query(Team).filter(Team.name == "Independent 12U Blue").one()
+    membership = db.query(TeamMembership).filter(TeamMembership.user_id == requester.id, TeamMembership.team_id == team.id).one()
+    db.refresh(requester)
+
+    assert approved.status == "approved"
+    assert team.association_id is None
+    assert team.age_group == "12U"
+    assert team.level == "AA"
+    assert membership.role == "team_admin"
+    assert requester.status == "active"
+    assert requester.default_team_id == team.id
+    assert sent_decisions[0]["target_name"] == "Independent 12U Blue"
+
+
 def test_rejecting_access_request_emails_requester_without_app_link(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
     from app.routers import access as access_router
 

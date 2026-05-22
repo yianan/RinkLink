@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 from html import escape
 
@@ -61,7 +62,7 @@ logger = logging.getLogger(__name__)
 ASSOCIATION_ROLES = {"association_admin"}
 TEAM_ROLES = {"team_admin", "manager", "scheduler", "coach"}
 ARENA_ROLES = {"arena_admin", "arena_ops"}
-RESOURCE_TARGET_TYPES = {"association", "team", "arena", "guardian_link", "player_link"}
+RESOURCE_TARGET_TYPES = {"association", "team", "arena", "guardian_link", "player_link", "team_setup", "association_attach"}
 ROLE_BASED_TARGET_TYPES = {"association", "team", "arena"}
 INVITE_ACCEPT_RATE_LIMIT = RateLimitRule(limit=5, window_seconds=300)
 ACCESS_REQUEST_RATE_LIMIT = RateLimitRule(limit=10, window_seconds=300)
@@ -101,6 +102,19 @@ def _build_target_summary(target_type: str, target) -> AccessTargetOut:
     if target_type == "arena":
         location = ", ".join(part for part in [target.city, target.state] if part)
         return AccessTargetOut(type=target_type, id=target.id, name=target.name, context=location or None)
+    if target_type == "team_setup":
+        details = target.details_json if isinstance(target.details_json, dict) else {}
+        name = str(details.get("team_name") or "New team")
+        context_parts = [str(details.get(key) or "").strip() for key in ("age_group", "level")]
+        context = " · ".join(part for part in context_parts if part)
+        return AccessTargetOut(type=target_type, id=target.id, name=name, context=context or "New team request")
+    if target_type == "association_attach":
+        details = target.details_json if isinstance(target.details_json, dict) else {}
+        team_name = str(details.get("team_name") or "Team")
+        association_name = str(details.get("association_name") or "Association")
+        current_association_name = str(details.get("current_association_name") or "").strip()
+        verb = "Move to" if current_association_name else "Join"
+        return AccessTargetOut(type=target_type, id=target.id, name=team_name, context=f"{verb} {association_name}")
 
     player_name = f"{target.first_name} {target.last_name}".strip()
     team_name = target.team.name if getattr(target, "team", None) else None
@@ -152,6 +166,16 @@ def _load_target(db: Session, target_type: str, target_id: str):
         if target is None:
             raise _not_found("Arena not found")
         return target
+    if target_type == "team_setup":
+        target = db.get(AccessRequest, target_id)
+        if target is None or target.target_type != "team_setup":
+            raise _not_found("Team request not found")
+        return target
+    if target_type == "association_attach":
+        target = db.get(AccessRequest, target_id)
+        if target is None or target.target_type != "association_attach":
+            raise _not_found("Association request not found")
+        return target
 
     target = db.get(Player, target_id)
     if target is None:
@@ -172,6 +196,14 @@ def _validate_role(target_type: str, role: str | None) -> None:
         if role not in ARENA_ROLES:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid arena role")
         return
+    if target_type == "team_setup":
+        if role is not None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="New team requests do not use roles")
+        return
+    if target_type == "association_attach":
+        if role is not None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Association requests do not use roles")
+        return
     if role is not None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="This target type does not use roles")
 
@@ -186,6 +218,16 @@ def _ensure_manage_target(context: AuthorizationContext, target_type: str, targe
     if target_type == "arena":
         ensure_arena_access(context, target.id, "arena.manage")
         return
+    if target_type == "team_setup":
+        ensure_capability(context, "platform.manage")
+        return
+    if target_type == "association_attach":
+        details = target.details_json if isinstance(target.details_json, dict) else {}
+        association_id = str(details.get("association_id") or "")
+        if not association_id:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Association is missing")
+        ensure_association_access(context, association_id, "association.manage")
+        return
     ensure_team_access(context, target.team, "team.manage_roster")
 
 
@@ -198,6 +240,12 @@ def _can_manage_target(context: AuthorizationContext, target_type: str, target) 
         return can_access_team(context, target, "team.manage_staff")
     if target_type == "arena":
         return can_access_arena(context, target.id, "arena.manage")
+    if target_type == "team_setup":
+        return False
+    if target_type == "association_attach":
+        details = target.details_json if isinstance(target.details_json, dict) else {}
+        association_id = str(details.get("association_id") or "")
+        return bool(association_id and can_access_association(context, association_id, "association.manage"))
     return can_access_team(context, target.team, "team.manage_roster")
 
 
@@ -356,6 +404,52 @@ def _apply_target_grant(
         _mark_user_active(user)
         return result
 
+    if target_type == "team_setup":
+        details = target.details_json if isinstance(target.details_json, dict) else {}
+        team_name = str(details.get("team_name") or "").strip()
+        age_group = str(details.get("age_group") or "").strip()
+        level = str(details.get("level") or "").strip()
+        if not team_name or not age_group or not level:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Team name, age group, and level are required")
+        team = Team(
+            association_id=None,
+            name=team_name,
+            age_group=age_group,
+            level=level,
+            manager_name=user.display_name or "",
+            manager_email=user.email,
+            manager_phone="",
+        )
+        db.add(team)
+        db.flush()
+        db.add(TeamMembership(user_id=user.id, team_id=team.id, role="team_admin"))
+        _mark_user_active(user, default_team_id=team.id)
+        target.details_json = {**details, "created_team_id": team.id}
+        return "created"
+
+    if target_type == "association_attach":
+        details = target.details_json if isinstance(target.details_json, dict) else {}
+        team_id = str(details.get("team_id") or "")
+        association_id = str(details.get("association_id") or "")
+        team = db.get(Team, team_id)
+        association = db.get(Association, association_id)
+        if team is None:
+            raise _not_found("Team not found")
+        if association is None:
+            raise _not_found("Association not found")
+        if team.association_id == association.id:
+            return "unchanged"
+        current_association = team.association
+        team.association_id = association.id
+        target.details_json = {
+            **details,
+            "association_name": association.name,
+            "team_name": team.name,
+            "current_association_id": current_association.id if current_association else None,
+            "current_association_name": current_association.name if current_association else None,
+        }
+        return "updated"
+
     if target_type == "guardian_link":
         link = (
             db.query(PlayerGuardianship)
@@ -419,6 +513,10 @@ def _has_existing_access(db: Session, *, user: AppUser, target_type: str, target
             .first()
             is not None
         )
+    if target_type == "team_setup":
+        return False
+    if target_type == "association_attach":
+        return False
     if target_type == "guardian_link":
         return (
             db.query(PlayerGuardianship)
@@ -527,6 +625,21 @@ def _access_request_reviewer_emails(db: Session, *, target_type: str, target, re
             )
             .all()
         )
+    elif target_type == "team_setup":
+        pass
+    elif target_type == "association_attach":
+        details = target.details_json if isinstance(target.details_json, dict) else {}
+        association_id = str(details.get("association_id") or "")
+        if association_id:
+            add_users(
+                _active_user_query(db)
+                .join(AssociationMembership, AssociationMembership.user_id == AppUser.id)
+                .filter(
+                    AssociationMembership.association_id == association_id,
+                    AssociationMembership.role.in_(ASSOCIATION_ROLES),
+                )
+                .all()
+            )
     elif target_type in {"guardian_link", "player_link"}:
         add_users(
             _active_user_query(db)
@@ -613,6 +726,47 @@ def _build_access_target_search_query(search: str) -> str:
     return f"%{search.strip()}%"
 
 
+def _team_setup_details(payload: AccessRequestCreate) -> dict:
+    details = payload.details if isinstance(payload.details, dict) else {}
+    normalized = {
+        "team_name": str(details.get("team_name") or "").strip(),
+        "age_group": str(details.get("age_group") or "").strip(),
+        "level": str(details.get("level") or "").strip(),
+        "location": str(details.get("location") or "").strip(),
+    }
+    missing = [label for key, label in (("team_name", "team name"), ("age_group", "age group"), ("level", "level")) if not normalized[key]]
+    if missing:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Missing {', '.join(missing)}")
+    return normalized
+
+
+def _association_attach_details(db: Session, context: AuthorizationContext, payload: AccessRequestCreate) -> dict:
+    details = payload.details if isinstance(payload.details, dict) else {}
+    team_id = str(details.get("team_id") or payload.target_id or "").strip()
+    association_id = str(details.get("association_id") or "").strip()
+    if not team_id or not association_id:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Team and association are required")
+
+    team = db.get(Team, team_id)
+    if team is None:
+        raise _not_found("Team not found")
+    association = db.get(Association, association_id)
+    if association is None:
+        raise _not_found("Association not found")
+    ensure_team_access(context, team, "team.manage")
+    if team.association_id == association.id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This team is already in that association")
+
+    return {
+        "team_id": team.id,
+        "team_name": team.name,
+        "current_association_id": team.association_id,
+        "current_association_name": team.association.name if team.association else None,
+        "association_id": association.id,
+        "association_name": association.name,
+    }
+
+
 def _invite_out(db: Session, invite: Invite) -> InviteOut:
     target = _load_target(db, invite.target_type, invite.target_id)
     inviter = db.get(AppUser, invite.invited_by_user_id)
@@ -655,6 +809,7 @@ def _access_request_out(db: Session, access_request: AccessRequest, *, mask_priv
         reviewed_by_user_id=access_request.reviewed_by_user_id,
         reviewed_by_email=reviewer.email if reviewer else None,
         target=_access_request_target_summary(access_request, target, mask_private_target=mask_private_target),
+        details=access_request.details_json,
     )
 
 
@@ -1116,6 +1271,89 @@ def create_access_request(
         route_key="access-request.create",
         rule=ACCESS_REQUEST_RATE_LIMIT,
     )
+    if payload.target_type == "team_setup":
+        details = _team_setup_details(payload)
+        existing = (
+            db.query(AccessRequest)
+            .filter(
+                AccessRequest.user_id == context.user.id,
+                AccessRequest.target_type == "team_setup",
+                AccessRequest.status == "pending",
+            )
+            .first()
+        )
+        if existing is not None:
+            existing.details_json = details
+            existing.notes = payload.notes
+            db.commit()
+            db.refresh(existing)
+            return _access_request_out(db, existing, mask_private_target=True)
+
+        request_id = str(uuid.uuid4())
+        access_request = AccessRequest(
+            id=request_id,
+            user_id=context.user.id,
+            target_type="team_setup",
+            target_id=request_id,
+            status="pending",
+            notes=payload.notes,
+            details_json=details,
+        )
+        db.add(access_request)
+        _record_audit(
+            db,
+            actor_user_id=context.user.id,
+            action="access_request.created",
+            resource_type="team_setup",
+            resource_id=request_id,
+            request=request,
+            details={"access_request_user_id": context.user.id, "team_name": details["team_name"]},
+        )
+        db.commit()
+        db.refresh(access_request)
+        _notify_access_request_reviewers(db, access_request=access_request, target=access_request, requester=context.user)
+        return _access_request_out(db, access_request, mask_private_target=True)
+
+    if payload.target_type == "association_attach":
+        details = _association_attach_details(db, context, payload)
+        existing = (
+            db.query(AccessRequest)
+            .filter(
+                AccessRequest.target_type == "association_attach",
+                AccessRequest.status == "pending",
+                AccessRequest.details_json["team_id"].as_string() == details["team_id"],
+                AccessRequest.details_json["association_id"].as_string() == details["association_id"],
+            )
+            .first()
+        )
+        if existing is not None:
+            return _access_request_out(db, existing, mask_private_target=True)
+
+        request_id = str(uuid.uuid4())
+        access_request = AccessRequest(
+            id=request_id,
+            user_id=context.user.id,
+            target_type="association_attach",
+            target_id=request_id,
+            status="pending",
+            notes=payload.notes,
+            details_json=details,
+        )
+        db.add(access_request)
+        _record_audit(
+            db,
+            actor_user_id=context.user.id,
+            action="association_attach_request.created",
+            resource_type="team",
+            resource_id=details["team_id"],
+            request=request,
+            details={"association_id": details["association_id"], "access_request_id": request_id},
+        )
+        db.commit()
+        db.refresh(access_request)
+        _notify_access_request_reviewers(db, access_request=access_request, target=access_request, requester=context.user)
+        return _access_request_out(db, access_request, mask_private_target=True)
+
     target = _load_target(db, payload.target_type, payload.target_id)
     if _has_existing_access(db, user=context.user, target_type=payload.target_type, target=target):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You already have access to this resource")

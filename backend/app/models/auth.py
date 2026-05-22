@@ -161,6 +161,7 @@ class AccessRequest(Base):
     target_id: Mapped[str] = mapped_column(String(36), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", server_default="pending")
     notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    details_json: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
     reviewed_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("app_users.id", ondelete="SET NULL"), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)

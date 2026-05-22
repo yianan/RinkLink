@@ -222,7 +222,7 @@ export const api = {
     request<import('../types').AccessTarget[]>(`/access-targets?${new URLSearchParams(params).toString()}`),
   getPublicAccessTargets: (params: Record<string, string>) =>
     request<import('../types').AccessTarget[]>(`/public/access-targets?${new URLSearchParams(params).toString()}`),
-  createAccessRequest: (data: { target_type: string; target_id: string; notes?: string | null }) =>
+  createAccessRequest: (data: { target_type: string; target_id: string; notes?: string | null; details?: Record<string, unknown> | null }) =>
     request<import('../types').AccessRequest>('/access-requests', { method: 'POST', body: JSON.stringify(data) }),
   approveAccessRequest: (requestId: string, role?: string | null) =>
     request<import('../types').AccessRequest>(`/access-requests/${requestId}/approve`, {

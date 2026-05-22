@@ -88,6 +88,7 @@ export default function AssociationListPage() {
   const teamsByAssociation = useMemo(() => {
     const by: Record<string, Team[]> = {};
     for (const t of teams) {
+      if (!t.association_id) continue;
       (by[t.association_id] ||= []).push(t);
     }
     for (const ts of Object.values(by)) {

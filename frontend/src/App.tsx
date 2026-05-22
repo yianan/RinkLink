@@ -14,6 +14,7 @@ import {
   Menu,
   Search,
   Link2,
+  PlusCircle,
   ShieldCheck,
   Snowflake,
   Trophy,
@@ -65,6 +66,7 @@ const ArenaListPage = lazy(() => import('./pages/ArenaListPage'));
 const ArenaDetailPage = lazy(() => import('./pages/ArenaDetailPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const FamilyLinksPage = lazy(() => import('./pages/FamilyLinksPage'));
+const AddAccessPage = lazy(() => import('./pages/AddAccessPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 
 function RouteFallback() {
@@ -185,6 +187,7 @@ const NAV_SECTIONS = [
   {
     label: 'Account',
     items: [
+      { path: '/add-access', label: 'Add Access', icon: PlusCircle },
       { path: '/family-links', label: 'My Players', icon: Link2, audience: 'family' },
       { path: '/settings', label: 'Settings', icon: UserCog },
     ],
@@ -222,6 +225,8 @@ function canViewPath(path: string, me: MeResponse | null, runtimeAuthEnabled: bo
     case '/':
       return true;
     case '/contact':
+      return true;
+    case '/add-access':
       return true;
     case '/roster':
       return hasCapability(me, 'team.view_private');
@@ -659,8 +664,9 @@ function AppContent() {
                     <Route path="/invite/:token" element={<InviteAcceptancePage />} />
                     <Route path="/contact" element={<ContactPage />} />
                     <Route path="/" element={<HomePage />} />
-                <Route path="/access" element={<AccessPage />} />
-                <Route path="/family-links" element={<FamilyLinksPage />} />
+                    <Route path="/access" element={<AccessPage />} />
+                    <Route path="/add-access" element={<AddAccessPage />} />
+                    <Route path="/family-links" element={<FamilyLinksPage />} />
                     <Route path="/associations" element={<AssociationListPage />} />
                     <Route path="/competitions" element={<CompetitionsPage />} />
                     <Route path="/standings" element={<StandingsPage />} />

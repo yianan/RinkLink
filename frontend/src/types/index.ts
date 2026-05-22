@@ -51,7 +51,7 @@ export interface LinkedPlayer {
 
 export interface AccessibleTeam {
   id: string;
-  association_id: string;
+  association_id: string | null;
   name: string;
   age_group: string;
   level: string;
@@ -111,6 +111,7 @@ export interface AccessRequest {
   reviewed_by_user_id: string | null;
   reviewed_by_email: string | null;
   target: AccessTarget;
+  details: Record<string, unknown> | unknown[] | null;
 }
 
 export interface UserAccessEntry {
@@ -203,7 +204,7 @@ export interface PublicSeason {
 
 export interface PublicTeam {
   id: string;
-  association_id: string;
+  association_id: string | null;
   association_name: string | null;
   name: string;
   age_group: string;
@@ -237,7 +238,7 @@ export interface PublicEvent {
 
 export interface Team {
   id: string;
-  association_id: string;
+  association_id: string | null;
   name: string;
   age_group: string;
   level: string;
@@ -258,7 +259,7 @@ export interface Team {
 
 export interface TeamSummary {
   id: string;
-  association_id: string;
+  association_id: string | null;
   name: string;
   age_group: string;
   level: string;

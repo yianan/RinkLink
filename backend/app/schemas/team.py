@@ -6,7 +6,7 @@ from .competition import TeamCompetitionMembershipOut
 
 
 class TeamCreate(BaseModel):
-    association_id: str
+    association_id: str | None = None
     name: str
     age_group: str
     level: str
@@ -17,6 +17,7 @@ class TeamCreate(BaseModel):
 
 
 class TeamUpdate(BaseModel):
+    association_id: str | None = None
     name: str | None = None
     age_group: str | None = None
     level: str | None = None
@@ -28,7 +29,7 @@ class TeamUpdate(BaseModel):
 
 class TeamOut(BaseModel):
     id: str
-    association_id: str
+    association_id: str | None = None
     name: str
     age_group: str
     level: str
@@ -51,7 +52,7 @@ class TeamOut(BaseModel):
 
 class TeamSummaryOut(BaseModel):
     id: str
-    association_id: str
+    association_id: str | None = None
     name: str
     age_group: str
     level: str

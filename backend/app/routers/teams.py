@@ -206,7 +206,14 @@ def update_team(
     if not team:
         raise HTTPException(404, "Team not found")
     ensure_team_access(context, team, "team.manage")
-    for k, v in body.model_dump(exclude_unset=True).items():
+    update_data = body.model_dump(exclude_unset=True)
+    if "association_id" in update_data and update_data["association_id"] != team.association_id:
+        next_association_id = update_data["association_id"]
+        if not context.user.is_platform_admin:
+            raise HTTPException(403, "Only platform admins can change a team's association")
+        if next_association_id and not db.get(Association, next_association_id):
+            raise HTTPException(400, "Association not found")
+    for k, v in update_data.items():
         setattr(team, k, v)
     db.commit()
     ttl_clear_prefix("teams:summary")

@@ -48,7 +48,7 @@ class LinkedPlayerOut(BaseModel):
 
 class AccessibleTeamOut(BaseModel):
     id: str
-    association_id: str
+    association_id: str | None = None
     name: str
     age_group: str
     level: str
@@ -98,6 +98,7 @@ class AccessRequestCreate(BaseModel):
     target_type: str
     target_id: str
     notes: str | None = Field(default=None, max_length=1000)
+    details: dict | None = None
 
 
 class AccessRequestDecision(BaseModel):
@@ -155,3 +156,4 @@ class AccessRequestOut(BaseModel):
     reviewed_by_user_id: str | None = None
     reviewed_by_email: str | None = None
     target: AccessTargetOut
+    details: dict | list | None = None

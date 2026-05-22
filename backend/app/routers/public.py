@@ -34,7 +34,7 @@ def _season_out(db: Session, season: Season) -> PublicSeasonOut:
 
 
 def _team_out(db: Session, team: Team) -> PublicTeamOut:
-    association = db.get(Association, team.association_id)
+    association = db.get(Association, team.association_id) if team.association_id else None
     return PublicTeamOut(
         id=team.id,
         association_id=team.association_id,

@@ -19,6 +19,7 @@ import type { AccessTarget } from '../types';
 
 const appIconSrc = '/icons/rinklink-icon-192.png';
 const SIGNUP_TARGET_TYPES = [
+  { value: 'team_setup', label: 'Create a new team' },
   { value: 'team', label: 'Team staff access' },
   { value: 'association', label: 'Association access' },
   { value: 'arena', label: 'Arena staff access' },
@@ -704,6 +705,10 @@ function RequestAccessSetupCard() {
   const [targetOptions, setTargetOptions] = useState<AccessTarget[]>([]);
   const [targetId, setTargetId] = useState('');
   const [notes, setNotes] = useState('');
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamAgeGroup, setNewTeamAgeGroup] = useState('');
+  const [newTeamLevel, setNewTeamLevel] = useState('');
+  const [newTeamLocation, setNewTeamLocation] = useState('');
   const [drafts, setDrafts] = useState<SignupAccessRequestDraft[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
@@ -742,7 +747,7 @@ function RequestAccessSetupCard() {
   }, [teamQuery]);
 
   useEffect(() => {
-    if (targetQuery.trim().length < 2) {
+    if (targetType === 'team_setup' || targetQuery.trim().length < 2) {
       setTargetOptions([]);
       setTargetId('');
       setLookupLoading(false);
@@ -789,6 +794,7 @@ function RequestAccessSetupCard() {
   const checkEmailPath = `/auth/check-email${email ? `?email=${encodeURIComponent(email)}` : ''}`;
   const isPlayerAccessRequest = targetType === 'guardian_link' || targetType === 'player_link';
   const isGuardianAccessRequest = targetType === 'guardian_link';
+  const isNewTeamRequest = targetType === 'team_setup';
   const searchLabel = signupTargetSearchLabel(targetType);
   const selectedLabel = isPlayerAccessRequest ? 'Player' : 'Choose one';
   const searchPlaceholder = isPlayerAccessRequest
@@ -796,6 +802,32 @@ function RequestAccessSetupCard() {
     : 'Start typing a name';
 
   const buildCurrentDraft = (): SignupAccessRequestDraft | null => {
+    if (isNewTeamRequest) {
+      const teamName = newTeamName.trim();
+      const ageGroup = newTeamAgeGroup.trim();
+      const level = newTeamLevel.trim();
+      if (!teamName || !ageGroup || !level) {
+        pushToast({
+          title: 'Team details required',
+          description: 'Add the team name, age group, and level before continuing.',
+          variant: 'warning',
+        });
+        return null;
+      }
+      return {
+        target_type: 'team_setup',
+        target_id: 'new-team',
+        target_name: teamName,
+        target_context: [ageGroup, level].filter(Boolean).join(' · ') || null,
+        notes: notes.trim() || null,
+        details: {
+          team_name: teamName,
+          age_group: ageGroup,
+          level,
+          location: newTeamLocation.trim(),
+        },
+      };
+    }
     if (!selectedTarget) {
       pushToast({
         title: 'Choose access',
@@ -875,6 +907,10 @@ function RequestAccessSetupCard() {
               setTargetId('');
               setLookupError(null);
               setDrafts([]);
+              setNewTeamName('');
+              setNewTeamAgeGroup('');
+              setNewTeamLevel('');
+              setNewTeamLocation('');
             }}
           >
             {SIGNUP_TARGET_TYPES.map((option) => (
@@ -918,41 +954,66 @@ function RequestAccessSetupCard() {
           </>
         ) : null}
 
-        <div className="rinklink-auth-field">
-          <label className="rinklink-auth-label" htmlFor="request-target-search">{searchLabel}</label>
-          <Input
-            id="request-target-search"
-            className="rinklink-auth-input"
-            value={targetQuery}
-            onChange={(event) => setTargetQuery(event.target.value)}
-            placeholder={searchPlaceholder}
-            disabled={isPlayerAccessRequest && !teamId}
-          />
-        </div>
+        {isNewTeamRequest ? (
+          <>
+            <div className="rinklink-auth-field">
+              <label className="rinklink-auth-label" htmlFor="new-team-name">Team name</label>
+              <Input id="new-team-name" className="rinklink-auth-input" value={newTeamName} onChange={(event) => setNewTeamName(event.target.value)} placeholder="Example: RinkLink 12U Blue" />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rinklink-auth-field">
+                <label className="rinklink-auth-label" htmlFor="new-team-age">Age group</label>
+                <Input id="new-team-age" className="rinklink-auth-input" value={newTeamAgeGroup} onChange={(event) => setNewTeamAgeGroup(event.target.value)} placeholder="Example: 12U" />
+              </div>
+              <div className="rinklink-auth-field">
+                <label className="rinklink-auth-label" htmlFor="new-team-level">Level</label>
+                <Input id="new-team-level" className="rinklink-auth-input" value={newTeamLevel} onChange={(event) => setNewTeamLevel(event.target.value)} placeholder="Example: AA" />
+              </div>
+            </div>
+            <div className="rinklink-auth-field">
+              <label className="rinklink-auth-label" htmlFor="new-team-location">Location</label>
+              <Input id="new-team-location" className="rinklink-auth-input" value={newTeamLocation} onChange={(event) => setNewTeamLocation(event.target.value)} placeholder="Optional" />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="rinklink-auth-field">
+              <label className="rinklink-auth-label" htmlFor="request-target-search">{searchLabel}</label>
+              <Input
+                id="request-target-search"
+                className="rinklink-auth-input"
+                value={targetQuery}
+                onChange={(event) => setTargetQuery(event.target.value)}
+                placeholder={searchPlaceholder}
+                disabled={isPlayerAccessRequest && !teamId}
+              />
+            </div>
 
-        <div className="rinklink-auth-field">
-          <label className="rinklink-auth-label" htmlFor="request-target">{selectedLabel}</label>
-          <Select
-            id="request-target"
-            className="rinklink-auth-input"
-            value={targetId}
-            onChange={(event) => setTargetId(event.target.value)}
-            disabled={lookupLoading || targetOptions.length === 0}
-          >
-            {targetOptions.length === 0 ? (
-              <option value="">{lookupLoading ? 'Loading matches…' : 'Search first'}</option>
-            ) : (
-              targetOptions.map((target) => (
-                <option key={target.id} value={target.id}>
-                  {target.name}{target.context ? ` · ${target.context}` : ''}
-                </option>
-              ))
-            )}
-          </Select>
-          {lookupError ? (
-            <div className="rinklink-auth-error mt-2">{lookupError}</div>
-          ) : null}
-        </div>
+            <div className="rinklink-auth-field">
+              <label className="rinklink-auth-label" htmlFor="request-target">{selectedLabel}</label>
+              <Select
+                id="request-target"
+                className="rinklink-auth-input"
+                value={targetId}
+                onChange={(event) => setTargetId(event.target.value)}
+                disabled={lookupLoading || targetOptions.length === 0}
+              >
+                {targetOptions.length === 0 ? (
+                  <option value="">{lookupLoading ? 'Loading matches…' : 'Search first'}</option>
+                ) : (
+                  targetOptions.map((target) => (
+                    <option key={target.id} value={target.id}>
+                      {target.name}{target.context ? ` · ${target.context}` : ''}
+                    </option>
+                  ))
+                )}
+              </Select>
+              {lookupError ? (
+                <div className="rinklink-auth-error mt-2">{lookupError}</div>
+              ) : null}
+            </div>
+          </>
+        )}
 
         <div className="rinklink-auth-field">
           <label className="rinklink-auth-label" htmlFor="request-notes">Note for admin</label>
