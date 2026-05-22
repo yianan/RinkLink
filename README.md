@@ -335,7 +335,7 @@ If the app is running on Render, the combined container startup already does all
 
 ```bash
 node dist/ensure-auth-schema.js
-npm run auth:migrate:yes
+npm run auth:migrate
 alembic upgrade head
 uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
 ```

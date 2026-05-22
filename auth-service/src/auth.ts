@@ -3,6 +3,7 @@ import "dotenv/config";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { haveIBeenPwned, jwt, twoFactor } from "better-auth/plugins";
+import type { BetterAuthOptions } from "better-auth/types";
 import type { BetterAuthPlugin } from "better-auth";
 import { Pool } from "pg";
 
@@ -226,7 +227,7 @@ function socialProviderConfig() {
   return providers;
 }
 
-export const auth = betterAuth({
+export const authOptions = {
   appName: "RinkLink",
   baseURL,
   secret: betterAuthSecret,
@@ -342,4 +343,6 @@ export const auth = betterAuth({
       },
     }),
   ],
-});
+} satisfies BetterAuthOptions;
+
+export const auth = betterAuth(authOptions);
