@@ -151,6 +151,9 @@ export default function ContactPage() {
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 sm:px-6 sm:py-8">
       {content}
+      <footer className="rinklink-auth-site-footer">
+        <span>Copyright &copy; {new Date().getFullYear()} RinkLink</span>
+      </footer>
     </main>
   );
 }

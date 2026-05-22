@@ -294,6 +294,26 @@ export default function AccountSettingsCards({
         </Card>
       ) : null}
 
+      <Card className={cn('rinklink-settings-card w-full pb-0 text-start', classNames?.card?.base)}>
+        <div className={cn('rinklink-settings-header', classNames?.card?.header)}>
+          <h2 className={cn('rinklink-settings-title', classNames?.card?.title)}>Get help</h2>
+          <p className={cn('rinklink-settings-description', classNames?.card?.description)}>
+            Send a message to the RinkLink admins.
+          </p>
+        </div>
+        <div className={cn('rinklink-settings-footer', classNames?.card?.footer)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className={cn('rinklink-settings-button', classNames?.card?.button)}
+            onClick={() => window.location.assign('/contact')}
+          >
+            Contact admins
+          </Button>
+        </div>
+      </Card>
+
       {canCloseAccount ? (
         <Card className={cn('rinklink-settings-card w-full pb-0 text-start', classNames?.card?.base)}>
           <div className={cn('rinklink-settings-header', classNames?.card?.header)}>

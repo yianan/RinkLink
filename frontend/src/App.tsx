@@ -11,7 +11,6 @@ import {
   Home,
   Inbox,
   LogOut,
-  Mail,
   Menu,
   Search,
   Link2,
@@ -187,7 +186,6 @@ const NAV_SECTIONS = [
     label: 'Account',
     items: [
       { path: '/family-links', label: 'My Players', icon: Link2, audience: 'family' },
-      { path: '/contact', label: 'Contact Us', icon: Mail },
       { path: '/settings', label: 'Settings', icon: UserCog },
     ],
   },
