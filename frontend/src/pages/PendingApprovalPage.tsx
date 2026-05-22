@@ -479,6 +479,13 @@ export default function PendingApprovalPage() {
     return <Navigate to="/" replace />;
   }
 
+  const hasSubmittedRequests = requests.length > 0 || signupRequestStatus === 'submitted';
+  const requestCardTitle = hasSubmittedRequests ? 'Request additional access' : 'Request access';
+  const requestCardDescription = hasSubmittedRequests
+    ? 'Need another team, player, association, arena, or new team setup? Send another request for approval.'
+    : 'Choose the access you need so an administrator can approve your account.';
+  const submitRequestLabel = hasSubmittedRequests ? 'Submit additional request' : 'Submit access request';
+
   const signOut = async () => {
     setSubmitting(true);
     try {
@@ -642,9 +649,9 @@ export default function PendingApprovalPage() {
           <Card className="p-7 sm:p-8">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Request additional access</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{requestCardTitle}</h2>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  Choose anything else you need and send it to the right administrator for approval.
+                  {requestCardDescription}
                 </p>
               </div>
               <Badge variant={statusVariant(me?.user.status || 'pending')}>{me?.user.status || 'pending'}</Badge>
@@ -760,7 +767,7 @@ export default function PendingApprovalPage() {
               </div>
 
               <Button type="button" onClick={() => void submitAccessRequest()} disabled={submitting || requestOptionsLoading || (requestTargetType !== 'team_setup' && !requestTargetId)}>
-                {submitting ? 'Submitting…' : 'Submit request'}
+                {submitting ? 'Submitting…' : submitRequestLabel}
               </Button>
             </div>
           </Card>
