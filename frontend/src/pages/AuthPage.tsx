@@ -872,7 +872,7 @@ function RequestAccessSetupCard() {
         });
         return;
       }
-      saveSignupAccessRequestDrafts(drafts);
+      saveSignupAccessRequestDrafts(drafts, email);
       navigate(checkEmailPath);
       return;
     }
@@ -883,7 +883,7 @@ function RequestAccessSetupCard() {
       ...drafts.filter((item) => !(item.target_type === currentDraft.target_type && item.target_id === currentDraft.target_id)),
       currentDraft,
     ];
-    saveSignupAccessRequestDrafts(nextDrafts);
+    saveSignupAccessRequestDrafts(nextDrafts, email);
     navigate(checkEmailPath);
   };
 

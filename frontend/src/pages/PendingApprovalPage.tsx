@@ -30,6 +30,7 @@ import type {
 } from '../types';
 
 const REQUEST_TARGET_TYPES = [
+  { value: 'team_setup', label: 'Create a New Team' },
   { value: 'team', label: 'Team Staff Access' },
   { value: 'association', label: 'Association Access' },
   { value: 'arena', label: 'Arena Staff Access' },
@@ -41,6 +42,8 @@ const PENDING_SCROLL_KEY = 'rinklink.pending.scrollY';
 
 function requestTargetHelp(targetType: string) {
   switch (targetType) {
+    case 'team_setup':
+      return 'Request setup for a new team. A platform admin will review it.';
     case 'association':
       return 'Request access to an association you help manage.';
     case 'arena':
@@ -102,6 +105,10 @@ export default function PendingApprovalPage() {
   const [requestTeamQuery, setRequestTeamQuery] = useState('');
   const [requestSearch, setRequestSearch] = useState('');
   const [requestNotes, setRequestNotes] = useState('');
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamAgeGroup, setNewTeamAgeGroup] = useState('');
+  const [newTeamLevel, setNewTeamLevel] = useState('');
+  const [newTeamLocation, setNewTeamLocation] = useState('');
   const [signupRequestStatus, setSignupRequestStatus] = useState<'idle' | 'submitting' | 'submitted' | 'failed'>('idle');
   const [signupRequestMessage, setSignupRequestMessage] = useState<string | null>(null);
   const [requestOptionsLoading, setRequestOptionsLoading] = useState(false);
@@ -163,7 +170,7 @@ export default function PendingApprovalPage() {
     if (!isAuthenticated || loading || me?.user.status === 'active' || signupRequestStatus !== 'idle') {
       return;
     }
-    const drafts = loadSignupAccessRequestDrafts();
+    const drafts = loadSignupAccessRequestDrafts(me?.user.email);
     if (drafts.length === 0) {
       return;
     }
@@ -317,7 +324,7 @@ export default function PendingApprovalPage() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    if (requestSearch.trim().length < 2) {
+    if (requestTargetType === 'team_setup' || requestSearch.trim().length < 2) {
       setRequestOptions([]);
       setRequestTargetId('');
       setRequestOptionsLoading(false);
@@ -483,7 +490,19 @@ export default function PendingApprovalPage() {
   };
 
   const submitAccessRequest = async () => {
-    if (!requestTargetId) {
+    const isTeamSetup = requestTargetType === 'team_setup';
+    const teamName = newTeamName.trim();
+    const ageGroup = newTeamAgeGroup.trim();
+    const level = newTeamLevel.trim();
+    if (isTeamSetup && (!teamName || !ageGroup || !level)) {
+      pushToast({
+        title: 'Team details required',
+        description: 'Add the team name, age group, and level before submitting.',
+        variant: 'warning',
+      });
+      return;
+    }
+    if (!isTeamSetup && !requestTargetId) {
       pushToast({
         title: 'Select a resource first',
         description: 'Choose the team, association, arena, or player you want access to.',
@@ -496,14 +515,26 @@ export default function PendingApprovalPage() {
     try {
       const created = await api.createAccessRequest({
         target_type: requestTargetType,
-        target_id: requestTargetId,
+        target_id: isTeamSetup ? 'new-team' : requestTargetId,
         notes: requestNotes.trim() || null,
+        details: isTeamSetup ? {
+          team_name: teamName,
+          age_group: ageGroup,
+          level,
+          location: newTeamLocation.trim(),
+        } : undefined,
       });
       setRequests((current) => {
         const withoutDuplicate = current.filter((request) => request.id !== created.id);
         return [created, ...withoutDuplicate];
       });
       setRequestNotes('');
+      if (isTeamSetup) {
+        setNewTeamName('');
+        setNewTeamAgeGroup('');
+        setNewTeamLevel('');
+        setNewTeamLocation('');
+      }
       pushToast({
         title: 'Access request submitted',
         description: created.target.name,
@@ -659,32 +690,61 @@ export default function PendingApprovalPage() {
                 </div>
               ) : null}
 
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Search
-                </label>
-                <Input
-                  className="mt-2"
-                  value={requestSearch}
-                  onChange={(event) => setRequestSearch(event.target.value)}
-                  placeholder="Type at least 2 characters"
-                />
-                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Resource
-                </label>
-                <Select value={requestTargetId} onChange={(event) => setRequestTargetId(event.target.value)} className="mt-2" disabled={requestOptionsLoading || requestOptions.length === 0}>
-                  {requestOptions.length === 0 ? (
-                    <option value="">{requestOptionsLoading ? 'Loading options…' : 'No requestable targets available'}</option>
-                  ) : (
-                    requestOptions.map((target) => (
-                      <option key={target.id} value={target.id}>{target.name}{target.context ? ` · ${target.context}` : ''}</option>
-                    ))
-                  )}
-                </Select>
-                {requestLookupError ? (
-                  <div className="mt-2 text-xs text-rose-600 dark:text-rose-300">{requestLookupError}</div>
-                ) : null}
-              </div>
+              {requestTargetType === 'team_setup' ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      Team name
+                    </label>
+                    <Input className="mt-2" value={newTeamName} onChange={(event) => setNewTeamName(event.target.value)} placeholder="Example: RinkLink 12U Blue" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      Age group
+                    </label>
+                    <Input className="mt-2" value={newTeamAgeGroup} onChange={(event) => setNewTeamAgeGroup(event.target.value)} placeholder="Example: 12U" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      Level
+                    </label>
+                    <Input className="mt-2" value={newTeamLevel} onChange={(event) => setNewTeamLevel(event.target.value)} placeholder="Example: AA" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      Location
+                    </label>
+                    <Input className="mt-2" value={newTeamLocation} onChange={(event) => setNewTeamLocation(event.target.value)} placeholder="Optional" />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    Search
+                  </label>
+                  <Input
+                    className="mt-2"
+                    value={requestSearch}
+                    onChange={(event) => setRequestSearch(event.target.value)}
+                    placeholder="Type at least 2 characters"
+                  />
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    Resource
+                  </label>
+                  <Select value={requestTargetId} onChange={(event) => setRequestTargetId(event.target.value)} className="mt-2" disabled={requestOptionsLoading || requestOptions.length === 0}>
+                    {requestOptions.length === 0 ? (
+                      <option value="">{requestOptionsLoading ? 'Loading options…' : 'No requestable targets available'}</option>
+                    ) : (
+                      requestOptions.map((target) => (
+                        <option key={target.id} value={target.id}>{target.name}{target.context ? ` · ${target.context}` : ''}</option>
+                      ))
+                    )}
+                  </Select>
+                  {requestLookupError ? (
+                    <div className="mt-2 text-xs text-rose-600 dark:text-rose-300">{requestLookupError}</div>
+                  ) : null}
+                </div>
+              )}
 
               <div>
                 <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
@@ -699,7 +759,7 @@ export default function PendingApprovalPage() {
                 />
               </div>
 
-              <Button type="button" onClick={() => void submitAccessRequest()} disabled={submitting || requestOptionsLoading || !requestTargetId}>
+              <Button type="button" onClick={() => void submitAccessRequest()} disabled={submitting || requestOptionsLoading || (requestTargetType !== 'team_setup' && !requestTargetId)}>
                 {submitting ? 'Submitting…' : 'Submit request'}
               </Button>
             </div>

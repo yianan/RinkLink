@@ -442,6 +442,13 @@ def test_platform_admin_can_approve_new_team_request(db: Session, monkeypatch: p
     assert created.target.type == "team_setup"
     assert created.target.name == "Independent 12U Blue"
     assert sent_reviews[0]["to_email"] == "platform-admin@example.com"
+    review_queue = list_access_requests(
+        scope="review",
+        status_filter="pending",
+        context=build_authorization_context(db, admin),
+        db=db,
+    )
+    assert [request.id for request in review_queue] == [created.id]
 
     approved = approve_access_request(
         request_id=created.id,
