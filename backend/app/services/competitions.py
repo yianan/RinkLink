@@ -192,11 +192,15 @@ def primary_membership_for_team(db: Session, team_id: str, season_id: str | None
     return memberships[0] if memberships else None
 
 
-def ensure_current_season_membership(db: Session, team: Team) -> None:
+def ensure_current_season_membership(db: Session, team: Team, *, commit: bool = True) -> bool:
     seasons = ensure_standard_seasons(db)
     current_season = next((season for season in seasons if season.is_active), None)
     if current_season and ensure_team_has_standings_membership(db, team, current_season.id):
+        if not commit:
+            return True
         db.commit()
+        return True
+    return False
 
 
 def shared_divisions_for_teams(

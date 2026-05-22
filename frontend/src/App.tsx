@@ -20,6 +20,7 @@ import {
   Trophy,
   Users,
   UserCog,
+  UserRound,
   X,
 } from 'lucide-react';
 import { TeamProvider, useTeam } from './context/TeamContext';
@@ -288,73 +289,94 @@ function canViewNavItem(item: { path: string; audience?: string }, me: MeRespons
 function AppNav({ navBadges = {}, onNavigate }: { navBadges?: Record<string, number>; onNavigate?: () => void }) {
   const location = useLocation();
   const { authEnabled: runtimeAuthEnabled, me } = useAuth();
+  const signedInName = me?.user.display_name?.trim() || me?.user.email || 'Signed in';
+  const signedInEmail = me?.user.email || '';
+  const signedInLabel = signedInEmail && signedInEmail !== signedInName ? `${signedInName} (${signedInEmail})` : signedInName;
 
   return (
-    <nav className="p-3">
-      {NAV_SECTIONS.map((section) => {
-        const visibleItems = section.items.filter((item) => canViewNavItem(item, me, runtimeAuthEnabled));
-        if (visibleItems.length === 0) {
-          return null;
-        }
-        return (
-          <div key={section.label} className="space-y-1">
-            <div className={sectionLabelClass}>{section.label}</div>
-            {visibleItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path);
-              const badgeCount = navBadges[item.path] || 0;
+    <div className="flex h-full min-h-0 flex-col">
+      <nav className="min-h-0 flex-1 overflow-y-auto p-3">
+        {NAV_SECTIONS.map((section) => {
+          const visibleItems = section.items.filter((item) => canViewNavItem(item, me, runtimeAuthEnabled));
+          if (visibleItems.length === 0) {
+            return null;
+          }
+          return (
+            <div key={section.label} className="space-y-1">
+              <div className={sectionLabelClass}>{section.label}</div>
+              {visibleItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path);
+                const badgeCount = navBadges[item.path] || 0;
 
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  end={item.path === '/'}
-                  onClick={onNavigate}
-                  aria-label={
-                    item.path === '/proposals' && badgeCount > 0
-                      ? `${item.label}, ${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
-                      : item.path === '/schedule' && badgeCount > 0
-                        ? `${item.label}, ${badgeCount} event${badgeCount === 1 ? '' : 's'} awaiting your confirmation`
-                        : item.label
-                  }
-                  className={cn(
-                    'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                    focusRingClass,
-                    isActive
-                      ? "bg-gradient-to-r from-white via-white to-[color:color-mix(in_srgb,var(--app-surface-strong)_82%,rgb(237_233_254))] text-slate-900 shadow-sm ring-1 ring-[color:var(--app-border-subtle)] before:absolute before:left-1 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-full before:bg-[color:var(--app-accent-link)] before:content-[''] dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 dark:text-slate-100 dark:shadow-none"
-                      : 'text-slate-700 hover:bg-white/70 hover:text-slate-900 hover:ring-1 hover:ring-slate-200/70 dark:text-slate-300 dark:hover:bg-slate-900/40 dark:hover:text-slate-100 dark:hover:ring-slate-700/70',
-                  )}
-                >
-                  <Icon
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    end={item.path === '/'}
+                    onClick={onNavigate}
+                    aria-label={
+                      item.path === '/proposals' && badgeCount > 0
+                        ? `${item.label}, ${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
+                        : item.path === '/schedule' && badgeCount > 0
+                          ? `${item.label}, ${badgeCount} event${badgeCount === 1 ? '' : 's'} awaiting your confirmation`
+                          : item.label
+                    }
                     className={cn(
-                      'h-4 w-4',
+                      'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+                      focusRingClass,
                       isActive
-                        ? 'text-[color:var(--app-accent-link)]'
-                        : 'text-slate-500 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300',
+                        ? "bg-gradient-to-r from-white via-white to-[color:color-mix(in_srgb,var(--app-surface-strong)_82%,rgb(237_233_254))] text-slate-900 shadow-sm ring-1 ring-[color:var(--app-border-subtle)] before:absolute before:left-1 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-full before:bg-[color:var(--app-accent-link)] before:content-[''] dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 dark:text-slate-100 dark:shadow-none"
+                        : 'text-slate-700 hover:bg-white/70 hover:text-slate-900 hover:ring-1 hover:ring-slate-200/70 dark:text-slate-300 dark:hover:bg-slate-900/40 dark:hover:text-slate-100 dark:hover:ring-slate-700/70',
                     )}
-                  />
-                  <span className="truncate">{item.label}</span>
-                  {badgeCount > 0 ? (
-                    <span
-                      className="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-sm dark:bg-rose-500"
-                      aria-label={
-                        item.path === '/proposals'
-                          ? `${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
-                          : item.path === '/schedule'
-                            ? `${badgeCount} event${badgeCount === 1 ? '' : 's'} awaiting your confirmation`
-                            : undefined
-                      }
-                    >
-                      {badgeCount > 99 ? '99+' : badgeCount}
-                    </span>
-                  ) : null}
-                </NavLink>
-              );
-            })}
+                  >
+                    <Icon
+                      className={cn(
+                        'h-4 w-4',
+                        isActive
+                          ? 'text-[color:var(--app-accent-link)]'
+                          : 'text-slate-500 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300',
+                      )}
+                    />
+                    <span className="truncate">{item.label}</span>
+                    {badgeCount > 0 ? (
+                      <span
+                        className="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-sm dark:bg-rose-500"
+                        aria-label={
+                          item.path === '/proposals'
+                            ? `${badgeCount} incoming proposal${badgeCount === 1 ? '' : 's'}`
+                            : item.path === '/schedule'
+                              ? `${badgeCount} event${badgeCount === 1 ? '' : 's'} awaiting your confirmation`
+                              : undefined
+                        }
+                      >
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </span>
+                    ) : null}
+                  </NavLink>
+                );
+              })}
+            </div>
+          );
+        })}
+      </nav>
+      {runtimeAuthEnabled && me ? (
+        <div className="border-t border-slate-200/70 p-3 dark:border-slate-800/70">
+          <div
+            className="flex min-w-0 items-center gap-3 rounded-xl bg-white/70 px-3 py-2 text-slate-900 ring-1 ring-slate-200/70 dark:bg-slate-900/50 dark:text-slate-100 dark:ring-slate-800"
+            title={signedInLabel}
+            aria-label={`Signed in as ${signedInLabel}`}
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <UserRound className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold">{signedInName}</div>
+            </div>
           </div>
-        );
-      })}
-    </nav>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -638,7 +660,7 @@ function AppContent() {
         </header>
 
         <div style={{ paddingTop: headerHeight }}>
-          <aside className="hidden lg:fixed lg:inset-y-14 lg:left-0 lg:block lg:w-56 lg:overflow-y-auto lg:border-r lg:border-slate-200/70 lg:bg-white/80 lg:backdrop-blur-sm dark:lg:border-slate-800/70 dark:lg:bg-slate-950/90">
+          <aside className="hidden lg:fixed lg:inset-y-14 lg:left-0 lg:flex lg:w-56 lg:flex-col lg:overflow-hidden lg:border-r lg:border-slate-200/70 lg:bg-white/80 lg:backdrop-blur-sm dark:lg:border-slate-800/70 dark:lg:bg-slate-950/90">
             <AppNav navBadges={navBadges} />
           </aside>
 

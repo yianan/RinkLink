@@ -11,7 +11,7 @@ from app.auth.context import build_authorization_context, can_access_team
 from app.auth.dependencies import current_user
 from app.auth import dependencies as auth_dependencies
 from app.config import settings
-from app.models import AccessRequest, AppUser, Arena, ArenaMembership, Association, AssociationMembership, AuditLog, Invite, Player, PlayerGuardianship, PlayerMembership, Season, Team, TeamMembership
+from app.models import AccessRequest, AppUser, Arena, ArenaMembership, Association, AssociationMembership, AuditLog, Competition, CompetitionDivision, Invite, Player, PlayerGuardianship, PlayerMembership, Season, Team, TeamCompetitionMembership, TeamMembership
 from app.routers.access import (
     approve_access_request,
     accept_invite,
@@ -72,6 +72,30 @@ def make_season(db: Session) -> Season:
     db.add(season)
     db.flush()
     return season
+
+
+def make_competition_division(db: Session, season: Season, *, age_group: str = "12U", level: str = "AA") -> CompetitionDivision:
+    competition = Competition(
+        name="Test League",
+        short_name="TL",
+        governing_body="Test",
+        competition_type="league",
+        region="MA",
+    )
+    db.add(competition)
+    db.flush()
+    division = CompetitionDivision(
+        competition_id=competition.id,
+        season_id=season.id,
+        name=f"{age_group} {level}",
+        age_group=age_group,
+        level=level,
+        standings_enabled=True,
+        sort_order=10,
+    )
+    db.add(division)
+    db.flush()
+    return division
 
 
 def make_user(db: Session, email: str, *, status: str = "pending", auth_state: str = "active") -> AppUser:
@@ -418,6 +442,8 @@ def test_platform_admin_can_approve_new_team_request(db: Session, monkeypatch: p
     requester = make_user(db, "new-team-requester@example.com")
     admin = make_user(db, "platform-admin@example.com", status="active")
     admin.is_platform_admin = True
+    season = make_season(db)
+    division = make_competition_division(db, season, age_group="12U", level="AA")
     db.commit()
 
     sent_reviews: list[dict] = []
@@ -460,6 +486,7 @@ def test_platform_admin_can_approve_new_team_request(db: Session, monkeypatch: p
 
     team = db.query(Team).filter(Team.name == "Independent 12U Blue").one()
     membership = db.query(TeamMembership).filter(TeamMembership.user_id == requester.id, TeamMembership.team_id == team.id).one()
+    competition_membership = db.query(TeamCompetitionMembership).filter(TeamCompetitionMembership.team_id == team.id).one()
     db.refresh(requester)
 
     assert approved.status == "approved"
@@ -467,6 +494,9 @@ def test_platform_admin_can_approve_new_team_request(db: Session, monkeypatch: p
     assert team.age_group == "12U"
     assert team.level == "AA"
     assert membership.role == "team_admin"
+    assert competition_membership.season_id == season.id
+    assert competition_membership.competition_division_id == division.id
+    assert competition_membership.is_primary is True
     assert requester.status == "active"
     assert requester.default_team_id == team.id
     assert sent_decisions[0]["target_name"] == "Independent 12U Blue"

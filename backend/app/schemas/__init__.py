@@ -48,7 +48,7 @@ from .team_season_venue_assignment import (
     TeamSeasonVenueAssignmentOut,
 )
 from .season import SeasonOut, TeamSeasonRecordOut, StandingsEntry
-from .competition import CompetitionOut, CompetitionDivisionOut, TeamCompetitionMembershipOut
+from .competition import CompetitionOut, CompetitionDivisionOut, TeamCompetitionMembershipCreate, TeamCompetitionMembershipOut
 from .auth import (
     AppUserOut,
     AssociationMembershipOut,
@@ -96,7 +96,7 @@ __all__ = [
     "IceSlotUploadPreview", "IceSlotConfirmUpload",
     "TeamSeasonVenueAssignmentCreate", "TeamSeasonVenueAssignmentUpdate", "TeamSeasonVenueAssignmentOut",
     "SeasonOut", "TeamSeasonRecordOut", "StandingsEntry",
-    "CompetitionOut", "CompetitionDivisionOut", "TeamCompetitionMembershipOut",
+    "CompetitionOut", "CompetitionDivisionOut", "TeamCompetitionMembershipCreate", "TeamCompetitionMembershipOut",
     "AppUserOut", "AssociationMembershipOut", "TeamMembershipOut", "ArenaMembershipOut",
     "LinkedPlayerOut", "AccessibleTeamOut", "MeOut",
     "AccessTargetOut", "InviteCreate", "InviteOut",

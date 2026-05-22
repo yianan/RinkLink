@@ -46,6 +46,14 @@ class TeamCompetitionMembershipOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TeamCompetitionMembershipCreate(BaseModel):
+    season_id: str
+    competition_division_id: str
+    membership_role: str = "primary"
+    is_primary: bool = True
+    sort_order: int = 10
+
+
 class CompetitionOut(BaseModel):
     id: str
     name: str

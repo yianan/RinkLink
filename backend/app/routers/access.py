@@ -54,6 +54,7 @@ from ..schemas import (
     UserAuditEntryOut,
 )
 from ..services.email import email_enabled, send_access_request_decision_email, send_access_request_review_email, send_email, send_invite_email
+from ..services.competitions import ensure_current_season_membership
 from ..config import settings
 
 router = APIRouter(tags=["auth"])
@@ -422,6 +423,7 @@ def _apply_target_grant(
         )
         db.add(team)
         db.flush()
+        ensure_current_season_membership(db, team, commit=False)
         db.add(TeamMembership(user_id=user.id, team_id=team.id, role="team_admin"))
         _mark_user_active(user, default_team_id=team.id)
         target.details_json = {**details, "created_team_id": team.id}

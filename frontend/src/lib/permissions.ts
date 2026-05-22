@@ -29,7 +29,7 @@ export function canViewTeams(me: MeResponse | null) {
 }
 
 export function canManageTeams(me: MeResponse | null) {
-  return hasAnyCapability(me, ['platform.manage', 'association.manage']);
+  return hasAnyCapability(me, ['platform.manage', 'association.manage', 'team.manage']);
 }
 
 export function canViewAssociations(me: MeResponse | null) {

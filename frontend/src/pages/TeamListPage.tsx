@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Phone, Save, Trash2, Users, X } from 'lucide-react';
 import { api } from '../api/client';
-import { AccessRequest, AccessTarget, Association, Team } from '../types';
+import { AccessRequest, AccessTarget, Association, CompetitionDivision, Team } from '../types';
 import { useSeason } from '../context/SeasonContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth } from '../context/AuthContext';
@@ -53,6 +53,7 @@ export default function TeamListPage() {
     !authEnabled ||
     !!me?.capabilities.includes('platform.manage') ||
     !!me?.capabilities.includes('association.manage');
+  const canCreateTeams = canEditAssociations;
   const canChangeTeamAssociation = !authEnabled || !!me?.capabilities.includes('platform.manage');
 
   const [teams, setTeams] = useState<Team[]>([]);
@@ -69,6 +70,10 @@ export default function TeamListPage() {
   const [associationRequestId, setAssociationRequestId] = useState('');
   const [associationRequestNotes, setAssociationRequestNotes] = useState('');
   const [associationRequestLoading, setAssociationRequestLoading] = useState(false);
+  const [competitionDivisions, setCompetitionDivisions] = useState<CompetitionDivision[]>([]);
+  const [primaryCompetitionDivisionId, setPrimaryCompetitionDivisionId] = useState('');
+  const [originalPrimaryMembershipId, setOriginalPrimaryMembershipId] = useState<string | null>(null);
+  const [originalPrimaryCompetitionDivisionId, setOriginalPrimaryCompetitionDivisionId] = useState('');
 
   const [selectedAssociationIds, setSelectedAssociationIds] = useState<string[]>([]);
   const [selectedCompetitionNames, setSelectedCompetitionNames] = useState<string[]>([]);
@@ -92,6 +97,31 @@ export default function TeamListPage() {
       cancelled = true;
     };
   }, [authEnabled, canEditAssociations, effectiveSeason]);
+
+  useEffect(() => {
+    if (!effectiveSeason || !teamEditable) {
+      setCompetitionDivisions([]);
+      return;
+    }
+    let cancelled = false;
+    api.getCompetitionDivisions({ season_id: effectiveSeason.id })
+      .then((divisions) => {
+        if (!cancelled) setCompetitionDivisions(divisions);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setCompetitionDivisions([]);
+          pushToast({
+            variant: 'error',
+            title: 'Unable to load competitions',
+            description: error instanceof Error ? error.message : String(error),
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveSeason, teamEditable]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setTeamField = (key: keyof typeof emptyTeamForm, value: string) => {
     setTeamForm((current) => ({ ...current, [key]: value }));
@@ -147,6 +177,9 @@ export default function TeamListPage() {
     setAssociationRequestOptions([]);
     setAssociationRequestId('');
     setAssociationRequestNotes('');
+    setPrimaryCompetitionDivisionId('');
+    setOriginalPrimaryMembershipId(null);
+    setOriginalPrimaryCompetitionDivisionId('');
     setTeamModalOpen(true);
   };
 
@@ -168,6 +201,9 @@ export default function TeamListPage() {
     setAssociationRequestOptions([]);
     setAssociationRequestId('');
     setAssociationRequestNotes('');
+    setPrimaryCompetitionDivisionId(team.primary_membership?.competition_division_id || '');
+    setOriginalPrimaryMembershipId(team.primary_membership?.id || null);
+    setOriginalPrimaryCompetitionDivisionId(team.primary_membership?.competition_division_id || '');
     setTeamModalOpen(true);
   };
 
@@ -192,11 +228,27 @@ export default function TeamListPage() {
     if (teamLogoFile) {
       await api.uploadTeamLogo(savedTeam.id, teamLogoFile);
     }
+    if (editTeam && effectiveSeason && primaryCompetitionDivisionId !== originalPrimaryCompetitionDivisionId) {
+      if (primaryCompetitionDivisionId) {
+        await api.setTeamCompetitionMembership(savedTeam.id, {
+          season_id: effectiveSeason.id,
+          competition_division_id: primaryCompetitionDivisionId,
+          membership_role: 'primary',
+          is_primary: true,
+          sort_order: 10,
+        });
+      } else if (originalPrimaryMembershipId) {
+        await api.deleteTeamCompetitionMembership(savedTeam.id, originalPrimaryMembershipId);
+      }
+    }
     setTeamModalOpen(false);
     setEditTeam(null);
     setTeamForm(emptyTeamForm);
     setTeamLogoFile(null);
     setRemoveTeamLogo(false);
+    setPrimaryCompetitionDivisionId('');
+    setOriginalPrimaryMembershipId(null);
+    setOriginalPrimaryCompetitionDivisionId('');
     const [teamData, associationData, accessRequests] = await Promise.all([
       api.getTeams(effectiveSeason ? { season_id: effectiveSeason.id } : undefined),
       canEditAssociations ? api.getAssociations() : Promise.resolve([] as Association[]),
@@ -352,7 +404,7 @@ export default function TeamListPage() {
         actions={(
           <>
             <FilterPanelTrigger count={activeFilterBadges.length} open={filtersOpen} onClick={() => setFiltersOpen((open) => !open)} />
-            {teamEditable ? (
+            {canCreateTeams ? (
               <Button type="button" onClick={openCreateTeam}>
                 <Users className="h-4 w-4" />
                 Add Team
@@ -414,17 +466,19 @@ export default function TeamListPage() {
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
-                      onClick={() => deleteTeam(team)}
-                      aria-label="Delete team"
-                      title="Delete team"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canCreateTeams ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className={`${tableActionButtonClass} ${destructiveIconButtonClass}`}
+                        onClick={() => deleteTeam(team)}
+                        aria-label="Delete team"
+                        title="Delete team"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -487,6 +541,9 @@ export default function TeamListPage() {
           setAssociationRequestOptions([]);
           setAssociationRequestId('');
           setAssociationRequestNotes('');
+          setPrimaryCompetitionDivisionId('');
+          setOriginalPrimaryMembershipId(null);
+          setOriginalPrimaryCompetitionDivisionId('');
         }}
         title={editTeam ? 'Edit Team' : 'Add Team'}
         footer={(
@@ -590,6 +647,25 @@ export default function TeamListPage() {
               </div>
             ) : null}
           </div>
+          {editTeam && effectiveSeason ? (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Primary Competition</label>
+              <Select
+                value={primaryCompetitionDivisionId}
+                onChange={(event) => setPrimaryCompetitionDivisionId(event.target.value)}
+              >
+                <option value="">No primary competition</option>
+                {competitionDivisions.map((division) => (
+                  <option key={division.id} value={division.id}>
+                    {[division.competition_short_name || division.competition_name, division.name].filter(Boolean).join(' - ')}
+                  </option>
+                ))}
+              </Select>
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Used for standings, league labels, and competition context for {effectiveSeason.name}.
+              </div>
+            </div>
+          ) : null}
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Team Name</label>
             <Input value={teamForm.name} onChange={(event) => setTeamField('name', event.target.value)} />

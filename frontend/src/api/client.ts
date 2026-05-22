@@ -557,6 +557,19 @@ export const api = {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return request<import('../types').TeamCompetitionMembership[]>(`/teams/${teamId}/competition-memberships${qs}`);
   },
+  setTeamCompetitionMembership: (teamId: string, data: {
+    season_id: string;
+    competition_division_id: string;
+    membership_role?: string;
+    is_primary?: boolean;
+    sort_order?: number;
+  }) =>
+    request<import('../types').TeamCompetitionMembership[]>(`/teams/${teamId}/competition-memberships`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteTeamCompetitionMembership: (teamId: string, membershipId: string) =>
+    request<import('../types').TeamCompetitionMembership[]>(`/teams/${teamId}/competition-memberships/${membershipId}`, { method: 'DELETE' }),
 
   seed: () => request<{ message: string }>('/seed', { method: 'POST' }),
 };
