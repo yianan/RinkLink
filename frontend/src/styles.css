@@ -224,6 +224,17 @@ html.dark {
     margin: 0 auto;
   }
 
+  .rinklink-auth-site-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem 1rem;
+    padding: 1rem 1rem 0.25rem;
+    color: var(--color-slate-500);
+    font-size: 0.875rem;
+  }
+
   .rinklink-auth-footer--back {
     display: flex;
     align-items: center;
@@ -683,6 +694,15 @@ html.dark {
   .rinklink-auth-input:focus-visible {
     border-color: rgba(56, 189, 248, 0.7) !important;
     box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18) !important;
+  }
+
+  .rinklink-select-control,
+  select.rinklink-auth-input {
+    background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.5 7.5L10 12L14.5 7.5' stroke='%23475569' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+    background-position: right 0.75rem center !important;
+    background-repeat: no-repeat !important;
+    background-size: 1.125rem 1.125rem !important;
+    padding-right: 2.5rem !important;
   }
 
   .rinklink-auth-password-field {

@@ -91,8 +91,10 @@ function DisabledAuthProvider({ children }: { children: ReactNode }) {
 function isPublicAuthPath(pathname: string) {
   return (
     pathname === '/login'
+    || pathname === '/contact'
     || pathname === '/auth/sign-in'
     || pathname === '/auth/sign-up'
+    || pathname === '/auth/request-access'
     || pathname === '/auth/check-email'
     || pathname === '/auth/forgot-password'
     || pathname === '/auth/reset-password'

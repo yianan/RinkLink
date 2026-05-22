@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { Copy, Lock, MailPlus, RefreshCcw, Search, ShieldCheck, ShieldOff, Trash2, Unlock, UserCheck, XCircle } from 'lucide-react';
+import { Lock, MailPlus, RefreshCcw, Search, ShieldCheck, ShieldOff, Trash2, Unlock, UserCheck, XCircle } from 'lucide-react';
 
 import { api } from '../api/client';
 import EmptyState from '../components/EmptyState';
@@ -33,6 +33,10 @@ type UserAccessActionDraft = {
 type UserAccessRemovalDraft = {
   user: AppUserIdentity;
   entry: UserAccessEntry;
+};
+
+type AccessRequestRejectionDraft = {
+  request: AccessRequest;
 };
 
 function statusVariant(status: string) {
@@ -81,7 +85,7 @@ function getUserAccessActionConfig(action: UserAccessAction, user: AppUserIdenti
     case 'restore-app':
       return {
         title: 'Restore app access',
-        description: `Restore ${user.email} so they can use RinkLink again without rebuilding memberships or family links.`,
+        description: `Restore ${user.email} so they can use RinkLink again without rebuilding memberships or player access.`,
         confirmLabel: 'Restore app access',
         confirmVariant: 'primary' as const,
         successTitle: 'App access restored',
@@ -117,9 +121,9 @@ function getMembershipKindLabel(kind: string) {
     case 'arena':
       return 'Arena Access';
     case 'guardian':
-      return 'Family Link';
+      return 'Parent/Guardian Access';
     case 'player':
-      return 'Player Link';
+      return 'Player Access';
     default:
       return 'Access';
   }
@@ -130,10 +134,10 @@ function getAccessEntryLabel(entry: UserAccessEntry) {
     return getAccessRoleLabel(entry.role);
   }
   if (entry.membership_kind === 'guardian') {
-    return 'Parent/Guardian Link';
+    return 'Parent/Guardian Access';
   }
   if (entry.membership_kind === 'player') {
-    return 'Player Link';
+    return 'Player Access';
   }
   return getAccessTargetTypeLabel(entry.target_type);
 }
@@ -151,9 +155,9 @@ function formatAuditAction(action: string) {
     case 'membership.revoked':
       return 'Membership removed';
     case 'guardian_link.revoked':
-      return 'Family link removed';
+      return 'Parent/guardian access removed';
     case 'player_link.revoked':
-      return 'Player link removed';
+      return 'Player access removed';
     case 'user.app_access_disabled':
       return 'App access disabled';
     case 'user.app_access_restored':
@@ -198,6 +202,8 @@ export default function AccessPage() {
   const [userAccessReason, setUserAccessReason] = useState('');
   const [userAccessRemoval, setUserAccessRemoval] = useState<UserAccessRemovalDraft | null>(null);
   const [userAccessRemovalReason, setUserAccessRemovalReason] = useState('');
+  const [requestRejection, setRequestRejection] = useState<AccessRequestRejectionDraft | null>(null);
+  const [requestRejectionReason, setRequestRejectionReason] = useState('');
 
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteTargetType, setInviteTargetType] = useState<InviteTargetType>('team');
@@ -422,12 +428,6 @@ export default function AccessPage() {
     return groups;
   }, {}) ?? {};
 
-  const copyInviteLink = async (invite: Invite) => {
-    const url = `${window.location.origin}/invite/${invite.token}`;
-    await navigator.clipboard.writeText(url);
-    pushToast({ title: 'Invite link copied', description: invite.target.name, variant: 'success' });
-  };
-
   const cancelInvite = async (invite: Invite) => {
     setBusyKey(`invite:${invite.id}`);
     try {
@@ -495,12 +495,15 @@ export default function AccessPage() {
     }
   };
 
-  const rejectRequest = async (request: AccessRequest) => {
+  const rejectRequest = async () => {
+    if (!requestRejection) return;
+    const { request } = requestRejection;
     setBusyKey(`request:reject:${request.id}`);
     try {
-      await api.rejectAccessRequest(request.id);
+      await api.rejectAccessRequest(request.id, requestRejectionReason.trim() || null);
       setRequests((current) => current.filter((entry) => entry.id !== request.id));
       pushToast({ title: 'Access request rejected', description: request.target.name, variant: 'info' });
+      closeRequestRejection();
     } catch (nextError) {
       pushToast({
         title: 'Unable to reject request',
@@ -582,6 +585,16 @@ export default function AccessPage() {
     setUserAccessRemovalReason('');
   };
 
+  const openRequestRejection = (request: AccessRequest) => {
+    setRequestRejection({ request });
+    setRequestRejectionReason('');
+  };
+
+  const closeRequestRejection = () => {
+    setRequestRejection(null);
+    setRequestRejectionReason('');
+  };
+
   const submitUserAccessAction = async () => {
     if (!userAccessAction) {
       return;
@@ -638,9 +651,9 @@ export default function AccessPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={familyOnlyMode ? 'Family Links' : 'Access'}
+        title={familyOnlyMode ? 'Player Access' : 'Access'}
         subtitle={familyOnlyMode
-          ? 'Create invites and review parent, guardian, and player link requests for the teams you administer.'
+          ? 'Create invites and review parent, guardian, and player access requests for the teams you administer.'
           : 'Create app-level invites, review pending access requests, and manage the onboarding queue for the resources you administer.'}
         actions={(
           <Button type="button" variant="outline" onClick={() => void load()} disabled={loading || !!busyKey}>
@@ -663,7 +676,7 @@ export default function AccessPage() {
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">User Access</h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                 Search existing users, then manage whether they can use RinkLink and whether they can authenticate.
-                Memberships and family links stay separate.
+                Memberships and player access stay separate.
               </p>
             </div>
             <span className="inline-flex shrink-0 self-start whitespace-nowrap rounded-full border border-cyan-300 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-800 shadow-sm dark:border-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-200">
@@ -784,8 +797,8 @@ export default function AccessPage() {
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Create Invite</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
               {familyOnlyMode
-                ? 'Use invites for the exact account email you want linked to a parent/guardian relationship or self-managed player account.'
-                : 'Use invites for the exact account email you want linked to a team, association, arena, parent/guardian relationship, or player account.'}
+                ? 'Use invites for the exact account email that should receive parent, guardian, or player access.'
+                : 'Use invites for the exact account email that should receive team, association, arena, parent, guardian, or player access.'}
             </p>
           </div>
           <Badge variant="outline" className="self-start">Preferred onboarding path</Badge>
@@ -839,8 +852,8 @@ export default function AccessPage() {
           ) : (
             <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-300">
               {inviteTargetType === 'guardian_link'
-                ? 'Guardian invites create a parent/guardian link to one player.'
-                : 'Player invites create the self-managed player attendance/account link.'}
+                ? 'Guardian invites give a parent or guardian access to one player.'
+                : 'Player invites give one player access to their own schedule and attendance.'}
             </div>
           )}
         </div>
@@ -903,12 +916,12 @@ export default function AccessPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  {familyOnlyMode ? 'Family Review Queue' : 'Review Queue'}
+                  {familyOnlyMode ? 'Player Review Queue' : 'Review Queue'}
                 </h2>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                   {familyOnlyMode
-                    ? 'These requests are waiting for approval on parent, guardian, and player links for teams you manage.'
-                    : 'These requests are waiting for approval on teams, associations, arenas, or family/player links that you manage.'}
+                    ? 'These requests are waiting for approval on parent, guardian, and player access for teams you manage.'
+                    : 'These requests are waiting for approval on teams, associations, arenas, parent access, or player access that you manage.'}
                 </p>
               </div>
               <Badge variant="outline">{filteredRequests.length} open</Badge>
@@ -978,7 +991,7 @@ export default function AccessPage() {
                           <UserCheck className="h-4 w-4" />
                           Approve
                         </Button>
-                        <Button type="button" variant="ghost" onClick={() => void rejectRequest(request)} disabled={busyKey !== null}>
+                        <Button type="button" variant="ghost" onClick={() => openRequestRejection(request)} disabled={busyKey !== null}>
                           <XCircle className="h-4 w-4" />
                           Reject
                         </Button>
@@ -994,12 +1007,12 @@ export default function AccessPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {familyOnlyMode ? 'Family Invites' : 'Managed Invites'}
+                {familyOnlyMode ? 'Player Invites' : 'Managed Invites'}
               </h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                 {familyOnlyMode
-                  ? 'Open parent/guardian and player invites for the teams you can manage. Copy links for testing or cancel stale entries.'
-                  : 'Open invites for the resources you can administer. Copy links for testing or cancel stale entries.'}
+                  ? 'Open parent/guardian and player invites for the teams you can manage.'
+                  : 'Open invites for the resources you can administer.'}
               </p>
             </div>
             <Badge variant="outline">{filteredInvites.length} open</Badge>
@@ -1040,10 +1053,6 @@ export default function AccessPage() {
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-3">
-                    <Button type="button" variant="outline" onClick={() => void copyInviteLink(invite)} disabled={busyKey !== null}>
-                      <Copy className="h-4 w-4" />
-                      Copy link
-                    </Button>
                     <Button type="button" variant="ghost" onClick={() => void cancelInvite(invite)} disabled={busyKey !== null}>
                       <ShieldCheck className="h-4 w-4" />
                       Cancel
@@ -1113,17 +1122,17 @@ export default function AccessPage() {
                     <div>
                       <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Access</h3>
                       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                        Memberships and family links are scoped. Removing one row does not affect other access.
+                        Memberships and player access are scoped. Removing one row does not affect other access.
                       </p>
                     </div>
-                    <Badge variant="outline">{userDetailSummary.access_entries.length} linked</Badge>
+                    <Badge variant="outline">{userDetailSummary.access_entries.length} active</Badge>
                   </div>
 
                   <div className="mt-5 space-y-5">
                     {userDetailSummary.access_entries.length === 0 ? (
                       <EmptyState
                         title="No scoped access"
-                        description="This user does not currently have team, association, arena, guardian, or player links."
+                        description="This user does not currently have team, association, arena, guardian, or player access."
                         className="px-4 py-8"
                       />
                     ) : (
@@ -1297,6 +1306,36 @@ export default function AccessPage() {
       </Modal>
 
       <Modal
+        open={!!requestRejection}
+        onClose={closeRequestRejection}
+        title="Reject access request"
+        description={requestRejection ? `Reject the request for ${requestRejection.request.target.name}.` : undefined}
+        footer={(
+          <>
+            <Button type="button" variant="outline" onClick={closeRequestRejection} disabled={!!busyKey}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => void rejectRequest()} disabled={!!busyKey || !requestRejection}>
+              Reject request
+            </Button>
+          </>
+        )}
+      >
+        <div className="space-y-3">
+          <label className="block text-xs font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400" htmlFor="request-rejection-reason">
+            Note to requester (optional)
+          </label>
+          <Textarea
+            id="request-rejection-reason"
+            value={requestRejectionReason}
+            onChange={(event) => setRequestRejectionReason(event.target.value)}
+            rows={4}
+            placeholder="Example: Please request the current season team instead."
+          />
+        </div>
+      </Modal>
+
+      <Modal
         open={!!userAccessAction && !!activeUserAccessConfig}
         onClose={closeUserAccessAction}
         title={activeUserAccessConfig?.title || 'Manage access'}
@@ -1329,7 +1368,7 @@ export default function AccessPage() {
             placeholder="Explain why this admin action is being taken. This will be stored in the audit log."
           />
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Memberships and family links are unchanged unless you revoke them separately.
+            Memberships and player access are unchanged unless you revoke them separately.
           </p>
         </div>
       </Modal>

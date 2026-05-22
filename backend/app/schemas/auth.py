@@ -102,10 +102,17 @@ class AccessRequestCreate(BaseModel):
 
 class AccessRequestDecision(BaseModel):
     role: str | None = None
+    reason: str | None = Field(default=None, max_length=1000)
 
 
 class UserAccessChange(BaseModel):
     reason: str | None = Field(default=None, max_length=1000)
+
+
+class ContactMessageCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=3, max_length=255)
+    message: str = Field(min_length=1, max_length=2000)
 
 
 class UserAccessEntryOut(BaseModel):

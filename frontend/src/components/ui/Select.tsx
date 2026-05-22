@@ -13,7 +13,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
       ref={ref}
       className={cn(
         fieldControlClass,
-        'block min-h-10 appearance-none py-2 pl-3 pr-10',
+        'rinklink-select-control block min-h-10 appearance-none py-2 pl-3 pr-10',
         className,
       )}
       {...props}

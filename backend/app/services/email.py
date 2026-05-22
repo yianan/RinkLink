@@ -18,8 +18,8 @@ ACCESS_TARGET_TYPE_LABELS = {
     "association": "Association Access",
     "team": "Team Staff Access",
     "arena": "Arena Staff Access",
-    "guardian_link": "Parent/Guardian Link",
-    "player_link": "Player Link",
+    "guardian_link": "Parent/Guardian Access",
+    "player_link": "Player Access",
 }
 
 ACCESS_ROLE_LABELS = {
@@ -234,6 +234,7 @@ def send_access_request_decision_email(
     role: str | None,
     app_link: str | None,
     reviewer_email: str,
+    reviewer_note: str | None = None,
 ) -> bool:
     approved = status == "approved"
     target_label = _target_type_label(target_type)
@@ -241,15 +242,18 @@ def send_access_request_decision_email(
     subject = "Your RinkLink access request was approved" if approved else "Your RinkLink access request was rejected"
     decision_line = "approved your access request" if approved else "rejected your access request"
     role_line = f"Role: {role_label}\n" if role_label else ""
+    note_line = f"Reviewer note: {reviewer_note}\n" if reviewer_note else ""
     link_line = f"\nOpen RinkLink here:\n{app_link}\n" if approved and app_link else ""
     text_body = (
         f"{reviewer_email} {decision_line}.\n\n"
         f"Target: {target_name}\n"
         f"Access type: {target_label}\n"
         f"{role_line}"
+        f"{note_line}"
         f"{link_line}"
     )
     role_html = f"<p style=\"margin:0 0 8px\"><strong>Role:</strong> {escape(role_label)}</p>" if role_label else ""
+    note_html = f"<p style=\"margin:0 0 8px\"><strong>Reviewer note:</strong> {escape(reviewer_note)}</p>" if reviewer_note else ""
     link_html = ""
     if approved and app_link:
         link_html = f"""
@@ -268,6 +272,7 @@ def send_access_request_decision_email(
         <p style="margin:0 0 8px"><strong>Target:</strong> {escape(target_name)}</p>
         <p style="margin:0 0 8px"><strong>Access type:</strong> {escape(target_label)}</p>
         {role_html}
+        {note_html}
         {link_html}
       </div>
     """

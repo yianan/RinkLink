@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import secrets
 from datetime import datetime, timedelta, timezone
+from html import escape
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import and_, func, or_, text
@@ -19,6 +20,7 @@ from ..auth.context import (
     ensure_capability,
     ensure_team_access,
 )
+from ..auth.dependencies import current_me_user
 from ..auth.rate_limit import RateLimitRule, enforce_rate_limit
 from ..database import get_db
 from ..models import (
@@ -42,6 +44,7 @@ from ..schemas import (
     AccessRequestOut,
     AccessTargetOut,
     AppUserOut,
+    ContactMessageCreate,
     InviteCreate,
     InviteOut,
     UserAccessChange,
@@ -49,7 +52,7 @@ from ..schemas import (
     UserAccessSummaryOut,
     UserAuditEntryOut,
 )
-from ..services.email import send_access_request_decision_email, send_access_request_review_email, send_invite_email
+from ..services.email import email_enabled, send_access_request_decision_email, send_access_request_review_email, send_email, send_invite_email
 from ..config import settings
 
 router = APIRouter(tags=["auth"])
@@ -63,6 +66,7 @@ ROLE_BASED_TARGET_TYPES = {"association", "team", "arena"}
 INVITE_ACCEPT_RATE_LIMIT = RateLimitRule(limit=5, window_seconds=300)
 ACCESS_REQUEST_RATE_LIMIT = RateLimitRule(limit=10, window_seconds=300)
 INVITE_CREATE_RATE_LIMIT = RateLimitRule(limit=20, window_seconds=300)
+CONTACT_RATE_LIMIT = RateLimitRule(limit=5, window_seconds=3600)
 
 
 def _utcnow() -> datetime:
@@ -77,6 +81,11 @@ def _as_utc(value: datetime) -> datetime:
 
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+def _is_valid_contact_email(email: str) -> bool:
+    normalized = email.strip()
+    return "@" in normalized and "." in normalized.rsplit("@", 1)[-1]
 
 
 def _not_found(detail: str) -> HTTPException:
@@ -266,6 +275,23 @@ def _revoke_auth_sessions(db: Session, *, user: AppUser) -> int:
         {"auth_id": user.auth_id},
     )
     return max(result.rowcount or 0, 0)
+
+
+def _revoke_user_scoped_access(db: Session, *, user_id: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    membership_models = {
+        "association": AssociationMembership,
+        "team": TeamMembership,
+        "arena": ArenaMembership,
+        "guardian": PlayerGuardianship,
+        "player": PlayerMembership,
+    }
+    for kind, model in membership_models.items():
+        memberships = db.query(model).filter(model.user_id == user_id).all()
+        counts[kind] = len(memberships)
+        for membership in memberships:
+            db.delete(membership)
+    return counts
 
 
 def _apply_target_grant(
@@ -554,6 +580,7 @@ def _notify_access_request_decision(
     requester: AppUser,
     reviewer: AppUser,
     role: str | None = None,
+    reviewer_note: str | None = None,
 ) -> None:
     target_summary = _build_target_summary(access_request.target_type, target)
     app_link = _access_request_target_link(access_request.target_type, target) if access_request.status == "approved" else None
@@ -566,9 +593,20 @@ def _notify_access_request_decision(
             role=role,
             app_link=app_link,
             reviewer_email=reviewer.email,
+            reviewer_note=reviewer_note,
         )
     except Exception:
         logger.exception("Failed to send access request decision email for request %s", access_request.id)
+
+
+def _contact_admin_emails(db: Session) -> list[str]:
+    return [
+        user.email
+        for user in _active_user_query(db)
+        .filter(AppUser.is_platform_admin.is_(True))
+        .order_by(func.lower(AppUser.email).asc())
+        .all()
+    ]
 
 
 def _build_access_target_search_query(search: str) -> str:
@@ -649,6 +687,73 @@ def _audit_relates_to_user(audit_log: AuditLog, *, user_id: str) -> bool:
         "access_request_user_id",
     }
     return any(details.get(key) == user_id for key in user_reference_keys)
+
+
+@router.post("/contact", status_code=status.HTTP_204_NO_CONTENT)
+def send_contact_message(
+    payload: ContactMessageCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    name = payload.name.strip()
+    email = _normalize_email(payload.email)
+    message = payload.message.strip()
+    if not _is_valid_contact_email(email):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Enter a valid email address")
+
+    enforce_rate_limit(request, user_id=email, route_key="contact", rule=CONTACT_RATE_LIMIT)
+
+    admin_emails = _contact_admin_emails(db)
+    if not admin_emails:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Contact is not configured")
+    if not email_enabled():
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Contact email is not configured")
+
+    existing_user = db.query(AppUser).filter(func.lower(AppUser.email) == email).first()
+    subject = "RinkLink contact request"
+    text_body = (
+        f"{name} sent a message to RinkLink admins.\n\n"
+        f"Email: {email}\n\n"
+        f"Message:\n{message}\n"
+    )
+    html_message = escape(message).replace("\n", "<br>")
+    html_body = (
+        "<p><strong>RinkLink contact request</strong></p>"
+        f"<p>{escape(name)} sent a message to RinkLink admins.</p>"
+        f"<p><strong>Email:</strong> {escape(email)}</p>"
+        f"<p><strong>Message:</strong></p><p>{html_message}</p>"
+    )
+
+    sent = False
+    for admin_email in admin_emails:
+        try:
+            sent = send_email(
+                to_email=admin_email,
+                subject=subject,
+                text_body=text_body,
+                html_body=html_body,
+            ) or sent
+        except Exception:
+            logger.exception("Failed to send contact message to admin %s", admin_email)
+
+    if not sent:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Message could not be sent")
+
+    _record_audit(
+        db,
+        actor_user_id=existing_user.id if existing_user else None,
+        action="contact.submitted",
+        resource_type="contact",
+        resource_id=existing_user.id if existing_user else email,
+        request=request,
+        details={
+            "email": email,
+            "name": name,
+            "recipient_count": len(admin_emails),
+        },
+    )
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/invites", response_model=list[InviteOut])
@@ -898,7 +1003,7 @@ def list_access_targets(
         return [_build_target_summary("arena", arena) for arena in arenas]
 
     if not team_id:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="team_id is required for player link lookups")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="team_id is required for player access lookups")
 
     team = db.get(Team, team_id)
     if team is None:
@@ -913,6 +1018,69 @@ def list_access_targets(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to search players on this team",
         )
+
+    players = (
+        db.query(Player)
+        .filter(
+            Player.team_id == team_id,
+            or_(
+                Player.first_name.ilike(search),
+                Player.last_name.ilike(search),
+            ),
+        )
+        .order_by(Player.last_name.asc(), Player.first_name.asc())
+        .limit(25)
+        .all()
+    )
+    masked_targets: list[AccessTargetOut] = []
+    for player in players:
+        summary = _build_target_summary(target_type, player)
+        summary.name = _masked_player_name(player)
+        masked_targets.append(summary)
+    return masked_targets
+
+
+@router.get("/public/access-targets", response_model=list[AccessTargetOut])
+def list_public_access_targets(
+    target_type: str = Query(pattern="^(association|team|arena|guardian_link|player_link)$"),
+    team_id: str | None = Query(default=None),
+    q: str = Query(min_length=2),
+    db: Session = Depends(get_db),
+):
+    search = _build_access_target_search_query(q)
+
+    if target_type == "association":
+        associations = (
+            db.query(Association)
+            .filter(Association.name.ilike(search))
+            .order_by(Association.name.asc())
+            .limit(25)
+            .all()
+        )
+        return [_build_target_summary("association", association) for association in associations]
+
+    if target_type == "team":
+        teams = (
+            db.query(Team)
+            .filter(Team.name.ilike(search))
+            .order_by(Team.name.asc())
+            .limit(25)
+            .all()
+        )
+        return [_build_target_summary("team", team) for team in teams]
+
+    if target_type == "arena":
+        arenas = (
+            db.query(Arena)
+            .filter(Arena.name.ilike(search))
+            .order_by(Arena.name.asc())
+            .limit(25)
+            .all()
+        )
+        return [_build_target_summary("arena", arena) for arena in arenas]
+
+    if not team_id:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="team_id is required for player access lookups")
 
     players = (
         db.query(Player)
@@ -1047,6 +1215,7 @@ def approve_access_request(
 @router.post("/access-requests/{request_id}/reject", response_model=AccessRequestOut)
 def reject_access_request(
     request_id: str,
+    payload: AccessRequestDecision | None = None,
     context: AuthorizationContext = Depends(current_authorization_context),
     db: Session = Depends(get_db),
     request: Request = None,
@@ -1063,6 +1232,7 @@ def reject_access_request(
     access_request.status = "rejected"
     access_request.reviewed_by_user_id = context.user.id
     access_request.reviewed_at = _utcnow()
+    reviewer_note = payload.reason.strip() if payload and payload.reason and payload.reason.strip() else None
     _record_audit(
         db,
         actor_user_id=context.user.id,
@@ -1070,7 +1240,7 @@ def reject_access_request(
         resource_type=access_request.target_type,
         resource_id=access_request.target_id,
         request=request,
-        details={"access_request_id": access_request.id, "rejected_user_id": access_request.user_id},
+        details={"access_request_id": access_request.id, "rejected_user_id": access_request.user_id, "reason": reviewer_note},
     )
     db.commit()
     db.refresh(access_request)
@@ -1081,6 +1251,7 @@ def reject_access_request(
             target=target,
             requester=requester,
             reviewer=context.user,
+            reviewer_note=reviewer_note,
         )
     return _access_request_out(db, access_request)
 
@@ -1404,6 +1575,59 @@ def _change_auth_access(
             "new_auth_state": next_state,
             "reason": reason,
             "revoked_sessions": revoked_sessions,
+        },
+    )
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/account/close", response_model=AppUserOut)
+def close_account(
+    payload: UserAccessChange | None = None,
+    user: AppUser = Depends(current_me_user),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    if user.is_platform_admin:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Platform admin accounts cannot be closed here")
+
+    previous_status = user.status
+    previous_access_state, next_access_state = _set_app_access_state(
+        user=user,
+        access_state="disabled",
+        invalidate_tokens=True,
+    )
+    previous_auth_state, next_auth_state = _set_auth_state(
+        user=user,
+        auth_state="disabled",
+        invalidate_tokens=True,
+    )
+    user.status = "closed"
+    user.default_team_id = None
+    revoked_memberships = _revoke_user_scoped_access(db, user_id=user.id)
+    revoked_sessions = _revoke_auth_sessions(db, user=user)
+    reason = payload.reason.strip() if payload and payload.reason and payload.reason.strip() else None
+
+    _record_audit(
+        db,
+        actor_user_id=user.id,
+        action="user.account_closed",
+        resource_type="user",
+        resource_id=user.id,
+        request=request,
+        details={
+            "target_user_id": user.id,
+            "email": user.email,
+            "previous_status": previous_status,
+            "new_status": user.status,
+            "previous_access_state": previous_access_state,
+            "new_access_state": next_access_state,
+            "previous_auth_state": previous_auth_state,
+            "new_auth_state": next_auth_state,
+            "revoked_memberships": revoked_memberships,
+            "revoked_sessions": revoked_sessions,
+            "reason": reason,
         },
     )
     db.commit()

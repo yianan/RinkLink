@@ -11,25 +11,28 @@ from app.auth.context import build_authorization_context, can_access_team
 from app.auth.dependencies import current_user
 from app.auth import dependencies as auth_dependencies
 from app.config import settings
-from app.models import AccessRequest, AppUser, Arena, ArenaMembership, Association, AssociationMembership, Invite, Player, PlayerGuardianship, Season, Team, TeamMembership
+from app.models import AccessRequest, AppUser, Arena, ArenaMembership, Association, AssociationMembership, AuditLog, Invite, Player, PlayerGuardianship, PlayerMembership, Season, Team, TeamMembership
 from app.routers.access import (
     approve_access_request,
     accept_invite,
+    close_account,
     create_access_request,
     create_invite,
     disable_auth,
     disable_app_access,
     get_user_access_summary,
     list_access_requests,
+    list_public_access_targets,
     list_access_targets,
     revoke_membership,
     revoke_user,
     restore_auth,
     restore_app_access,
     reject_access_request,
+    send_contact_message,
     list_users,
 )
-from app.schemas import AccessRequestCreate, AccessRequestDecision, InviteCreate
+from app.schemas import AccessRequestCreate, AccessRequestDecision, ContactMessageCreate, InviteCreate, UserAccessChange
 from fastapi.security import HTTPAuthorizationCredentials
 
 
@@ -122,6 +125,71 @@ def test_pending_user_can_lookup_request_targets_with_search(db: Session) -> Non
     assert "Parent/guardian access" in (player_targets[0].context or "")
 
 
+def test_public_signup_target_lookup_does_not_require_auth_context(db: Session) -> None:
+    association = make_association(db, "Signup Association")
+    team = make_team(db, association, "Signup Team")
+    season = make_season(db)
+    db.add(
+        Player(
+            team_id=team.id,
+            season_id=season.id,
+            first_name="Casey",
+            last_name="Forward",
+            jersey_number=9,
+            position="F",
+        )
+    )
+    db.commit()
+
+    team_targets = list_public_access_targets(target_type="team", team_id=None, q="Sign", db=db)
+    player_targets = list_public_access_targets(target_type="player_link", team_id=team.id, q="Case", db=db)
+
+    assert [target.id for target in team_targets] == [team.id]
+    assert player_targets[0].name == "Casey F."
+    assert "Player access" in (player_targets[0].context or "")
+
+
+def test_contact_message_sends_to_active_platform_admins(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    platform_admin = make_user(db, "admin@example.com", status="active")
+    platform_admin.is_platform_admin = True
+    disabled_admin = make_user(db, "disabled-admin@example.com", status="active", auth_state="disabled")
+    disabled_admin.is_platform_admin = True
+    requester = make_user(db, "parent@example.com", status="closed", auth_state="disabled")
+    sent: list[dict[str, str]] = []
+    db.commit()
+
+    monkeypatch.setattr("app.routers.access.email_enabled", lambda: True)
+    monkeypatch.setattr("app.routers.access.send_email", lambda **kwargs: sent.append(kwargs) or True)
+
+    response = send_contact_message(
+        ContactMessageCreate(name="Parent User", email="Parent@Example.com", message="Please restore my account."),
+        request=make_request("/api/contact"),
+        db=db,
+    )
+
+    assert response.status_code == 204
+    assert [message["to_email"] for message in sent] == ["admin@example.com"]
+    assert sent[0]["subject"] == "RinkLink contact request"
+    assert "Please restore my account." in sent[0]["text_body"]
+    audit = db.query(AuditLog).filter(AuditLog.action == "contact.submitted").one()
+    assert audit.actor_user_id == requester.id
+    assert audit.details_json["email"] == "parent@example.com"
+
+
+def test_contact_message_requires_configured_platform_admin(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.routers.access.email_enabled", lambda: True)
+
+    with pytest.raises(HTTPException) as exc_info:
+        send_contact_message(
+            ContactMessageCreate(name="Parent User", email="parent@example.com", message="I need help."),
+            request=make_request("/api/contact"),
+            db=db,
+        )
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail == "Contact is not configured"
+
+
 def test_player_lookup_requires_team_id_for_family_link_search(db: Session) -> None:
     association = make_association(db, "Lookup Association")
     team = make_team(db, association, "Lookup Team")
@@ -133,7 +201,7 @@ def test_player_lookup_requires_team_id_for_family_link_search(db: Session) -> N
         list_access_targets(target_type="guardian_link", team_id=None, q="Jo", context=context, db=db)
 
     assert exc_info.value.status_code == 422
-    assert exc_info.value.detail == "team_id is required for player link lookups"
+    assert exc_info.value.detail == "team_id is required for player access lookups"
 
 
 def test_guardian_request_can_be_created_without_team_staff_request(db: Session) -> None:
@@ -339,6 +407,7 @@ def test_approving_access_request_emails_requester_with_app_link(db: Session, mo
             "role": "scheduler",
             "app_link": f"{settings.frontend_url.rstrip('/')}/",
             "reviewer_email": "approver@example.com",
+            "reviewer_note": None,
         }
     ]
 
@@ -360,6 +429,7 @@ def test_rejecting_access_request_emails_requester_without_app_link(db: Session,
     admin_context = build_authorization_context(db, admin)
     rejected = reject_access_request(
         request_id=access_request.id,
+        payload=AccessRequestDecision(reason="Please request the current team."),
         context=admin_context,
         db=db,
         request=make_request(f"/api/access-requests/{access_request.id}/reject"),
@@ -375,6 +445,7 @@ def test_rejecting_access_request_emails_requester_without_app_link(db: Session,
             "role": None,
             "app_link": None,
             "reviewer_email": "arena-admin@example.com",
+            "reviewer_note": "Please request the current team.",
         }
     ]
 
@@ -648,6 +719,71 @@ def test_disable_and_restore_auth_updates_user_state(db: Session) -> None:
 
     assert restored.auth_state == "active"
     assert restored.revoked_at is not None
+
+
+def test_close_account_disables_sign_in_and_revokes_scoped_access(db: Session) -> None:
+    association = make_association(db, "Close Association")
+    team = make_team(db, association, "Close Team")
+    arena = make_arena(db, "Close Arena")
+    season = make_season(db)
+    user = make_user(db, "close-me@example.com", status="active")
+    player = Player(
+        team_id=team.id,
+        season_id=season.id,
+        first_name="Close",
+        last_name="Player",
+        jersey_number=9,
+        position="F",
+    )
+    db.add(player)
+    db.flush()
+    db.add_all([
+        AssociationMembership(user_id=user.id, association_id=association.id, role="association_admin"),
+        TeamMembership(user_id=user.id, team_id=team.id, role="manager"),
+        ArenaMembership(user_id=user.id, arena_id=arena.id, role="arena_ops"),
+        PlayerGuardianship(user_id=user.id, player_id=player.id, relationship_type="guardian"),
+        PlayerMembership(user_id=user.id, player_id=player.id),
+    ])
+    user.default_team_id = team.id
+    db.commit()
+
+    closed = close_account(
+        payload=UserAccessChange(reason="No longer using it"),
+        user=user,
+        db=db,
+        request=make_request("/api/account/close"),
+    )
+
+    assert closed.status == "closed"
+    assert closed.access_state == "disabled"
+    assert closed.auth_state == "disabled"
+    assert closed.default_team_id is None
+    assert closed.revoked_at is not None
+    assert db.query(AssociationMembership).filter_by(user_id=user.id).count() == 0
+    assert db.query(TeamMembership).filter_by(user_id=user.id).count() == 0
+    assert db.query(ArenaMembership).filter_by(user_id=user.id).count() == 0
+    assert db.query(PlayerGuardianship).filter_by(user_id=user.id).count() == 0
+    assert db.query(PlayerMembership).filter_by(user_id=user.id).count() == 0
+    audit = db.query(AuditLog).filter_by(action="user.account_closed", resource_id=user.id).one()
+    assert audit.details_json["reason"] == "No longer using it"
+    assert audit.details_json["revoked_memberships"] == {
+        "association": 1,
+        "team": 1,
+        "arena": 1,
+        "guardian": 1,
+        "player": 1,
+    }
+
+
+def test_platform_admin_cannot_self_close_account(db: Session) -> None:
+    admin = make_user(db, "platform-admin@example.com", status="active")
+    admin.is_platform_admin = True
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        close_account(user=admin, db=db, request=make_request("/api/account/close"))
+
+    assert exc_info.value.status_code == 400
 
 
 def test_user_access_summary_includes_memberships_and_history(db: Session) -> None:

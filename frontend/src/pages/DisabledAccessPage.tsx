@@ -1,4 +1,5 @@
-import { LogOut, ShieldX } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { LogOut, Mail, ShieldX } from 'lucide-react';
 
 import PageHeader from '../components/PageHeader';
 import { Button } from '../components/ui/Button';
@@ -8,7 +9,9 @@ import { authClient, clearApiAccessToken } from '../lib/auth-client';
 
 export default function DisabledAccessPage() {
   const { me } = useAuth();
+  const navigate = useNavigate();
   const signInDisabled = me?.user.auth_state === 'disabled';
+  const accountClosed = me?.user.status === 'closed';
 
   const handleSignOut = async () => {
     clearApiAccessToken();
@@ -18,10 +21,12 @@ export default function DisabledAccessPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={signInDisabled ? 'Sign-In Disabled' : 'App Access Disabled'}
-        subtitle={signInDisabled
-          ? 'This account can no longer sign in to RinkLink until an administrator restores it.'
-          : 'This account is authenticated, but RinkLink access has been turned off by an administrator.'}
+        title={accountClosed ? 'Account Closed' : signInDisabled ? 'Sign-In Disabled' : 'App Access Disabled'}
+        subtitle={accountClosed
+          ? 'Contact a RinkLink admin if you need this account restored.'
+          : signInDisabled
+            ? 'This account can no longer sign in to RinkLink until an administrator restores it.'
+            : 'This account is authenticated, but RinkLink access has been turned off by an administrator.'}
       />
 
       <Card className="p-6">
@@ -35,19 +40,27 @@ export default function DisabledAccessPage() {
                 {me?.user.email || 'This account'} cannot use RinkLink right now
               </div>
               <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                {signInDisabled
-                  ? 'Contact your club or platform administrator if sign-in should be restored.'
-                  : 'Contact your club or platform administrator if you believe this was disabled by mistake.'}
+                {accountClosed
+                  ? 'Contact us if you need to use this account again.'
+                  : signInDisabled
+                    ? 'Contact us if sign-in should be restored.'
+                    : 'Contact us if you believe this was disabled by mistake.'}
               </div>
             </div>
             <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
-              {signInDisabled
-                ? 'Existing sessions have been revoked. Historical invites, memberships, and audit records remain in place until sign-in is restored.'
-                : 'Historical invites, memberships, and audit records remain in place. An administrator must restore app access before this account can use the product again.'}
+              {accountClosed
+                ? 'An admin can reopen this account if it should be active again.'
+                : signInDisabled
+                  ? 'An admin can restore sign-in if this account should be active.'
+                  : 'An admin can restore app access if this account should be active.'}
             </div>
             <div className="flex flex-wrap gap-3">
               <Button type="button" variant="outline" onClick={() => window.location.reload()}>
                 Retry
+              </Button>
+              <Button type="button" variant="outline" onClick={() => navigate('/contact')}>
+                <Mail className="h-4 w-4" />
+                Contact us
               </Button>
               <Button type="button" variant="ghost" onClick={() => void handleSignOut()}>
                 <LogOut className="h-4 w-4" />

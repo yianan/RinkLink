@@ -177,6 +177,16 @@ export const api = {
       method: 'DELETE',
       body: JSON.stringify({ reason: reason ?? null }),
     }),
+  closeAccount: (reason?: string | null) =>
+    request<import('../types').AppUserIdentity>('/account/close', {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason ?? null }),
+    }),
+  contactSupport: (data: { name: string; email: string; message: string }) =>
+    request<void>('/contact', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   getBrowseSeasons: () => request<import('../types').PublicSeason[]>('/browse/seasons'),
   getBrowseTeams: (params?: Record<string, string>) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
@@ -210,6 +220,8 @@ export const api = {
   },
   getAccessTargets: (params: Record<string, string>) =>
     request<import('../types').AccessTarget[]>(`/access-targets?${new URLSearchParams(params).toString()}`),
+  getPublicAccessTargets: (params: Record<string, string>) =>
+    request<import('../types').AccessTarget[]>(`/public/access-targets?${new URLSearchParams(params).toString()}`),
   createAccessRequest: (data: { target_type: string; target_id: string; notes?: string | null }) =>
     request<import('../types').AccessRequest>('/access-requests', { method: 'POST', body: JSON.stringify(data) }),
   approveAccessRequest: (requestId: string, role?: string | null) =>
@@ -217,8 +229,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ role: role ?? null }),
     }),
-  rejectAccessRequest: (requestId: string) =>
-    request<import('../types').AccessRequest>(`/access-requests/${requestId}/reject`, { method: 'POST' }),
+  rejectAccessRequest: (requestId: string, reason?: string | null) =>
+    request<import('../types').AccessRequest>(`/access-requests/${requestId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason ?? null }),
+    }),
   getAssociations: () => request<import('../types').Association[]>('/associations'),
   createAssociation: (data: Partial<import('../types').Association>) =>
     request<import('../types').Association>('/associations', { method: 'POST', body: JSON.stringify(data) }),

@@ -14,6 +14,7 @@ import { Textarea } from '../components/ui/Textarea';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { authClient } from '../lib/auth-client';
+import { clearSignupAccessRequestDraft, loadSignupAccessRequestDrafts } from '../lib/access-request-draft';
 import { getAccessRoleLabel, getAccessTargetTypeLabel } from '../lib/accessLabels';
 import { cn } from '../lib/cn';
 import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
@@ -32,8 +33,8 @@ const REQUEST_TARGET_TYPES = [
   { value: 'team', label: 'Team Staff Access' },
   { value: 'association', label: 'Association Access' },
   { value: 'arena', label: 'Arena Staff Access' },
-  { value: 'guardian_link', label: 'Parent/Guardian Link' },
-  { value: 'player_link', label: 'Player Link' },
+  { value: 'guardian_link', label: 'Parent/Guardian Access' },
+  { value: 'player_link', label: 'Player Access' },
 ] as const;
 
 const PENDING_SCROLL_KEY = 'rinklink.pending.scrollY';
@@ -45,9 +46,9 @@ function requestTargetHelp(targetType: string) {
     case 'arena':
       return 'Request access to an arena you work with.';
     case 'guardian_link':
-      return 'Request a parent or guardian link for a specific player.';
+      return 'Request parent or guardian access for a specific player.';
     case 'player_link':
-      return 'Request a self-managed player link for a specific player account.';
+      return 'Request player access for yourself.';
     default:
       return 'Request staff access for a team.';
   }
@@ -101,6 +102,8 @@ export default function PendingApprovalPage() {
   const [requestTeamQuery, setRequestTeamQuery] = useState('');
   const [requestSearch, setRequestSearch] = useState('');
   const [requestNotes, setRequestNotes] = useState('');
+  const [signupRequestStatus, setSignupRequestStatus] = useState<'idle' | 'submitting' | 'submitted' | 'failed'>('idle');
+  const [signupRequestMessage, setSignupRequestMessage] = useState<string | null>(null);
   const [requestOptionsLoading, setRequestOptionsLoading] = useState(false);
   const [requestLookupError, setRequestLookupError] = useState<string | null>(null);
   const [browseSeasons, setBrowseSeasons] = useState<PublicSeason[]>([]);
@@ -155,6 +158,48 @@ export default function PendingApprovalPage() {
     if (!isAuthenticated) return;
     void loadPendingData();
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || loading || me?.user.status === 'active' || signupRequestStatus !== 'idle') {
+      return;
+    }
+    const drafts = loadSignupAccessRequestDrafts();
+    if (drafts.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    setSignupRequestStatus('submitting');
+    setSignupRequestMessage(drafts.length === 1 ? `Submitting your request for ${drafts[0].target_name}.` : `Submitting ${drafts.length} access requests.`);
+    Promise.all(drafts.map((draft) => api.createAccessRequest({
+      target_type: draft.target_type,
+      target_id: draft.target_id,
+      notes: draft.notes,
+    })))
+      .then((createdRequests) => {
+        if (cancelled) return;
+        clearSignupAccessRequestDraft();
+        setRequests((current) => {
+          const createdIds = new Set(createdRequests.map((request) => request.id));
+          const withoutDuplicates = current.filter((request) => !createdIds.has(request.id));
+          return [...createdRequests, ...withoutDuplicates];
+        });
+        setSignupRequestStatus('submitted');
+        setSignupRequestMessage(createdRequests.length === 1
+          ? `Your request for ${createdRequests[0].target.name} is waiting for approval.`
+          : `${createdRequests.length} requests are waiting for approval.`);
+        void refreshProfile({ silent: true });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setSignupRequestStatus('failed');
+        setSignupRequestMessage(error instanceof Error ? error.message : String(error));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, loading, me?.user.status, refreshProfile, signupRequestStatus]);
 
   useEffect(() => {
     if (!isAuthenticated || me?.user.status === 'active') return;
@@ -478,7 +523,7 @@ export default function PendingApprovalPage() {
         subtitle={(
           <>
             You&apos;re signed in as <span className="font-medium text-slate-900 dark:text-slate-100">{me?.user.email || 'Unknown user'}</span>.
-            An administrator still needs to approve access to the right team, association, arena, or family link.
+            An administrator still needs to approve access to the right team, association, arena, or player.
           </>
         )}
         actions={(
@@ -497,6 +542,17 @@ export default function PendingApprovalPage() {
       {error ? (
         <Card className="border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200">
           {error}
+        </Card>
+      ) : null}
+
+      {signupRequestMessage ? (
+        <Card className={cn(
+          'p-4 text-sm',
+          signupRequestStatus === 'failed'
+            ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200'
+            : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200',
+        )}>
+          {signupRequestMessage}
         </Card>
       ) : null}
 
@@ -594,7 +650,7 @@ export default function PendingApprovalPage() {
                     ))}
                   </Select>
                   <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    Search the team first, then choose the player you need linked to this account.
+                    Search the team first, then choose the player you need access to.
                   </div>
                 </div>
               ) : null}

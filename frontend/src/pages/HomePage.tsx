@@ -238,7 +238,7 @@ export default function HomePage() {
   const snapshotRecord = competitionRecord || record;
   const linkedPlayerLabel = linkedPlayersForActiveTeam.length === 1
     ? `${linkedPlayersForActiveTeam[0].first_name} ${linkedPlayersForActiveTeam[0].last_name}`
-    : `${linkedPlayersForActiveTeam.length} linked players`;
+    : `${linkedPlayersForActiveTeam.length} players`;
 
   const resetDemoData = async () => {
     const shouldReset = await confirm({
@@ -363,7 +363,7 @@ export default function HomePage() {
           familyMode
             ? linkedPlayersForActiveTeam.length > 0
               ? `Attendance and event view for ${linkedPlayerLabel}`
-              : 'Attendance and schedule view for your linked players'
+              : 'Attendance and schedule view for your players'
             : effectiveSeason
             ? primaryMembership
               ? `${effectiveSeason.name} Season • ${primaryMembership.competition_short_name} ${primaryMembership.division_name}`
@@ -389,9 +389,9 @@ export default function HomePage() {
       <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2', familyMode ? 'xl:grid-cols-3' : snapshotRecord ? 'xl:grid-cols-5' : 'xl:grid-cols-4')}>
         {familyMode ? (
           <StatCard
-            title="Linked Players"
+            title="Your Players"
             value={linkedPlayersForActiveTeam.length}
-            subtitle={linkedPlayersForActiveTeam.length > 0 ? linkedPlayerLabel : 'No linked players on this team'}
+            subtitle={linkedPlayersForActiveTeam.length > 0 ? linkedPlayerLabel : 'No players on this team'}
             icon={<Trophy className="h-4 w-4" />}
             color="bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-400"
           />
@@ -464,7 +464,7 @@ export default function HomePage() {
                   <div className="font-medium text-slate-900 dark:text-slate-100">No upcoming events</div>
                   <div className="mt-1">
                     {familyMode
-                      ? 'Upcoming practices and games for your linked players will appear here.'
+                      ? 'Upcoming practices and games for your players will appear here.'
                       : 'Schedule a practice or accept a proposal to populate the next event block.'}
                   </div>
                   <div className="mt-3">
@@ -545,7 +545,7 @@ export default function HomePage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {familyMode ? 'Linked Players' : 'Incoming Proposals'}
+                  {familyMode ? 'Your Players' : 'Incoming Proposals'}
                 </div>
                 <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                   {familyMode ? 'Players you can respond for from this account.' : 'Requests waiting on your response.'}
@@ -563,7 +563,7 @@ export default function HomePage() {
               linkedPlayersForActiveTeam.length === 0 ? (
                 <div className="px-4 py-4">
                   <div className="rounded-xl border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
-                    <div className="font-medium text-slate-900 dark:text-slate-100">No linked players on this team</div>
+                    <div className="font-medium text-slate-900 dark:text-slate-100">No players on this team</div>
                     <div className="mt-1">Switch teams or accept a player or guardian invite to see attendance here.</div>
                   </div>
                 </div>

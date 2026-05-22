@@ -294,7 +294,7 @@ def update_event_attendance(
         raise HTTPException(403, "You do not have access to update attendance for this team")
     invalid_updates = set(updates) - allowed_player_ids
     if invalid_updates:
-        raise HTTPException(403, "You can only update attendance for linked players")
+        raise HTTPException(403, "You can only update attendance for your players")
     roster = [
         player
         for player in team_roster_for_event(db, event, team_id)

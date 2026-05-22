@@ -1,22 +1,35 @@
 import { AuthView, ForgotPasswordForm, ResetPasswordForm } from '@daveyplate/better-auth-ui';
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
+import { api } from '../api/client';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
+import { Textarea } from '../components/ui/Textarea';
+import { saveSignupAccessRequestDrafts, type SignupAccessRequestDraft } from '../lib/access-request-draft';
 import { authApiBaseUrl, authClient } from '../lib/auth-client';
-import { buildAuthCallbackUrl, consumeAuthReturnTo } from '../lib/auth-routing';
+import { buildAuthCallbackUrl, consumeAuthReturnTo, peekAuthReturnTo } from '../lib/auth-routing';
 import { cn } from '../lib/cn';
 import { useAuth } from '../context/AuthContext';
 import { BetterAuthUiProvider } from '../context/BetterAuthUiProvider';
 import { useToast } from '../context/ToastContext';
+import type { AccessTarget } from '../types';
 
 const appIconSrc = '/icons/rinklink-icon-192.png';
+const SIGNUP_TARGET_TYPES = [
+  { value: 'team', label: 'Team staff access' },
+  { value: 'association', label: 'Association access' },
+  { value: 'arena', label: 'Arena staff access' },
+  { value: 'guardian_link', label: 'Parent or guardian access' },
+  { value: 'player_link', label: 'Player access' },
+] as const;
 
 const allowedPathnames = new Set([
   'sign-in',
   'sign-up',
+  'request-access',
   'check-email',
   'forgot-password',
   'reset-password',
@@ -54,6 +67,20 @@ function AuthCard({
       {footer ? <div className="rinklink-auth-footer">{footer}</div> : null}
     </div>
   );
+}
+
+function signupTargetSearchLabel(targetType: (typeof SIGNUP_TARGET_TYPES)[number]['value']) {
+  switch (targetType) {
+    case 'association':
+      return 'Find association';
+    case 'arena':
+      return 'Find arena';
+    case 'guardian_link':
+    case 'player_link':
+      return 'Find player';
+    default:
+      return 'Find team';
+  }
 }
 
 function CheckEmailCard() {
@@ -107,9 +134,6 @@ function CheckEmailCard() {
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>Back to sign in</span>
           </RouterLink>
-          <Button type="button" variant="ghost" onClick={() => navigate('/auth/sign-up')}>
-            Change email
-          </Button>
         </div>
       )}
     >
@@ -117,8 +141,7 @@ function CheckEmailCard() {
         <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/50">
           <div className="font-medium text-slate-900 dark:text-slate-100">What happens next</div>
           <div className="mt-2">
-            After verification, RinkLink will sign you in automatically and route you to the right next step:
-            pending onboarding if you have no grants yet, or directly into the app if you already have access.
+            After you verify your email, your request will be sent to an admin for review.
           </div>
         </div>
 
@@ -331,6 +354,10 @@ function describeSignUpError(error: unknown): string {
     return 'Check the email, name, and password, then try again.';
   }
 
+  if (normalizedMessage === 'failed to fetch' || normalizedMessage.includes('networkerror')) {
+    return 'RinkLink could not reach the auth service. Check that the app is fully running, then try again.';
+  }
+
   return message;
 }
 
@@ -519,6 +546,7 @@ function SignInCard() {
 function SignUpCard() {
   const navigate = useNavigate();
   const pushToast = useToast();
+  const inviteReturnTo = (peekAuthReturnTo() || '').startsWith('/invite/');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -576,7 +604,9 @@ function SignUpCard() {
         description: trimmedEmail,
         variant: 'success',
       });
-      navigate(`/auth/check-email?email=${encodeURIComponent(trimmedEmail)}`);
+      navigate(inviteReturnTo
+        ? `/auth/check-email?email=${encodeURIComponent(trimmedEmail)}`
+        : `/auth/request-access?email=${encodeURIComponent(trimmedEmail)}`);
     } catch (error) {
       pushToast({
         title: 'Unable to create account',
@@ -592,7 +622,9 @@ function SignUpCard() {
     <AuthCard
       eyebrow="Create account"
       title="Create your RinkLink account"
-      description="Self-signup creates your identity first. You can verify your email, review invites, browse published team information, and request app access after that."
+      description={inviteReturnTo
+        ? 'Create your account with the invited email, verify it, and RinkLink will return you to the invite.'
+        : 'Enter your details to get started.'}
       footer={(
         <RouterLink to="/auth/sign-in" className="rinklink-auth-footer-link inline-flex items-center gap-1.5">
           <ArrowLeft className="h-3.5 w-3.5" />
@@ -652,9 +684,338 @@ function SignUpCard() {
         />
 
         <Button type="submit" className="rinklink-auth-primary-button" disabled={busy}>
-          {busy ? 'Creating account…' : 'Create account'}
+          {busy ? 'Creating account…' : inviteReturnTo ? 'Create account' : 'Create account and continue'}
         </Button>
       </form>
+    </AuthCard>
+  );
+}
+
+function RequestAccessSetupCard() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const pushToast = useToast();
+  const email = searchParams.get('email') || '';
+  const [targetType, setTargetType] = useState<(typeof SIGNUP_TARGET_TYPES)[number]['value']>('team');
+  const [teamQuery, setTeamQuery] = useState('');
+  const [teamOptions, setTeamOptions] = useState<AccessTarget[]>([]);
+  const [teamId, setTeamId] = useState('');
+  const [targetQuery, setTargetQuery] = useState('');
+  const [targetOptions, setTargetOptions] = useState<AccessTarget[]>([]);
+  const [targetId, setTargetId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [drafts, setDrafts] = useState<SignupAccessRequestDraft[]>([]);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (targetType === 'guardian_link' || targetType === 'player_link') {
+      return;
+    }
+    setTeamQuery('');
+    setTeamOptions([]);
+    setTeamId('');
+  }, [targetType]);
+
+  useEffect(() => {
+    if (teamQuery.trim().length < 2) {
+      setTeamOptions([]);
+      setTeamId('');
+      return;
+    }
+    let cancelled = false;
+    api.getPublicAccessTargets({ target_type: 'team', q: teamQuery.trim() })
+      .then((targets) => {
+        if (cancelled) return;
+        setTeamOptions(targets);
+        setTeamId((current) => (current && targets.some((team) => team.id === current) ? current : targets[0]?.id || ''));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setTeamOptions([]);
+        setTeamId('');
+        setLookupError(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [teamQuery]);
+
+  useEffect(() => {
+    if (targetQuery.trim().length < 2) {
+      setTargetOptions([]);
+      setTargetId('');
+      setLookupLoading(false);
+      setLookupError(null);
+      return;
+    }
+    if ((targetType === 'guardian_link' || targetType === 'player_link') && !teamId) {
+      setTargetOptions([]);
+      setTargetId('');
+      setLookupLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const params: Record<string, string> = { target_type: targetType, q: targetQuery.trim() };
+    if (targetType === 'guardian_link' || targetType === 'player_link') {
+      params.team_id = teamId;
+    }
+    setLookupLoading(true);
+    setLookupError(null);
+    api.getPublicAccessTargets(params)
+      .then((targets) => {
+        if (cancelled) return;
+        setTargetOptions(targets);
+        setTargetId((current) => (current && targets.some((target) => target.id === current) ? current : targets[0]?.id || ''));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setTargetOptions([]);
+        setTargetId('');
+        setLookupError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLookupLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [targetQuery, targetType, teamId]);
+
+  const selectedTarget = targetOptions.find((target) => target.id === targetId) || null;
+  const checkEmailPath = `/auth/check-email${email ? `?email=${encodeURIComponent(email)}` : ''}`;
+  const isPlayerAccessRequest = targetType === 'guardian_link' || targetType === 'player_link';
+  const isGuardianAccessRequest = targetType === 'guardian_link';
+  const searchLabel = signupTargetSearchLabel(targetType);
+  const selectedLabel = isPlayerAccessRequest ? 'Player' : 'Choose one';
+  const searchPlaceholder = isPlayerAccessRequest
+    ? 'Start typing the player name'
+    : 'Start typing a name';
+
+  const buildCurrentDraft = (): SignupAccessRequestDraft | null => {
+    if (!selectedTarget) {
+      pushToast({
+        title: 'Choose access',
+        description: 'Search and choose the team, association, arena, or player before continuing.',
+        variant: 'warning',
+      });
+      return null;
+    }
+    return {
+      target_type: selectedTarget.type,
+      target_id: selectedTarget.id,
+      target_name: selectedTarget.name,
+      target_context: selectedTarget.context,
+      notes: notes.trim() || null,
+    };
+  };
+
+  const addCurrentRequest = () => {
+    const draft = buildCurrentDraft();
+    if (!draft) return;
+    setDrafts((current) => {
+      const withoutDuplicate = current.filter((item) => !(item.target_type === draft.target_type && item.target_id === draft.target_id));
+      return [...withoutDuplicate, draft];
+    });
+    setTargetQuery('');
+    setTargetOptions([]);
+    setTargetId('');
+    setNotes('');
+  };
+
+  const removeDraft = (draftToRemove: SignupAccessRequestDraft) => {
+    setDrafts((current) => current.filter((item) => !(item.target_type === draftToRemove.target_type && item.target_id === draftToRemove.target_id)));
+  };
+
+  const continueToVerification = () => {
+    if (isGuardianAccessRequest) {
+      if (drafts.length === 0) {
+        pushToast({
+          title: 'Add a child',
+          description: 'Add each player to the request before continuing.',
+          variant: 'warning',
+        });
+        return;
+      }
+      saveSignupAccessRequestDrafts(drafts);
+      navigate(checkEmailPath);
+      return;
+    }
+
+    const currentDraft = buildCurrentDraft();
+    if (!currentDraft) return;
+    const nextDrafts = [
+      ...drafts.filter((item) => !(item.target_type === currentDraft.target_type && item.target_id === currentDraft.target_id)),
+      currentDraft,
+    ];
+    saveSignupAccessRequestDrafts(nextDrafts);
+    navigate(checkEmailPath);
+  };
+
+  return (
+    <AuthCard
+      eyebrow="Request access"
+      title="Choose your access"
+      description="Your account was created. Choose what you need access to, then verify your email."
+    >
+      <div className="rinklink-auth-form">
+        <div className="rinklink-auth-field">
+          <label className="rinklink-auth-label" htmlFor="request-access-type">I need</label>
+          <Select
+            id="request-access-type"
+            className="rinklink-auth-input"
+            value={targetType}
+            onChange={(event) => {
+              setTargetType(event.target.value as (typeof SIGNUP_TARGET_TYPES)[number]['value']);
+              setTargetQuery('');
+              setTargetOptions([]);
+              setTargetId('');
+              setLookupError(null);
+              setDrafts([]);
+            }}
+          >
+            {SIGNUP_TARGET_TYPES.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </Select>
+        </div>
+
+        {isPlayerAccessRequest ? (
+          <>
+            <div className="rinklink-auth-field">
+              <label className="rinklink-auth-label" htmlFor="request-team-search">Find team</label>
+              <Input
+                id="request-team-search"
+                className="rinklink-auth-input"
+                value={teamQuery}
+                onChange={(event) => setTeamQuery(event.target.value)}
+                placeholder="Start typing the team name"
+              />
+            </div>
+            <div className="rinklink-auth-field">
+              <label className="rinklink-auth-label" htmlFor="request-team">Choose team</label>
+              <Select
+                id="request-team"
+                className="rinklink-auth-input"
+                value={teamId}
+                onChange={(event) => setTeamId(event.target.value)}
+                disabled={teamOptions.length === 0}
+              >
+                {teamOptions.length === 0 ? (
+                  <option value="">Search for a team</option>
+                ) : (
+                  teamOptions.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}{team.context ? ` · ${team.context}` : ''}
+                    </option>
+                  ))
+                )}
+              </Select>
+            </div>
+          </>
+        ) : null}
+
+        <div className="rinklink-auth-field">
+          <label className="rinklink-auth-label" htmlFor="request-target-search">{searchLabel}</label>
+          <Input
+            id="request-target-search"
+            className="rinklink-auth-input"
+            value={targetQuery}
+            onChange={(event) => setTargetQuery(event.target.value)}
+            placeholder={searchPlaceholder}
+            disabled={isPlayerAccessRequest && !teamId}
+          />
+        </div>
+
+        <div className="rinklink-auth-field">
+          <label className="rinklink-auth-label" htmlFor="request-target">{selectedLabel}</label>
+          <Select
+            id="request-target"
+            className="rinklink-auth-input"
+            value={targetId}
+            onChange={(event) => setTargetId(event.target.value)}
+            disabled={lookupLoading || targetOptions.length === 0}
+          >
+            {targetOptions.length === 0 ? (
+              <option value="">{lookupLoading ? 'Loading matches…' : 'Search first'}</option>
+            ) : (
+              targetOptions.map((target) => (
+                <option key={target.id} value={target.id}>
+                  {target.name}{target.context ? ` · ${target.context}` : ''}
+                </option>
+              ))
+            )}
+          </Select>
+          {lookupError ? (
+            <div className="rinklink-auth-error mt-2">{lookupError}</div>
+          ) : null}
+        </div>
+
+        <div className="rinklink-auth-field">
+          <label className="rinklink-auth-label" htmlFor="request-notes">Note for admin</label>
+          <Textarea
+            id="request-notes"
+            className="rinklink-auth-input"
+            rows={4}
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder={isPlayerAccessRequest ? 'Optional' : "Example: I help with this team's schedule."}
+          />
+        </div>
+
+        {isGuardianAccessRequest ? (
+          <div className="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-sm dark:border-slate-800 dark:bg-slate-900/50">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="font-medium text-slate-900 dark:text-slate-100">
+                  Children in this request
+                </div>
+                <div className="mt-1 text-slate-600 dark:text-slate-300">
+                  Add each player before continuing.
+                </div>
+              </div>
+              <Button type="button" variant="outline" onClick={addCurrentRequest} disabled={!selectedTarget}>
+                Add child
+              </Button>
+            </div>
+            {drafts.length > 0 ? (
+              <div className="space-y-2">
+                {drafts.map((draft) => (
+                  <div
+                    key={`${draft.target_type}:${draft.target_id}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950/40"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-slate-900 dark:text-slate-100">{draft.target_name}</div>
+                      {draft.target_context ? (
+                        <div className="truncate text-xs text-slate-500 dark:text-slate-400">{draft.target_context}</div>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100"
+                      onClick={() => removeDraft(draft)}
+                      aria-label={`Remove ${draft.target_name}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-300 px-3 py-3 text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                No players added yet.
+              </div>
+            )}
+          </div>
+        ) : null}
+        <Button type="button" className="rinklink-auth-primary-button" onClick={continueToVerification} disabled={isGuardianAccessRequest && drafts.length === 0}>
+          Continue
+        </Button>
+      </div>
     </AuthCard>
   );
 }
@@ -777,6 +1138,7 @@ function TwoFactorSignInCard() {
 export default function AuthPage() {
   const { pathname = 'sign-in' } = useParams();
   const isSignUp = pathname === 'sign-up';
+  const isRequestAccess = pathname === 'request-access';
   const isCheckEmail = pathname === 'check-email';
   const isForgotPassword = pathname === 'forgot-password';
   const isResetPassword = pathname === 'reset-password';
@@ -789,16 +1151,24 @@ export default function AuthPage() {
 
   const pageMeta = pathname === 'sign-up'
     ? {
-        mastheadTitle: 'Join the teams, families, and arenas already running on RinkLink.',
-        mastheadSubtitle: 'Create your account, verify your email, then review invites or request the exact access you need.',
+        mastheadTitle: 'Create your RinkLink account.',
+        mastheadSubtitle: 'Sign up, choose the access you need, and verify your email.',
         cardEyebrow: 'Create account',
         cardTitle: 'Create your RinkLink account',
         cardDescription: null,
       }
+    : isRequestAccess
+      ? {
+          mastheadTitle: 'Choose what you need.',
+          mastheadSubtitle: 'Pick the team, association, arena, or player connected to your account.',
+          cardEyebrow: 'Request access',
+          cardTitle: 'Tell us what you need',
+          cardDescription: null,
+        }
     : pathname === 'check-email'
       ? {
           mastheadTitle: 'Check your inbox.',
-          mastheadSubtitle: 'Verification completes the identity step, then RinkLink routes you into pending onboarding or your granted workspace.',
+          mastheadSubtitle: 'Use the verification link to finish signup. Then an admin can review your request.',
           cardEyebrow: 'Check your email',
           cardTitle: 'Finish verifying your email',
           cardDescription: null,
@@ -859,34 +1229,21 @@ export default function AuthPage() {
                   cardDescription: 'Pick up where your team left off.',
                 };
 
-  const featureItems = isSignUp || isCheckEmail
-    ? [
-        {
-          title: 'Scoped access',
-          copy: 'Identity comes first. Resource rights are still granted by the right admin for the right team, arena, or family link.',
-        },
-        {
-          title: 'Invite ready',
-          copy: 'Invite links can take a brand-new user through signup, email verification, and exact grant acceptance.',
-        },
-        {
-          title: 'Pending browse',
-          copy: 'Verified users can still browse published teams, schedules, and standings while waiting on approval.',
-        },
-      ]
+  const featureItems = isSignUp || isRequestAccess || isCheckEmail
+    ? []
     : isVerifyEmail
       ? [
           {
-            title: 'Secure handoff',
-            copy: 'The browser opens the RinkLink app first, then verification completes against the auth service behind it.',
+            title: 'Checking your link',
+            copy: 'This should only take a moment.',
           },
           {
-            title: 'Session ready',
-            copy: 'After the email check succeeds, RinkLink signs you in and continues to the right next step.',
+            title: 'Almost done',
+            copy: 'RinkLink will open once your email is verified.',
           },
           {
-            title: 'Access remains scoped',
-            copy: 'Verification confirms identity; team, family, arena, and admin rights still come from explicit grants.',
+            title: 'Need access?',
+            copy: 'An admin can review your request after signup.',
           },
         ]
     : isForgotPassword || isResetPassword
@@ -919,20 +1276,7 @@ export default function AuthPage() {
               copy: 'You can trust the current device for a limited window to reduce repeat prompts.',
             },
           ]
-      : [
-          {
-            title: 'Today’s schedule',
-            copy: 'Games, practices, and rink details are ready where you left them.',
-          },
-          {
-            title: 'Availability updates',
-            copy: 'Review player, family, and staff responses without digging through messages.',
-          },
-          {
-            title: 'Access and invites',
-            copy: 'Handle approvals, requests, and account changes from the same workspace.',
-          },
-        ];
+      : [];
 
   const authViewClassNames = {
     base: cn('rinklink-auth-card', isSignUp && 'rinklink-auth-card--signup'),
@@ -996,9 +1340,6 @@ export default function AuthPage() {
               <div className="font-display text-2xl font-bold tracking-tight text-slate-950 dark:text-slate-50">
                 RinkLink
               </div>
-              <div className="text-sm text-slate-600 dark:text-slate-300">
-                Schedules, access, and rink operations in sync.
-              </div>
             </div>
           </div>
 
@@ -1007,20 +1348,24 @@ export default function AuthPage() {
             <p className="rinklink-auth-hero-subtitle">{pageMeta.mastheadSubtitle}</p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            {featureItems.map((item) => (
-              <div key={item.title} className="rinklink-auth-feature">
-                <div className="rinklink-auth-feature-title">{item.title}</div>
-                <div className="rinklink-auth-feature-copy">{item.copy}</div>
-              </div>
-            ))}
-          </div>
+          {featureItems.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              {featureItems.map((item) => (
+                <div key={item.title} className="rinklink-auth-feature">
+                  <div className="rinklink-auth-feature-title">{item.title}</div>
+                  <div className="rinklink-auth-feature-copy">{item.copy}</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </section>
 
-        <section className={cn('rinklink-auth-panel max-w-xl', isSignUp && 'max-w-2xl')}>
+        <section className={cn('rinklink-auth-panel max-w-xl', (isSignUp || isRequestAccess) && 'max-w-2xl')}>
           {isSignUp
             ? <SignUpCard />
-            : isCheckEmail
+            : isRequestAccess
+              ? <RequestAccessSetupCard />
+              : isCheckEmail
               ? <CheckEmailCard />
               : isVerifyEmail
                 ? <VerifyEmailCard />
@@ -1063,6 +1408,12 @@ export default function AuthPage() {
                   )}
         </section>
       </div>
+      <footer className="rinklink-auth-site-footer">
+        <span>Copyright &copy; {new Date().getFullYear()} RinkLink</span>
+        <RouterLink to="/contact" className="rinklink-auth-footer-link">
+          Contact us
+        </RouterLink>
+      </footer>
     </main>
   );
 }

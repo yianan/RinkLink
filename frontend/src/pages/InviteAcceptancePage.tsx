@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 
 import { api } from '../api/client';
@@ -34,6 +34,7 @@ export default function InviteAcceptancePage() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const autoAcceptStarted = useRef(false);
 
   const inviteResolved = useMemo(() => invite?.status === 'accepted', [invite?.status]);
 
@@ -56,6 +57,28 @@ export default function InviteAcceptancePage() {
     if (!isAuthenticated) return;
     void loadInvite();
   }, [isAuthenticated, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const acceptInvite = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const nextInvite = await api.acceptInvite(token);
+      setInvite(nextInvite);
+      await refreshProfile();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!invite || invite.status !== 'pending' || submitting || autoAcceptStarted.current) {
+      return;
+    }
+    autoAcceptStarted.current = true;
+    void acceptInvite();
+  }, [invite, submitting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!inviteResolved || !me) {
@@ -86,13 +109,13 @@ export default function InviteAcceptancePage() {
       <div className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-4 py-8 sm:px-6">
         <Card className="w-full p-8 sm:p-10">
           <div className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-200">
-            Invite Link
+            Access Invite
           </div>
           <h1 className="mt-5 font-display text-3xl font-bold tracking-tight text-slate-950 dark:text-slate-50">
-            Sign in to review this access invite.
+            Accept your RinkLink invite
           </h1>
           <p className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
-            The invite will be applied to the authenticated account that matches the invited email address.
+            Sign in if you already have an account. Create one if you are new to RinkLink.
           </p>
           <div className="mt-8 flex gap-3">
             <Button
@@ -120,20 +143,6 @@ export default function InviteAcceptancePage() {
     );
   }
 
-  const acceptInvite = async () => {
-    setSubmitting(true);
-    setError(null);
-    try {
-      const nextInvite = await api.acceptInvite(token);
-      setInvite(nextInvite);
-      await refreshProfile();
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : String(nextError));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const signOutAndSwitchAccount = async () => {
     clearApiAccessToken();
     await authClient.signOut();
@@ -148,7 +157,7 @@ export default function InviteAcceptancePage() {
           Invite Review
         </div>
         <h1 className="mt-5 font-display text-3xl font-bold tracking-tight text-slate-950 dark:text-slate-50">
-          Review and accept access for this account.
+          Applying access for this account.
         </h1>
         <p className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
           Signed in as <span className="font-medium text-slate-900 dark:text-slate-100">{me?.user.email || 'Unknown user'}</span>.
@@ -200,7 +209,7 @@ export default function InviteAcceptancePage() {
             onClick={() => void acceptInvite()}
             disabled={!invite || invite.status !== 'pending' || submitting}
           >
-            {submitting ? 'Accepting…' : 'Accept invite'}
+            {submitting ? 'Accepting…' : invite?.status === 'pending' ? 'Accept now' : 'Invite accepted'}
           </Button>
           <Button type="button" variant="ghost" onClick={() => void signOutAndSwitchAccount()} disabled={submitting}>
             Sign out and switch account

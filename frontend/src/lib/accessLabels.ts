@@ -2,8 +2,8 @@ const ACCESS_TARGET_TYPE_LABELS: Record<string, string> = {
   association: 'Association Access',
   team: 'Team Staff Access',
   arena: 'Arena Staff Access',
-  guardian_link: 'Parent/Guardian Link',
-  player_link: 'Player Link',
+  guardian_link: 'Parent/Guardian Access',
+  player_link: 'Player Access',
 };
 
 const ACCESS_ROLE_LABELS: Record<string, string> = {

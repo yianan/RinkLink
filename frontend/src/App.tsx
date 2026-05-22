@@ -11,6 +11,7 @@ import {
   Home,
   Inbox,
   LogOut,
+  Mail,
   Menu,
   Search,
   Link2,
@@ -65,6 +66,7 @@ const ArenaListPage = lazy(() => import('./pages/ArenaListPage'));
 const ArenaDetailPage = lazy(() => import('./pages/ArenaDetailPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const FamilyLinksPage = lazy(() => import('./pages/FamilyLinksPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
 
 function RouteFallback() {
   return (
@@ -153,7 +155,7 @@ const NAV_SECTIONS = [
     label: 'Team',
     items: [
       { path: '/roster', label: 'Roster', icon: ClipboardList },
-      { path: '/family-links', label: 'Family Links', icon: Link2 },
+      { path: '/family-links', label: 'Player Access', icon: Link2, audience: 'admin' },
       { path: '/availability', label: 'Availability', icon: Calendar },
       { path: '/schedule', label: 'Schedule', icon: ClipboardSignature },
     ],
@@ -184,6 +186,8 @@ const NAV_SECTIONS = [
   {
     label: 'Account',
     items: [
+      { path: '/family-links', label: 'My Players', icon: Link2, audience: 'family' },
+      { path: '/contact', label: 'Contact Us', icon: Mail },
       { path: '/settings', label: 'Settings', icon: UserCog },
     ],
   },
@@ -191,6 +195,22 @@ const NAV_SECTIONS = [
 
 function hasCapability(me: MeResponse | null, capability: string) {
   return !!me?.capabilities.includes(capability);
+}
+
+function canManagePlayerAccess(me: MeResponse | null) {
+  return (
+    hasCapability(me, 'platform.manage')
+    || hasCapability(me, 'association.manage')
+    || hasCapability(me, 'team.manage_roster')
+  );
+}
+
+function canUseMyPlayers(me: MeResponse | null) {
+  return (
+    hasCapability(me, 'player.respond_guarded')
+    || hasCapability(me, 'player.respond_self')
+    || (me?.linked_players.length || 0) > 0
+  );
 }
 
 function canViewPath(path: string, me: MeResponse | null, runtimeAuthEnabled: boolean) {
@@ -203,14 +223,12 @@ function canViewPath(path: string, me: MeResponse | null, runtimeAuthEnabled: bo
   switch (path) {
     case '/':
       return true;
+    case '/contact':
+      return true;
     case '/roster':
       return hasCapability(me, 'team.view_private');
     case '/family-links':
-      return (
-        hasCapability(me, 'platform.manage')
-        || hasCapability(me, 'association.manage')
-        || hasCapability(me, 'team.manage_roster')
-      );
+      return canManagePlayerAccess(me) || canUseMyPlayers(me);
     case '/availability':
       return hasCapability(me, 'team.manage_schedule');
     case '/schedule':
@@ -248,6 +266,22 @@ function canViewPath(path: string, me: MeResponse | null, runtimeAuthEnabled: bo
   }
 }
 
+function canViewNavItem(item: { path: string; audience?: string }, me: MeResponse | null, runtimeAuthEnabled: boolean) {
+  if (!canViewPath(item.path, me, runtimeAuthEnabled)) {
+    return false;
+  }
+  if (item.path !== '/family-links') {
+    return true;
+  }
+  if (item.audience === 'admin') {
+    return canManagePlayerAccess(me);
+  }
+  if (item.audience === 'family') {
+    return !canManagePlayerAccess(me) && canUseMyPlayers(me);
+  }
+  return true;
+}
+
 function AppNav({ navBadges = {}, onNavigate }: { navBadges?: Record<string, number>; onNavigate?: () => void }) {
   const location = useLocation();
   const { authEnabled: runtimeAuthEnabled, me } = useAuth();
@@ -255,7 +289,7 @@ function AppNav({ navBadges = {}, onNavigate }: { navBadges?: Record<string, num
   return (
     <nav className="p-3">
       {NAV_SECTIONS.map((section) => {
-        const visibleItems = section.items.filter((item) => canViewPath(item.path, me, runtimeAuthEnabled));
+        const visibleItems = section.items.filter((item) => canViewNavItem(item, me, runtimeAuthEnabled));
         if (visibleItems.length === 0) {
           return null;
         }
@@ -476,6 +510,7 @@ function AppContent() {
         <Routes>
           <Route path="/auth/:pathname" element={<AuthPage />} />
           <Route path="/invite/:token" element={<InviteAcceptancePage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<Navigate to="/auth/sign-in" replace />} />
           <Route path="*" element={<Navigate to="/auth/sign-in" replace />} />
         </Routes>
@@ -489,6 +524,7 @@ function AppContent() {
         <Routes>
           <Route path="/pending" element={<PendingApprovalPage />} />
           <Route path="/invite/:token" element={<InviteAcceptancePage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/auth/:pathname" element={<PendingAuthRedirectRoute />} />
           <Route path="*" element={<Navigate to="/pending" replace />} />
         </Routes>
@@ -501,6 +537,7 @@ function AppContent() {
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/disabled" element={<DisabledAccessPage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/auth/:pathname" element={<DisabledAuthRedirectRoute />} />
           <Route path="*" element={<Navigate to="/disabled" replace />} />
         </Routes>
@@ -622,6 +659,7 @@ function AppContent() {
                     <Route path="/disabled" element={<Navigate to="/" replace />} />
                     <Route path="/login" element={<Navigate to={authEnabled ? '/auth/sign-in' : '/'} replace />} />
                     <Route path="/invite/:token" element={<InviteAcceptancePage />} />
+                    <Route path="/contact" element={<ContactPage />} />
                     <Route path="/" element={<HomePage />} />
                 <Route path="/access" element={<AccessPage />} />
                 <Route path="/family-links" element={<FamilyLinksPage />} />

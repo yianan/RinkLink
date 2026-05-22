@@ -4,11 +4,14 @@ import {
 } from '@daveyplate/better-auth-ui';
 import { useContext, useEffect, useMemo, useState, type FormEvent } from 'react';
 
+import { api } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/cn';
 import { Alert } from '../ui/Alert';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
+import { Modal } from '../ui/Modal';
 
 type CardClassNames = {
   base?: string;
@@ -62,6 +65,7 @@ export default function AccountSettingsCards({
     mutators: { updateUser },
     toast,
   } = useContext(AuthUIContext);
+  const { clearProfile, me } = useAuth();
 
   const mergedLocalization = useMemo(
     () => ({ ...contextLocalization, ...localization }),
@@ -74,7 +78,12 @@ export default function AccountSettingsCards({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
   const [resending, setResending] = useState(false);
+  const [closeDialogOpen, setCloseDialogOpen] = useState(false);
+  const [closeConfirmText, setCloseConfirmText] = useState('');
+  const [closeReason, setCloseReason] = useState('');
+  const [closing, setClosing] = useState(false);
   const user = sessionData?.user;
+  const canCloseAccount = !!me && !me.user.is_platform_admin;
 
   useEffect(() => {
     setName(user?.name ?? '');
@@ -151,6 +160,28 @@ export default function AccountSettingsCards({
       }));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const closeAccount = async () => {
+    if (closeConfirmText.trim().toUpperCase() !== 'CLOSE') {
+      toast({
+        variant: 'error',
+        message: 'Type CLOSE to confirm.',
+      });
+      return;
+    }
+    setClosing(true);
+    try {
+      await api.closeAccount(closeReason.trim() || null);
+      clearProfile();
+      window.location.assign('/auth/sign-in');
+    } catch (error) {
+      toast({
+        variant: 'error',
+        message: extractErrorMessage(error, 'Unable to close account.'),
+      });
+      setClosing(false);
     }
   };
 
@@ -262,6 +293,96 @@ export default function AccountSettingsCards({
           </div>
         </Card>
       ) : null}
+
+      {canCloseAccount ? (
+        <Card className={cn('rinklink-settings-card w-full pb-0 text-start', classNames?.card?.base)}>
+          <div className={cn('rinklink-settings-header', classNames?.card?.header)}>
+            <h2 className={cn('rinklink-settings-title', classNames?.card?.title)}>Close account</h2>
+            <p className={cn('rinklink-settings-description', classNames?.card?.description)}>
+              Close your RinkLink account and remove your current access. RinkLink keeps audit history for admins.
+            </p>
+          </div>
+          <div className={cn('rinklink-settings-footer', classNames?.card?.footer)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              className={cn('rinklink-settings-button rinklink-settings-button-destructive', classNames?.card?.button)}
+              onClick={() => setCloseDialogOpen(true)}
+            >
+              Close account
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
+      <Modal
+        open={closeDialogOpen}
+        title="Close account?"
+        description="This disables sign-in and removes your current RinkLink access."
+        onClose={() => {
+          if (closing) return;
+          setCloseDialogOpen(false);
+          setCloseConfirmText('');
+          setCloseReason('');
+        }}
+        footer={(
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setCloseDialogOpen(false);
+                setCloseConfirmText('');
+                setCloseReason('');
+              }}
+              disabled={closing}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void closeAccount()}
+              disabled={closing || closeConfirmText.trim().toUpperCase() !== 'CLOSE'}
+            >
+              {closing ? 'Closing…' : 'Close account'}
+            </Button>
+          </>
+        )}
+      >
+        <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
+          <Alert variant="warning">
+            You will be signed out. Your team, player, association, and arena access will be removed. RinkLink will keep audit history and past records.
+          </Alert>
+          <div className="grid gap-2">
+            <label className={cn('rinklink-settings-label', classNames?.card?.label)} htmlFor="close-account-reason">
+              Note (optional)
+            </label>
+            <Input
+              id="close-account-reason"
+              className={cn('rinklink-settings-input', classNames?.card?.input)}
+              value={closeReason}
+              onChange={(event) => setCloseReason(event.target.value)}
+              placeholder="Optional"
+              disabled={closing}
+            />
+          </div>
+          <div className="grid gap-2">
+            <label className={cn('rinklink-settings-label', classNames?.card?.label)} htmlFor="close-account-confirm">
+              Type CLOSE to confirm
+            </label>
+            <Input
+              id="close-account-confirm"
+              className={cn('rinklink-settings-input', classNames?.card?.input)}
+              value={closeConfirmText}
+              onChange={(event) => setCloseConfirmText(event.target.value)}
+              autoComplete="off"
+              disabled={closing}
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
