@@ -414,7 +414,7 @@ export interface Proposal {
   revision_number: number;
   home_availability_window_id: string;
   away_availability_window_id: string;
-  event_type: 'league' | 'tournament' | 'practice' | 'showcase' | 'scrimmage' | 'exhibition';
+  event_type: 'league' | 'practice' | 'showcase' | 'scrimmage' | 'exhibition';
   proposed_date: string;
   proposed_start_time: string | null;
   proposed_end_time: string | null;
@@ -454,7 +454,7 @@ export interface IceBookingRequest {
   requester_team_id: string;
   away_team_id: string | null;
   season_id: string | null;
-  event_type: 'league' | 'tournament' | 'practice' | 'showcase' | 'scrimmage' | 'exhibition';
+  event_type: 'league' | 'practice' | 'showcase' | 'scrimmage' | 'exhibition';
   status: 'requested' | 'accepted' | 'rejected' | 'cancelled';
   arena_id: string;
   arena_rink_id: string;
@@ -540,7 +540,7 @@ export interface AutoMatchResult {
 
 export interface Event {
   id: string;
-  event_type: 'league' | 'tournament' | 'practice' | 'showcase' | 'scrimmage' | 'exhibition';
+  event_type: 'league' | 'practice' | 'showcase' | 'scrimmage' | 'exhibition';
   status: string;
   home_team_id: string;
   away_team_id: string | null;

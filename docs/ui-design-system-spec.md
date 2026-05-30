@@ -72,9 +72,8 @@ Status colors:
 Competition-specific color coding extends this logic:
 
 - `League` → sky
-- `State Tournament` → amber
 - `District` → orange
-- `Showcase` / `Tournament` → emerald
+- `Showcase` → emerald
 - `Festival` → violet
 - `Non-League` / `Scrimmage` → neutral
 

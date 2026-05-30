@@ -375,7 +375,6 @@ def seed_demo_data(
     request_accepted_date = anchor_date + timedelta(days=8)
     request_pending_opponent_date = anchor_date + timedelta(days=9)
     request_practice_accepted_date = anchor_date + timedelta(days=11)
-    request_cancelled_date = anchor_date + timedelta(days=12)
     live_game_date = today
     completed_game_date = anchor_date - timedelta(days=14)
     completed_aa_game_date = anchor_date - timedelta(days=10)
@@ -424,7 +423,6 @@ def seed_demo_data(
         "edge_request_accepted": ("Edge Ice Center", "Rink B", request_accepted_date, time(17, 15), time(18, 30), "call_for_pricing", None),
         "fox_request_pending": ("Fox Valley Ice House", "Rink A", request_pending_opponent_date, time(18, 0), time(19, 15), "fixed_price", 51500),
         "centennial_request_practice_accepted": ("Centennial Ice Arena", "Rink A", request_practice_accepted_date, time(20, 15), time(21, 30), "fixed_price", 43500),
-        "fox_request_cancelled": ("Fox Valley Ice House", "Rink B", request_cancelled_date, time(19, 15), time(20, 30), "fixed_price", 56000),
     }
     for arena_index, arena in enumerate(arenas):
         slot_specs[f"demo_open_{arena_index}_prime"] = (
@@ -473,11 +471,9 @@ def seed_demo_data(
 
     league_id = _id()
     showcase_id = _id()
-    tournament_id = _id()
     competitions = [
         Competition(id=league_id, name="Central States Development Hockey League", short_name="CSDHL", governing_body="AHAI", competition_type="league", region="Illinois", website="https://csdhl.example.com"),
         Competition(id=showcase_id, name="CCM Windy City Showcase", short_name="CCM Showcase", governing_body="Independent", competition_type="showcase", region="Chicago"),
-        Competition(id=tournament_id, name="AHAI Invitational Tournament", short_name="AHAI Invite", governing_body="AHAI", competition_type="tournament", region="Illinois"),
     ]
     db.add_all(competitions)
     db.flush()
@@ -486,7 +482,6 @@ def seed_demo_data(
         CompetitionDivision(id=_id(), competition_id=league_id, season_id=season_id, name="14U AA", age_group="14U", level="AA", standings_enabled=True, sort_order=10),
         CompetitionDivision(id=_id(), competition_id=league_id, season_id=season_id, name="12U A", age_group="12U", level="A", standings_enabled=True, sort_order=20),
         CompetitionDivision(id=_id(), competition_id=showcase_id, season_id=season_id, name="14U Invite", age_group="14U", level="AA", standings_enabled=False, sort_order=30),
-        CompetitionDivision(id=_id(), competition_id=tournament_id, season_id=season_id, name="12U Qualifier", age_group="12U", level="A", standings_enabled=False, sort_order=40),
     ]
     db.add_all(divisions)
     db.flush()
@@ -494,7 +489,6 @@ def seed_demo_data(
     memberships: list[TeamCompetitionMembership] = []
     for team_index, team in enumerate(teams):
         primary_division = divisions[0] if team.age_group == "14U" else divisions[1]
-        secondary_division = divisions[2] if team.age_group == "14U" else divisions[3]
         memberships.append(
             TeamCompetitionMembership(
                 team_id=team.id,
@@ -505,13 +499,13 @@ def seed_demo_data(
                 sort_order=10 + team_index,
             )
         )
-        if team_index % 3 != 2:
+        if team.age_group == "14U" and team_index % 3 != 2:
             memberships.append(
                 TeamCompetitionMembership(
                     team_id=team.id,
                     season_id=season_id,
-                    competition_division_id=secondary_division.id,
-                    membership_role="showcase" if team.age_group == "14U" else "tournament",
+                    competition_division_id=divisions[2].id,
+                    membership_role="showcase",
                     is_primary=False,
                     sort_order=30 + team_index,
                 )
@@ -859,7 +853,6 @@ def seed_demo_data(
         (12, 16, request_accepted_date + timedelta(days=4), arenas[6], "Rink A", "showcase"),
         (7, 11, request_accepted_date + timedelta(days=2), arenas[5], "Rink B", "league"),
         (9, 15, request_accepted_date + timedelta(days=3), arenas[7], "Rink A", "league"),
-        (13, 17, request_accepted_date + timedelta(days=4), arenas[8], "Rink B", "tournament"),
         (14, None, request_practice_accepted_date + timedelta(days=2), arenas[7], "Rink B", "practice"),
         (16, None, request_practice_accepted_date + timedelta(days=3), arenas[8], "Rink A", "practice"),
     ]
@@ -934,34 +927,12 @@ def seed_demo_data(
     db.add(accepted_practice_request_event)
     db.flush()
 
-    cancelled_request_event = Event(
-        id=_id(),
-        event_type="tournament",
-        status="cancelled",
-        home_team_id=teams[2].id,
-        away_team_id=teams[0].id,
-        season_id=season_id,
-        competition_division_id=divisions[2].id,
-        arena_id=arenas[2].id,
-        arena_rink_id=arena_rink_by_key[("Fox Valley Ice House", "Rink B")].id,
-        ice_slot_id=slot_by_key["fox_request_cancelled"].id,
-        home_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Home")].id,
-        away_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Away")].id,
-        date=request_cancelled_date,
-        start_time=time(19, 15),
-        end_time=time(20, 30),
-        notes="Cancelled after bracket change.",
-    )
-    db.add(cancelled_request_event)
-    db.flush()
-
     supplemental_booking_events: list[Event] = []
     supplemental_accepted_booking_specs = [
         (6, 8, "demo_practice_3_late", "league", divisions[0].id),
         (10, 12, "demo_practice_5_late", "showcase", divisions[2].id),
         (7, None, "demo_practice_4_late", "practice", None),
         (13, 15, "demo_practice_7_late", "league", divisions[1].id),
-        (14, 16, "demo_practice_8_late", "tournament", divisions[2].id),
         (17, None, "demo_practice_2_late", "practice", None),
     ]
     for home_index, away_index, slot_key, event_type, division_id in supplemental_accepted_booking_specs:
@@ -1131,27 +1102,6 @@ def seed_demo_data(
             message="Looking for an extra late practice.",
             response_message="Accepted. Practice Rink A is assigned.",
         ),
-        IceBookingRequest(
-            id=_id(),
-            requester_team_id=teams[2].id,
-            away_team_id=teams[0].id,
-            season_id=season_id,
-            event_type="tournament",
-            status="cancelled",
-            arena_id=arenas[2].id,
-            arena_rink_id=arena_rink_by_key[("Fox Valley Ice House", "Rink B")].id,
-            ice_slot_id=slot_by_key["fox_request_cancelled"].id,
-            event_id=cancelled_request_event.id,
-            pricing_mode=slot_by_key["fox_request_cancelled"].pricing_mode,
-            price_amount_cents=slot_by_key["fox_request_cancelled"].price_amount_cents,
-            currency=slot_by_key["fox_request_cancelled"].currency,
-            final_price_amount_cents=56000,
-            final_currency="USD",
-            home_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Home")].id,
-            away_locker_room_id=locker_room_by_key[("Fox Valley Ice House", "Rink B", "Away")].id,
-            message="Tournament overflow game request.",
-            response_message="Cancelled after the event was moved to another sheet.",
-        ),
     ]
     for accepted_event, (home_index, away_index, slot_key, event_type, _division_id) in zip(
         supplemental_booking_events,
@@ -1191,7 +1141,6 @@ def seed_demo_data(
         (12, 14, "demo_request_1_game", "showcase"),
         (16, None, "demo_request_2_game", "practice"),
         (6, 12, "demo_request_6_game", "league"),
-        (10, 14, "demo_request_8_game", "tournament"),
         (7, 13, "demo_open_3_prime", "league"),
         (9, None, "demo_open_4_prime", "practice"),
         (15, 17, "demo_open_5_prime", "league"),
@@ -1265,8 +1214,6 @@ def seed_demo_data(
     slot_by_key["fox_request_pending"].booked_by_team_id = teams[1].id
     slot_by_key["centennial_request_practice_accepted"].status = "booked"
     slot_by_key["centennial_request_practice_accepted"].booked_by_team_id = teams[5].id
-    slot_by_key["fox_request_cancelled"].status = "available"
-    slot_by_key["fox_request_cancelled"].booked_by_team_id = None
     for _home_index, _away_index, slot_key, _division_id, _message in supplemental_proposal_specs:
         slot_by_key[slot_key].status = "held"
         slot_by_key[slot_key].booked_by_team_id = teams[_home_index].id
@@ -1289,7 +1236,6 @@ def seed_demo_data(
         *events,
         accepted_request_event,
         accepted_practice_request_event,
-        cancelled_request_event,
         *supplemental_booking_events,
     ]
     _assert_seed_event_links(db, seeded_events)
@@ -1440,18 +1386,6 @@ def seed_demo_data(
             notif_type="locker_room_update",
             title="Locker rooms assigned",
             message=f"{teams[5].name} Practice\n{request_practice_accepted_date.isoformat()} 20:15\n{arenas[0].name} • Rink A\nHome: Practice Rink A\nNote: Accepted. Practice Rink A is assigned.",
-        ),
-        Notification(
-            team_id=teams[2].id,
-            notif_type="locker_room_update",
-            title="Locker rooms updated",
-            message=f"{teams[2].name} vs {teams[0].name}\n{request_cancelled_date.isoformat()} 19:15\n{arenas[2].name} • Rink B\nHome: Home Rink B | Away: Away Rink B\nNote: Cancelled after the event was moved to another sheet.",
-        ),
-        Notification(
-            team_id=teams[0].id,
-            notif_type="locker_room_update",
-            title="Locker rooms updated",
-            message=f"{teams[2].name} vs {teams[0].name}\n{request_cancelled_date.isoformat()} 19:15\n{arenas[2].name} • Rink B\nHome: Home Rink B | Away: Away Rink B\nNote: Cancelled after the event was moved to another sheet.",
         ),
     ]
     for accepted_event, (home_index, away_index, _slot_key, _event_type, _division_id) in zip(

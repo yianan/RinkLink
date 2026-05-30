@@ -508,7 +508,7 @@ export default function ProposalsPage() {
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Event Type</label>
             <Select value={rescheduleForm.event_type} onChange={(event) => setRescheduleForm((current) => ({ ...current, event_type: event.target.value as Proposal['event_type'] }))}>
-              {(['league', 'tournament', 'practice', 'showcase', 'scrimmage', 'exhibition'] as Proposal['event_type'][]).map((eventType) => (
+              {(['league', 'practice', 'showcase', 'scrimmage', 'exhibition'] as Proposal['event_type'][]).map((eventType) => (
                 <option key={eventType} value={eventType}>{getCompetitionLabel(eventType)}</option>
               ))}
             </Select>

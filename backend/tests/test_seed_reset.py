@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.models import AppUser, Arena, Association, Proposal, Team, TeamCompetitionMembership
+from app.models import AppUser, Arena, Association, Competition, Event, IceBookingRequest, Proposal, Team, TeamCompetitionMembership
 from app.seed.pinned_admins import pinned_platform_admin_emails, repair_pinned_platform_admins
 from app.seed.seed_data import PreservedAppUser, seed_demo_data
 from app.services.schedule_conflicts import find_event_conflicts
@@ -109,5 +109,8 @@ def test_seed_demo_data_restores_preserved_platform_admin(db) -> None:
         else:
             assert conflicts == [], proposal.message
     assert intentional_conflict_count == 1
+    assert db.query(Competition).filter(Competition.competition_type.in_(("tournament", "state_tournament"))).count() == 0
+    assert db.query(Event).filter(Event.event_type.in_(("tournament", "state_tournament"))).count() == 0
+    assert db.query(IceBookingRequest).filter(IceBookingRequest.event_type.in_(("tournament", "state_tournament"))).count() == 0
     assert db.query(TeamCompetitionMembership.team_id).distinct().count() == db.query(Team).count()
     assert result["preserved_users"] == 1

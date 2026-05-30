@@ -11,11 +11,10 @@ from .team_logos import effective_team_logo_url
 
 COMPETITION_ORDER = {
     "league": 0,
-    "tournament": 1,
-    "showcase": 2,
-    "scrimmage": 3,
-    "exhibition": 4,
-    "practice": 5,
+    "showcase": 1,
+    "scrimmage": 2,
+    "exhibition": 3,
+    "practice": 4,
 }
 
 
@@ -247,7 +246,7 @@ def normalize_event_competition(event: Event, db: Session) -> None:
         event.counts_for_standings = False
         return
     competition_type = event.event_type
-    if competition_type not in {"league", "showcase", "tournament"}:
+    if competition_type not in {"league", "showcase"}:
         event.competition_division_id = None
         event.counts_for_standings = False
         return

@@ -16,6 +16,7 @@ from ..models import Arena, ArenaRink, AvailabilityWindow, Event, IceSlot, Locke
 from ..schemas import ProposalCreate, ProposalOut, ProposalRescheduleCreate
 from ..services.competitions import normalize_event_competition
 from ..services.event_view import enrich_event
+from ..services.event_types import validate_event_type
 from ..services.season_utils import resolve_season_id
 from ..services.arena_logos import arena_logo_url
 from ..services.proposal_lifecycle import book_slot, cancel_proposal_record, hold_slot, release_slot
@@ -131,6 +132,7 @@ def create_proposal(
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
+    validate_event_type(body.event_type)
     if body.proposed_by_team_id not in {body.home_team_id, body.away_team_id}:
         raise HTTPException(400, "Proposing team must be part of the proposal")
     proposing_team = db.get(Team, body.proposed_by_team_id)
@@ -190,6 +192,7 @@ def request_reschedule(
     context: AuthorizationContext = Depends(authorization_context),
     db: Session = Depends(get_db),
 ):
+    validate_event_type(body.event_type)
     base = db.get(Proposal, proposal_id)
     if not base:
         raise HTTPException(404, "Proposal not found")

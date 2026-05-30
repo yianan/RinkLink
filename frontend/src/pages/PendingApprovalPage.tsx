@@ -207,7 +207,7 @@ export default function PendingApprovalPage() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, loading, me?.user.status, refreshProfile, signupRequestStatus]);
+  }, [isAuthenticated, loading, me?.user.email, me?.user.status, refreshProfile, signupRequestStatus]);
 
   useEffect(() => {
     if (!isAuthenticated || me?.user.status === 'active') return;

@@ -24,7 +24,7 @@ import { cn } from '../lib/cn';
 import { canManageProposals } from '../lib/permissions';
 import { filterButtonClass } from '../lib/uiClasses';
 
-const EVENT_TYPES: Proposal['event_type'][] = ['league', 'tournament', 'practice', 'showcase', 'scrimmage', 'exhibition'];
+const EVENT_TYPES: Proposal['event_type'][] = ['league', 'practice', 'showcase', 'scrimmage', 'exhibition'];
 const LEVELS_10U_PLUS = ['AAA', 'AA', 'A', 'B', 'C', 'Rec'];
 const LEVELS_6U_8U = ['Beginner', 'Beginner/Intermediate', 'Intermediate', 'Intermediate/Advanced', 'Advanced'];
 

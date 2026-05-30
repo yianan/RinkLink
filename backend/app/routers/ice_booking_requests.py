@@ -11,6 +11,7 @@ from ..models import Arena, ArenaRink, Association, Event, IceBookingRequest, Ic
 from ..schemas import IceBookingRequestAccept, IceBookingRequestAction, IceBookingRequestCreate, IceBookingRequestOut
 from ..services.arena_logos import arena_logo_url
 from ..services.competitions import normalize_event_competition
+from ..services.event_types import validate_event_type
 from ..services.locker_rooms import assign_locker_rooms, notify_locker_room_update
 from ..services.records import is_recordable_event, recompute_team_records
 from ..services.team_logos import effective_team_logo_url
@@ -91,6 +92,7 @@ def _compose_arena_note(
 
 
 def _validate_request_event_type(event_type: str, away_team_id: str | None) -> None:
+    validate_event_type(event_type)
     if event_type in {"practice", "scrimmage"}:
         return
     if not away_team_id:

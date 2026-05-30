@@ -33,6 +33,7 @@ from ..services.attendance import (
 )
 from ..services.competitions import normalize_event_competition
 from ..services.event_view import enrich_event, enrich_events, event_enrichment_options
+from ..services.event_types import validate_event_type
 from ..services.locker_rooms import assign_locker_rooms, event_has_started, notify_locker_room_update
 from ..services.records import is_recordable_event, recompute_team_records
 from ..services.schedule_conflicts import assert_no_event_conflicts
@@ -62,6 +63,7 @@ def _compose_booking_response_message(
 
 
 def _validate_event_links(db: Session, event: Event) -> None:
+    validate_event_type(event.event_type)
     arena = db.get(Arena, event.arena_id)
     if not arena:
         raise HTTPException(404, "Arena not found")

@@ -25,7 +25,7 @@ import { accentActionClass, interactiveTitleClass, listRowButtonClass, selectabl
 import { formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time';
 import { useToast } from '../context/ToastContext';
 
-const EVENT_TYPES: Event['event_type'][] = ['league', 'tournament', 'practice', 'showcase', 'scrimmage', 'exhibition'];
+const EVENT_TYPES: Event['event_type'][] = ['league', 'practice', 'showcase', 'scrimmage', 'exhibition'];
 const LIST_LIMIT = 100;
 
 function formatPriceLabel(pricingMode: string, priceAmountCents: number | null, currency = 'USD') {

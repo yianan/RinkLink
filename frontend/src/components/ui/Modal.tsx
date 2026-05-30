@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/cn';
@@ -25,7 +25,6 @@ export function Modal({
   footer,
   className,
 }: ModalProps) {
-  const descriptionId = useId();
   const contentRef = useRef<HTMLDivElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
 
@@ -40,7 +39,6 @@ export function Modal({
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--app-overlay)] backdrop-blur-[2px]" />
         <Dialog.Content
           ref={contentRef}
-          aria-describedby={descriptionId}
           onOpenAutoFocus={(event) => {
             event.preventDefault();
             const firstFocusable = contentRef.current?.querySelector<HTMLElement>(
@@ -62,7 +60,7 @@ export function Modal({
               <Dialog.Title className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 {title}
               </Dialog.Title>
-              <Dialog.Description id={descriptionId} className={description ? 'mt-1 text-sm text-slate-600 dark:text-slate-400' : 'sr-only'}>
+              <Dialog.Description className={description ? 'mt-1 text-sm text-slate-600 dark:text-slate-400' : 'sr-only'}>
                 {description || title}
               </Dialog.Description>
             </div>

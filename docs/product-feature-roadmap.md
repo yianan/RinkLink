@@ -184,19 +184,6 @@ These are valuable, but should follow stronger core workflows.
 - **Effort**: Large
 - **Dependencies**: stronger rink and slot workflow rules
 
-#### 12. Tournament and Trip Mode
-
-- **What**: support multi-game weekends and travel-heavy events
-- **Why**: tournaments are operationally different from single-game scheduling
-- **User value**: improves planning for destination events
-- **Scope**:
-  - grouped games
-  - travel notes
-  - lodging and restaurant references
-  - weekend packet view
-- **Effort**: Medium to Large
-- **Dependencies**: games and calendar workflows
-
 ## External Integrations
 
 These should be approached conservatively.
@@ -293,10 +280,9 @@ If the goal is maximum product value with reasonable implementation risk, build 
 9. Printable and PDF outputs
 10. Association admin view
 11. Ice marketplace / slot exchange
-12. Tournament and trip mode
-13. USA Hockey import
-14. Frontend code splitting
-15. MYHockey import
+12. USA Hockey import
+13. Frontend code splitting
+14. MYHockey import
 
 ## Features to Delay Intentionally
 

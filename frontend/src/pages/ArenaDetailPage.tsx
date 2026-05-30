@@ -276,7 +276,6 @@ export default function ArenaDetailPage() {
       : rinks[0]?.id || '';
     initialRinkSyncDone.current = true;
     if (preferredRinkId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedRinkId(preferredRinkId);
     }
   }, [arenaRinkId, rinks]);
@@ -291,7 +290,6 @@ export default function ArenaDetailPage() {
 
   useEffect(() => {
     if (!selectedRinkId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLockerRooms([]);
       setIceSlots([]);
       setSlotUploadOpen(false);
@@ -333,7 +331,6 @@ export default function ArenaDetailPage() {
 
   useEffect(() => {
     if (!acceptRequest) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAcceptLockerRooms([]);
       return;
     }
@@ -347,7 +344,6 @@ export default function ArenaDetailPage() {
 
   useEffect(() => {
     if (!bookedSlotTarget) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditLockerRooms([]);
       setLockerAssignForm(emptyLockerAssignForm);
       return;
@@ -362,14 +358,12 @@ export default function ArenaDetailPage() {
 
   useEffect(() => {
     if (!actionRequest || !actionMode) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActionForm(emptyActionForm);
     }
   }, [actionMode, actionRequest]);
 
   useEffect(() => {
     if (!cancelSlotTarget) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCancelSlotForm(emptyActionForm);
     }
   }, [cancelSlotTarget]);
@@ -377,7 +371,6 @@ export default function ArenaDetailPage() {
   useEffect(() => {
     if (requestTab === 'active' && upcomingItems.length === 0) {
       if (pendingRequests.length > 0) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setRequestTab('pending');
       } else if (historyRequests.length > 0) {
         setRequestTab('history');
