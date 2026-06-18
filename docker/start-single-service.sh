@@ -57,11 +57,6 @@ if [ "${RESEED_DEMO_ON_START:-false}" = "true" ]; then
   fi
 fi
 
-if [ "${DUMP_DEMO_DATA_ON_START:-false}" = "true" ]; then
-  echo "Dumping demo data snapshot for ${DUMP_DEMO_DATA_SEASON:-2025-2026}"
-  python -m app.seed.demo_data_snapshot --season-name "${DUMP_DEMO_DATA_SEASON:-2025-2026}" --format log-chunks
-fi
-
 uvicorn app.main:app --host 0.0.0.0 --port "$APP_PORT" &
 API_PID=$!
 
