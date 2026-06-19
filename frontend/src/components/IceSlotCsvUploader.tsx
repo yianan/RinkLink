@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Check, Loader2, UploadCloud, X } from 'lucide-react';
+import { Check, Download, Loader2, UploadCloud, X } from 'lucide-react';
 import { api } from '../api/client';
 import { IceSlotUploadPreview } from '../types';
 import { cn } from '../lib/cn';
@@ -11,6 +11,24 @@ import { Card } from './ui/Card';
 interface Props {
   arenaRinkId: string;
   onConfirmed: () => void;
+}
+
+const DATE_FORMAT_HELP = 'Dates: YYYY-MM-DD, MM/DD/YYYY, MM/DD/YY, MM-DD-YYYY, or MM-DD-YY.';
+const TIME_FORMAT_HELP = 'Times: HH:MM, H:MM AM/PM, or HH:MM:SS.';
+const ICE_SLOT_TEMPLATE = [
+  'Date,Start Time,End Time,Pricing Mode,Price,Currency,Notes',
+  '2026-09-12,18:30,19:45,fixed_price,325,USD,Prime evening slot',
+  '09/19/2026,7:00 PM,8:15 PM,call_for_pricing,,USD,Call rink office',
+].join('\n');
+
+function downloadCsvTemplate(filename: string, content: string) {
+  const blob = new Blob([`${content}\n`], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function formatPriceLabel(pricingMode: string, priceAmountCents: number | null, currency = 'USD') {
@@ -90,12 +108,23 @@ export default function IceSlotCsvUploader({ arenaRinkId, onConfirmed }: Props) 
                 <UploadCloud className="h-6 w-6" />
               </div>
               <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Drag & drop a CSV file here</div>
-              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Expected columns: Date, Start Time, End Time, optional Pricing Mode, Price, Currency, Notes</div>
+              <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">or choose a file to preview before importing</div>
 
-              <div className="mt-5 flex items-center justify-center">
-              <Button type="button" variant="outline" onClick={() => document.getElementById('ice-slot-csv-input')?.click()}>
+              <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                Expected columns: Date, Start Time, End Time, optional Pricing Mode, Price, Currency, Notes
+              </div>
+              <div className="mx-auto mt-2 max-w-2xl text-xs leading-5 text-slate-500 dark:text-slate-400">
+                {DATE_FORMAT_HELP} {TIME_FORMAT_HELP}
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                <Button type="button" variant="primary" onClick={() => document.getElementById('ice-slot-csv-input')?.click()}>
                   <UploadCloud className="h-4 w-4" />
-                  Browse Files
+                  Choose CSV
+                </Button>
+                <Button type="button" variant="outline" onClick={() => downloadCsvTemplate('ice-slot-template.csv', ICE_SLOT_TEMPLATE)}>
+                  <Download className="h-4 w-4" />
+                  Template
                 </Button>
                 <input
                   id="ice-slot-csv-input"
@@ -116,7 +145,8 @@ export default function IceSlotCsvUploader({ arenaRinkId, onConfirmed }: Props) 
       {preview && (
         <div className="space-y-3">
           {preview.warnings.length > 0 && (
-            <Alert variant="warning">
+            <Alert variant="warning" title="Fix CSV warnings before importing">
+              <div>Rows with warnings were skipped. Correct the CSV and upload it again before confirming.</div>
               <ul className="list-disc space-y-1 pl-5">
                 {preview.warnings.map((w, i) => (
                   <li key={i}>{w}</li>
@@ -176,7 +206,7 @@ export default function IceSlotCsvUploader({ arenaRinkId, onConfirmed }: Props) 
           </Card>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="primary" onClick={handleConfirm} disabled={loading || preview.entries.length === 0}>
+            <Button type="button" variant="primary" onClick={handleConfirm} disabled={loading || preview.entries.length === 0 || preview.warnings.length > 0}>
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -185,7 +215,7 @@ export default function IceSlotCsvUploader({ arenaRinkId, onConfirmed }: Props) 
               ) : (
                 <>
                   <Check className="h-4 w-4" />
-                  Confirm & Add {preview.entries.length} Slot(s)
+                  Confirm Import
                 </>
               )}
             </Button>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { PlusCircle } from 'lucide-react';
 
 import { api } from '../api/client';
+import AgeLevelSelect from '../components/AgeLevelSelect';
 import PageHeader from '../components/PageHeader';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -245,13 +246,13 @@ export default function AddAccessPage() {
                   <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Team name</label>
                   <Input value={teamName} onChange={(event) => setTeamName(event.target.value)} placeholder="Example: RinkLink 12U Blue" />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Age group</label>
-                  <Input value={ageGroup} onChange={(event) => setAgeGroup(event.target.value)} placeholder="Example: 12U" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Level</label>
-                  <Input value={level} onChange={(event) => setLevel(event.target.value)} placeholder="Example: AA" />
+                <div className="md:col-span-2">
+                  <AgeLevelSelect
+                    ageGroup={ageGroup}
+                    level={level}
+                    onAgeGroupChange={setAgeGroup}
+                    onLevelChange={setLevel}
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Location</label>

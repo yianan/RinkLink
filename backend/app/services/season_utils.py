@@ -8,10 +8,15 @@ from ..models.season import Season
 
 SEASON_START_MONTH = 8
 PRECREATE_NEXT_SEASON_MONTH = 7
+ACTIVE_SEASON_PLANNING_MONTH = 6
 
 
 def season_start_year_for_date(target_date: date) -> int:
     return target_date.year if target_date.month >= SEASON_START_MONTH else target_date.year - 1
+
+
+def active_season_start_year_for_date(target_date: date) -> int:
+    return target_date.year if target_date.month >= ACTIVE_SEASON_PLANNING_MONTH else target_date.year - 1
 
 
 def canonical_season_bounds(start_year: int) -> tuple[date, date]:
@@ -32,10 +37,10 @@ def ensure_standard_seasons(
     today: date | None = None,
 ) -> list[Season]:
     current_date = today or date.today()
-    current_start_year = season_start_year_for_date(current_date)
-    required_start_years = {current_start_year}
+    active_start_year = active_season_start_year_for_date(current_date)
+    required_start_years = {active_start_year, active_start_year - 1}
     if current_date.month == PRECREATE_NEXT_SEASON_MONTH:
-        required_start_years.add(current_start_year + 1)
+        required_start_years.add(active_start_year + 1)
 
     seasons = db.query(Season).order_by(Season.start_date.desc(), Season.created_at.desc()).all()
 
@@ -49,7 +54,7 @@ def ensure_standard_seasons(
     for start_year, season in seasons_by_start_year.items():
         expected_start, expected_end = canonical_season_bounds(start_year)
         expected_name = canonical_season_name(start_year)
-        expected_active = start_year == current_start_year
+        expected_active = start_year == active_start_year
 
         if season.name != expected_name:
             season.name = expected_name
@@ -73,7 +78,7 @@ def ensure_standard_seasons(
             name=canonical_season_name(start_year),
             start_date=start_date,
             end_date=end_date,
-            is_active=start_year == current_start_year,
+            is_active=start_year == active_start_year,
         )
         db.add(season)
         seasons_by_start_year[start_year] = season

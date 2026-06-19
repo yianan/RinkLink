@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Check, UploadCloud, X } from 'lucide-react';
+import { Check, Download, UploadCloud, X } from 'lucide-react';
 import { api } from '../api/client';
 import { PlayerUploadPreview } from '../types';
 import { cn } from '../lib/cn';
@@ -23,6 +23,22 @@ export default function RosterCsvUploader({
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [replaceExisting, setReplaceExisting] = useState(true);
+
+  const rosterTemplate = [
+    'First Name,Last Name,Jersey,Position',
+    'Avery,Smith,12,F',
+    'Jordan,Lee,30,G',
+  ].join('\n');
+
+  const downloadTemplate = () => {
+    const blob = new Blob([`${rosterTemplate}\n`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'roster-template.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleFile = useCallback(async (file: File) => {
     setError('');
@@ -81,7 +97,11 @@ export default function RosterCsvUploader({
           <div className="mt-5 flex items-center justify-center gap-2">
             <Button type="button" variant="primary" disabled={loading} onClick={() => document.getElementById('roster-csv-input')?.click()}>
               <UploadCloud className="h-4 w-4" />
-              Choose File
+              Choose CSV
+            </Button>
+            <Button type="button" variant="outline" disabled={loading} onClick={downloadTemplate}>
+              <Download className="h-4 w-4" />
+              Template
             </Button>
             <input
               id="roster-csv-input"
@@ -126,9 +146,16 @@ export default function RosterCsvUploader({
             </label>
           </div>
 
-          {preview.warnings.map((w, i) => (
-            <Alert key={i} variant="warning">{w}</Alert>
-          ))}
+          {preview.warnings.length > 0 ? (
+            <Alert variant="warning" title="Fix CSV warnings before importing">
+              <div>Rows with warnings were skipped. Correct the CSV and upload it again before confirming.</div>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {preview.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </Alert>
+          ) : null}
 
           <Card className="overflow-hidden">
             <div className="max-h-[420px] overflow-x-auto">
@@ -156,7 +183,7 @@ export default function RosterCsvUploader({
           </Card>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="primary" onClick={handleConfirm} disabled={loading || preview.entries.length === 0}>
+            <Button type="button" variant="primary" onClick={handleConfirm} disabled={loading || preview.entries.length === 0 || preview.warnings.length > 0}>
               <Check className="h-4 w-4" />
               Confirm Import
             </Button>

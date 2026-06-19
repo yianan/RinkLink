@@ -5,6 +5,9 @@ from datetime import date, time
 
 from ..schemas.arena import IceSlotUploadRow, IceSlotUploadPreview
 
+DATE_FORMAT_HELP = "Use YYYY-MM-DD, MM/DD/YYYY, MM/DD/YY, MM-DD-YYYY, or MM-DD-YY"
+TIME_FORMAT_HELP = "Use HH:MM, H:MM AM/PM, or HH:MM:SS"
+
 HEADER_MAP = {
     "date": "date",
     "game date": "date",
@@ -31,15 +34,19 @@ def _normalize_header(h: str) -> str:
 
 def _parse_date(val: str) -> date:
     val = val.strip()
+    if not val:
+        raise ValueError(f"Date is required. {DATE_FORMAT_HELP}")
     for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y", "%m-%d-%y"):
         try:
             if fmt == "%Y-%m-%d":
+                if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", val):
+                    raise ValueError
                 return date.fromisoformat(val)
             from datetime import datetime as dt
             return dt.strptime(val, fmt).date()
         except ValueError:
             continue
-    raise ValueError(f"Unrecognized date format: {val}")
+    raise ValueError(f"Unrecognized date format: {val}. {DATE_FORMAT_HELP}")
 
 
 def _parse_time(val: str) -> time | None:
@@ -52,7 +59,7 @@ def _parse_time(val: str) -> time | None:
             return dt.strptime(val, fmt).time()
         except ValueError:
             continue
-    return None
+    raise ValueError(f"Unrecognized time format: {val}. {TIME_FORMAT_HELP}")
 
 
 def _parse_price_cents(val: str) -> int | None:

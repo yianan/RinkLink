@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { api } from '../api/client';
+import AgeLevelSelect from '../components/AgeLevelSelect';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -960,15 +961,13 @@ function RequestAccessSetupCard() {
               <label className="rinklink-auth-label" htmlFor="new-team-name">Team name</label>
               <Input id="new-team-name" className="rinklink-auth-input" value={newTeamName} onChange={(event) => setNewTeamName(event.target.value)} placeholder="Example: RinkLink 12U Blue" />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rinklink-auth-field">
-                <label className="rinklink-auth-label" htmlFor="new-team-age">Age group</label>
-                <Input id="new-team-age" className="rinklink-auth-input" value={newTeamAgeGroup} onChange={(event) => setNewTeamAgeGroup(event.target.value)} placeholder="Example: 12U" />
-              </div>
-              <div className="rinklink-auth-field">
-                <label className="rinklink-auth-label" htmlFor="new-team-level">Level</label>
-                <Input id="new-team-level" className="rinklink-auth-input" value={newTeamLevel} onChange={(event) => setNewTeamLevel(event.target.value)} placeholder="Example: AA" />
-              </div>
+            <div className="rinklink-auth-field">
+              <AgeLevelSelect
+                ageGroup={newTeamAgeGroup}
+                level={newTeamLevel}
+                onAgeGroupChange={setNewTeamAgeGroup}
+                onLevelChange={setNewTeamLevel}
+              />
             </div>
             <div className="rinklink-auth-field">
               <label className="rinklink-auth-label" htmlFor="new-team-location">Location</label>

@@ -22,7 +22,7 @@ import TeamLogo from '../components/TeamLogo';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
 import { getGameStatusLabel, getGameStatusVariant } from '../lib/gameStatus';
 import { accentActionClass, interactiveTitleClass, listRowButtonClass, selectableRowButtonActiveClass, selectableRowButtonClass } from '../lib/uiClasses';
-import { formatShortDate, formatTimeHHMM, toLocalDateString } from '../lib/time';
+import { formatShortDate, formatTimeHHMM, todayLocalDateString, toLocalDateString } from '../lib/time';
 import { useToast } from '../context/ToastContext';
 
 const EVENT_TYPES: Event['event_type'][] = ['league', 'practice', 'showcase', 'scrimmage', 'exhibition'];
@@ -61,18 +61,20 @@ function attendanceSummaryLabel(event: Event) {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
-const emptyForm = {
-  event_type: 'league' as Event['event_type'],
-  away_team_id: '',
-  arena_id: '',
-  arena_rink_id: '',
-  ice_slot_id: '',
-  date: '',
-  start_time: '',
-  end_time: '',
-  notes: '',
-  opponent_message: '',
-};
+function emptyEventForm(date = todayLocalDateString()) {
+  return {
+    event_type: 'league' as Event['event_type'],
+    away_team_id: '',
+    arena_id: '',
+    arena_rink_id: '',
+    ice_slot_id: '',
+    date,
+    start_time: '',
+    end_time: '',
+    notes: '',
+    opponent_message: '',
+  };
+}
 
 export default function EventsPage() {
   const navigate = useNavigate();
@@ -89,7 +91,7 @@ export default function EventsPage() {
   const [arenaRinks, setArenaRinks] = useState<ArenaRink[]>([]);
   const [openIceSlots, setOpenIceSlots] = useState<IceSlot[]>([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => emptyEventForm());
   const [scoreEdits, setScoreEdits] = useState<Record<string, Partial<{ home: string; away: string }>>>({});
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
@@ -288,7 +290,7 @@ export default function EventsPage() {
       message: requestMessage || null,
     });
     setOpen(false);
-    setForm(emptyForm);
+    setForm(emptyEventForm());
     const requests = await api.getTeamIceBookingRequests(activeTeam.id);
     setBookingRequests(requests);
     pushToast({ variant: 'success', title: 'Booking request sent' });
@@ -365,7 +367,10 @@ export default function EventsPage() {
               <span className="hidden sm:inline">{calendarBusy ? 'Copying...' : 'Add to Calendar'}</span>
             </Button>
             {canManageSchedule ? (
-              <Button type="button" className="h-10 px-4" onClick={() => setOpen(true)}>
+              <Button type="button" className="h-10 px-4" onClick={() => {
+                setForm(emptyEventForm(todayStr));
+                setOpen(true);
+              }}>
                 <CalendarPlus2 className="h-4 w-4" />
                 <span className="sm:hidden">Schedule</span>
                 <span className="hidden sm:inline">Schedule Event</span>
@@ -624,7 +629,7 @@ export default function EventsPage() {
 
       <Modal
         open={open}
-        onClose={() => { setOpen(false); setForm(emptyForm); }}
+        onClose={() => { setOpen(false); setForm(emptyEventForm()); }}
         title="Schedule Event"
         footer={(
           <>
@@ -636,7 +641,7 @@ export default function EventsPage() {
               <SendHorizontal className="h-4 w-4" />
               Send Booking Request
             </Button>
-            <Button type="button" variant="outline" onClick={() => { setOpen(false); setForm(emptyForm); }}>
+            <Button type="button" variant="outline" onClick={() => { setOpen(false); setForm(emptyEventForm()); }}>
               <X className="h-4 w-4" />
               Cancel
             </Button>

@@ -39,6 +39,12 @@ from ..services.records import recompute_team_records
 from ..services.season_utils import canonical_season_bounds, canonical_season_name
 
 
+DEMO_BASE_SEASON_START_YEAR = 2025
+DEMO_ACTIVE_SEASON_START_YEAR = 2026
+DEMO_ACTIVE_COMPLETED_THROUGH = date(2026, 9, 30)
+DEMO_ACTIVE_COMPLETED_LEAGUE_GAMES = 2
+
+
 def _id() -> str:
     return str(uuid.uuid4())
 
@@ -243,6 +249,410 @@ def _assert_seed_team_competitions(teams: list[Team], memberships: list[TeamComp
         raise RuntimeError(f"Seed teams missing competition memberships: {joined_names}")
 
 
+def _shift_demo_date(value: date | None, years: int) -> date | None:
+    if value is None:
+        return None
+    try:
+        return value.replace(year=value.year + years)
+    except ValueError:
+        return value.replace(year=value.year + years, day=28)
+
+
+def _copy_model_columns(source, *, overrides: dict) -> dict:
+    data = {column.key: getattr(source, column.key) for column in source.__table__.columns}
+    data.pop("created_at", None)
+    data.pop("updated_at", None)
+    data.update(overrides)
+    return data
+
+
+def _sync_event_link_dates(event: Event) -> None:
+    if event.ice_slot:
+        event.ice_slot.date = event.date
+    if event.home_availability_window:
+        event.home_availability_window.date = event.date
+    if event.away_availability_window:
+        event.away_availability_window.date = event.date
+    if event.proposal:
+        event.proposal.proposed_date = event.date
+        if event.proposal.ice_slot:
+            event.proposal.ice_slot.date = event.date
+        if event.proposal.home_availability_window:
+            event.proposal.home_availability_window.date = event.date
+        if event.proposal.away_availability_window:
+            event.proposal.away_availability_window.date = event.date
+
+
+def _shape_active_season_progress(db: Session, season: Season) -> None:
+    completed_start = season.start_date + timedelta(days=24)
+    future_start = DEMO_ACTIVE_COMPLETED_THROUGH + timedelta(days=4)
+    future_index = 0
+
+    events = (
+        db.query(Event)
+        .filter(Event.season_id == season.id)
+        .order_by(Event.date, Event.start_time, Event.id)
+        .all()
+    )
+    final_league_events = [
+        event
+        for event in events
+        if event.event_type == "league"
+        and event.status == "final"
+        and event.home_score is not None
+        and event.away_score is not None
+    ]
+    final_games_by_team: dict[str, int] = {}
+    for event in final_league_events:
+        final_games_by_team[event.home_team_id] = final_games_by_team.get(event.home_team_id, 0) + 1
+        if event.away_team_id:
+            final_games_by_team[event.away_team_id] = final_games_by_team.get(event.away_team_id, 0) + 1
+
+    kept_final_event_ids: set[str] = set()
+    for event in final_league_events:
+        if len(kept_final_event_ids) >= DEMO_ACTIVE_COMPLETED_LEAGUE_GAMES:
+            break
+        if final_games_by_team.get(event.home_team_id, 0) <= 1:
+            continue
+        if event.away_team_id and final_games_by_team.get(event.away_team_id, 0) <= 1:
+            continue
+        kept_final_event_ids.add(event.id)
+
+    completed_index = 0
+    for event in events:
+        is_final_league = (
+            event.event_type == "league"
+            and event.status == "final"
+            and event.home_score is not None
+            and event.away_score is not None
+        )
+        if is_final_league and event.id in kept_final_event_ids:
+            event.date = completed_start + timedelta(days=completed_index * 8)
+            completed_index += 1
+        else:
+            if is_final_league:
+                event.status = "scheduled"
+                event.home_score = None
+                event.away_score = None
+            event.date = future_start + timedelta(days=future_index * 5)
+            future_index += 1
+        _sync_event_link_dates(event)
+
+    proposed_proposals = (
+        db.query(Proposal)
+        .filter(
+            Proposal.status == "proposed",
+            Proposal.proposed_date >= season.start_date,
+            Proposal.proposed_date <= season.end_date,
+        )
+        .order_by(Proposal.proposed_date, Proposal.proposed_start_time, Proposal.id)
+        .all()
+    )
+    for proposal_index, proposal in enumerate(proposed_proposals):
+        conflict_event = None
+        if proposal.message and proposal.message.startswith("Conflict demo:"):
+            conflict_event = (
+                db.query(Event)
+                .filter(
+                    Event.season_id == season.id,
+                    Event.status.in_(("scheduled", "confirmed", "final")),
+                    (Event.home_team_id.in_((proposal.home_team_id, proposal.away_team_id)))
+                    | (Event.away_team_id.in_((proposal.home_team_id, proposal.away_team_id))),
+                )
+                .order_by(Event.date, Event.start_time, Event.id)
+                .first()
+            )
+        if conflict_event:
+            proposal.proposed_date = conflict_event.date
+            proposal.proposed_start_time = conflict_event.start_time
+            proposal.proposed_end_time = conflict_event.end_time
+        else:
+            proposal.proposed_date = future_start + timedelta(days=(future_index + proposal_index) * 5)
+        if proposal.ice_slot:
+            proposal.ice_slot.date = proposal.proposed_date
+            proposal.ice_slot.start_time = proposal.proposed_start_time
+            proposal.ice_slot.end_time = proposal.proposed_end_time
+        if proposal.home_availability_window:
+            proposal.home_availability_window.date = proposal.proposed_date
+            proposal.home_availability_window.start_time = proposal.proposed_start_time
+            proposal.home_availability_window.end_time = proposal.proposed_end_time
+        if proposal.away_availability_window:
+            proposal.away_availability_window.date = proposal.proposed_date
+            proposal.away_availability_window.start_time = proposal.proposed_start_time
+            proposal.away_availability_window.end_time = proposal.proposed_end_time
+
+
+def _seed_season_snapshot(
+    db: Session,
+    *,
+    source_season: Season,
+    target_start_year: int,
+    is_active: bool,
+) -> dict[str, int]:
+    year_delta = target_start_year - source_season.start_date.year
+    target_start, target_end = canonical_season_bounds(target_start_year)
+    target_season = Season(
+        id=_id(),
+        name=canonical_season_name(target_start_year),
+        start_date=target_start,
+        end_date=target_end,
+        is_active=is_active,
+    )
+    db.add(target_season)
+    db.flush()
+
+    division_id_map: dict[str, str] = {}
+    source_divisions = (
+        db.query(CompetitionDivision)
+        .filter(CompetitionDivision.season_id == source_season.id)
+        .order_by(CompetitionDivision.sort_order, CompetitionDivision.name)
+        .all()
+    )
+    for division in source_divisions:
+        new_id = _id()
+        division_id_map[division.id] = new_id
+        db.add(
+            CompetitionDivision(
+                **_copy_model_columns(
+                    division,
+                    overrides={"id": new_id, "season_id": target_season.id},
+                )
+            )
+        )
+    db.flush()
+
+    source_memberships = (
+        db.query(TeamCompetitionMembership)
+        .filter(TeamCompetitionMembership.season_id == source_season.id)
+        .order_by(TeamCompetitionMembership.sort_order, TeamCompetitionMembership.team_id)
+        .all()
+    )
+    for membership in source_memberships:
+        db.add(
+            TeamCompetitionMembership(
+                **_copy_model_columns(
+                    membership,
+                    overrides={
+                        "id": _id(),
+                        "season_id": target_season.id,
+                        "competition_division_id": division_id_map[membership.competition_division_id],
+                    },
+                )
+            )
+        )
+
+    source_proposals = (
+        db.query(Proposal)
+        .filter(Proposal.proposed_date >= source_season.start_date, Proposal.proposed_date <= source_season.end_date)
+        .order_by(Proposal.proposed_date, Proposal.id)
+        .all()
+    )
+    source_events = (
+        db.query(Event)
+        .filter(Event.season_id == source_season.id)
+        .order_by(Event.date, Event.start_time, Event.id)
+        .all()
+    )
+    source_requests = (
+        db.query(IceBookingRequest)
+        .filter(IceBookingRequest.season_id == source_season.id)
+        .order_by(IceBookingRequest.created_at, IceBookingRequest.id)
+        .all()
+    )
+    source_slot_ids = {
+        slot_id
+        for slot_id in (
+            [proposal.ice_slot_id for proposal in source_proposals]
+            + [event.ice_slot_id for event in source_events]
+            + [request.ice_slot_id for request in source_requests]
+        )
+        if slot_id
+    }
+
+    slot_id_map: dict[str, str] = {}
+    source_slots = (
+        db.query(IceSlot)
+        .filter(IceSlot.id.in_(source_slot_ids))
+        .order_by(IceSlot.date, IceSlot.start_time, IceSlot.id)
+        .all()
+    )
+    for slot in source_slots:
+        new_id = _id()
+        slot_id_map[slot.id] = new_id
+        db.add(
+            IceSlot(
+                **_copy_model_columns(
+                    slot,
+                    overrides={"id": new_id, "date": _shift_demo_date(slot.date, year_delta)},
+                )
+            )
+        )
+    db.flush()
+
+    availability_id_map: dict[str, str] = {}
+    source_availability = (
+        db.query(AvailabilityWindow)
+        .filter(AvailabilityWindow.season_id == source_season.id)
+        .order_by(AvailabilityWindow.date, AvailabilityWindow.team_id)
+        .all()
+    )
+    for window in source_availability:
+        new_id = _id()
+        availability_id_map[window.id] = new_id
+        db.add(
+            AvailabilityWindow(
+                **_copy_model_columns(
+                    window,
+                    overrides={
+                        "id": new_id,
+                        "season_id": target_season.id,
+                        "date": _shift_demo_date(window.date, year_delta),
+                    },
+                )
+            )
+        )
+    db.flush()
+
+    proposal_id_map: dict[str, str] = {}
+    for proposal in source_proposals:
+        new_id = _id()
+        proposal_id_map[proposal.id] = new_id
+        db.add(
+            Proposal(
+                **_copy_model_columns(
+                    proposal,
+                    overrides={
+                        "id": new_id,
+                        "thread_root_proposal_id": None,
+                        "parent_proposal_id": None,
+                        "active_pair_key": None,
+                        "home_availability_window_id": availability_id_map[proposal.home_availability_window_id],
+                        "away_availability_window_id": availability_id_map[proposal.away_availability_window_id],
+                        "proposed_date": _shift_demo_date(proposal.proposed_date, year_delta),
+                        "ice_slot_id": slot_id_map.get(proposal.ice_slot_id) if proposal.ice_slot_id else None,
+                    },
+                )
+            )
+        )
+    db.flush()
+
+    event_id_map: dict[str, str] = {}
+    for event in source_events:
+        new_id = _id()
+        event_id_map[event.id] = new_id
+        db.add(
+            Event(
+                **_copy_model_columns(
+                    event,
+                    overrides={
+                        "id": new_id,
+                        "home_availability_window_id": availability_id_map.get(event.home_availability_window_id) if event.home_availability_window_id else None,
+                        "away_availability_window_id": availability_id_map.get(event.away_availability_window_id) if event.away_availability_window_id else None,
+                        "proposal_id": proposal_id_map.get(event.proposal_id) if event.proposal_id else None,
+                        "season_id": target_season.id,
+                        "competition_division_id": division_id_map.get(event.competition_division_id) if event.competition_division_id else None,
+                        "ice_slot_id": slot_id_map.get(event.ice_slot_id) if event.ice_slot_id else None,
+                        "date": _shift_demo_date(event.date, year_delta),
+                    },
+                )
+            )
+        )
+    db.flush()
+
+    for request in source_requests:
+        db.add(
+            IceBookingRequest(
+                **_copy_model_columns(
+                    request,
+                    overrides={
+                        "id": _id(),
+                        "season_id": target_season.id,
+                        "ice_slot_id": slot_id_map[request.ice_slot_id],
+                        "event_id": event_id_map.get(request.event_id) if request.event_id else None,
+                    },
+                )
+            )
+        )
+
+    player_id_map: dict[str, str] = {}
+    source_players = (
+        db.query(Player)
+        .filter(Player.season_id == source_season.id)
+        .order_by(Player.team_id, Player.jersey_number)
+        .all()
+    )
+    for player in source_players:
+        new_id = _id()
+        player_id_map[player.id] = new_id
+        db.add(
+            Player(
+                **_copy_model_columns(
+                    player,
+                    overrides={"id": new_id, "season_id": target_season.id},
+                )
+            )
+        )
+    db.flush()
+
+    source_attendance = db.query(EventAttendance).filter(EventAttendance.event_id.in_(event_id_map.keys())).all()
+    for attendance in source_attendance:
+        db.add(
+            EventAttendance(
+                **_copy_model_columns(
+                    attendance,
+                    overrides={
+                        "event_id": event_id_map[attendance.event_id],
+                        "player_id": player_id_map[attendance.player_id],
+                    },
+                )
+            )
+        )
+
+    source_player_stats = db.query(EventPlayerStat).filter(EventPlayerStat.event_id.in_(event_id_map.keys())).all()
+    for stat in source_player_stats:
+        db.add(
+            EventPlayerStat(
+                **_copy_model_columns(
+                    stat,
+                    overrides={
+                        "id": _id(),
+                        "event_id": event_id_map[stat.event_id],
+                        "player_id": player_id_map[stat.player_id],
+                    },
+                )
+            )
+        )
+
+    source_goalie_stats = db.query(EventGoalieStat).filter(EventGoalieStat.event_id.in_(event_id_map.keys())).all()
+    for stat in source_goalie_stats:
+        db.add(
+            EventGoalieStat(
+                **_copy_model_columns(
+                    stat,
+                    overrides={
+                        "id": _id(),
+                        "event_id": event_id_map[stat.event_id],
+                        "player_id": player_id_map[stat.player_id],
+                    },
+                )
+            )
+        )
+
+    db.flush()
+    if is_active and target_start_year == DEMO_ACTIVE_SEASON_START_YEAR:
+        _shape_active_season_progress(db, target_season)
+        db.flush()
+    return {
+        "seasons": 1,
+        "ice_slots": len(source_slots),
+        "availability_windows": len(source_availability),
+        "events": len(source_events),
+        "proposals": len(source_proposals),
+        "booking_requests": len(source_requests),
+        "players": len(source_players),
+    }
+
+
 def seed_demo_data(
     db: Session,
     *,
@@ -259,13 +669,13 @@ def seed_demo_data(
     seed_zip_codes(db)
 
     season_id = _id()
-    season_start, season_end = canonical_season_bounds(2025)
+    season_start, season_end = canonical_season_bounds(DEMO_BASE_SEASON_START_YEAR)
     season = Season(
         id=season_id,
-        name=canonical_season_name(2025),
+        name=canonical_season_name(DEMO_BASE_SEASON_START_YEAR),
         start_date=season_start,
         end_date=season_end,
-        is_active=True,
+        is_active=False,
     )
     db.add(season)
 
@@ -1419,6 +1829,13 @@ def seed_demo_data(
             )
     db.add_all(notifications)
 
+    active_season_counts = _seed_season_snapshot(
+        db,
+        source_season=season,
+        target_start_year=DEMO_ACTIVE_SEASON_START_YEAR,
+        is_active=True,
+    )
+
     db.commit()
 
     for team in teams:
@@ -1441,4 +1858,6 @@ def seed_demo_data(
         "booking_requests": len(booking_requests),
         "notifications": len(notifications),
         "preserved_users": len(preserved_users),
+        "seasons": db.query(Season).count(),
+        "active_season_events": active_season_counts["events"],
     }

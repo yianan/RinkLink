@@ -16,7 +16,7 @@ import SegmentedTabs from '../components/SegmentedTabs';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { getCompetitionBadgeVariant, getCompetitionLabel } from '../lib/competition';
-import { formatShortDate, formatTimeHHMM } from '../lib/time';
+import { formatShortDate, formatTimeHHMM, todayLocalDateString } from '../lib/time';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { useNavBadgeRefresh } from '../context/NavBadgeContext';
@@ -251,7 +251,7 @@ export default function ProposalsPage() {
     setRescheduleProposal(proposal);
     setRescheduleForm({
       event_type: proposal.event_type,
-      proposed_date: proposal.proposed_date,
+      proposed_date: todayLocalDateString(),
       arena_id: proposal.arena_id,
       arena_rink_id: proposal.arena_rink_id,
       ice_slot_id: '',

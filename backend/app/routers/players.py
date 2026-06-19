@@ -26,6 +26,76 @@ def _require_team_for_roster_access(db: Session, team_id: str, context: Authoriz
     return team
 
 
+def _duplicate_player_query(
+    db: Session,
+    *,
+    team_id: str,
+    season_id: str,
+    first_name: str,
+    last_name: str,
+    jersey_number: int | None,
+    position: str | None,
+):
+    q = db.query(Player).filter(
+        Player.team_id == team_id,
+        Player.season_id == season_id,
+        Player.first_name == first_name,
+        Player.last_name == last_name,
+    )
+    q = (
+        q.filter(Player.jersey_number == jersey_number)
+        if jersey_number is not None
+        else q.filter(Player.jersey_number.is_(None))
+    )
+    q = (
+        q.filter(Player.position == position)
+        if position is not None
+        else q.filter(Player.position.is_(None))
+    )
+    return q
+
+
+def _reject_duplicate_player(
+    db: Session,
+    *,
+    team_id: str,
+    season_id: str,
+    first_name: str,
+    last_name: str,
+    jersey_number: int | None,
+    position: str | None,
+    exclude_player_id: str | None = None,
+) -> None:
+    q = _duplicate_player_query(
+        db,
+        team_id=team_id,
+        season_id=season_id,
+        first_name=first_name,
+        last_name=last_name,
+        jersey_number=jersey_number,
+        position=position,
+    )
+    if exclude_player_id:
+        q = q.filter(Player.id != exclude_player_id)
+    if q.first():
+        raise HTTPException(409, "This player already exists on the selected season roster")
+
+
+def _player_out(player: Player) -> PlayerOut:
+    return PlayerOut(
+        id=player.id,
+        team_id=player.team_id,
+        season_id=player.season_id,
+        first_name=player.first_name,
+        last_name=player.last_name,
+        jersey_number=player.jersey_number,
+        position=player.position,
+        season_totals=PlayerSeasonTotalsOut(),
+        created_at=player.created_at,
+        updated_at=player.updated_at,
+    )
+
+
 @router.get("/teams/{team_id}/players", response_model=list[PlayerOut])
 def list_players(
     team_id: str,
@@ -138,11 +208,16 @@ def create_player(
     _require_team_for_roster_access(db, team_id, context, "team.manage_roster")
     if not db.get(Season, body.season_id):
         raise HTTPException(404, "Season not found")
-    p = Player(team_id=team_id, **body.model_dump())
+    payload = body.model_dump()
+    payload["first_name"] = payload["first_name"].strip()
+    payload["last_name"] = payload["last_name"].strip()
+    payload["position"] = payload["position"].strip() if payload["position"] else None
+    _reject_duplicate_player(db, team_id=team_id, **payload)
+    p = Player(team_id=team_id, **payload)
     db.add(p)
     db.commit()
     db.refresh(p)
-    return p
+    return _player_out(p)
 
 
 @router.put("/players/{id}", response_model=PlayerOut)
@@ -158,11 +233,26 @@ def update_player(
     if not p.team:
         raise HTTPException(404, "Team not found")
     ensure_team_access(context, p.team, "team.manage_roster")
-    for k, v in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+    if "first_name" in data and data["first_name"] is not None:
+        data["first_name"] = data["first_name"].strip()
+    if "last_name" in data and data["last_name"] is not None:
+        data["last_name"] = data["last_name"].strip()
+    if "position" in data:
+        data["position"] = data["position"].strip() if data["position"] else None
+    next_values = {
+        "season_id": p.season_id,
+        "first_name": data.get("first_name", p.first_name),
+        "last_name": data.get("last_name", p.last_name),
+        "jersey_number": data.get("jersey_number", p.jersey_number),
+        "position": data.get("position", p.position),
+    }
+    _reject_duplicate_player(db, team_id=p.team_id, exclude_player_id=p.id, **next_values)
+    for k, v in data.items():
         setattr(p, k, v)
     db.commit()
     db.refresh(p)
-    return p
+    return _player_out(p)
 
 
 @router.delete("/players/{id}", status_code=204)

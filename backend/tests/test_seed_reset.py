@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
-from app.models import AppUser, Arena, Association, Competition, Event, IceBookingRequest, Proposal, Team, TeamCompetitionMembership
+from app.models import AppUser, Arena, Association, Competition, Event, IceBookingRequest, Proposal, Season, Team, TeamCompetitionMembership
 from app.seed.pinned_admins import pinned_platform_admin_emails, repair_pinned_platform_admins
 from app.seed.seed_data import PreservedAppUser, seed_demo_data
+from app.services.season_utils import ensure_standard_seasons
 from app.services.schedule_conflicts import find_event_conflicts
 
 
@@ -49,6 +52,12 @@ def test_repair_pinned_platform_admins_promotes_existing_user(db, monkeypatch) -
     assert user.access_state == "active"
     assert user.auth_state == "active"
     assert user.is_platform_admin is True
+
+
+def test_standard_seasons_default_to_next_planning_season_in_june(db) -> None:
+    seasons = ensure_standard_seasons(db, today=date(2026, 6, 17))
+
+    assert [(season.name, season.is_active) for season in seasons] == [("2026-2027", True), ("2025-2026", False)]
 
 
 def test_seed_demo_data_restores_preserved_platform_admin(db) -> None:
@@ -108,9 +117,58 @@ def test_seed_demo_data_restores_preserved_platform_admin(db) -> None:
             assert conflicts, proposal.message
         else:
             assert conflicts == [], proposal.message
-    assert intentional_conflict_count == 1
+    seasons = db.query(Season).order_by(Season.start_date).all()
+    assert [(season.name, season.is_active) for season in seasons] == [("2025-2026", False), ("2026-2027", True)]
+    assert db.query(Event).filter(Event.season_id == seasons[0].id).count() > 0
+    assert db.query(Event).filter(Event.season_id == seasons[1].id).count() > 0
+    completed_league_counts = [
+        db.query(Event)
+        .filter(
+            Event.season_id == season.id,
+            Event.event_type == "league",
+            Event.status == "final",
+            Event.home_score.isnot(None),
+            Event.away_score.isnot(None),
+        )
+        .count()
+        for season in seasons
+    ]
+    assert completed_league_counts[0] > completed_league_counts[1]
+    assert completed_league_counts[1] == 2
+    latest_active_final = (
+        db.query(Event.date)
+        .filter(
+            Event.season_id == seasons[1].id,
+            Event.event_type == "league",
+            Event.status == "final",
+        )
+        .order_by(Event.date.desc())
+        .first()
+    )
+    assert latest_active_final is not None
+    assert latest_active_final.date <= date(2026, 9, 30)
+    assert (
+        db.query(Event)
+        .filter(
+            Event.season_id == seasons[1].id,
+            Event.event_type == "league",
+            Event.status == "scheduled",
+            Event.date > date(2026, 9, 30),
+        )
+        .count()
+        > 0
+    )
+    for season in seasons:
+        assert (
+            db.query(TeamCompetitionMembership.team_id)
+            .filter(TeamCompetitionMembership.season_id == season.id)
+            .distinct()
+            .count()
+        ) == db.query(Team).count()
+    assert intentional_conflict_count == 2
     assert db.query(Competition).filter(Competition.competition_type.in_(("tournament", "state_tournament"))).count() == 0
     assert db.query(Event).filter(Event.event_type.in_(("tournament", "state_tournament"))).count() == 0
     assert db.query(IceBookingRequest).filter(IceBookingRequest.event_type.in_(("tournament", "state_tournament"))).count() == 0
     assert db.query(TeamCompetitionMembership.team_id).distinct().count() == db.query(Team).count()
+    assert result["seasons"] == 2
     assert result["preserved_users"] == 1

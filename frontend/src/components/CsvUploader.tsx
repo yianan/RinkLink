@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Check, UploadCloud, X } from 'lucide-react';
+import { Check, Download, UploadCloud, X } from 'lucide-react';
 import { api } from '../api/client';
 import { AvailabilityUploadPreview, AvailabilityUploadRow } from '../types';
 import { cn } from '../lib/cn';
@@ -12,6 +12,24 @@ import { Card } from './ui/Card';
 interface Props {
   teamId: string;
   onConfirmed: () => void;
+}
+
+const DATE_FORMAT_HELP = 'Dates: YYYY-MM-DD, MM/DD/YYYY, MM/DD/YY, MM-DD-YYYY, or MM-DD-YY.';
+const TIME_FORMAT_HELP = 'Times: HH:MM, H:MM AM/PM, or HH:MM:SS.';
+const AVAILABILITY_TEMPLATE = [
+  'Date,Time,End Time,Home/Away,Notes',
+  '2026-09-12,18:30,19:45,Home,Home ice at main rink',
+  '09/19/2026,7:00 PM,8:15 PM,Away,Away game window',
+].join('\n');
+
+function downloadCsvTemplate(filename: string, content: string) {
+  const blob = new Blob([`${content}\n`], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function CsvUploader({ teamId, onConfirmed }: Props) {
@@ -75,9 +93,13 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
           <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">or choose a file to preview before importing</div>
 
           <div className="mt-5 flex items-center justify-center gap-2">
-            <Button type="button" variant="primary" disabled={loading} onClick={() => document.getElementById('schedule-csv-input')?.click()}>
+            <Button type="button" variant="primary" disabled={loading} onClick={() => document.getElementById('availability-csv-input')?.click()}>
               <UploadCloud className="h-4 w-4" />
-              Choose File
+              Choose CSV
+            </Button>
+            <Button type="button" variant="outline" disabled={loading} onClick={() => downloadCsvTemplate('availability-template.csv', AVAILABILITY_TEMPLATE)}>
+              <Download className="h-4 w-4" />
+              Template
             </Button>
             <input
               id="availability-csv-input"
@@ -94,6 +116,9 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
           <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
             Expected columns: Date, Time, End Time, Home/Away, Notes
           </div>
+          <div className="mx-auto mt-2 max-w-2xl text-xs leading-5 text-slate-500 dark:text-slate-400">
+            {DATE_FORMAT_HELP} {TIME_FORMAT_HELP}
+          </div>
         </div>
       )}
 
@@ -109,9 +134,16 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
               <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Confirm to add these entries to team availability.</div>
             </div>
           </div>
-          {preview.warnings.map((w, i) => (
-            <Alert key={i} variant="warning">{w}</Alert>
-          ))}
+          {preview.warnings.length > 0 ? (
+            <Alert variant="warning" title="Fix CSV warnings before importing">
+              <div>Rows with warnings were skipped. Correct the CSV and upload it again before confirming.</div>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {preview.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </Alert>
+          ) : null}
 
           <Card className="overflow-hidden">
             <div className="max-h-[420px] overflow-x-auto">
@@ -145,9 +177,9 @@ export default function CsvUploader({ teamId, onConfirmed }: Props) {
           </Card>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="primary" onClick={handleConfirm} disabled={loading}>
+            <Button type="button" variant="primary" onClick={handleConfirm} disabled={loading || preview.entries.length === 0 || preview.warnings.length > 0}>
               <Check className="h-4 w-4" />
-              Confirm Upload
+              Confirm Import
             </Button>
             <Button type="button" variant="outline" onClick={() => setPreview(null)} disabled={loading}>
               <X className="h-4 w-4" />

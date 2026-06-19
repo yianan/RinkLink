@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { Check, ChevronDown, LogOut } from 'lucide-react';
 
 import { api } from '../api/client';
+import AgeLevelSelect from '../components/AgeLevelSelect';
 import PageHeader from '../components/PageHeader';
 import TeamLogo from '../components/TeamLogo';
 import { Badge } from '../components/ui/Badge';
@@ -484,7 +485,7 @@ export default function PendingApprovalPage() {
   const requestCardDescription = hasSubmittedRequests
     ? 'Need another team, player, association, arena, or new team setup? Send another request for approval.'
     : 'Choose the access you need so an administrator can approve your account.';
-  const submitRequestLabel = hasSubmittedRequests ? 'Submit additional request' : 'Submit access request';
+  const submitRequestLabel = hasSubmittedRequests ? 'Send additional request' : 'Send request';
 
   const signOut = async () => {
     setSubmitting(true);
@@ -705,17 +706,13 @@ export default function PendingApprovalPage() {
                     </label>
                     <Input className="mt-2" value={newTeamName} onChange={(event) => setNewTeamName(event.target.value)} placeholder="Example: RinkLink 12U Blue" />
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                      Age group
-                    </label>
-                    <Input className="mt-2" value={newTeamAgeGroup} onChange={(event) => setNewTeamAgeGroup(event.target.value)} placeholder="Example: 12U" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                      Level
-                    </label>
-                    <Input className="mt-2" value={newTeamLevel} onChange={(event) => setNewTeamLevel(event.target.value)} placeholder="Example: AA" />
+                  <div className="sm:col-span-2">
+                    <AgeLevelSelect
+                      ageGroup={newTeamAgeGroup}
+                      level={newTeamLevel}
+                      onAgeGroupChange={setNewTeamAgeGroup}
+                      onLevelChange={setNewTeamLevel}
+                    />
                   </div>
                   <div className="sm:col-span-2">
                     <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
@@ -767,7 +764,7 @@ export default function PendingApprovalPage() {
               </div>
 
               <Button type="button" onClick={() => void submitAccessRequest()} disabled={submitting || requestOptionsLoading || (requestTargetType !== 'team_setup' && !requestTargetId)}>
-                {submitting ? 'Submitting…' : submitRequestLabel}
+                {submitting ? 'Sending…' : submitRequestLabel}
               </Button>
             </div>
           </Card>

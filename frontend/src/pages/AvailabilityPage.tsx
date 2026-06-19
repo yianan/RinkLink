@@ -27,6 +27,7 @@ import {
   formatTimeHHMM,
   hasInvalidTimeRange,
   parseLocalDate,
+  todayLocalDateString,
   toLocalDateString,
 } from '../lib/time';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
@@ -42,6 +43,16 @@ const statusColors: Record<string, 'success' | 'info' | 'warning' | 'neutral'> =
   Cancelled: 'neutral',
   Blocked: 'warning',
 };
+
+function defaultAvailabilityForm(date = todayLocalDateString()) {
+  return {
+    date,
+    start_time: '',
+    end_time: '',
+    availability_type: 'home' as 'home' | 'away',
+    notes: '',
+  };
+}
 
 function getAvailabilityStatusLabel(window: AvailabilityWindow) {
   if (window.blocked) return 'Blocked';
@@ -122,13 +133,7 @@ export default function AvailabilityPage() {
   const [editingWindowId, setEditingWindowId] = useState<string | null>(null);
   const [selectedAvailabilityTypes, setSelectedAvailabilityTypes] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  const [form, setForm] = useState({
-    date: '',
-    start_time: '',
-    end_time: '',
-    availability_type: 'home' as 'home' | 'away',
-    notes: '',
-  });
+  const [form, setForm] = useState(() => defaultAvailabilityForm());
   const availabilityTimeError = hasInvalidTimeRange(form.start_time, form.end_time)
     ? 'Available until must be the same as or later than available from.'
     : '';
@@ -309,7 +314,7 @@ export default function AvailabilityPage() {
     }
     setOpen(false);
     setEditingWindowId(null);
-    setForm({ date: '', start_time: '', end_time: '', availability_type: 'home', notes: '' });
+    setForm(defaultAvailabilityForm());
     load();
     pushToast({ variant: 'success', title: editingWindowId ? 'Availability updated' : 'Availability added' });
   };
@@ -375,7 +380,7 @@ export default function AvailabilityPage() {
             />
             <Button type="button" onClick={() => {
               setEditingWindowId(null);
-              setForm({ date: '', start_time: '', end_time: '', availability_type: 'home', notes: '' });
+              setForm(defaultAvailabilityForm(todayStr));
               setOpen(true);
             }}
             >
@@ -790,7 +795,10 @@ export default function AvailabilityPage() {
               title={activeFilterBadges.length > 0 ? 'No availability windows match these filters' : 'No availability windows yet'}
               description={activeFilterBadges.length > 0 ? 'Clear or change filters to see the season calendar again.' : 'Add your first home or away window to start planning matchups.'}
               actions={activeFilterBadges.length === 0 ? (
-                <Button type="button" size="sm" onClick={() => setOpen(true)}>
+                <Button type="button" size="sm" onClick={() => {
+                  setForm(defaultAvailabilityForm(todayStr));
+                  setOpen(true);
+                }}>
                   <CalendarPlus2 className="h-4 w-4" />
                   Add Availability
                 </Button>
@@ -807,15 +815,16 @@ export default function AvailabilityPage() {
         onClose={() => {
           setOpen(false);
           setEditingWindowId(null);
+          setForm(defaultAvailabilityForm());
         }}
         title={editingWindowId ? 'Edit Availability' : 'Add Availability'}
         footer={(
           <>
             <Button type="button" onClick={saveAvailability} disabled={!form.date || !!availabilityTimeError}>
               <Save className="h-4 w-4" />
-              {editingWindowId ? 'Save Changes' : 'Save'}
+              Save
             </Button>
-            <Button type="button" variant="outline" onClick={() => { setOpen(false); setEditingWindowId(null); }}>
+            <Button type="button" variant="outline" onClick={() => { setOpen(false); setEditingWindowId(null); setForm(defaultAvailabilityForm()); }}>
               <X className="h-4 w-4" />
               Cancel
             </Button>

@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from sqlalchemy.orm import Session, joinedload
 
-from ..models import Competition, CompetitionDivision, Event, Team, TeamCompetitionMembership
+from ..models import Competition, CompetitionDivision, Event, Season, Team, TeamCompetitionMembership
 from ..schemas import CompetitionDivisionOut, CompetitionOut, StandingsEntry, TeamCompetitionMembershipOut
 from .season_utils import ensure_standard_seasons
 from .team_logos import effective_team_logo_url
@@ -192,7 +192,9 @@ def primary_membership_for_team(db: Session, team_id: str, season_id: str | None
 
 
 def ensure_current_season_membership(db: Session, team: Team, *, commit: bool = True) -> bool:
-    seasons = ensure_standard_seasons(db)
+    seasons = db.query(Season).filter(Season.is_active.is_(True)).order_by(Season.start_date.desc(), Season.created_at.desc()).all()
+    if not seasons:
+        seasons = ensure_standard_seasons(db)
     current_season = next((season for season in seasons if season.is_active), None)
     if current_season and ensure_team_has_standings_membership(db, team, current_season.id):
         if not commit:

@@ -18,7 +18,7 @@ import IceSlotCsvUploader from '../components/IceSlotCsvUploader';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
 import { mapsQueryUrl } from '../lib/maps';
-import { formatShortDate, formatTimeHHMM, hasInvalidTimeRange } from '../lib/time';
+import { formatShortDate, formatTimeHHMM, hasInvalidTimeRange, todayLocalDateString } from '../lib/time';
 import { cn } from '../lib/cn';
 import { canManageArena, canManageArenaBookingRequests, canManageArenaSlots, canViewArenas } from '../lib/permissions';
 import { accentLinkClass, accentSelectorPillActiveClass, chromeIconButtonClass, destructiveIconButtonClass, selectorPillClass, selectorPillIdleClass, tableActionButtonClass } from '../lib/uiClasses';
@@ -27,7 +27,9 @@ import { getCompetitionLabel } from '../lib/competition';
 
 const emptyRinkForm = { name: '', notes: '' };
 const emptyLockerForm = { name: '', notes: '' };
-const emptySlotForm = { date: '', start_time: '', end_time: '', pricing_mode: 'fixed_price', price: '', currency: 'USD', notes: '' };
+function emptyIceSlotForm(date = todayLocalDateString()) {
+  return { date, start_time: '', end_time: '', pricing_mode: 'fixed_price', price: '', currency: 'USD', notes: '' };
+}
 const emptyAcceptForm = { home_locker_room_id: '', away_locker_room_id: '', response_message: '' };
 const emptyActionForm = { response_message: '' };
 const emptyLockerAssignForm = { home_locker_room_id: '', away_locker_room_id: '', response_message: '' };
@@ -161,7 +163,7 @@ export default function ArenaDetailPage() {
 
   const [slotModalOpen, setSlotModalOpen] = useState(false);
   const [slotUploadOpen, setSlotUploadOpen] = useState(false);
-  const [slotForm, setSlotForm] = useState(emptySlotForm);
+  const [slotForm, setSlotForm] = useState(() => emptyIceSlotForm());
   const [editSlot, setEditSlot] = useState<IceSlot | null>(null);
   const [bookedSlotTarget, setBookedSlotTarget] = useState<BookedSlotActionTarget | null>(null);
   const [cancelSlotTarget, setCancelSlotTarget] = useState<CancelSlotTarget | null>(null);
@@ -523,7 +525,7 @@ export default function ArenaDetailPage() {
     }
     setSlotModalOpen(false);
     setEditSlot(null);
-    setSlotForm(emptySlotForm);
+    setSlotForm(emptyIceSlotForm());
     refreshIceSlots();
   };
 
@@ -1151,11 +1153,16 @@ export default function ArenaDetailPage() {
               </div>
               {slotEditable ? (
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button type="button" size="sm" variant="outline" onClick={() => setSlotUploadOpen((current) => !current)}>
-                    <FileUp className="h-3.5 w-3.5" />
-                    {slotUploadOpen ? 'Hide Upload' : 'Upload CSV'}
-                  </Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => setSlotModalOpen(true)}>
+                  {!slotUploadOpen ? (
+                    <Button type="button" size="sm" variant="outline" onClick={() => setSlotUploadOpen(true)}>
+                      <FileUp className="h-3.5 w-3.5" />
+                      Upload CSV
+                    </Button>
+                  ) : null}
+                  <Button type="button" size="sm" variant="outline" onClick={() => {
+                    setSlotForm(emptyIceSlotForm(todayIso));
+                    setSlotModalOpen(true);
+                  }}>
                     <CalendarPlus2 className="h-3.5 w-3.5" />
                     Add Ice Slot
                   </Button>
@@ -1558,7 +1565,7 @@ export default function ArenaDetailPage() {
 
       <Modal
         open={slotModalOpen}
-        onClose={() => { setSlotModalOpen(false); setEditSlot(null); setSlotForm(emptySlotForm); }}
+        onClose={() => { setSlotModalOpen(false); setEditSlot(null); setSlotForm(emptyIceSlotForm()); }}
         title={editSlot ? 'Edit Ice Slot' : 'Add Ice Slot'}
         footer={(
           <>
@@ -1570,7 +1577,7 @@ export default function ArenaDetailPage() {
               <Save className="h-4 w-4" />
               Save
             </Button>
-            <Button type="button" variant="outline" onClick={() => { setSlotModalOpen(false); setEditSlot(null); setSlotForm(emptySlotForm); }}>
+            <Button type="button" variant="outline" onClick={() => { setSlotModalOpen(false); setEditSlot(null); setSlotForm(emptyIceSlotForm()); }}>
               <X className="h-4 w-4" />
               Cancel
             </Button>

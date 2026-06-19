@@ -84,6 +84,7 @@ export default function RosterPage() {
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [saving, setSaving] = useState(false);
   const confirm = useConfirmDialog();
   const pushToast = useToast();
   const rosterVisible = !authEnabled || canViewPrivateRoster(me);
@@ -111,7 +112,7 @@ export default function RosterPage() {
   };
 
   const handleSave = async () => {
-    if (!activeTeam || !effectiveSeason) return;
+    if (!activeTeam || !effectiveSeason || saving) return;
     const payload = {
       season_id: effectiveSeason.id,
       first_name: form.first_name.trim(),
@@ -119,15 +120,36 @@ export default function RosterPage() {
       jersey_number: form.jersey_number ? Number(form.jersey_number) : null,
       position: form.position.trim() || null,
     };
-    if (editId) {
-      await api.updatePlayer(editId, payload);
-    } else {
-      await api.createPlayer(activeTeam.id, payload);
+    try {
+      setSaving(true);
+      if (editId) {
+        await api.updatePlayer(editId, payload);
+        pushToast({
+          variant: 'success',
+          title: 'Player updated',
+          description: `${payload.first_name} ${payload.last_name} was saved.`,
+        });
+      } else {
+        await api.createPlayer(activeTeam.id, payload);
+        pushToast({
+          variant: 'success',
+          title: 'Player added',
+          description: `${payload.first_name} ${payload.last_name} was added to the roster.`,
+        });
+      }
+      setOpen(false);
+      setEditId(null);
+      setForm({ ...emptyForm });
+      load();
+    } catch (error) {
+      pushToast({
+        variant: 'error',
+        title: editId ? 'Player update failed' : 'Player add failed',
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setSaving(false);
     }
-    setOpen(false);
-    setEditId(null);
-    setForm({ ...emptyForm });
-    load();
   };
 
   const handleDelete = async (id: string) => {
@@ -326,15 +348,17 @@ export default function RosterPage() {
 
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          if (!saving) setOpen(false);
+        }}
         title={`${editId ? 'Edit' : 'Add'} Player`}
         footer={
           <>
-            <Button type="button" onClick={handleSave} disabled={!form.first_name || !form.last_name}>
+            <Button type="button" onClick={handleSave} disabled={saving || !form.first_name.trim() || !form.last_name.trim()}>
               <Save className="h-4 w-4" />
-              Save
+              {saving ? 'Saving...' : 'Save'}
             </Button>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
               <X className="h-4 w-4" />
               Cancel
             </Button>

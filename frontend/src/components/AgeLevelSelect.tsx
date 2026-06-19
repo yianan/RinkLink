@@ -1,10 +1,10 @@
 import { Input } from './ui/Input';
 import { Select } from './ui/Select';
 
-const STANDARD_AGE_GROUPS = ['19U', '16U', '14U', '12U', '10U', '8U', '6U'];
+const STANDARD_AGE_GROUPS = ['19U', '18U', '16U', '14U', '12U', '10U', '8U', '6U'];
 
 const LEVELS_10U_PLUS = ['AAA', 'AA', 'A', 'B', 'C', 'Rec'];
-const LEVELS_6U_8U = ['Beginner', 'Beginner/Intermediate', 'Intermediate', 'Intermediate/Advanced', 'Advanced'];
+const LEVELS_6U_8U = ['Red', 'White', 'Blue'];
 
 const CUSTOM = '__custom__';
 
