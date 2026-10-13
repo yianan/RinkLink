@@ -41,7 +41,7 @@ import {
   type Values,
 } from "./forms";
 import { today, timeLabel } from "./time";
-import { authViewClassNames } from "./theme";
+import { actionLinkClass, authViewClassNames } from "./theme";
 import { AuthShell } from "./AuthShell";
 import { accentLinkClass } from "../lib/uiClasses";
 import type {
@@ -204,7 +204,7 @@ export function SchedulePage() {
       {calendarUrl && (
         <Alert variant="info">
           Subscribe to this link in Apple, Google, or Outlook Calendar:{" "}
-          <a className="break-all underline" href={calendarUrl}>
+          <a className={`${accentLinkClass} break-all underline`} href={calendarUrl}>
             {calendarUrl}
           </a>
         </Alert>
@@ -448,7 +448,7 @@ export function AvailabilityPage() {
             <div className="flex flex-wrap gap-2">
               {!window.blocked && window.date >= today() && (
                 <Link
-                  className="rounded-lg border px-3 py-2 text-sm"
+                  className={actionLinkClass}
                   to={`/search?availability=${window.id}`}
                 >
                   Find opponents
@@ -997,7 +997,7 @@ export function ProposalsPage() {
       >
         <ResourceState loading={history.loading} error={history.error} />
         {history.data?.map((row) => (
-          <div key={row.id} className="border-b py-3">
+          <div key={row.id} className="border-b border-[color:var(--app-border-subtle)] py-3">
             <strong>
               Revision {row.revision_number}: {row.status}
             </strong>
@@ -1170,7 +1170,7 @@ export function TeamsPage() {
               </p>
               <p className="text-sm">
                 {team.manager_name}{" "}
-                <a className="underline" href={`mailto:${team.manager_email}`}>
+                <a className={`${accentLinkClass} underline`} href={`mailto:${team.manager_email}`}>
                   {team.manager_email}
                 </a>{" "}
                 {team.manager_phone}
@@ -1482,7 +1482,7 @@ export function AccessPage() {
           empty={!requests.data?.length}
         />
         {requests.data?.map((request) => (
-          <div key={request.id} className="space-y-2 border-b pb-3">
+          <div key={request.id} className="space-y-2 border-b border-[color:var(--app-border-subtle)] pb-3">
             <p>
               {request.user_email} · {request.team_name} · {request.status}
             </p>
@@ -1524,7 +1524,7 @@ export function AccessPage() {
             {request.team_name}: {request.status}
           </p>
         ))}
-        <Link className="underline" to="/teams">
+        <Link className={`${accentLinkClass} underline`} to="/teams">
           Request another team
         </Link>
       </Card>
@@ -1610,7 +1610,7 @@ export function OnboardingPage() {
         loading={targets.loading}
         error={targets.error || requests.error}
       />
-      <Link className="underline" to="/contact">
+      <Link className={`${accentLinkClass} underline`} to="/contact">
         Contact an administrator
       </Link>
     </div>
@@ -1728,7 +1728,7 @@ export function ContactPage() {
           </Button>
         </form>
       )}
-      <Link className="underline" to="/">
+      <Link className={`${accentLinkClass} underline`} to="/">
         Back to RinkLink
       </Link>
     </Card>

@@ -33,3 +33,9 @@ export function navigationClass(active: boolean) {
                         : 'text-slate-700 hover:bg-white/70 hover:text-slate-900 hover:ring-1 hover:ring-slate-200/70 dark:text-slate-300 dark:hover:bg-slate-900/40 dark:hover:text-slate-100 dark:hover:ring-slate-700/70',);
 }
 
+
+export const actionLinkClass = cn(
+  "inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-all",
+  focusRingClass,
+  'border border-slate-300/90 bg-white/95 text-slate-800 shadow-sm backdrop-blur-[1px] hover:border-[color:var(--app-accent-link)]/35 hover:bg-[color:color-mix(in_srgb,var(--app-accent-link)_8%,white)] hover:text-[color:var(--app-accent-link-hover)] hover:ring-1 hover:ring-[color:var(--app-accent-link)]/15 disabled:border-[color:var(--app-border-subtle)] disabled:bg-[var(--app-disabled-surface)] disabled:text-[color:var(--app-disabled-text)] dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-[color:var(--app-accent-link)]/45 dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-link)_14%,transparent)] dark:hover:text-[color:var(--app-accent-link)] dark:hover:ring-[color:var(--app-accent-link)]/20',
+);
