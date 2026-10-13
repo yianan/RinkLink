@@ -5,7 +5,7 @@ def test_security_settings_auth_routes_are_allowlisted() -> None:
     assert _is_allowed_auth_proxy_path("list-accounts") is True
     assert _is_allowed_auth_proxy_path("list-sessions") is True
     assert _is_allowed_auth_proxy_path("request-password-reset") is True
-    assert _is_allowed_auth_proxy_path("delete-user/callback") is True
+    assert _is_allowed_auth_proxy_path("delete-user/callback") is False
 
 
 def test_unknown_auth_routes_remain_blocked() -> None:

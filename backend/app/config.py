@@ -69,7 +69,7 @@ def _origin_from_url(value: str | None) -> str | None:
 def _load() -> Settings:
     app_env = os.getenv("APP_ENV", "development").strip().lower() or "development"
     render_external_url = _normalize_http_url(os.getenv("RENDER_EXTERNAL_URL"))
-    default_sqlite_path = Path(__file__).resolve().parents[1] / "rinklink.db"
+    default_sqlite_path = Path(__file__).resolve().parents[1] / "rinklink-minimal.db"
     db_url = os.getenv("DATABASE_URL", f"sqlite:///{default_sqlite_path}")
 
     # Some hosted platforms expose Postgres URLs as postgres:// or postgresql://.

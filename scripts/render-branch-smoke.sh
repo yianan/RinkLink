@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-https://rinklink-branch-app.onrender.com}"
+BASE_URL="${BASE_URL:-https://rinklink-minimal-app.onrender.com}"
 ALLOWED_ORIGIN="${ALLOWED_ORIGIN:-$BASE_URL}"
 DISALLOWED_ORIGIN="${DISALLOWED_ORIGIN:-http://localhost:5173}"
 BODY_FILE="${BODY_FILE:-/tmp/rinklink-render-smoke-body.txt}"
@@ -47,6 +47,8 @@ assert_not_status() {
 echo "==> health"
 assert_status 200 "$BASE_URL/api/health"
 grep -q '"status":"ok"' "$BODY_FILE" || fail "health response missing status=ok"
+
+grep -q '"variant":"minimal"' "$BODY_FILE" || fail "wrong application variant"
 
 echo "==> jwks"
 assert_status 200 "$BASE_URL/.well-known/jwks.json"

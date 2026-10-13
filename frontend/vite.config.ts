@@ -6,6 +6,7 @@ const apiProxyTarget = process.env.VITE_PROXY_API_TARGET || 'http://localhost:80
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  cacheDir: '.cache/vite',
   build: {
     rollupOptions: {
       output: {
@@ -36,6 +37,7 @@ export default defineConfig({
       },
     },
   },
+  preview: { proxy: { '/api': apiProxyTarget } },
   server: {
     proxy: {
       '/api': apiProxyTarget,

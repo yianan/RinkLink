@@ -3,10 +3,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-AUTH_BASE="${AUTH_BASE:-http://localhost:3000}"
-API_BASE="${API_BASE:-http://localhost:8000}"
-MAILPIT_BASE="${MAILPIT_BASE:-http://localhost:8025}"
-ORIGIN="${ORIGIN:-http://localhost:5173}"
+AUTH_BASE="${AUTH_BASE:-http://localhost:3100}"
+API_BASE="${API_BASE:-http://localhost:8100}"
+MAILPIT_BASE="${MAILPIT_BASE:-http://localhost:8125}"
+ORIGIN="${ORIGIN:-http://localhost:5183}"
 PASSWORD="${PASSWORD:-RinkLinkLocal!7Q2x}"
 EMAIL="${1:-local-smoke-$(date +%s)@example.com}"
 NAME="${NAME:-Local Smoke}"

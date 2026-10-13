@@ -37,24 +37,6 @@ class AppUser(Base):
     default_team = relationship("Team", foreign_keys=[default_team_id])
 
 
-class AssociationMembership(Base):
-    __tablename__ = "association_memberships"
-    __table_args__ = (
-        UniqueConstraint("user_id", "association_id", name="uq_association_memberships_user_association"),
-        Index("ix_association_memberships_association", "association_id"),
-    )
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id: Mapped[str] = mapped_column(ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False)
-    association_id: Mapped[str] = mapped_column(ForeignKey("associations.id", ondelete="CASCADE"), nullable=False)
-    role: Mapped[str] = mapped_column(String(50), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
-
-    user = relationship("AppUser", foreign_keys=[user_id])
-    association = relationship("Association", foreign_keys=[association_id])
-
-
 class TeamMembership(Base):
     __tablename__ = "team_memberships"
     __table_args__ = (
@@ -71,59 +53,6 @@ class TeamMembership(Base):
 
     user = relationship("AppUser", foreign_keys=[user_id])
     team = relationship("Team", foreign_keys=[team_id])
-
-
-class ArenaMembership(Base):
-    __tablename__ = "arena_memberships"
-    __table_args__ = (
-        UniqueConstraint("user_id", "arena_id", name="uq_arena_memberships_user_arena"),
-        Index("ix_arena_memberships_arena", "arena_id"),
-    )
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id: Mapped[str] = mapped_column(ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False)
-    arena_id: Mapped[str] = mapped_column(ForeignKey("arenas.id", ondelete="CASCADE"), nullable=False)
-    role: Mapped[str] = mapped_column(String(50), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
-
-    user = relationship("AppUser", foreign_keys=[user_id])
-    arena = relationship("Arena", foreign_keys=[arena_id])
-
-
-class PlayerGuardianship(Base):
-    __tablename__ = "player_guardianships"
-    __table_args__ = (
-        UniqueConstraint("user_id", "player_id", name="uq_player_guardianships_user_player"),
-        Index("ix_player_guardianships_player", "player_id"),
-    )
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id: Mapped[str] = mapped_column(ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False)
-    player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), nullable=False)
-    relationship_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
-
-    user = relationship("AppUser", foreign_keys=[user_id])
-    player = relationship("Player", foreign_keys=[player_id])
-
-
-class PlayerMembership(Base):
-    __tablename__ = "player_memberships"
-    __table_args__ = (
-        UniqueConstraint("user_id", "player_id", name="uq_player_memberships_user_player"),
-        Index("ix_player_memberships_player", "player_id"),
-    )
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id: Mapped[str] = mapped_column(ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False)
-    player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
-
-    user = relationship("AppUser", foreign_keys=[user_id])
-    player = relationship("Player", foreign_keys=[player_id])
 
 
 class Invite(Base):

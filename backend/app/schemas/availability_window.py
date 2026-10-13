@@ -1,77 +1,48 @@
-from __future__ import annotations
-
 import datetime as dt
-
-from pydantic import BaseModel, model_validator
-
-
-def _validate_time_range(start_time: dt.time | None, end_time: dt.time | None) -> None:
-    if start_time is not None and end_time is not None and end_time < start_time:
-        raise ValueError("End time must be the same as or later than start time")
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class AvailabilityWindowCreate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     date: dt.date
     start_time: dt.time | None = None
     end_time: dt.time | None = None
-    availability_type: str
-    status: str = "open"
-    notes: str | None = None
+    availability_type: Literal['home', 'away']
+    notes: str | None = Field(default=None, max_length=1000)
     season_id: str | None = None
+    blocked: bool = False
 
-    @model_validator(mode="after")
-    def validate_time_range(self):
-        _validate_time_range(self.start_time, self.end_time)
+    @model_validator(mode='after')
+    def time_range(self):
+        if any(value and value.tzinfo for value in [self.start_time, self.end_time]):
+            raise ValueError('Use local times without a timezone suffix')
+        if self.start_time and self.end_time and self.end_time <= self.start_time:
+            raise ValueError('End time must be later than start time')
         return self
 
 
 class AvailabilityWindowUpdate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     date: dt.date | None = None
     start_time: dt.time | None = None
     end_time: dt.time | None = None
-    availability_type: str | None = None
-    status: str | None = None
-    notes: str | None = None
+    availability_type: Literal['home', 'away'] | None = None
+    notes: str | None = Field(default=None, max_length=1000)
+    season_id: str | None = None
     blocked: bool | None = None
 
-    @model_validator(mode="after")
-    def validate_time_range(self):
-        if self.start_time is not None and self.end_time is not None:
-            _validate_time_range(self.start_time, self.end_time)
-        return self
 
-
-class AvailabilityWindowOut(BaseModel):
+class AvailabilityWindowOut(AvailabilityWindowCreate):
+    model_config = ConfigDict(from_attributes=True)
     id: str
     team_id: str
-    season_id: str | None
-    date: dt.date
-    start_time: dt.time | None
-    end_time: dt.time | None
-    availability_type: str
     status: str
-    blocked: bool
-    opponent_team_id: str | None
-    notes: str | None
     event_id: str | None = None
-    created_at: dt.datetime
-    updated_at: dt.datetime
-
-    model_config = {"from_attributes": True}
 
 
-class AvailabilityUploadRow(BaseModel):
-    date: dt.date
-    start_time: dt.time | None = None
-    end_time: dt.time | None = None
-    availability_type: str
-    notes: str | None = None
-    status: str = "open"
-
-    @model_validator(mode="after")
-    def validate_time_range(self):
-        _validate_time_range(self.start_time, self.end_time)
-        return self
+class AvailabilityUploadRow(AvailabilityWindowCreate):
+    pass
 
 
 class AvailabilityUploadPreview(BaseModel):
@@ -80,4 +51,4 @@ class AvailabilityUploadPreview(BaseModel):
 
 
 class AvailabilityConfirmUpload(BaseModel):
-    entries: list[AvailabilityUploadRow]
+    entries: list[AvailabilityUploadRow] = Field(max_length=500)

@@ -6,7 +6,7 @@ import { api, ApiError } from '../api/client';
 import type { AppBootstrap, MeResponse } from '../types';
 import { authEnabled, clearApiAccessToken, getApiAccessToken } from '../lib/auth-client';
 
-const bootstrapStorageKey = 'rinklink.appBootstrap';
+const bootstrapStorageKey = 'rinklink.minimal.appBootstrap';
 const bootstrapCacheTtlMs = 60_000;
 
 interface AuthContextValue {

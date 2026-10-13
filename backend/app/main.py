@@ -21,6 +21,12 @@ logger = logging.getLogger("rinklink.request_timing")
 async def lifespan(app: FastAPI):
     from . import models  # noqa: F401
 
+    from .schema_guard import assert_minimal_database
+    assert_minimal_database(engine)
+    from .database import SessionLocal
+    from .services.zip_reference import ensure_zip_reference
+    with SessionLocal() as db:
+        ensure_zip_reference(db)
     assert_auth_runtime_safe()
     app.state.auth_proxy_client = httpx.AsyncClient(follow_redirects=False, timeout=30.0)
     try:
@@ -62,7 +68,7 @@ async def request_timing_middleware(request: Request, call_next):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "variant": "minimal"}
 
 
 _UPSTREAM_HEADER_EXCLUDES = {
@@ -83,8 +89,6 @@ _AUTH_PROXY_ALLOWED_PREFIXES = (
     "callback/",
     "change-email",
     "change-password",
-    "delete-user",
-    "delete-user/",
     "error",
     "forget-password",
     "get-session",
@@ -184,57 +188,20 @@ async def auth_jwks_proxy(request: Request) -> Response:
     return await _proxy_auth_request(request, "/.well-known/jwks.json")
 
 
-# Routers imported after app creation to avoid circular imports
-from .routers import (  # noqa: E402
-    arenas,
-    associations,
-    availability,
-    bootstrap,
-    events,
-    ice_booking_requests,
-    teams,
-    search,
-    proposals,
-    notifications,
-    players,
-    scoresheet,
-    seasons,
-    competitions,
-    dashboard,
-    me,
-    public,
-    access,
-    calendar,
-    seed as seed_router,
-)
-
-app.include_router(arenas.router, prefix="/api")
-app.include_router(associations.router, prefix="/api")
-app.include_router(availability.router, prefix="/api")
-app.include_router(bootstrap.router, prefix="/api")
-app.include_router(events.router, prefix="/api")
-app.include_router(ice_booking_requests.router, prefix="/api")
-app.include_router(teams.router, prefix="/api")
-app.include_router(search.router, prefix="/api")
-app.include_router(proposals.router, prefix="/api")
-app.include_router(notifications.router, prefix="/api")
-app.include_router(players.router, prefix="/api")
-app.include_router(scoresheet.router, prefix="/api")
-app.include_router(seasons.router, prefix="/api")
-app.include_router(competitions.router, prefix="/api")
-app.include_router(dashboard.router, prefix="/api")
-app.include_router(me.router, prefix="/api")
-app.include_router(public.router, prefix="/api")
-app.include_router(access.router, prefix="/api")
+from .routers import minimal, calendar  # noqa: E402
+app.include_router(minimal.router, prefix="/api")
 app.include_router(calendar.router, prefix="/api")
-app.include_router(seed_router.router, prefix="/api")
 
 # Serve the React SPA for all non-API routes (production only — only present in Docker image)
 _STATIC = Path(__file__).parent.parent / "static"
 if _STATIC.is_dir():
     @app.get("/{full_path:path}", include_in_schema=False)
     def _spa(full_path: str):
-        candidate = _STATIC / full_path
+        if full_path.startswith("api/"):
+            raise HTTPException(404, "API route not found")
+        candidate = (_STATIC / full_path).resolve()
+        if not candidate.is_relative_to(_STATIC.resolve()):
+            raise HTTPException(404, "File not found")
         if candidate.is_file():
             return FileResponse(str(candidate))
         # Serve index.html with no-cache so browsers always get the latest

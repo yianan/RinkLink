@@ -1,304 +1,75 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
-
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
-
 from ..config import settings
 from ..database import get_db
-from ..models import (
-    AppUser,
-    AssociationMembership,
-    ArenaMembership,
-    Event,
-    PlayerGuardianship,
-    PlayerMembership,
-    Proposal,
-    Team,
-    TeamMembership,
-)
-from .capabilities import ALL_CAPABILITIES, capabilities_for_roles, effective_capabilities
-from .dependencies import current_user, require_active_user
-
-PRIVILEGED_CAPABILITIES = {
-    "platform.manage",
-    "association.manage",
-    "team.manage_staff",
-    "arena.manage",
-}
+from ..models import AppUser, TeamMembership
+from .capabilities import ALL_CAPABILITIES, capabilities_for_roles
+from .dependencies import require_active_user, current_user
 
 
-@dataclass(slots=True)
+@dataclass
 class AuthorizationContext:
     user: AppUser
-    association_memberships: list[AssociationMembership]
-    team_memberships: list[TeamMembership]
-    arena_memberships: list[ArenaMembership]
-    guardianships: list[PlayerGuardianship]
-    player_memberships: list[PlayerMembership]
-    capabilities: set[str]
-    association_roles: dict[str, str]
-    team_roles: dict[str, str]
-    arena_roles: dict[str, str]
-    association_ids: set[str]
-    team_ids: set[str]
-    arena_ids: set[str]
-    guardian_player_ids: set[str]
-    player_ids: set[str]
-    linked_team_ids: set[str]
-    token_claims: dict | None = None
+    team_memberships: list
+    team_roles: dict
+    team_ids: set
+    capabilities: set
 
 
-def build_authorization_context(db: Session, user: AppUser) -> AuthorizationContext:
-    if user.is_platform_admin:
-        return AuthorizationContext(
-            user=user,
-            association_memberships=[],
-            team_memberships=[],
-            arena_memberships=[],
-            guardianships=[],
-            player_memberships=[],
-            capabilities=set(ALL_CAPABILITIES),
-            association_roles={},
-            team_roles={},
-            arena_roles={},
-            association_ids=set(),
-            team_ids=set(),
-            arena_ids=set(),
-            guardian_player_ids=set(),
-            player_ids=set(),
-            linked_team_ids=set(),
-            token_claims=getattr(user, "_token_claims", None),
-        )
-
-    association_memberships = (
-        db.query(AssociationMembership)
-        .filter(AssociationMembership.user_id == user.id)
-        .order_by(AssociationMembership.association_id)
-        .all()
-    )
-    team_memberships = (
-        db.query(TeamMembership)
-        .filter(TeamMembership.user_id == user.id)
-        .order_by(TeamMembership.team_id)
-        .all()
-    )
-    arena_memberships = (
-        db.query(ArenaMembership)
-        .filter(ArenaMembership.user_id == user.id)
-        .order_by(ArenaMembership.arena_id)
-        .all()
-    )
-    guardianships = db.query(PlayerGuardianship).filter(PlayerGuardianship.user_id == user.id).all()
-    player_memberships = db.query(PlayerMembership).filter(PlayerMembership.user_id == user.id).all()
-
-    capabilities = (
-        set(ALL_CAPABILITIES)
-        if user.is_platform_admin
-        else effective_capabilities(
-            user=user,
-            association_roles=[membership.role for membership in association_memberships],
-            team_roles=[membership.role for membership in team_memberships],
-            arena_roles=[membership.role for membership in arena_memberships],
-            has_guardian_link=bool(guardianships),
-            has_player_link=bool(player_memberships),
-        )
-    )
-
-    association_roles = {membership.association_id: membership.role for membership in association_memberships}
-    team_roles = {membership.team_id: membership.role for membership in team_memberships}
-    arena_roles = {membership.arena_id: membership.role for membership in arena_memberships}
-    association_ids = set(association_roles.keys())
-    team_ids = set(team_roles.keys())
-    arena_ids = set(arena_roles.keys())
-    guardian_player_ids = {guardianship.player_id for guardianship in guardianships}
-    player_ids = {membership.player_id for membership in player_memberships}
-
-    linked_team_ids: set[str] = set()
-    for guardianship in guardianships:
-        if guardianship.player:
-            linked_team_ids.add(guardianship.player.team_id)
-    for membership in player_memberships:
-        if membership.player:
-            linked_team_ids.add(membership.player.team_id)
-
-    return AuthorizationContext(
-        user=user,
-        association_memberships=association_memberships,
-        team_memberships=team_memberships,
-        arena_memberships=arena_memberships,
-        guardianships=guardianships,
-        player_memberships=player_memberships,
-        capabilities=capabilities,
-        association_roles=association_roles,
-        team_roles=team_roles,
-        arena_roles=arena_roles,
-        association_ids=association_ids,
-        team_ids=team_ids,
-        arena_ids=arena_ids,
-        guardian_player_ids=guardian_player_ids,
-        player_ids=player_ids,
-        linked_team_ids=linked_team_ids,
-        token_claims=getattr(user, "_token_claims", None),
-    )
+def build_authorization_context(db, user):
+    stored = db.get(AppUser, user.id)
+    if stored is not None:
+        stored._token_claims = getattr(user, '_token_claims', None)
+        user = stored
+    memberships = db.query(TeamMembership).filter(TeamMembership.user_id == user.id).all()
+    roles = {membership.team_id: membership.role for membership in memberships}
+    return AuthorizationContext(user, memberships, roles, set(roles),
+        set(ALL_CAPABILITIES) if user.is_platform_admin else capabilities_for_roles(roles.values()))
 
 
-def enforced_authorization_context(db: Session, user: AppUser) -> AuthorizationContext:
-    return _enforce_privileged_mfa(build_authorization_context(db, user))
-
-
-def _enforce_privileged_mfa(context: AuthorizationContext) -> AuthorizationContext:
-    if settings.auth_bypass_dev_only or not settings.auth_require_mfa_for_privileged:
-        return context
-    requires_mfa = context.user.is_platform_admin or bool(PRIVILEGED_CAPABILITIES & context.capabilities)
-    if requires_mfa and not bool((context.token_claims or {}).get("mfa_verified")):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Two-factor authentication is required for this account",
-        )
+def enforced_authorization_context(db, user):
+    context = build_authorization_context(db, user)
+    privileged = user.is_platform_admin or "team.manage_staff" in context.capabilities
+    if settings.auth_require_mfa_for_privileged and privileged and not settings.auth_bypass_dev_only:
+        if not (getattr(user, "_token_claims", None) or {}).get("mfa_verified"):
+            raise HTTPException(403, "Two-factor authentication is required for this account")
     return context
 
 
-def authorization_context(
-    user: AppUser = Depends(require_active_user),
-    db: Session = Depends(get_db),
-) -> AuthorizationContext:
+def authorization_context(user=Depends(require_active_user), db: Session = Depends(get_db)):
     return enforced_authorization_context(db, user)
 
 
-def current_authorization_context(
-    user: AppUser = Depends(current_user),
-    db: Session = Depends(get_db),
-) -> AuthorizationContext:
+def current_authorization_context(user=Depends(current_user), db: Session = Depends(get_db)):
     return enforced_authorization_context(db, user)
 
 
-def can_access_association(context: AuthorizationContext, association_id: str, capability: str) -> bool:
-    if context.user.is_platform_admin:
-        return True
-    role = context.association_roles.get(association_id)
-    if role is None:
-        return False
-    return capability in capabilities_for_roles([role])
+def can_access_team(context, team, capability):
+    return context.user.is_platform_admin or capability in capabilities_for_roles([context.team_roles.get(team.id)])
 
 
-def has_capability(context: AuthorizationContext, capability: str) -> bool:
-    return context.user.is_platform_admin or capability in context.capabilities
+def ensure_team_access(context, team, capability):
+    if not can_access_team(context, team, capability):
+        raise HTTPException(403, "You do not have access to this team")
 
 
-def can_access_team(
-    context: AuthorizationContext,
-    team: Team,
-    capability: str,
-    *,
-    allow_linked_family: bool = False,
-) -> bool:
-    if context.user.is_platform_admin:
-        return True
-    if allow_linked_family and team.id in context.linked_team_ids:
-        if context.guardian_player_ids and "player.respond_guarded" in context.capabilities:
-            return True
-        if context.player_ids and "player.respond_self" in context.capabilities:
-            return True
-    team_role = context.team_roles.get(team.id)
-    if team_role is not None and capability in capabilities_for_roles([team_role]):
-        return True
-    association_role = context.association_roles.get(team.association_id)
-    if association_role is not None and capability in capabilities_for_roles([association_role]):
-        return True
-    return False
+def ensure_capability(context, capability):
+    if capability not in context.capabilities:
+        raise HTTPException(403, "You do not have permission to access this resource")
 
 
-def can_access_arena(context: AuthorizationContext, arena_id: str, capability: str) -> bool:
-    if context.user.is_platform_admin:
-        return True
-    role = context.arena_roles.get(arena_id)
-    if role is None:
-        return False
-    return capability in capabilities_for_roles([role])
+def ensure_event_team_access(context, event, capability):
+    if not any(can_access_team(context, team, capability) for team in [event.home_team, event.away_team] if team):
+        raise HTTPException(403, "You do not have access to this event")
 
 
-def can_access_any_event_team(
-    context: AuthorizationContext,
-    event: Event,
-    capability: str,
-    *,
-    allow_linked_family: bool = False,
-) -> bool:
-    teams = [team for team in (event.home_team, event.away_team) if team is not None]
-    return any(
-        can_access_team(context, team, capability, allow_linked_family=allow_linked_family)
-        for team in teams
-    )
+def ensure_proposal_team_access(context, proposal, capability):
+    if not any(can_access_team(context, team, capability) for team in [proposal.home_team, proposal.away_team] if team):
+        raise HTTPException(403, "You do not have access to this proposal")
 
 
-def can_access_any_proposal_team(context: AuthorizationContext, proposal: Proposal, capability: str) -> bool:
-    teams = [team for team in (proposal.home_team, proposal.away_team) if team is not None]
-    return any(can_access_team(context, team, capability) for team in teams)
-
-
-def can_access_proposal_counterparty(context: AuthorizationContext, proposal: Proposal, capability: str) -> bool:
-    teams = [
-        team
-        for team in (proposal.home_team, proposal.away_team)
-        if team is not None and team.id != proposal.proposed_by_team_id
-    ]
-    return any(can_access_team(context, team, capability) for team in teams)
-
-
-def ensure_association_access(context: AuthorizationContext, association_id: str, capability: str) -> None:
-    if can_access_association(context, association_id, capability):
-        return
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this association")
-
-
-def ensure_capability(context: AuthorizationContext, capability: str, detail: str = "You do not have permission to access this resource") -> None:
-    if has_capability(context, capability):
-        return
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
-
-
-def ensure_team_access(
-    context: AuthorizationContext,
-    team: Team,
-    capability: str,
-    *,
-    allow_linked_family: bool = False,
-) -> None:
-    if can_access_team(context, team, capability, allow_linked_family=allow_linked_family):
-        return
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this team")
-
-
-def ensure_arena_access(context: AuthorizationContext, arena_id: str, capability: str) -> None:
-    if can_access_arena(context, arena_id, capability):
-        return
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this arena")
-
-
-def ensure_event_team_access(
-    context: AuthorizationContext,
-    event: Event,
-    capability: str,
-    *,
-    allow_linked_family: bool = False,
-) -> None:
-    if can_access_any_event_team(context, event, capability, allow_linked_family=allow_linked_family):
-        return
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this event")
-
-
-def ensure_proposal_team_access(context: AuthorizationContext, proposal: Proposal, capability: str) -> None:
-    if can_access_any_proposal_team(context, proposal, capability):
-        return
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this proposal")
-
-
-def ensure_proposal_counterparty_access(context: AuthorizationContext, proposal: Proposal, capability: str) -> None:
-    if can_access_proposal_counterparty(context, proposal, capability):
-        return
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="You do not have permission to respond to this proposal",
-    )
+def ensure_proposal_counterparty_access(context, proposal, capability):
+    teams = [team for team in [proposal.home_team, proposal.away_team] if team and team.id != proposal.proposed_by_team_id]
+    if not any(can_access_team(context, team, capability) for team in teams):
+        raise HTTPException(403, "Only the opposing team can respond to this proposal")

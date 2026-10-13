@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..models import AvailabilityWindow, Event, Team
-from .event_view import enrich_event
+from .presentation import enrich_event
 
 
 def _secret() -> bytes:

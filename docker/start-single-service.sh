@@ -37,6 +37,11 @@ AUTH_AUDIENCE="${AUTH_AUDIENCE:-$API_AUDIENCE}"
 
 export PUBLIC_APP_URL AUTH_INTERNAL_BASE_URL AUTH_SERVICE_HOST AUTH_SERVICE_PORT AUTH_DATABASE_URL API_AUDIENCE BETTER_AUTH_URL FRONTEND_URL AUTH_JWKS_URL AUTH_ISSUER AUTH_AUDIENCE
 
+# Validate isolation before any auth migration or bootstrap can touch the database.
+cd /app/backend
+python -c 'from app.database import engine; from app.schema_guard import assert_minimal_database; assert_minimal_database(engine)'
+alembic upgrade head
+
 cd /app/auth-service
 node dist/ensure-auth-schema.js
 npm run auth:migrate:compiled
@@ -45,17 +50,6 @@ PORT="$AUTH_SERVICE_PORT" node dist/index.js &
 AUTH_PID=$!
 
 cd /app/backend
-alembic upgrade head
-python -m app.seed.repair_pinned_admins
-
-if [ "${RESEED_DEMO_ON_START:-false}" = "true" ]; then
-  if [ -n "${RESEED_DEMO_ON_START_COMMIT:-}" ] && [ "${RENDER_GIT_COMMIT:-}" != "${RESEED_DEMO_ON_START_COMMIT}" ]; then
-    echo "Skipping demo reseed: RENDER_GIT_COMMIT does not match RESEED_DEMO_ON_START_COMMIT"
-  else
-    echo "Reseeding demo data while preserving existing app users"
-    python -m app.seed.bootstrap_demo --preserve-existing-users
-  fi
-fi
 
 uvicorn app.main:app --host 0.0.0.0 --port "$APP_PORT" &
 API_PID=$!

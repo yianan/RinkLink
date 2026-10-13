@@ -109,7 +109,6 @@ def parse_csv(content: str) -> AvailabilityUploadPreview:
                 end_time=end_t,
                 availability_type=et,
                 notes=notes,
-                status="open",
             ))
         except (ValueError, KeyError) as e:
             warnings.append(f"Row {i}: {e}")

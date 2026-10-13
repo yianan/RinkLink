@@ -8,3 +8,11 @@ backend/rinklink.db-shm
 backend/rinklink.db-wal
 .git
 .gitignore
+
+**/.cache
+**/.playwright-cli
+**/.env
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+output/

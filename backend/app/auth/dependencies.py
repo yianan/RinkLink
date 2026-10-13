@@ -9,6 +9,7 @@ import jwt as pyjwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from ..config import settings
 from ..database import get_db
@@ -130,7 +131,17 @@ def _resolve_current_user(
 
     if not settings.auth_enabled:
         if settings.auth_bypass_dev_only:
-            return _synthetic_admin()
+            user = db.query(AppUser).filter(AppUser.auth_id == 'dev-admin').first()
+            if user is None:
+                user = _synthetic_admin()
+                db.add(user)
+                try:
+                    db.commit()
+                    db.refresh(user)
+                except IntegrityError:
+                    db.rollback()
+                    user = db.query(AppUser).filter(AppUser.auth_id == 'dev-admin').one()
+            return user
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Authentication is not enabled")
 
     if credentials is None or credentials.scheme.lower() != "bearer":

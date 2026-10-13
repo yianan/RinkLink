@@ -23,7 +23,7 @@ def get_team_calendar_feed_url(
         from fastapi import HTTPException
 
         raise HTTPException(404, "Team not found")
-    ensure_team_access(context, team, "team.view", allow_linked_family=True)
+    ensure_team_access(context, team, "team.view")
     return {"url": calendar_feed_url(team_id)}
 
 

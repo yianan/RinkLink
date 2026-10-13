@@ -1,21 +1,21 @@
-export const AUTH_RETURN_TO_KEY = 'rinklink.returnTo';
+export const AUTH_RETURN_TO_KEY = "rinklink.minimal.returnTo";
 
 export function setAuthReturnTo(path: string) {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return;
   }
   window.sessionStorage.setItem(AUTH_RETURN_TO_KEY, path);
 }
 
 export function peekAuthReturnTo() {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return null;
   }
   return window.sessionStorage.getItem(AUTH_RETURN_TO_KEY);
 }
 
 export function consumeAuthReturnTo() {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return null;
   }
   const returnTo = window.sessionStorage.getItem(AUTH_RETURN_TO_KEY);
@@ -26,8 +26,8 @@ export function consumeAuthReturnTo() {
   return returnTo;
 }
 
-export function buildAuthCallbackUrl(fallbackPath = '/pending') {
-  if (typeof window === 'undefined') {
+export function buildAuthCallbackUrl(fallbackPath = "/pending") {
+  if (typeof window === "undefined") {
     return `/auth/callback?redirectTo=${encodeURIComponent(fallbackPath)}`;
   }
   const redirectTo = peekAuthReturnTo() || fallbackPath;

@@ -3,7 +3,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from ..models.season import Season
+from ..models import Season
 
 
 SEASON_START_MONTH = 8

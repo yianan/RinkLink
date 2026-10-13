@@ -2,11 +2,13 @@ services:
   - type: web
     runtime: docker
     plan: free
-    name: rinklink-branch-app
-    branch: codex/auth-foundation
+    name: rinklink-minimal-app
+    branch: codex/team-matching-scheduling
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
+      - key: RINKLINK_VARIANT
+        value: minimal
       - key: APP_ENV
         value: production
       - key: DATABASE_URL

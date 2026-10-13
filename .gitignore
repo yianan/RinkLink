@@ -25,3 +25,11 @@ Thumbs.db
 
 # Env
 .env
+
+frontend/.cache/
+
+.playwright-cli/
+output/playwright/
+
+/auth-service/node_modules
+/frontend/node_modules
