@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from ..models import Association, AvailabilityWindow, Proposal, Team, TeamSeasonVenueAssignment
 from ..schemas.search import AutoMatchResult
+from .availability_matching import matching_windows_are_available
 from .distance import get_distance
 from .competitions import primary_membership_for_team
 from .team_logos import effective_team_logo_url
@@ -40,15 +41,12 @@ def find_auto_matches(db: Session, team_id: str) -> list[AutoMatchResult]:
 
     results: list[AutoMatchResult] = []
     for window in my_windows:
-        if window.start_time is None:
-            continue
         opposite_type = "away" if window.availability_type == "home" else "home"
         matches = (
             db.query(AvailabilityWindow)
             .join(Team, AvailabilityWindow.team_id == Team.id)
             .filter(
                 AvailabilityWindow.date == window.date,
-                AvailabilityWindow.start_time == window.start_time,
                 AvailabilityWindow.availability_type == opposite_type,
                 AvailabilityWindow.status == "open",
                 AvailabilityWindow.blocked == False,  # noqa: E712
@@ -61,6 +59,8 @@ def find_auto_matches(db: Session, team_id: str) -> list[AutoMatchResult]:
             matches = [match for match in matches if match.season_id == window.season_id]
 
         for match in matches:
+            if not matching_windows_are_available(db, window, match):
+                continue
             opp_team = db.get(Team, match.team_id)
             if not opp_team:
                 continue

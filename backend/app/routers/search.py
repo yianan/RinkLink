@@ -5,6 +5,7 @@ from ..auth.context import AuthorizationContext, authorization_context, ensure_t
 from ..database import get_db
 from ..models import Association, Arena, AvailabilityWindow, Proposal, Team, TeamSeasonVenueAssignment
 from ..schemas.search import AutoMatchResult, OpponentResult
+from ..services.availability_matching import matching_windows_are_available
 from ..services.competitions import primary_membership_for_team
 from ..services.distance import get_distance
 from ..services.matching import find_auto_matches
@@ -50,7 +51,7 @@ def search_opponents(
         raise HTTPException(400, "Availability window does not belong to team")
     if my_window.status != "open":
         raise HTTPException(400, "Availability window is not open")
-    if my_window.start_time is None:
+    if my_window.blocked:
         return []
 
     opposite_type = "away" if my_window.availability_type == "home" else "home"
@@ -59,7 +60,6 @@ def search_opponents(
         .join(Team, AvailabilityWindow.team_id == Team.id)
         .filter(
             AvailabilityWindow.date == my_window.date,
-            AvailabilityWindow.start_time == my_window.start_time,
             AvailabilityWindow.availability_type == opposite_type,
             AvailabilityWindow.status == "open",
             AvailabilityWindow.blocked == False,  # noqa: E712
@@ -83,7 +83,8 @@ def search_opponents(
         if arena and arena.zip_code:
             base_zip = arena.zip_code
 
-    windows = query.all()
+    windows = [window for window in query.all()
+        if matching_windows_are_available(db, my_window, window)]
     window_ids = [window.id for window in windows]
     proposals = (
         db.query(Proposal)

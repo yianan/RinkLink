@@ -14,6 +14,7 @@ from ..auth.context import (
 from ..database import get_db
 from ..models import Arena, ArenaRink, AvailabilityWindow, Event, IceSlot, LockerRoom, Proposal, Team
 from ..schemas import ProposalCreate, ProposalOut, ProposalRescheduleCreate
+from ..services.availability_matching import validate_proposal_availability
 from ..services.competitions import normalize_event_competition
 from ..services.event_view import enrich_event
 from ..services.event_types import validate_event_type
@@ -142,6 +143,8 @@ def create_proposal(
     home_window, away_window = _validate_windows(db, body.home_availability_window_id, body.away_availability_window_id)
     if home_window.team_id != body.home_team_id or away_window.team_id != body.away_team_id:
         raise HTTPException(400, "Availability windows must match the selected teams")
+    validate_proposal_availability(db, home_window, away_window, body.proposed_date,
+        body.proposed_start_time, body.proposed_end_time)
     _, _, slot = _validate_venue(
         db,
         arena_id=body.arena_id,
@@ -330,6 +333,12 @@ def accept_proposal(
     ensure_proposal_counterparty_access(context, proposal, "team.manage_proposals")
     if proposal.status != "proposed":
         raise HTTPException(400, f"Cannot accept proposal with status '{proposal.status}'")
+    # Reschedule revisions negotiate a new interval independently of the original windows.
+    if proposal.parent_proposal_id is None:
+        home_window, away_window = _validate_windows(db, proposal.home_availability_window_id,
+            proposal.away_availability_window_id)
+        validate_proposal_availability(db, home_window, away_window, proposal.proposed_date,
+            proposal.proposed_start_time, proposal.proposed_end_time)
     proposal.status = "accepted"
     proposal.responded_at = datetime.now(timezone.utc)
 
