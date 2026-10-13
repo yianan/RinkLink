@@ -31,6 +31,11 @@ class Arena(Identity, Base):
     city: Mapped[str] = mapped_column(String(100), default="")
     state: Mapped[str] = mapped_column(String(2), default="")
     zip_code: Mapped[str] = mapped_column(String(10), default="")
+    phone: Mapped[str] = mapped_column(String(30), default="")
+    contact_email: Mapped[str] = mapped_column(String(200), default="")
+    website: Mapped[str | None] = mapped_column(String(500))
+    notes: Mapped[str | None] = mapped_column(Text)
+    logo_asset_id: Mapped[str | None] = mapped_column(ForeignKey("media_assets.id"))
     rinks = relationship("ArenaRink", back_populates="arena")
 
 
@@ -39,12 +44,14 @@ class ArenaRink(Identity, Base):
     __table_args__ = (UniqueConstraint("arena_id", "name"),)
     arena_id: Mapped[str] = mapped_column(ForeignKey("arenas.id"))
     name: Mapped[str] = mapped_column(String(200))
+    notes: Mapped[str | None] = mapped_column(Text)
     arena = relationship("Arena", back_populates="rinks")
 
 
 class Team(Identity, Base):
     __tablename__ = "teams"
     name: Mapped[str] = mapped_column(String(200))
+    logo_asset_id: Mapped[str | None] = mapped_column(ForeignKey("media_assets.id"))
     club_name: Mapped[str] = mapped_column(String(200), default="")
     age_group: Mapped[str] = mapped_column(String(20))
     level: Mapped[str] = mapped_column(String(50))

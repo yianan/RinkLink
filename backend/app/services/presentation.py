@@ -11,6 +11,10 @@ def enrich(row, db):
     home, away = db.get(Team, row.home_team_id), db.get(Team, row.away_team_id) if row.away_team_id else None
     arena, rink = db.get(Arena, row.arena_id), db.get(ArenaRink, row.arena_rink_id)
     data.update(home_team_name=home.name, away_team_name=away.name if away else getattr(row, "opponent_name", None),
+        home_team_logo_url=f'/api/team-logos/{home.logo_asset_id}' if home.logo_asset_id else None,
+        away_team_logo_url=f'/api/team-logos/{away.logo_asset_id}' if away and away.logo_asset_id else None,
+        arena_logo_url=f'/api/arena-logos/{arena.logo_asset_id}' if arena.logo_asset_id else None,
+        home_association_name=home.club_name, away_association_name=away.club_name if away else None,
         arena_name=arena.name, arena_rink_name=rink.name, location_label=f"{arena.name} > {rink.name}")
     return data
 

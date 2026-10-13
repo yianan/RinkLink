@@ -27,10 +27,15 @@ class VenueCreate(Strict):
     city: str = Field(default="", max_length=100)
     state: str = Field(default="", max_length=2)
     zip_code: str = Field(default="", max_length=10)
+    phone: str = Field(default="", max_length=30)
+    contact_email: str = Field(default="", max_length=200)
+    website: str | None = Field(default=None, max_length=500)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class RinkCreate(Strict):
     name: str = Field(min_length=1, max_length=200)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class GameInterval(Strict):

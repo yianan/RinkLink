@@ -1,4 +1,8 @@
 """Only team matching, scheduling, venue reference data, and team access."""
+import mimetypes
+from starlette.responses import Response
+from ..services.logo_assets import read_logo_upload, create_media_asset
+from ..models import MediaAsset
 import secrets
 from datetime import date, datetime, timedelta, timezone
 from typing import Annotated
@@ -88,6 +92,13 @@ def teams(db: DB, context: CTX, mine: bool = False):
     return [row_out(team) for team in query.limit(500).all()]
 
 
+@router.get('/access-targets/public')
+def public_access_targets(db: DB):
+    # Signup discovery exposes only the same team labels used by the matching directory.
+    return [{'id': team.id, 'name': team.name, 'age_group': team.age_group, 'level': team.level}
+        for team in db.query(Team).order_by(Team.name).limit(500).all()]
+
+
 @router.get('/access-targets')
 def access_targets(db: DB, context: CURRENT):
     return [{"id": team.id, "name": team.name, "age_group": team.age_group, "level": team.level}
@@ -130,9 +141,27 @@ def update_team(team_id: str, body: TeamCreate, db: DB, context: CTX):
     return row_out(team)
 
 
+@router.delete('/teams/{team_id}', status_code=204)
+def delete_empty_team(team_id: str, db: DB, context: CTX):
+    team = required(db, Team, team_id)
+    ensure_team_access(context, team, 'team.manage')
+    lock_teams(db, {team_id})
+    if (db.query(AvailabilityWindow).filter(AvailabilityWindow.team_id == team_id).first()
+        or db.query(Event).filter(or_(Event.home_team_id == team_id, Event.away_team_id == team_id)).first()
+        or db.query(Proposal).filter(or_(Proposal.home_team_id == team_id, Proposal.away_team_id == team_id)).first()
+        or db.query(Invite).filter(Invite.target_id == team_id).first()):
+        raise HTTPException(409, 'Teams with schedule or access history must be kept')
+    for membership in db.query(TeamMembership).filter(TeamMembership.team_id == team_id).all():
+        db.delete(membership)
+    audit(db, context, 'team.delete', team)
+    db.delete(team)
+    commit(db)
+
+
 @router.get('/arenas')
 def arenas(db: DB, context: CTX):
-    return [row_out(arena) for arena in db.query(Arena).order_by(Arena.name).limit(500).all()]
+    return [{**row_out(arena), 'rink_count': db.query(ArenaRink).filter(ArenaRink.arena_id == arena.id).count()}
+        for arena in db.query(Arena).order_by(Arena.name).limit(500).all()]
 
 
 @router.post('/arenas', status_code=201)
@@ -142,6 +171,48 @@ def add_arena(body: VenueCreate, db: DB, context: CTX):
     db.add(arena)
     commit(db)
     return row_out(arena)
+
+
+@router.get('/arenas/{arena_id}')
+def get_arena(arena_id: str, db: DB, context: CTX):
+    return row_out(required(db, Arena, arena_id))
+
+
+@router.put('/arenas/{arena_id}')
+def update_arena(arena_id: str, body: VenueCreate, db: DB, context: CTX):
+    ensure_capability(context, 'venue.manage')
+    arena = required(db, Arena, arena_id)
+    for key, value in body.model_dump().items():
+        setattr(arena, key, value)
+    audit(db, context, 'arena.update', arena)
+    commit(db)
+    return row_out(arena)
+
+
+@router.put('/arena-rinks/{rink_id}')
+def update_rink(rink_id: str, body: RinkCreate, db: DB, context: CTX):
+    ensure_capability(context, 'venue.manage')
+    rink = required(db, ArenaRink, rink_id)
+    for key, value in body.model_dump().items():
+        setattr(rink, key, value)
+    audit(db, context, 'rink.update', rink)
+    commit(db)
+    return row_out(rink)
+
+
+@router.delete('/arenas/{arena_id}', status_code=204)
+def delete_empty_arena(arena_id: str, db: DB, context: CTX):
+    ensure_capability(context, 'venue.manage')
+    arena = required(db, Arena, arena_id)
+    if (db.query(Event).filter(Event.arena_id == arena_id).first()
+        or db.query(Proposal).filter(Proposal.arena_id == arena_id).first()
+        or db.query(Team).filter(Team.home_arena_id == arena_id).first()):
+        raise HTTPException(409, 'A venue referenced by a team or schedule must be kept')
+    for rink in db.query(ArenaRink).filter(ArenaRink.arena_id == arena_id).all():
+        db.delete(rink)
+    audit(db, context, 'arena.delete', arena)
+    db.delete(arena)
+    commit(db)
 
 
 @router.get('/arenas/{arena_id}/rinks')
@@ -608,9 +679,27 @@ def create_invite(body: InviteCreate, request: Request, db: DB, context: CTX):
 
 
 @router.get('/invites')
-def invites(db: DB, context: CTX, team_id: str):
-    ensure_team_access(context, required(db, Team, team_id), 'team.manage_staff')
-    return [invitation_out(db, invite) for invite in db.query(Invite).filter(Invite.target_id == team_id).order_by(Invite.created_at.desc()).limit(100).all()]
+def invites(db: DB, context: CURRENT, team_id: str | None = None, direction: str = 'managed'):
+    query = db.query(Invite)
+    if direction == 'mine':
+        query = query.filter(Invite.email == context.user.email.lower())
+    elif context.user.status != 'active' or context.user.access_state != 'active' or context.user.auth_state != 'active':
+        raise HTTPException(403, 'Active team access is required')
+    elif team_id:
+        ensure_team_access(context, required(db, Team, team_id), 'team.manage_staff')
+        query = query.filter(Invite.target_id == team_id)
+    elif not context.user.is_platform_admin:
+        ids = [identity for identity, role in context.team_roles.items() if role == 'team_admin']
+        query = query.filter(Invite.target_id.in_(ids))
+    return [invitation_out(db, invite) for invite in query.order_by(Invite.created_at.desc()).limit(100).all()]
+
+
+@router.get('/invites/{token}')
+def invitation_details(token: str, db: DB):
+    invite = db.query(Invite).filter(Invite.token == token).first()
+    if not invite or invite.status != 'pending' or invite.expires_at.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc):
+        raise HTTPException(404, 'Invitation not found or expired')
+    return invitation_out(db, invite)
 
 
 @router.post('/invites/{token}/accept')
@@ -749,3 +838,67 @@ def contact(body: ContactMessageCreate, request: Request, db: DB):
         text_body=f'{body.name} <{body.email}>\n{body.message}') for (email,) in emails]
     if not any(delivered):
         raise HTTPException(503, "Contact delivery is not configured")
+
+
+async def set_profile_logo(db, context, row, file, kind):
+    filename, payload, _ = await read_logo_upload(file)
+    content_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+    asset = create_media_asset(db,kind=kind,filename=filename,payload=payload,content_type=content_type)
+    row.logo_asset_id = asset.id
+    audit(db,context,'logo.update',row)
+    commit(db)
+    return row_out(row)
+
+
+@router.post('/teams/{team_id}/logo')
+async def upload_team_logo(team_id: str, db: DB, context: CTX, file: UploadFile = File(...)):
+    team = required(db,Team,team_id)
+    ensure_team_access(context,team,'team.manage')
+    return await set_profile_logo(db,context,team,file,'team-logo')
+
+
+@router.post('/arenas/{arena_id}/logo')
+async def upload_arena_logo(arena_id: str, db: DB, context: CTX, file: UploadFile = File(...)):
+    ensure_capability(context,'venue.manage')
+    return await set_profile_logo(db,context,required(db,Arena,arena_id),file,'arena-logo')
+
+
+@router.delete('/teams/{team_id}/logo')
+def remove_team_logo(team_id: str, db: DB, context: CTX):
+    team = required(db,Team,team_id)
+    ensure_team_access(context,team,'team.manage')
+    team.logo_asset_id = None
+    audit(db,context,'logo.remove',team)
+    commit(db)
+    return row_out(team)
+
+
+@router.delete('/arenas/{arena_id}/logo')
+def remove_arena_logo(arena_id: str, db: DB, context: CTX):
+    ensure_capability(context,'venue.manage')
+    arena = required(db,Arena,arena_id)
+    arena.logo_asset_id = None
+    audit(db,context,'logo.remove',arena)
+    commit(db)
+    return row_out(arena)
+
+
+def profile_logo(db, asset_id, kind):
+    asset = required(db,MediaAsset,asset_id)
+    if asset.kind != kind:
+        raise HTTPException(404,'Logo not found')
+    return Response(asset.data, media_type=asset.content_type, headers={
+        'Cache-Control':'public, max-age=31536000, immutable', 'ETag':'"'+asset.sha256+'"',
+        'X-Content-Type-Options':'nosniff',
+        'Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    })
+
+
+@router.get('/team-logos/{asset_id}')
+def team_logo(asset_id: str, db: DB):
+    return profile_logo(db,asset_id,'team-logo')
+
+
+@router.get('/arena-logos/{asset_id}')
+def arena_logo(asset_id: str, db: DB):
+    return profile_logo(db,asset_id,'arena-logo')

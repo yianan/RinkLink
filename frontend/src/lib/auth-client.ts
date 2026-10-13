@@ -1,24 +1,24 @@
-import { createAuthClient } from "better-auth/react";
-import { twoFactorClient } from "better-auth/client/plugins";
+import { createAuthClient } from 'better-auth/react';
+import { twoFactorClient } from 'better-auth/client/plugins';
 
 const defaultAuthOrigin = import.meta.env.DEV
-  ? "http://localhost:3000"
+  ? 'http://localhost:3000'
   : window.location.origin;
-const authOrigin = (
-  import.meta.env.VITE_AUTH_BASE_URL || defaultAuthOrigin
-).replace(/\/+$/, "");
+const authOrigin = (import.meta.env.VITE_AUTH_BASE_URL || defaultAuthOrigin).replace(/\/+$/, '');
 export const authApiBaseUrl = `${authOrigin}/api/auth`;
 const tokenRefreshSkewMs = 30_000;
-const tokenStorageKey = "rinklink.apiToken";
+const tokenStorageKey = 'rinklink.apiToken';
 
 const authFlag = import.meta.env.VITE_AUTH_ENABLED;
 
-export const authEnabled = authFlag !== "false";
+export const authEnabled = authFlag === undefined
+  ? true
+  : authFlag === 'true';
 export const authClient = createAuthClient({
   baseURL: authOrigin,
   plugins: [
     twoFactorClient({
-      twoFactorPage: "/auth/two-factor",
+      twoFactorPage: '/auth/two-factor',
     }),
   ],
   sessionOptions: {
@@ -32,15 +32,12 @@ let tokenRequest: Promise<string | null> | null = null;
 
 function parseJwtExpiration(token: string): number {
   try {
-    const [, payload] = token.split(".");
+    const [, payload] = token.split('.');
     if (!payload) return 0;
-    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const paddedPayload = normalizedPayload.padEnd(
-      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
-      "=",
-    );
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedPayload = normalizedPayload.padEnd(normalizedPayload.length + ((4 - normalizedPayload.length % 4) % 4), '=');
     const decoded = JSON.parse(window.atob(paddedPayload));
-    return typeof decoded.exp === "number" ? decoded.exp * 1000 : 0;
+    return typeof decoded.exp === 'number' ? decoded.exp * 1000 : 0;
   } catch {
     return 0;
   }
@@ -50,13 +47,10 @@ function cacheApiAccessToken(token: string) {
   cachedApiToken = token;
   cachedApiTokenExpiresAt = parseJwtExpiration(token);
   try {
-    window.sessionStorage.setItem(
-      tokenStorageKey,
-      JSON.stringify({
-        token,
-        expiresAt: cachedApiTokenExpiresAt,
-      }),
-    );
+    window.sessionStorage.setItem(tokenStorageKey, JSON.stringify({
+      token,
+      expiresAt: cachedApiTokenExpiresAt,
+    }));
   } catch {
     // Session storage is an optimization only; the memory cache still works.
   }
@@ -69,15 +63,8 @@ function loadStoredApiAccessToken(now: number): string | null {
   try {
     const stored = window.sessionStorage.getItem(tokenStorageKey);
     if (!stored) return null;
-    const payload = JSON.parse(stored) as {
-      token?: string;
-      expiresAt?: number;
-    };
-    if (
-      !payload.token ||
-      !payload.expiresAt ||
-      payload.expiresAt <= now + tokenRefreshSkewMs
-    ) {
+    const payload = JSON.parse(stored) as { token?: string; expiresAt?: number };
+    if (!payload.token || !payload.expiresAt || payload.expiresAt <= now + tokenRefreshSkewMs) {
       window.sessionStorage.removeItem(tokenStorageKey);
       return null;
     }
@@ -99,9 +86,7 @@ export function clearApiAccessToken() {
   }
 }
 
-export async function getApiAccessToken(
-  forceRefresh = false,
-): Promise<string | null> {
+export async function getApiAccessToken(forceRefresh = false): Promise<string | null> {
   if (!authEnabled) {
     return null;
   }
@@ -120,10 +105,10 @@ export async function getApiAccessToken(
 
   tokenRequest = (async () => {
     const response = await fetch(`${authApiBaseUrl}/token`, {
-      method: "GET",
-      credentials: "include",
+      method: 'GET',
+      credentials: 'include',
       headers: {
-        Accept: "application/json",
+        Accept: 'application/json',
       },
     });
 
@@ -137,7 +122,7 @@ export async function getApiAccessToken(
       throw new Error(`${response.status}: ${text}`);
     }
 
-    const payload = (await response.json()) as { token?: string };
+    const payload = await response.json() as { token?: string };
     if (!payload.token) {
       clearApiAccessToken();
       return null;

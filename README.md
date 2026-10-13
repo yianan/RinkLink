@@ -12,7 +12,7 @@ This branch (`codex/team-matching-scheduling`) starts from the full application'
 - Platform administrators, team administrators and schedulers; team invitations, requests and revocation.
 - Existing sign-in, email verification, password recovery, MFA/session settings and account closure.
 
-There are no player/parent accounts, rosters, RSVP, scoresheets, scoring, standings, competition management, arena operators, ice inventory/pricing, booking requests or locker-room workflows. Venues are reference addresses and rink names. RinkLink **does not reserve ice**.
+There are no player/parent accounts, rosters, RSVP, scoresheets, scoring, standings, competition management, arena operators, ice inventory/pricing, booking requests or locker-room workflows. Venues retain their original profiles, contact fields, logos and rink names. RinkLink **does not reserve ice**.
 
 ## Database isolation
 
@@ -76,8 +76,15 @@ alembic check
 cd ../frontend
 npm run lint
 npm run build
+node --test tests/compatibility.test.cjs
 ```
 
 The domain suite is verified on SQLite and PostgreSQL and exercises matching, proposals, shared schedules, rescheduling/cancellation, conflicts, permissions, invitations, access approval, CSV import and database-isolation checks. Original authentication/configuration tests remain. Tests for removed domains were removed with those domains.
 
 The included postcode reference covers the same 12 Chicago-area ZIP codes as the full application. Distances outside that dataset are shown as unavailable; broader geocoding is not implemented.
+
+## Original visual design
+
+The retained screens use the original frontend components, shared stylesheet, fixed header/sidebar, selectors, cards and dialogs from `a0b3da8`. The former replacement minimal layouts have been removed. Excluded routes and controls are omitted; simple manual time entry replaces ice inventory selection within the existing forms. `frontend/src/api/compatibility.ts` preserves those components' data contracts over the minimal API. Team and venue logos are database-backed, and venue contact fields remain available.
+
+Visual verification used native sign-in with independent PostgreSQL fixtures and the original frontend at equal viewport dimensions. Real scheduling, practice editing, proposal acceptance/rescheduling, team profile updates and rink updates were exercised through the browser. Shared styling, Availability and Settings are unchanged from the original source.

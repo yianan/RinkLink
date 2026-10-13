@@ -215,3 +215,31 @@ def test_development_admin_initialization_is_concurrent_safe(tmp_path, monkeypat
         ids=list(executor.map(resolve,range(16)))
     assert len(set(ids))==1
     with factory() as session:assert session.query(AppUser).count()==1
+
+
+def test_original_profile_controls_preserve_fields_and_logo_authorization(scenario):
+    s=scenario;c=s['client'];team_id=s['teams'][0].id
+    svg=b'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="blue"/></svg>'
+    uploaded=c.post(f'/api/teams/{team_id}/logo',files={'file':('test.svg',svg,'text/html')})
+    assert uploaded.status_code==200,uploaded.text
+    asset_id=uploaded.json()['logo_asset_id']
+    image=c.get(f'/api/team-logos/{asset_id}')
+    assert image.content==svg and image.headers['content-type'].startswith('image/svg+xml')
+    assert image.headers['x-content-type-options']=='nosniff' and 'sandbox' in image.headers['content-security-policy']
+    assert c.get(f'/api/arena-logos/{asset_id}').status_code==404
+    s['state']['user']=s['users'][1]
+    assert c.post(f'/api/teams/{team_id}/logo',files={'file':('test.svg',svg)}).status_code==403
+    assert c.delete(f'/api/teams/{team_id}/logo').status_code==403
+    s['state']['user']=s['users'][0]
+    assert c.post(f'/api/teams/{team_id}/logo',files={'file':('bad.html',svg)}).status_code==400
+    assert c.delete(f'/api/teams/{team_id}/logo').json()['logo_asset_id'] is None
+    assert c.put(f'/api/arenas/{s["arena"].id}',json={'name':'Updated'}).status_code==403
+    s['state']['user']=s['admin']
+    venue={'name':'Updated','phone':'555-0100','contact_email':'rink@example.test','website':'https://example.test','notes':'Reference only'}
+    updated=c.put(f'/api/arenas/{s["arena"].id}',json=venue)
+    assert updated.status_code==200,updated.text
+    assert all(updated.json()[key]==value for key,value in venue.items())
+    assert c.put(f'/api/arena-rinks/{s["rink"].id}',json={'name':'Main rink','notes':'Entrance A'}).status_code==200
+    assert c.delete(f'/api/teams/{team_id}').status_code==409
+    assert c.delete(f'/api/arenas/{s["arena"].id}').status_code==409
+    assert c.get('/api/teams').status_code==200
