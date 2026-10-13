@@ -41,6 +41,9 @@ import {
   type Values,
 } from "./forms";
 import { today, timeLabel } from "./time";
+import { authViewClassNames } from "./theme";
+import { AuthShell } from "./AuthShell";
+import { accentLinkClass } from "../lib/uiClasses";
 import type {
   Event,
   AvailabilityWindow,
@@ -85,9 +88,9 @@ function ResourceState({
   return error ? (
     <Alert variant="error">{error}</Alert>
   ) : loading ? (
-    <p className="p-4 text-slate-500">Loading…</p>
+    <p className="p-4 text-slate-500 dark:text-slate-400">Loading…</p>
   ) : empty ? (
-    <p className="p-4 text-slate-500">No records to show.</p>
+    <p className="p-4 text-slate-500 dark:text-slate-400">No records to show.</p>
   ) : null;
 }
 function NeedTeam() {
@@ -259,7 +262,7 @@ export function SchedulePage() {
                   ? `${event.home_team_name} practice`
                   : `${event.home_team_name} vs ${event.away_team_name}`}
               </h2>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 {event.date} · {timeLabel(event.start_time, event.end_time)} ·{" "}
                 {event.location_label}
               </p>
@@ -272,7 +275,7 @@ export function SchedulePage() {
               {event.proposal_id ? (
                 <Link
                   to="/proposals"
-                  className="text-sm font-medium text-violet-700 underline"
+                  className={`${accentLinkClass} text-sm font-medium underline`}
                 >
                   Reschedule with opponent
                 </Link>
@@ -351,7 +354,7 @@ export function SchedulePage() {
             values={values}
             onChange={setValues}
           />
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Enter ice already arranged externally. To agree a game with another
             RinkLink team, use Proposals.
           </p>
@@ -435,7 +438,7 @@ export function AvailabilityPage() {
             <div className="font-semibold">
               {window.date} · {timeLabel(window.start_time, window.end_time)}
             </div>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               {window.availability_type} ·{" "}
               {window.blocked ? "blocked" : window.status}
             </p>
@@ -487,7 +490,7 @@ export function AvailabilityPage() {
       ))}
       <Card className="space-y-3 p-5">
         <h2 className="font-semibold">Import availability CSV</h2>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Columns: Date, Start Time, End Time, Home/Away, Notes. Review the
           preview before importing.
         </p>
@@ -570,7 +573,7 @@ export function AvailabilityPage() {
             onChange={setValues}
             timesRequired={false}
           />
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Leave both times empty for an all-day window or block.
           </p>
           <Field label="Home or away">
@@ -740,7 +743,7 @@ export function SearchPage() {
         >
           <div>
             <h2 className="font-semibold">{match.team_name}</h2>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               {match.age_group} {match.level} · {match.date} · Game{" "}
               {timeLabel(match.home_start_time, match.home_end_time)}
             </p>
@@ -753,7 +756,7 @@ export function SearchPage() {
             </p>
           </div>
           {match.has_existing_proposal ? (
-            <Link className="text-violet-700 underline" to="/proposals">
+            <Link className={`${accentLinkClass} underline`} to="/proposals">
               View existing proposal
             </Link>
           ) : (
@@ -797,7 +800,7 @@ export function SearchPage() {
             values={values}
             onChange={setValues}
           />
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             The home team arranges ice externally. RinkLink records the
             agreement; it does not reserve ice.
           </p>
@@ -856,7 +859,7 @@ export function ProposalsPage() {
               <h2 className="font-semibold">
                 {row.home_team_name} vs {row.away_team_name}
               </h2>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 {row.proposed_date} ·{" "}
                 {timeLabel(row.proposed_start_time, row.proposed_end_time)} ·{" "}
                 {row.location_label}
@@ -978,7 +981,7 @@ export function ProposalsPage() {
             values={values}
             onChange={setValues}
           />
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             The agreed game stays in place until the opposing team accepts.
           </p>
           {action.error && <Alert variant="error">{action.error}</Alert>}
@@ -1161,7 +1164,7 @@ export function TeamsPage() {
           >
             <div>
               <h2 className="font-semibold">{team.name}</h2>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 {team.club_name} · {team.age_group} {team.level} · Ranking{" "}
                 {team.myhockey_ranking ?? "not entered"}
               </p>
@@ -1629,25 +1632,17 @@ export function AuthPage() {
   if (pathname === "callback") return <Navigate to={target} replace />;
   return (
     <BetterAuthUiProvider>
-      <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-5 p-6">
-        <div className="text-center">
-          <img
-            src="/icons/rinklink-icon-192.png"
-            alt="RinkLink"
-            className="mx-auto mb-3 h-12 w-12 rounded-xl"
-          />
-          <h1 className="text-2xl font-bold">RinkLink</h1>
-          <p className="text-sm text-slate-500">Team matching and scheduling</p>
-        </div>
+      <AuthShell>
         <AuthView
           pathname={pathname}
           redirectTo={target}
           callbackURL={target}
+          classNames={authViewClassNames}
         />
-        <Link to="/contact" className="text-center text-sm underline">
+        <Link to="/contact" className="rinklink-auth-footer-link mt-4 block text-center text-sm">
           Contact an administrator
         </Link>
-      </div>
+      </AuthShell>
     </BetterAuthUiProvider>
   );
 }
@@ -1785,16 +1780,18 @@ function VerifyEmailPage() {
     };
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <Card className="mx-auto my-12 max-w-lg space-y-4 p-6">
+    <AuthShell>
+    <Card className="space-y-4 p-6">
       <h1 className="text-xl font-bold">Verify your email</h1>
       {error ? (
         <Alert variant="error">{error}</Alert>
       ) : (
         <p>Verifying your email…</p>
       )}
-      <Link to="/auth/sign-in" className="underline">
+      <Link to="/auth/sign-in" className={accentLinkClass}>
         Return to sign-in
       </Link>
     </Card>
+    </AuthShell>
   );
 }

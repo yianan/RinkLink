@@ -25,6 +25,8 @@ import { Select } from "./components/ui/Select";
 import { Alert } from "./components/ui/Alert";
 import { Button } from "./components/ui/Button";
 import ThemeToggle from "./components/ThemeToggle";
+import { navigationClass } from "./minimal/theme";
+import { toolbarSelectClass } from "./lib/uiClasses";
 import SettingsPage from "./pages/SettingsPage";
 import { WorkspaceContext, useResource, useWorkspace } from "./minimal/context";
 import {
@@ -173,7 +175,7 @@ function Shell() {
   return (
     <WorkspaceContext.Provider value={workspace}>
       <div className="min-h-screen">
-        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+        <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-gradient-to-r from-white via-cyan-50 to-violet-50 px-4 py-3 dark:border-white/10 dark:from-slate-950 dark:via-slate-950 dark:to-slate-950">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3">
             <Button
               variant="ghost"
@@ -190,7 +192,7 @@ function Shell() {
             />
             <div className="mr-auto">
               <div className="font-display font-bold">RinkLink</div>
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-slate-600 dark:text-white/70">
                 Team matching and scheduling
               </div>
             </div>
@@ -198,7 +200,7 @@ function Shell() {
               aria-label="Active team"
               value={team?.id || ""}
               onChange={(event) => setTeamId(event.target.value)}
-              className="!w-auto max-w-64"
+              className={`${toolbarSelectClass} !w-auto max-w-64`}
             >
               {!mine.data?.length && <option value="">No teams yet</option>}
               {mine.data?.map((item) => (
@@ -211,7 +213,7 @@ function Shell() {
               aria-label="Active season"
               value={season?.id || ""}
               onChange={(event) => setSeasonId(event.target.value)}
-              className="!w-auto"
+              className={`${toolbarSelectClass} !w-auto`}
             >
               {seasons.data?.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -233,7 +235,7 @@ function Shell() {
         </header>
         <div className="mx-auto flex max-w-7xl">
           <aside
-            className={`${menu ? "block" : "hidden"} shrink-0 border-r border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950 lg:block lg:w-56 ${menu ? "fixed inset-y-20 left-0 z-30 w-64 shadow-xl" : ""}`}
+            className={`${menu ? "block" : "hidden"} shrink-0 border-r border-slate-200/70 bg-white/80 p-3 backdrop-blur-sm dark:border-slate-800/70 dark:bg-slate-950/90 lg:block lg:w-56 ${menu ? "fixed inset-y-20 left-0 z-30 w-64 shadow-xl" : ""}`}
           >
             <nav className="space-y-1">
               {nav.map((item) => (
@@ -241,15 +243,21 @@ function Shell() {
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-xl p-3 text-sm font-medium ${isActive ? "bg-violet-50 text-violet-800 dark:bg-slate-800 dark:text-violet-200" : "text-slate-600 dark:text-slate-300"}`
+                    navigationClass(isActive)
                   }
                 >
-                  <item.icon size={18} />
-                  {item.label}
+                  {({ isActive }) => (
+                    <>
+                      <item.icon size={18} className={isActive
+                        ? "text-[color:var(--app-accent-link)]"
+                        : "text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300"} />
+                      {item.label}
+                    </>
+                  )}
                 </NavLink>
               ))}
               {allowed("venue.manage") && (
-                <NavLink className="block rounded-xl p-3 text-sm" to="/venues">
+                <NavLink className={({ isActive }) => navigationClass(isActive)} to="/venues">
                   Venue directory
                 </NavLink>
               )}
