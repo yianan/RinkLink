@@ -67,7 +67,7 @@ def seed(db, *, today=None):
                     identities[source['id']] = existing.id
                     continue
                 if model is Proposal and values['active_pair_key']:
-                    values['active_pair_key'] = ':'.join(sorted([values['home_availability_window_id'], values['away_availability_window_id']]))
+                    values['active_pair_key'] = '|'.join(sorted([values['home_availability_window_id'], values['away_availability_window_id']]))
                 db.add(model(**_decode(model, values)))
                 identities[source['id']] = values['id']
                 added[table] += 1

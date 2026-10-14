@@ -27,3 +27,12 @@ test('team onboarding retains the original form details in strict minimal API fi
   const [,request]=prepareRequest('/access-requests',{method:'POST',body:JSON.stringify({target_type:'team_setup',target_id:'new-team',details:{team_name:'New Team',age_group:'14U',level:'AA',home_zip_code:'60025',association_id:'removed'}})});
   assert.deepEqual(JSON.parse(request.body).details,{name:'New Team',age_group:'14U',level:'AA',home_zip_code:'60025',club_name:''});
 });
+test('original match cards use the actual seeded team logos and clubs',()=>{
+  normalizeResponse('/teams',[{id:'selected',name:'Selected',club_name:'Home club',logo_asset_id:'home-logo'}]);
+  const [match]=normalizeResponse('/search/opponents',[{id:'opponent',team_id:'opponent',name:'Opponent',team_name:'Opponent',club_name:'Away club',logo_asset_id:'away-logo',home_team_id:'selected',away_team_id:'opponent'}]);
+  assert.equal(match.team_logo_url,'/api/team-logos/away-logo');
+  assert.equal(match.home_team_logo_url,'/api/team-logos/home-logo');
+  assert.equal(match.away_team_logo_url,'/api/team-logos/away-logo');
+  assert.equal(match.home_association_name,'Home club');
+  assert.equal(match.away_association_name,'Away club');
+});

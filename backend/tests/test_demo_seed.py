@@ -12,6 +12,9 @@ def test_original_demo_seed_is_additive_idempotent_and_has_usable_matches(db):
     assert added['teams'] == 18 and added['arenas'] == 9 and added['arena_rinks'] == 18
     assert added['events'] == 68 and added['proposals'] == 14
     assert db.query(MediaAsset).count() == 27
+    from app.routers.minimal import pair_key
+    for proposal in db.query(Proposal).filter(Proposal.status == 'proposed'):
+        assert proposal.active_pair_key == pair_key(proposal.home_availability_window_id, proposal.away_availability_window_id)
     assert db.get(AppUser, owner.id).email == 'owner@example.test'
     assert db.get(Team, custom.id).club_name == 'User club'
     assert db.query(Team).count() == 19

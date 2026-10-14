@@ -48,13 +48,18 @@ function normalizeItem(path: string, row: Row): Row {
   if (path === '/me') return normalizeMe(row);
   if (path.startsWith('/teams') && !/\/(events|proposals|availability|calendar)/.test(path)) return normalizeTeam(row);
   if (path.startsWith('/arenas') && !path.includes('/rinks')) return { ...row, logo_url: row.logo_asset_id ? `/api/arena-logos/${row.logo_asset_id}` : null };
-  if (path.includes('/search/')) return {
-    team_logo_url: null, home_team_logo_url: null, away_team_logo_url: null,
+  if (path.includes('/search/')) {
+    normalizeTeam(row);
+    const home = teamCache.get(String(row.home_team_id));
+    const away = teamCache.get(String(row.away_team_id));
+    return {
+    team_logo_url: row.logo_asset_id ? `/api/team-logos/${row.logo_asset_id}` : null, home_team_logo_url: home?.logo_asset_id ? `/api/team-logos/${home.logo_asset_id}` : null, away_team_logo_url: away?.logo_asset_id ? `/api/team-logos/${away.logo_asset_id}` : null,
     primary_competition_short_name: null, primary_division_name: null,
     home_primary_competition_short_name: null, home_primary_division_name: null,
     away_primary_competition_short_name: null, away_primary_division_name: null,
-    ...row, home_team_name: teamCache.get(String(row.home_team_id))?.name, away_team_name: teamCache.get(String(row.away_team_id))?.name, away_start_time: row.start_time, away_end_time: row.end_time, association_name: row.club_name || '', home_association_name: row.home_club_name || '', away_association_name: row.away_club_name || '',
-  };
+    ...row, home_team_name: teamCache.get(String(row.home_team_id))?.name, away_team_name: teamCache.get(String(row.away_team_id))?.name, away_start_time: row.start_time, away_end_time: row.end_time, association_name: row.club_name || '', home_association_name: home?.club_name || '', away_association_name: away?.club_name || '',
+    };
+  }
   if (path.includes('/events') || path.includes('/proposals')) return {
     home_team_logo_url: null, away_team_logo_url: null,
     home_team_association: null, away_team_association: null, arena_logo_url: null,
