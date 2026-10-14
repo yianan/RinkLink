@@ -54,7 +54,7 @@ docker compose -p rinklink-minimal up
 
 Ports: frontend `5183`, API `8100`, auth `3100`, Postgres `55432`, Mailpit `8125` (SMTP `1125`). Containers and volumes are separate from the full app.
 
-`python -m app.seed.demo` adds two teams, compatible availability and a practice only when the team table is empty. It never resets existing users or schedules. For real-auth development, create the initial platform administrator with the existing auth-service bootstrap mechanism (`RINKLINK_BOOTSTRAP_ADMIN_EMAIL`, `RINKLINK_BOOTSTRAP_ADMIN_PASSWORD`, `RINKLINK_BOOTSTRAP_ADMIN_NAME`).
+`python -m app.seed.demo` adds the original full-app demo universe for the retained domains: 18 teams, 9 arenas, 18 rinks, 27 profile logos, 84 seasonal availability windows, 68 games/practices and 14 proposals across two seasons. It also adds 18 upcoming full-game home/away windows for immediate matching. The seed is additive and idempotent: existing accounts, memberships, teams, venues and user-edited schedules are preserved. Fixture provenance is recorded in `backend/app/seed/fixtures/original_demo.json`; excluded domains and accounts are not imported. For real-auth development, create the initial platform administrator with the existing auth-service bootstrap mechanism (`RINKLINK_BOOTSTRAP_ADMIN_EMAIL`, `RINKLINK_BOOTSTRAP_ADMIN_PASSWORD`, `RINKLINK_BOOTSTRAP_ADMIN_NAME`).
 
 ## Behaviour
 
