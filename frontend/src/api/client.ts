@@ -321,9 +321,9 @@ export const api = {
       body: JSON.stringify({ season_id: seasonId, entries, replace_existing: replaceExisting }),
     }),
 
-  getAvailability: (teamId: string, params?: Record<string, string>) => {
+  getAvailability: (teamId: string, params?: Record<string, string>, options?: ApiOptions) => {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
-    return request<import('../types').AvailabilityWindow[]>(`/teams/${teamId}/availability${qs}`);
+    return request<import('../types').AvailabilityWindow[]>(`/teams/${teamId}/availability${qs}`, options);
   },
   createAvailability: (teamId: string, data: Partial<import('../types').AvailabilityWindow>) =>
     request<import('../types').AvailabilityWindow>(`/teams/${teamId}/availability`, { method: 'POST', body: JSON.stringify(data) }),

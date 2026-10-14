@@ -2,6 +2,7 @@
 
 This branch (`codex/team-matching-scheduling`) starts from the full application's deployed matching fix, `a0b3da8`. It provides a manager-facing version of RinkLink:
 
+- Original dashboard showing upcoming games/practices, open availability and incoming proposals.
 - Team profiles, manager contacts, age/level, optional ranking and home venue.
 - Home/away availability, blocked periods and reviewed CSV import.
 - Opponent search and automatic matches using full game duration, age/level, season and distance.

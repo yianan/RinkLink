@@ -46,6 +46,7 @@ import type { MeResponse } from './types';
 
 const appIconSrc = '/icons/rinklink-icon-192.png';
 
+const HomePage = lazy(() => import('./pages/HomePage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const PendingApprovalPage = lazy(() => import('./pages/PendingApprovalPage'));
 const DisabledAccessPage = lazy(() => import('./pages/DisabledAccessPage'));
@@ -141,7 +142,7 @@ function DisabledAuthRedirectRoute() {
   return <Navigate to={consumeAuthReturnTo() || '/disabled'} replace />;
 }
 
-const MINIMAL_PATHS = new Set(['/availability', '/schedule', '/search', '/proposals', '/teams', '/access', '/arenas', '/settings', '/add-access']);
+const MINIMAL_PATHS = new Set(['/', '/availability', '/schedule', '/search', '/proposals', '/teams', '/access', '/arenas', '/settings', '/add-access']);
 
 const NAV_SECTIONS = [
   {
@@ -670,7 +671,7 @@ function AppContent() {
                     <Route path="/login" element={<Navigate to={authEnabled ? '/auth/sign-in' : '/'} replace />} />
                     <Route path="/invite/:token" element={<InviteAcceptancePage />} />
                     <Route path="/contact" element={<ContactPage />} />
-                    <Route path="/" element={<Navigate to="/schedule" replace />} />
+                    <Route path="/" element={<HomePage />} />
                     <Route path="/add-access" element={<AddAccessPage />} />
                     <Route path="/access" element={<AccessPage />} />
                     <Route path="/teams" element={<TeamListPage />} />
